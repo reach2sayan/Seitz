@@ -115,12 +115,9 @@ fabric.properties
 # Virtualenv
 # http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
 .Python
-[Bb]in
-[Ii]nclude
-[Ll]ib
-[Ll]ib64
-[Ll]ocal
-[Ss]cripts
+# NOTE: the stock VirtualEnv template ignores [Bb]in/[Ii]nclude/[Ll]ib/etc,
+# which also swallow this C++ project's source dirs (include/, etc). Dropped
+# those broad patterns; only the genuinely venv-specific entries remain.
 pyvenv.cfg
 .venv
 pip-selfcheck.json
