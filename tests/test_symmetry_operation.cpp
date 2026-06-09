@@ -1,0 +1,49 @@
+#include <spglib/core/symmetry_operation.hpp>
+
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+using namespace spglib;
+using Catch::Approx;
+
+namespace {
+SymmetryOperation rot_z_90() {
+  Matrix3i r;
+  r << 0, -1, 0, 1, 0, 0, 0, 0, 1;
+  return {r, Vector3d(0.0, 0.0, 0.0)};
+}
+} // namespace
+
+TEST_CASE("apply computes rot . x + trans", "[symop]") {
+  SymmetryOperation op{Matrix3i::Identity(), Vector3d(0.5, 0.0, 0.0)};
+  CHECK(op.apply(Vector3d(0.1, 0.2, 0.3)).isApprox(Vector3d(0.6, 0.2, 0.3)));
+}
+
+TEST_CASE("composition matches sequential application", "[symop]") {
+  SymmetryOperation a = rot_z_90();
+  a.translation = Vector3d(0.5, 0.0, 0.0);
+  SymmetryOperation b{Matrix3i::Identity(), Vector3d(0.0, 0.25, 0.0)};
+  SymmetryOperation ab = a * b;
+  Vector3d x(0.1, 0.2, 0.3);
+  CHECK(ab.apply(x).isApprox(a.apply(b.apply(x))));
+}
+
+TEST_CASE("inverse undoes the operation", "[symop]") {
+  SymmetryOperation a = rot_z_90();
+  a.translation = Vector3d(0.5, 0.1, 0.0);
+  auto inv = a.inverse();
+  REQUIRE(inv.has_value());
+  SymmetryOperation id = a * *inv;
+  CHECK(id.rotation == Matrix3i::Identity());
+  CHECK(id.translation.cwiseAbs().maxCoeff() == Approx(0.0).margin(1e-12));
+}
+
+TEST_CASE("same_operation respects symprec on translations", "[symop]") {
+  SymmetryOperation a = rot_z_90();
+  a.translation = Vector3d(0.5, 0.0, 0.0);
+  SymmetryOperation b = a;
+  b.translation += Vector3d(1.0, -2.0, 3.0); // differ by a lattice vector
+  CHECK(same_operation(a, b, 1e-5));
+  b.translation = a.translation + Vector3d(0.01, 0.0, 0.0);
+  CHECK_FALSE(same_operation(a, b, 1e-5));
+}

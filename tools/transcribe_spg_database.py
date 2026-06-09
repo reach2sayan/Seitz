@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""Transcribe spglib's spg_database.c data tables into a constexpr C++ header.
+
+The space-group database is pure generated data (530 Hall entries with encoded
+symmetry operations). Rather than hand-type ~10k lines, we mechanically convert
+the three C arrays
+  - spacegroup_types[531]
+  - symmetry_operations[]            (encoded ints; layer ops live here too)
+  - symmetry_operation_index[531][2]
+into `inline constexpr std::array`s. The decoder and accessors are hand-written
+in src/data/spg_database.cpp.
+
+Usage: transcribe_spg_database.py <spg_database.c> <out.hpp>
+"""
+import re
+import sys
+
+CENTERING = {
+    "CENTERING_ERROR": 0, "PRIMITIVE": 1, "BODY": 2, "FACE": 3,
+    "A_FACE": 4, "B_FACE": 5, "C_FACE": 6, "BASE": 7, "R_CENTER": 8,
+}
+
+
+def extract_array_body(text, decl):
+    """Return the text between the outermost braces of `decl ... = { ... }`."""
+    start = text.index(decl)
+    brace = text.index("{", start)
+    depth = 0
+    i = brace
+    in_str = False
+    while i < len(text):
+        c = text[i]
+        if in_str:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[brace + 1:i]
+        i += 1
+    raise ValueError("unbalanced braces for " + decl)
+
+
+def strip_comments(s):
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
+    s = re.sub(r"//[^\n]*", "", s)
+    return s
+
+
+def split_top_level(s):
+    """Split on top-level commas, respecting strings and nested braces."""
+    parts, depth, in_str, cur = [], 0, False, []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if in_str:
+            cur.append(c)
+            if c == "\\":
+                cur.append(s[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            cur.append(c)
+        elif c in "{[":
+            depth += 1
+            cur.append(c)
+        elif c in "}]":
+            depth -= 1
+            cur.append(c)
+        elif c == "," and depth == 0:
+            parts.append("".join(cur))
+            cur = []
+        else:
+            cur.append(c)
+        i += 1
+    if "".join(cur).strip():
+        parts.append("".join(cur))
+    return parts
+
+
+def parse_string_literal(tok):
+    tok = tok.strip()
+    return tok[tok.index('"') + 1:tok.rindex('"')]
+
+
+def cpp_string(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def parse_entries(body):
+    """Yield each top-level {...} group's inner text."""
+    depth, in_str, cur, started = 0, False, [], False
+    i = 0
+    while i < len(body):
+        c = body[i]
+        if in_str:
+            cur.append(c)
+            if c == "\\":
+                cur.append(body[i + 1]); i += 2; continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True; cur.append(c)
+        elif c == "{":
+            depth += 1
+            if depth == 1:
+                started = True; cur = []
+            else:
+                cur.append(c)
+        elif c == "}":
+            depth -= 1
+            if depth == 0 and started:
+                yield "".join(cur); started = False
+            else:
+                cur.append(c)
+        elif started:
+            cur.append(c)
+        i += 1
+
+
+def main():
+    src, out = sys.argv[1], sys.argv[2]
+    text = open(src).read()
+
+    # spacegroup_types: 531 entries (0..530).
+    sg_body = extract_array_body(text, "spacegroup_types[]")
+    sg_entries = list(parse_entries(strip_comments(sg_body)))[:531]
+    assert len(sg_entries) == 531, len(sg_entries)
+    sg_rows = []
+    for e in sg_entries:
+        f = split_top_level(e)
+        assert len(f) == 9, (len(f), e)
+        number = int(f[0])
+        strs = [parse_string_literal(f[k]) for k in range(1, 7)]
+        strs = [s.rstrip(" ") for s in strs]
+        strs[1] = strs[1].replace("=", '"')  # hall_symbol: '=' -> '"'
+        centering = CENTERING[f[7].strip()]
+        pg = int(f[8])
+        sg_rows.append((number, strs, centering, pg))
+
+    # symmetry_operations: flat list of encoded ints (entire array).
+    ops_body = strip_comments(extract_array_body(text, "symmetry_operations[]"))
+    ops = [int(x) for x in ops_body.replace("\n", " ").split(",") if x.strip()]
+
+    # symmetry_operation_index: 531 {count, start} pairs.
+    idx_body = extract_array_body(text, "symmetry_operation_index[][2]")
+    idx_entries = list(parse_entries(strip_comments(idx_body)))[:531]
+    idx = []
+    for e in idx_entries:
+        a, b = [int(x) for x in e.split(",")]
+        idx.append((a, b))
+
+    with open(out, "w") as fh:
+        w = fh.write
+        w("#pragma once\n\n")
+        w("// GENERATED by tools/transcribe_spg_database.py from spglib v2.7.0\n")
+        w("// spg_database.c. Do not edit by hand.\n\n")
+        w("#include <array>\n\n")
+        w("namespace spglib::data {\n\n")
+        w("struct SpacegroupTypeRaw {\n")
+        w("  int number;\n")
+        w("  char const *schoenflies;\n")
+        w("  char const *hall_symbol;\n")
+        w("  char const *international;\n")
+        w("  char const *international_full;\n")
+        w("  char const *international_short;\n")
+        w("  char const *choice;\n")
+        w("  int centering;\n")
+        w("  int pointgroup_number;\n")
+        w("};\n\n")
+
+        w("inline constexpr std::array<SpacegroupTypeRaw, %d> kSpacegroupTypes = {{\n" % len(sg_rows))
+        for (number, strs, centering, pg) in sg_rows:
+            lits = ", ".join(cpp_string(s) for s in strs)
+            w("    {%d, %s, %d, %d},\n" % (number, lits, centering, pg))
+        w("}};\n\n")
+
+        w("inline constexpr std::array<int, %d> kSymmetryOperations = {{\n" % len(ops))
+        for i in range(0, len(ops), 12):
+            w("    " + ", ".join(str(x) for x in ops[i:i + 12]) + ",\n")
+        w("}};\n\n")
+
+        w("inline constexpr std::array<std::array<int, 2>, %d> kSymmetryOperationIndex = {{\n" % len(idx))
+        for (a, b) in idx:
+            w("    {{%d, %d}},\n" % (a, b))
+        w("}};\n\n")
+        w("} // namespace spglib::data\n")
+
+    print("spacegroup_types: %d, symmetry_operations: %d, index: %d" %
+          (len(sg_rows), len(ops), len(idx)))
+
+
+if __name__ == "__main__":
+    main()

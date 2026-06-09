@@ -1,0 +1,85 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Debug",
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SPGLIB_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "binaryDir": "${sourceDir}/cmake-build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SPGLIB_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "mkl",
+      "displayName": "Release + MKL",
+      "inherits": "release",
+      "cacheVariables": {
+        "SPGLIB_USE_MKL": "ON"
+      }
+    },
+    {
+      "name": "oracle",
+      "displayName": "Debug + reference-spglib oracle",
+      "inherits": "default",
+      "cacheVariables": {
+        "SPGLIB_BUILD_ORACLE_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "mkl",
+      "configurePreset": "mkl"
+    },
+    {
+      "name": "oracle",
+      "configurePreset": "oracle"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "oracle",
+      "configurePreset": "oracle",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
