@@ -159,9 +159,22 @@ bool step8(State &p) {
 } // namespace
 
 Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
-  using StepFn = bool (*)(State &);
-  std::array<StepFn, 8> const steps{step1, step2, step3, step4,
-                                    step5, step6, step7, step8};
+  struct Step {
+    bool (*apply)(State &);
+    bool restarts; // firing this step restarts the pass from step 1
+  };
+  // Restart set {step2, step5, step6, step7, step8} mirrors niggli.c, where
+  // those steps `continue` the loop while step1/3/4 fall through.
+  constexpr std::array<Step, 8> steps{{
+      {step1, false},
+      {step2, true},
+      {step3, false},
+      {step4, false},
+      {step5, true},
+      {step6, true},
+      {step7, true},
+      {step8, true},
+  }};
 
   State p;
   p.lattice = lattice;
@@ -170,18 +183,18 @@ Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
 
   bool converged = false;
   for (int attempt = 0; attempt < kMaxAttempts && !converged; ++attempt) {
-    int j = 0;
-    for (; j < 8; ++j) {
-      if (steps[static_cast<std::size_t>(j)](p)) {
+    bool restarted = false;
+    for (auto const &[apply, restarts] : steps) {
+      if (std::invoke(apply, p)) {
         reset(p);
-        // Steps 2, 5, 6, 7, 8 restart the pass from step 1.
-        if (j == 1 || j == 4 || j == 5 || j == 6 || j == 7)
+        if (restarts) {
+          restarted = true;
           break;
+        }
       }
     }
-    if (j == 8) {
-      converged = true;
-    }
+    // A full pass with no restarting step means the cell is Niggli-reduced.
+    converged = !restarted;
   }
 
   if (!converged) {

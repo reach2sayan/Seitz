@@ -5,8 +5,11 @@
 #include <spglib/math/integer_matrix.hpp>
 #include <spglib/reduce/delaunay.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <map>
 #include <optional>
+#include <ranges>
 
 // Port of the symmetry-operation search in symmetry.c (3D space-group path):
 //   1. Delaunay-reduce the lattice and enumerate the lattice point group by
@@ -23,7 +26,6 @@ namespace {
 constexpr int kNumAttempt = 100; // symmetry.c NUM_ATTEMPT
 constexpr double kAngleReduceRate = 0.95;
 constexpr double kSinDtheta2Cutoff = 1e-12;
-constexpr double kPi = 3.14159265358979323846;
 
 // symmetry.c relative_axes: 26 candidate lattice vectors.
 constexpr int kRelativeAxes[26][3] = {
@@ -35,9 +37,7 @@ constexpr int kRelativeAxes[26][3] = {
     {-1, -1, 1},
 };
 
-[[nodiscard]] Vector3i axis(int i) {
-  return {kRelativeAxes[i][0], kRelativeAxes[i][1], kRelativeAxes[i][2]};
-}
+[[nodiscard]] Vector3i axis(int const (&a)[3]) { return {a[0], a[1], a[2]}; }
 
 // symmetry.c is_identity_metric, angle_tolerance < 0 path uses the sin-based
 // criterion; a positive angle_tolerance compares angles in degrees.
@@ -60,11 +60,12 @@ constexpr int kRelativeAxes[26][3] = {
     if (angle_tolerance) {
       auto angle = [](Matrix3d const &m, int a, int b) {
         return std::acos(m(a, b) / std::sqrt(m(a, a)) / std::sqrt(m(b, b))) /
-               kPi * 180.0;
+               std::numbers::pi * 180.0;
       };
       if (std::fabs(angle(orig, j, k) - angle(rotated, j, k)) >
-          *angle_tolerance)
+          *angle_tolerance) {
         return false;
+      }
     } else {
       double const cos1 = orig(j, k) / length_orig[j] / length_orig[k];
       double const cos2 = rotated(j, k) / length_rot[j] / length_rot[k];
@@ -75,8 +76,9 @@ constexpr int kRelativeAxes[26][3] = {
                                   (length_orig[k] + length_rot[k])) /
                                  4;
       if (sin_dtheta2 > kSinDtheta2Cutoff &&
-          sin_dtheta2 * length_ave2 > symprec * symprec)
+          sin_dtheta2 * length_ave2 > symprec * symprec) {
         return false;
+      }
     }
   }
   return true;
@@ -89,24 +91,25 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
                           Matrix3d const &metric_orig, double symprec,
                           AngleTolerance angle_tolerance) {
   PointSymmetry found;
-  for (int i = 0; i < 26; ++i)
-    for (int j = 0; j < 26; ++j)
-      for (int k = 0; k < 26; ++k) {
+  for (auto const &ai : kRelativeAxes) {
+    for (auto const &aj : kRelativeAxes) {
+      for (auto const &ak : kRelativeAxes) {
         Matrix3i axes;
-        axes.col(0) = axis(i);
-        axes.col(1) = axis(j);
-        axes.col(2) = axis(k);
-        int const det = axes.determinant();
-        if (det != 1 && det != -1)
+        axes << axis(ai), axis(aj), axis(ak);
+        if (int const det = axes.determinant(); det != 1 && det != -1) {
           continue;
+        }
         Matrix3d const lattice = min_lattice * axes.cast<double>();
         Matrix3d const metric = math::metric_tensor(lattice);
         if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
-          if (found.size() >= 48)
+          if (found.size() >= 48) {
             return std::nullopt;
+          }
           found.push_back(axes);
         }
       }
+    }
+  }
   return found;
 }
 
@@ -123,36 +126,38 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
   PointSymmetry out;
   for (Matrix3i const &rot : orig) {
     Matrix3d const similar = trans_inv * rot.cast<double>() * trans_mat;
-    if (!math::is_int_matrix(similar, tol))
+    if (!math::is_int_matrix(similar, tol)) {
       continue;
+    }
     Matrix3i const r = math::round_to_int(similar);
-    if (std::abs(r.determinant()) != 1)
+    if (std::abs(r.determinant()) != 1) {
       return leaf::new_error(e_symmetry_operation_search_failed{});
-    out.push_back(r);
+    }
+    out.push_back(std::move(r));
   }
   return out;
 }
 
-// First-occurrence index of the least-frequent atom type
-// (symmetry.c get_index_with_least_atoms).
-[[nodiscard]] int index_with_least_atoms(Cell const &cell) {
+// First-occurrence index of the least-frequent atom type, or nullopt for an
+// empty cell (symmetry.c get_index_with_least_atoms).
+[[nodiscard]] std::optional<int> index_with_least_atoms(Cell const &cell) {
   int const n = static_cast<int>(cell.size());
-  std::vector<int> count(static_cast<std::size_t>(n), 0);
+  if (n == 0)
+    return std::nullopt;
+
+  // How many atoms share each type.
+  std::map<int, int> frequency;
   for (int i = 0; i < n; ++i)
-    for (int j = 0; j < n; ++j)
-      if (cell.type(i) == cell.type(j)) {
-        ++count[static_cast<std::size_t>(j)];
-        break;
-      }
-  int min = count[0];
-  int min_index = 0;
+    ++frequency[cell.type(i)];
+
+  // Return the first atom whose type is the rarest. Scanning in index order
+  // reproduces spglib's tie-break: among equally-rare types, smallest index.
+  int const min_frequency = std::ranges::min(frequency | std::views::values);
   for (int i = 0; i < n; ++i)
-    if (count[static_cast<std::size_t>(i)] > 0 &&
-        count[static_cast<std::size_t>(i)] < min) {
-      min = count[static_cast<std::size_t>(i)];
-      min_index = i;
-    }
-  return min_index;
+    if (frequency.at(cell.type(i)) == min_frequency)
+      return i;
+
+  return std::nullopt; // unreachable: min_frequency came from the cell itself
 }
 
 // Translations t such that x -> rot . x + t maps the cell onto itself
@@ -164,8 +169,9 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
   std::vector<Vector3d> result;
   int const n = static_cast<int>(cell.size());
   for (int i = 0; i < n; ++i) {
-    if (cell.type(i) != cell.type(min_index))
+    if (cell.type(i) != cell.type(min_index)) {
       continue;
+    }
     Vector3d const trans = cell.position(i) - origin;
     if (checker.check_total_overlap(trans, rot, symprec))
       result.push_back(math::mod1(trans));
@@ -178,18 +184,20 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
 Result<PointSymmetry> lattice_symmetry(Cell const &cell, double symprec,
                                        AngleTolerance angle_tolerance) {
   auto const min_lattice = reduce::delaunay_reduce(cell.lattice(), symprec);
-  if (!min_lattice)
+  if (!min_lattice) {
     return leaf::new_error(e_symmetry_operation_search_failed{});
-
+  }
   Matrix3d const metric_orig = math::metric_tensor(*min_lattice);
   AngleTolerance angle = angle_tolerance;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     auto found =
         collect_metric_symmetries(*min_lattice, metric_orig, symprec, angle);
-    if (found)
+    if (found) {
       return transform_pointsymmetry(*found, cell.lattice(), *min_lattice);
-    if (angle)
+    }
+    if (angle) {
       *angle *= kAngleReduceRate; // too many: tighten and retry
+    }
     // std::nullopt (auto): identical retry, will exhaust attempts and fail.
   }
   return leaf::new_error(e_symmetry_operation_search_failed{});
@@ -201,23 +209,27 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
   if (lat_sym.empty())
     return leaf::new_error(e_symmetry_operation_search_failed{});
 
-  OverlapChecker const checker(cell);
-  int const min_index = index_with_least_atoms(cell);
+  std::optional<int> const min_index = index_with_least_atoms(cell);
+  if (!min_index)
+    return leaf::new_error(e_empty_cell{});
 
+  OverlapChecker const checker(cell);
   SymmetryOperations ops;
   for (Matrix3i const &rot : lat_sym)
     for (Vector3d const &t :
-         translations_for_rotation(cell, checker, rot, min_index, symprec))
+         translations_for_rotation(cell, checker, rot, *min_index, symprec))
       ops.push_back({rot, t});
 
   return ops;
 }
 
 std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
+  std::optional<int> const min_index = index_with_least_atoms(cell);
+  if (!min_index)
+    return {};
   OverlapChecker const checker(cell);
-  int const min_index = index_with_least_atoms(cell);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
-                                   min_index, symprec);
+                                   *min_index, symprec);
 }
 
 } // namespace spglib::symmetry

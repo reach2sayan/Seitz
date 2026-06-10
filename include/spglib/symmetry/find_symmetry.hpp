@@ -18,7 +18,9 @@ lattice_symmetry(Cell const &cell, double symprec,
 
 // All space-group operations of the cell exactly as given (including the
 // centering/pure translations of a non-primitive cell). Port of
-// symmetry.c sym_get_operation / get_space_group_operations.
+// symmetry.c sym_get_operation / get_space_group_operations. Errors with
+// e_empty_cell for a cell with no atoms, otherwise
+// e_symmetry_operation_search_failed.
 [[nodiscard]] Result<SymmetryOperations>
 find_symmetry(Cell const &cell, double symprec,
               AngleTolerance angle_tolerance = std::nullopt);

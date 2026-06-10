@@ -15,6 +15,7 @@ struct e_symmetry_operation_search_failed {};
 struct e_pointgroup_not_found {};
 struct e_niggli_failed {};
 struct e_delaunay_failed {};
+struct e_empty_cell {};
 
 struct e_atoms_too_close {
   double distance;

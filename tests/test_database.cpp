@@ -4,7 +4,8 @@
 
 using namespace spglib;
 
-TEST_CASE("decode_operation recovers identity and inversion", "[database]") {
+TEST_CASE("operations_from_database returns identity and inversion",
+          "[database]") {
   // Hall 1 is P1: a single identity operation.
   auto p1 = data::operations_from_database(1);
   REQUIRE(p1.size() == 1);

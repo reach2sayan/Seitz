@@ -1,5 +1,4 @@
 #include <spglib/core/overlap.hpp>
-
 #include <spglib/math/integer_matrix.hpp>
 
 #include <algorithm>
@@ -19,8 +18,7 @@ namespace {
 // stable under the (mod 1) translation part of a symmetry operation.
 [[nodiscard]] double lattice_point_distance_sq(Matrix3d const &lattice,
                                                Vector3d const &frac) noexcept {
-  return (lattice * frac.unaryExpr([](double x) { return x - math::nint(x); }))
-      .squaredNorm();
+  return (lattice * math::nearest_offset(frac)).squaredNorm();
 }
 
 // Permutation sorting atoms by (type, distance-to-nearest-lattice-point), the
@@ -49,7 +47,7 @@ argsort_by_distance(Matrix3d const &lattice, Positions const &pos,
 
 bool is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
                 double symprec) noexcept {
-  Vector3d diff = (a - b).unaryExpr([](double x) { return x - math::nint(x); });
+  Vector3d diff = math::nearest_offset(a - b);
   return (lattice * diff).norm() <= symprec;
 }
 
@@ -59,12 +57,9 @@ OverlapChecker::OverlapChecker(Cell const &cell)
       size_(static_cast<int>(cell.size())) {
   auto const perm =
       argsort_by_distance(cell.lattice(), cell.positions(), cell.types());
-  for (int i = 0; i < size_; ++i) {
-    pos_sorted_.row(i) =
-        cell.positions().row(perm[static_cast<std::size_t>(i)]);
-    types_sorted_[static_cast<std::size_t>(i)] =
-        cell.types()[static_cast<std::size_t>(
-            perm[static_cast<std::size_t>(i)])];
+  for (auto const [i, src] : perm | std::views::enumerate) {
+    pos_sorted_.row(i) = cell.positions().row(src);
+    types_sorted_[static_cast<std::size_t>(i)] = cell.types()[src];
   }
 }
 
@@ -73,29 +68,24 @@ bool OverlapChecker::possible_overlap(Vector3d const &trans,
                                       double symprec) const {
   int const search_num = std::min(size_, 3);
   Matrix3d const rotd = rot.cast<double>();
-  for (int it = 0; it < search_num; ++it) {
+  // Every probed atom must coincide with some atom of the same type.
+  return std::ranges::all_of(std::views::iota(0, search_num), [&](int it) {
     Vector3d const pr = rotd * row(pos_sorted_, it) + trans;
     int const tr = types_sorted_[static_cast<std::size_t>(it)];
-    bool found = false;
-    for (int i = 0; i < size_; ++i) {
-      if (is_overlap_same_type(pr, row(pos_sorted_, i), tr,
-                               types_sorted_[static_cast<std::size_t>(i)],
-                               lattice_, symprec)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found)
-      return false;
-  }
-  return true;
+    return std::ranges::any_of(std::views::iota(0, size_), [&](int i) {
+      return is_overlap_same_type(pr, row(pos_sorted_, i), tr,
+                                  types_sorted_[static_cast<std::size_t>(i)],
+                                  lattice_, symprec);
+    });
+  });
 }
 
 bool OverlapChecker::check_total_overlap(Vector3d const &trans,
                                          Matrix3i const &rot,
                                          double symprec) const {
-  if (!possible_overlap(trans, rot, symprec))
+  if (!possible_overlap(trans, rot, symprec)) {
     return false;
+  }
 
   bool const is_identity = rot == Matrix3i::Identity();
   Matrix3d const rotd = rot.cast<double>();
@@ -111,13 +101,15 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   std::vector<char> found(static_cast<std::size_t>(size_), 0);
   int search_start = 0;
   for (int io = 0; io < size_; ++io) {
-    while (search_start < size_ &&
-           found[static_cast<std::size_t>(search_start)])
-      ++search_start;
+    const auto it =
+        std::ranges::find(found.begin() + search_start, found.end(), false);
+
+    search_start = static_cast<int>(std::ranges::distance(found.begin(), it));
     int ir = search_start;
     for (; ir < size_; ++ir) {
-      if (found[static_cast<std::size_t>(ir)])
+      if (found[static_cast<std::size_t>(ir)]) {
         continue;
+      }
       if (is_overlap_same_type(row(pos_sorted_, io), row(rotated, ir),
                                types_sorted_[static_cast<std::size_t>(io)],
                                types_sorted_[static_cast<std::size_t>(ir)],
@@ -126,8 +118,9 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
         break;
       }
     }
-    if (ir == size_)
+    if (ir == size_) {
       return false;
+    }
   }
   return true;
 }

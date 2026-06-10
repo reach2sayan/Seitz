@@ -4,6 +4,8 @@
 
 #include <array>
 #include <cmath>
+#include <optional>
+#include <ranges>
 #include <utility>
 
 namespace spglib::reduce {
@@ -23,90 +25,105 @@ constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
 // dot product, fold and flip and report "not yet reduced". Returns true when no
 // positive dot product remains (delaunay.c delaunay_reduce_basis, rank 3).
 [[nodiscard]] bool reduce_step(std::array<Vector3d, 4> &b, double symprec) {
-  for (int i = 0; i < 3; ++i)
-    for (int j = i + 1; j < 4; ++j)
-      if (b[static_cast<std::size_t>(i)].dot(b[static_cast<std::size_t>(j)]) >
-          symprec) {
-        for (int k = 0; k < 4; ++k) {
+  for (std::size_t i = 0; i < 3; ++i)
+    for (std::size_t j = i + 1; j < 4; ++j)
+      if (b[i].dot(b[j]) > symprec) {
+        for (std::size_t k = 0; k < 4; ++k) {
           if (k != i && k != j) {
-            b[static_cast<std::size_t>(k)] += b[static_cast<std::size_t>(i)];
+            b[k] += b[i];
           }
         }
-        b[static_cast<std::size_t>(i)] = -b[static_cast<std::size_t>(i)];
+        b[i] = -b[i];
         return false;
       }
   return true;
 }
 
+// Fold the extended basis until no pair has a positive dot product; nullopt if
+// it has not converged within kMaxAttempts steps (delaunay.c
+// delaunay_reduce_basis, rank 3).
+[[nodiscard]] std::optional<std::array<Vector3d, 4>>
+reduce_basis(std::array<Vector3d, 4> b, double symprec) {
+  for (std::size_t attempt = 0; attempt < kMaxAttempts; ++attempt)
+    if (reduce_step(b, symprec)) {
+      return b;
+    }
+  return std::nullopt;
+}
+
 // From the candidate set {b1, b2, b1+b2, b3, b4, b2+b3, b3+b1}, pick the three
 // shortest linearly independent vectors (delaunay.c
-// get_delaunay_shortest_vectors, rank 3) and store them back into basis[0..2].
-void shortest_vectors(std::array<Vector3d, 4> &basis, double symprec) {
+// get_delaunay_shortest_vectors, rank 3) into basis[0..2].
+[[nodiscard]] std::array<Vector3d, 4>
+shortest_vectors(std::array<Vector3d, 4> basis, double symprec) {
   std::array<Vector3d, 7> b{basis[0],           basis[1], basis[0] + basis[1],
                             basis[2],           basis[3], basis[1] + basis[2],
                             basis[2] + basis[0]};
-  for (int i = 0; i < 6; ++i) {
-    for (int j = 0; j < 6; ++j) {
-      if (b[static_cast<std::size_t>(j)].squaredNorm() >
-          b[static_cast<std::size_t>(j + 1)].squaredNorm() + kZeroPrec) {
-        std::swap(b[static_cast<std::size_t>(j)],
-                  b[static_cast<std::size_t>(j + 1)]);
-      }
-    }
-  }
+  std::ranges::sort(b, {}, [](const Vector3d &v) { return v.squaredNorm(); });
 
-  for (int i = 2; i < 7; ++i) {
-    Matrix3d m;
-    m.col(0) = b[0];
-    m.col(1) = b[1];
-    m.col(2) = b[static_cast<std::size_t>(i)];
-    if (std::abs(m.determinant()) > symprec) {
-      basis[2] = b[static_cast<std::size_t>(i)];
-      basis[0] = b[0];
-      basis[1] = b[1];
-      return;
-    }
+  const auto it =
+      std::ranges::find_if(std::views::drop(b, 2), [&](const Vector3d &v) {
+        Matrix3d m;
+        m.col(0) = b[0];
+        m.col(1) = b[1];
+        m.col(2) = v;
+        return std::abs(m.determinant()) > symprec;
+      });
+
+  if (it != b.end()) {
+    basis[0] = b[0];
+    basis[1] = b[1];
+    basis[2] = *it;
   }
+  return basis;
+}
+
+// Assemble the reduced lattice from the first three reduced basis vectors,
+// flipped to be right-handed; nullopt if the cell is degenerate.
+[[nodiscard]] std::optional<Matrix3d>
+oriented_cell(std::array<Vector3d, 4> const &basis, double symprec) {
+  Matrix3d red;
+  red << basis[0], basis[1], basis[2];
+
+  double const volume = red.determinant();
+  if (std::abs(volume) < symprec) {
+    return std::nullopt;
+  }
+  return volume < 0.0 ? Matrix3d(-red) : red;
+}
+
+// Pass the reduced lattice through iff the change of basis from the input is
+// unimodular; nullopt otherwise.
+[[nodiscard]] std::optional<Matrix3d>
+if_unimodular(Matrix3d const &red, Matrix3d const &lattice, double symprec) {
+  return math::inverse(red, symprec)
+      .and_then([&](Matrix3d const &red_inv) -> std::optional<Matrix3d> {
+        Matrix3i const change = math::round_to_int(Matrix3d(red_inv * lattice));
+        if (std::abs(change.determinant()) != 1) {
+          return std::nullopt;
+        }
+        return red;
+      });
 }
 
 } // namespace
 
 Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, double symprec) {
-  auto basis = extended_basis(lattice);
+  auto const reduced = reduce_basis(extended_basis(lattice), symprec)
+                           .transform([&](std::array<Vector3d, 4> const &b) {
+                             return shortest_vectors(b, symprec);
+                           })
+                           .and_then([&](std::array<Vector3d, 4> const &b) {
+                             return oriented_cell(b, symprec);
+                           })
+                           .and_then([&](Matrix3d const &red) {
+                             return if_unimodular(red, lattice, symprec);
+                           });
 
-  bool reduced = false;
-  for (int attempt = 0; attempt < kMaxAttempts; ++attempt)
-    if (reduce_step(basis, symprec)) {
-      reduced = true;
-      break;
-    }
   if (!reduced) {
     return leaf::new_error(e_delaunay_failed{});
   }
-  shortest_vectors(basis, symprec);
-
-  Matrix3d red;
-  red.col(0) = basis[0];
-  red.col(1) = basis[1];
-  red.col(2) = basis[2];
-
-  double const volume = red.determinant();
-  if (std::abs(volume) < symprec)
-    return leaf::new_error(e_delaunay_failed{});
-  if (volume < 0.0)
-    red = -red;
-
-  // The change of basis from the input to the reduced lattice must be
-  // unimodular.
-  auto const red_inv = math::inverse(red, symprec);
-  if (!red_inv) {
-    return leaf::new_error(e_delaunay_failed{});
-  }
-  Matrix3i const change = math::round_to_int(Matrix3d(*red_inv * lattice));
-  if (std::abs(change.determinant()) != 1) {
-    return leaf::new_error(e_delaunay_failed{});
-  }
-  return red;
+  return *reduced;
 }
 
 } // namespace spglib::reduce

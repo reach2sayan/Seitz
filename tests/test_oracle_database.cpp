@@ -6,8 +6,7 @@
 
 using namespace spglib;
 
-TEST_CASE("database operations match spg_get_symmetry_from_database for all "
-          "530 Hall numbers",
+TEST_CASE("db ops match spg_get_symmetry_from_database for all 530 Hall numbers",
           "[oracle][database]") {
   int mismatches = 0;
   int first_bad = 0;
@@ -27,8 +26,7 @@ TEST_CASE("database operations match spg_get_symmetry_from_database for all "
   CHECK(mismatches == 0);
 }
 
-TEST_CASE("database spacegroup types match spg_get_spacegroup_type for all 530 "
-          "Hall numbers",
+TEST_CASE("db spg types match spg_get_spacegroup_type for all 530 Hall numbers",
           "[oracle][database]") {
   int mismatches = 0;
   int first_bad = 0;

@@ -77,10 +77,6 @@ inline constexpr int kNumHallNumbers = 530;
 // The lazily-built, immutable space-group database.
 [[nodiscard]] Database const &database();
 
-// Decode one packed operation: rotation in base-3 (digits {-1,0,1}),
-// translation in base-12 (n/12). Port of spgdb_decode_symmetry.
-[[nodiscard]] SymmetryOperation decode_operation(int encoded) noexcept;
-
 // Convenience lookups by Hall number (1..530); empty / number-0 if out of
 // range.
 [[nodiscard]] SymmetryOperations operations_from_database(int hall_number);

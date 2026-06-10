@@ -7,6 +7,7 @@
 #include <spglib/symmetry/find_symmetry.hpp>
 
 #include <cmath>
+#include <numeric>
 #include <optional>
 #include <utility>
 
@@ -57,24 +58,23 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
   cand.push_back(Vector3d::UnitZ());
 
   double const init_volume = std::abs(cell.lattice().determinant());
-  int const n = static_cast<int>(cand.size());
-  auto const at = [&](int i) { return cand[static_cast<std::size_t>(i)]; };
+  std::size_t const n = cand.size();
 
-  for (int i = 0; i < n; ++i)
-    for (int j = i + 1; j < n; ++j)
-      for (int k = j + 1; k < n; ++k) {
+  for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t j = i + 1; j < n; ++j)
+      for (std::size_t k = j + 1; k < n; ++k) {
         Matrix3d tmp;
-        tmp.col(0) = cell.lattice() * at(i);
-        tmp.col(1) = cell.lattice() * at(j);
-        tmp.col(2) = cell.lattice() * at(k);
+        tmp.col(0) = cell.lattice() * cand[i];
+        tmp.col(1) = cell.lattice() * cand[j];
+        tmp.col(2) = cell.lattice() * cand[k];
         double const volume = std::abs(tmp.determinant());
         if (volume <= symprec || math::nint(init_volume / volume) != multi)
           continue;
 
         Matrix3d relative;
-        relative.col(0) = at(i);
-        relative.col(1) = at(j);
-        relative.col(2) = at(k);
+        relative.col(0) = cand[i];
+        relative.col(1) = cand[j];
+        relative.col(2) = cand[k];
         // Clean the relative lattice via its exact integer inverse, if
         // possible.
         auto const rel_inv = math::inverse(relative, symprec);
@@ -118,6 +118,7 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
   double tol = symprec;
   bool ok = false;
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
+
     for (int i = 0; i < n; ++i) {
       overlap[static_cast<std::size_t>(i)] = i;
       for (int j = 0; j < n; ++j)
@@ -128,14 +129,18 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
           break;
         }
     }
+
     bool retry = false;
     for (int i = 0; i < n && !retry; ++i) {
-      if (overlap[static_cast<std::size_t>(i)] != i)
+      if (overlap[static_cast<std::size_t>(i)] != i) {
         continue;
+      }
       int count = 0;
-      for (int j = 0; j < n; ++j)
-        if (overlap[static_cast<std::size_t>(j)] == i)
+      for (int j = 0; j < n; ++j) {
+        if (overlap[static_cast<std::size_t>(j)] == i) {
           ++count;
+        }
+      }
       if (count < ratio) {
         tol *= kTrimIncreaseRate;
         retry = true;
@@ -172,16 +177,16 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
     for (int l = 0; l < 3; ++l) {
       double const pi = pos(i, l);
       double const pk = pos(k, l);
-      if (std::abs(pk - pi) > 0.5)
+      if (std::abs(pk - pi) > 0.5) {
         tpos(j, l) += pi < pk ? pi + 1.0 : pi - 1.0;
-      else
+      }
+      else {
         tpos(j, l) += pi;
+      }
     }
   }
   int const multi = n / tn;
-  for (int i = 0; i < tn; ++i)
-    for (int l = 0; l < 3; ++l)
-      tpos(i, l) = math::mod1(tpos(i, l) / multi);
+  tpos = tpos.unaryExpr([multi](double x) { return math::mod1(x / multi); });
 
   return std::make_pair(Cell(trimmed_lattice, tpos, trimmed_types), mapping);
 }
@@ -194,25 +199,28 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
   for (int attempt = 0; attempt < kNumAttempt;
        ++attempt, tolerance *= kReduceRate) {
     auto const pure = pure_translations(cell, tolerance);
-    if (pure.empty())
+    if (pure.empty()) {
       continue;
+    }
 
     if (pure.size() == 1) {
       auto smallest = smallest_lattice_cell(cell, tolerance);
-      if (!smallest)
+      if (!smallest) {
         continue;
+      }
       std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
-      for (Index i = 0; i < cell.size(); ++i)
-        mapping[static_cast<std::size_t>(i)] = static_cast<int>(i);
+      std::iota(mapping.begin(), mapping.end(), 0);
       return Primitive{std::move(*smallest), std::move(mapping)};
     }
 
     auto const prim_lat = primitive_lattice(cell, pure, tolerance);
-    if (!prim_lat)
+    if (!prim_lat) {
       continue;
+    }
     auto trimmed = trim_cell(*prim_lat, cell, tolerance);
-    if (!trimmed)
+    if (!trimmed) {
       continue;
+    }
     return Primitive{std::move(trimmed->first), std::move(trimmed->second)};
   }
   return leaf::new_error(e_cell_standardization_failed{});

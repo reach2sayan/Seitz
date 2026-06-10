@@ -4,7 +4,11 @@
 #include <spglib/data/hall_generators_view.hpp>
 #include <spglib/math/fractional.hpp>
 
+#include <boost/container/static_vector.hpp>
+
 #include <array>
+#include <cstdint>
+#include <ranges>
 
 // Port of hall_symbol.c (3D space-group path). Given the symmetry operations of
 // the conventional (bravais) cell and a candidate Hall number, this determines
@@ -77,8 +81,9 @@ constexpr std::size_t kCenteringCount = 9; // Centering::error .. r_center
 [[nodiscard]] std::array<Matrix3i, 3>
 unpack_generators(data::GeneratorSet const &g) {
   std::array<Matrix3i, 3> rot;
-  for (std::size_t i = 0; i < 3; ++i)
+  for (std::size_t i = 0; i < 3; ++i) {
     rot[i] = data::generator_matrix(g, i);
+  }
   return rot;
 }
 
@@ -89,19 +94,20 @@ unpack_generators(data::GeneratorSet const &g) {
                                     SymmetryOperations const &symmetry,
                                     std::array<Matrix3i, 3> const &rot) {
   trans = {Vector3d::Zero(), Vector3d::Zero(), Vector3d::Zero()};
-  for (int i = 0; i < 3; ++i) {
-    if (rot[static_cast<std::size_t>(i)].isZero())
+
+  for (auto [t, r] : std::views::zip(trans, rot)) {
+    if (r.isZero()) {
       continue;
-    bool found = false;
-    for (auto const &op : symmetry)
-      if (op.rotation == rot[static_cast<std::size_t>(i)]) {
-        trans[static_cast<std::size_t>(i)] = op.translation;
-        found = true;
-        break;
-      }
-    if (!found)
+    }
+
+    const auto it = std::ranges::find_if(
+        symmetry, [&](const auto &op) { return op.rotation == r; });
+    if (it == symmetry.end()) {
       return false;
+    }
+    t = it->translation;
   }
+
   return true;
 }
 
@@ -110,13 +116,15 @@ unpack_generators(data::GeneratorSet const &g) {
 [[nodiscard]] bool set_dw(Vector3d &dw, SymmetryOperations const &db_ops,
                           Matrix3i const &rot, Vector3d const &trans,
                           Centering c) {
-  Vector3d const trans_prim = transform_translation(c, trans);
-  for (auto const &db : db_ops)
-    if (db.rotation == rot) {
-      dw = trans_prim - transform_translation(c, db.translation);
-      return true;
-    }
-  return false;
+  const Vector3d trans_prim = transform_translation(c, trans);
+  const auto it = std::ranges::find_if(
+      db_ops, [&](const auto &db) { return db.rotation == rot; });
+  if (it == db_ops.end()) {
+    return false;
+  }
+
+  dw = trans_prim - transform_translation(c, it->translation);
+  return true;
 }
 
 // shift = VSpU . dw (get_origin_shift), with dw assembled per generator.
@@ -125,23 +133,22 @@ unpack_generators(data::GeneratorSet const &g) {
                                     std::array<Vector3d, 3> const &trans,
                                     Centering c, data::VSpUSet const &vspu) {
   auto const &db_ops = data::database().operations.at(hall_number);
-  std::array<double, 9> dw{};
-  for (int i = 0; i < 3; ++i) {
-    auto const ui = static_cast<std::size_t>(i);
-    if (rot[ui].determinant() == 0)
+  data::DwVector dw = data::DwVector::Zero();
+  for (std::size_t i = 0; i < 3; ++i) {
+    if (rot[i].determinant() == 0) {
       continue; // zero generator -> dw block stays 0
+    }
     Vector3d tmp;
-    if (!set_dw(tmp, db_ops, rot[ui], trans[ui], c))
+    if (!set_dw(tmp, db_ops, rot[i], trans[i], c)) {
       return false;
+    }
+
     // hall_number is always > 0 here (3D; layer groups, hall_number < 0, would
     // leave the c component un-folded — out of scope).
-    dw[ui * 3] = math::mod1(tmp[0]);
-    dw[ui * 3 + 1] = math::mod1(tmp[1]);
-    dw[ui * 3 + 2] = math::mod1(tmp[2]);
+    dw.segment<3>(static_cast<Eigen::Index>(i * 3)) = math::mod1(tmp);
   }
 
-  shift = data::vspu_matrix(vspu) * Eigen::Map<data::DwVector const>(dw.data());
-  shift = math::mod1(shift);
+  shift = math::mod1(data::vspu_matrix(vspu) * dw);
   return true;
 }
 
@@ -153,27 +160,33 @@ unpack_generators(data::GeneratorSet const &g) {
                                      SymmetryOperations const &symmetry,
                                      double symprec) {
   auto const &db_ops = data::database().operations.at(hall_number);
-  std::vector<char> found(db_ops.size(), 0);
-  for (auto const &op : symmetry) {
-    bool is_found = false;
-    for (std::size_t j = 0; j < db_ops.size(); ++j) {
-      if (op.rotation != db_ops[j].rotation)
-        continue;
-      Vector3d const diff = transform_translation(c, op.translation) -
-                            transform_translation(c, db_ops[j].translation) +
-                            shift;
-      Vector3d const shift_rot =
-          transform_rotation(c, db_ops[j].rotation) * shift;
-      if (!found[j] &&
-          is_overlap(diff, shift_rot, primitive_lattice, symprec)) {
-        found[j] = 1;
-        is_found = true;
-        break;
-      }
-    }
-    if (!is_found)
+  boost::container::static_vector<std::uint8_t, 192> found(db_ops.size(), 0);
+  for (const auto &op : symmetry) {
+    const auto it = std::ranges::find_if(
+        db_ops | std::views::enumerate, [&](const auto &entry) {
+          const auto [idx, db_op] = entry;
+
+          if (found[idx] || op.rotation != db_op.rotation) {
+            return false;
+          }
+
+          const Vector3d diff = transform_translation(c, op.translation) -
+                                transform_translation(c, db_op.translation) +
+                                shift;
+
+          const Vector3d shift_rot =
+              transform_rotation(c, db_op.rotation) * shift;
+
+          return is_overlap(diff, shift_rot, primitive_lattice, symprec);
+        });
+
+    if (it == std::ranges::end(db_ops | std::views::enumerate)) {
       return false;
+    }
+
+    found[std::get<0>(*it)] = 1;
   }
+
   return true;
 }
 
@@ -184,34 +197,37 @@ unpack_generators(data::GeneratorSet const &g) {
                                   Centering c, data::GeneratorSet const &gens,
                                   data::VSpUSet const &vspu, double symprec) {
   auto const &db_ops = data::database().operations.at(hall_number);
-  if (db_ops.size() != symmetry.size())
+  if (db_ops.size() != symmetry.size()) {
     return false;
+  }
   auto const rot = unpack_generators(gens);
   std::array<Vector3d, 3> trans;
-  if (!get_translations(trans, symmetry, rot))
-    return false;
-  if (!get_origin_shift(shift, hall_number, rot, trans, c, vspu))
-    return false;
-  return is_match_database(hall_number, shift, primitive_lattice, c, symmetry,
-                           symprec);
+
+  bool found = get_translations(trans, symmetry, rot);
+  if (found) {
+    found = get_origin_shift(shift, hall_number, rot, trans, c, vspu);
+  }
+  if (found) {
+    found = is_match_database(hall_number, shift, primitive_lattice, c,
+                              symmetry, symprec);
+  }
+  return found;
 }
 
 // ---- per-crystal-system candidate loops ----
-
 template <std::size_t N>
 [[nodiscard]] bool
 try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
             SymmetryOperations const &sym, Centering c,
             std::array<data::GeneratorSet, N> const &gens,
             std::array<data::VSpUSet, N> const &vspu, double symprec) {
-  for (std::size_t i = 0; i < N; ++i)
-    if (is_hall_symbol(shift, hall_number, prim, sym, c, gens[i], vspu[i],
-                       symprec))
-      return true;
-  return false;
+  return std::ranges::any_of(std::views::zip(gens, vspu), [&](const auto &x) {
+    const auto &[gen, vsp] = x;
+    return is_hall_symbol(shift, hall_number, prim, sym, c, gen, vsp, symprec);
+  });
 }
 
-[[nodiscard]] bool is_rhombohedral_hall(int h) {
+[[nodiscard]] constexpr bool is_rhombohedral_hall(int h) {
   switch (h) {
   case 433:
   case 434:

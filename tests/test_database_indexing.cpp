@@ -14,6 +14,28 @@
 using namespace spglib;
 
 namespace {
+// Reference unpack of one packed operation (spgdb_decode_symmetry: rotation
+// base-3 {-1,0,1}, translation base-12 n/12). Kept local to this test so the
+// equivalence check has an independent decoder to compare the database against.
+SymmetryOperation decode_operation(int encoded) {
+  Matrix3i rot;
+  int r = encoded % 19683; // 3^9
+  int digit = 6561;        // 3^8
+  for (int i = 0; i < 3; ++i)
+    for (int j = 0; j < 3; ++j) {
+      rot(i, j) = (r % (digit * 3)) / digit - 1;
+      digit /= 3;
+    }
+  int const t = encoded / 19683;
+  Vector3d trans;
+  digit = 144; // 12^2
+  for (int i = 0; i < 3; ++i) {
+    trans[i] = static_cast<double>((t % (digit * 12)) / digit) / 12.0;
+    digit /= 12;
+  }
+  return {rot, trans};
+}
+
 // Old style: decode operations straight from the flat array using the
 // {count, start} offsets.
 SymmetryOperations operations_by_offset(int hall) {
@@ -22,7 +44,7 @@ SymmetryOperations operations_by_offset(int hall) {
   SymmetryOperations ops;
   ops.reserve(static_cast<std::size_t>(idx[0]));
   for (int i = 0; i < idx[0]; ++i)
-    ops.push_back(data::decode_operation(
+    ops.push_back(decode_operation(
         data::kSymmetryOperations[static_cast<std::size_t>(idx[1] + i)]));
   return ops;
 }

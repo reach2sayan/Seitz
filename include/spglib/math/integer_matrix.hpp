@@ -28,6 +28,15 @@ round_to_int(Eigen::MatrixBase<Derived> const &a) noexcept {
   return a.unaryExpr([](double x) { return nint(x); }).eval();
 }
 
+// Displacement from each coordinate to its nearest integer, x - nint(x). For a
+// fractional position this is the offset to the nearest lattice point, the
+// quantity that is invariant under integer lattice translations.
+template <typename Derived>
+[[nodiscard]] inline auto
+nearest_offset(Eigen::MatrixBase<Derived> const &a) noexcept {
+  return a.unaryExpr([](double x) { return x - nint(x); });
+}
+
 // True iff every entry of `a` is within `symprec` of an integer
 // (spglib `mat_is_int_matrix`).
 [[nodiscard]] inline bool is_int_matrix(const Matrix3d &a,

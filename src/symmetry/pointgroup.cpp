@@ -1,8 +1,11 @@
 #include <spglib/symmetry/pointgroup.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <optional>
+#include <ranges>
+#include <utility>
 
 // Port of pointgroup.c (3D space-group path). Two static tables drive it:
 //   * kPointgroupData: for each of the 32 point groups, the histogram of
@@ -270,15 +273,10 @@ rotation_type(Matrix3i const &rot) noexcept {
 [[nodiscard]] PointSymmetry
 unique_rotations(std::span<Matrix3i const> rotations) {
   PointSymmetry out;
-  for (Matrix3i const &r : rotations) {
-    bool seen = false;
-    for (Matrix3i const &u : out)
-      if (u == r) {
-        seen = true;
-        break;
-      }
-    if (!seen && out.size() < out.capacity())
+  for (const Matrix3i &r : rotations) {
+    if (std::ranges::find(out, r) == out.end() && out.size() < out.capacity()) {
       out.push_back(r);
+    }
   }
   return out;
 }
@@ -286,26 +284,30 @@ unique_rotations(std::span<Matrix3i const> rotations) {
 [[nodiscard]] bool class_table(std::array<int, kRotationTypeCount> &table,
                                PointSymmetry const &ps) {
   table.fill(0);
-  for (Matrix3i const &r : ps) {
-    auto const t = rotation_type(r);
-    if (!t)
+  for (const auto &r : ps) {
+    if (const auto t = rotation_type(r)) {
+      ++table[static_cast<std::size_t>(*t)];
+    } else {
       return false;
-    ++table[static_cast<std::size_t>(*t)];
+    }
   }
   return true;
 }
 
 [[nodiscard]] int pointgroup_number(PointSymmetry const &ps) {
   std::array<int, kRotationTypeCount> table{};
-  if (!class_table(table, ps))
+  if (!class_table(table, ps)) {
     return 0;
-  for (int i = 1; i < 33; ++i)
-    if (kPointgroupData[static_cast<std::size_t>(i)].table == table)
+  }
+  for (const auto [i, pg_data] : kPointgroupData | std::views::enumerate) {
+    if (pg_data.table == table) {
       return i;
+    }
+  }
   return 0;
 }
 
-[[nodiscard]] Matrix3i proper_rotation(Matrix3i const &rot) {
+[[nodiscard]] inline Matrix3i proper_rotation(Matrix3i const &rot) {
   return rot.determinant() == -1 ? Matrix3i(-rot) : rot;
 }
 
@@ -313,12 +315,13 @@ unique_rotations(std::span<Matrix3i const> rotations) {
 // rotation; std::nullopt for the identity / when none matches
 // (get_rotation_axis).
 [[nodiscard]] std::optional<int> rotation_axis(Matrix3i const &proper_rot) {
-  if (proper_rot == kIdentity)
-    return std::nullopt;
-  for (int i = 0; i < kNumRotAxes; ++i) {
-    Vector3i const v = proper_rot * rot_axis(i);
-    if (v == rot_axis(i))
-      return i;
+  if (proper_rot != kIdentity) {
+    for (int i = 0; i < kNumRotAxes; ++i) {
+      Vector3i const v = proper_rot * rot_axis(i);
+      if (v == rot_axis(i)) {
+        return i;
+      }
+    }
   }
   return std::nullopt;
 }
@@ -334,18 +337,20 @@ unique_rotations(std::span<Matrix3i const> rotations) {
     sum_rot += rot;
   }
   std::vector<int> result;
-  for (int i = 0; i < kNumRotAxes; ++i)
-    if ((sum_rot * rot_axis(i)).isZero())
-      result.push_back(i);
+  result.reserve(kNumRotAxes);
+  std::ranges::copy_if(std::views::iota(0, kNumRotAxes),
+                       std::back_inserter(result),
+                       [&](int i) { return (sum_rot * rot_axis(i)).isZero(); });
   return result;
 }
 
 // 1 if axis_vec == kRotAxes[idx], -1 if == -kRotAxes[idx], else 0.
 [[nodiscard]] int axis_sign(Vector3i const &axis_vec, int idx) {
-  if (axis_vec == rot_axis(idx))
+  if (axis_vec == rot_axis(idx)) {
     return 1;
-  if (axis_vec == Vector3i(-rot_axis(idx)))
+  } else if (axis_vec == Vector3i(-rot_axis(idx))) {
     return -1;
+  }
   return 0;
 }
 
@@ -362,8 +367,7 @@ using AxisTriple = std::array<SignedAxis, 3>;
 // (set_transformation_matrix).
 [[nodiscard]] Matrix3i transformation_from_axes(AxisTriple const &axes) {
   Matrix3i tmat;
-  for (int j = 0; j < 3; ++j) {
-    auto const &a = axes[static_cast<std::size_t>(j)];
+  for (auto const &[j, a] : axes | std::views::enumerate) {
     tmat.col(j) = a.sign * rot_axis(a.index);
   }
   return tmat;
@@ -379,13 +383,15 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
       break;
     }
   }
-  if (!two_fold)
+  if (!two_fold) {
     return false;
+  }
   axes[1] = {*two_fold, 1};
 
   auto const ortho = orthogonal_axes(prop_rot, 2);
-  if (ortho.empty())
+  if (ortho.empty()) {
     return false;
+  }
 
   int min_norm = 8;
   bool found = false;
@@ -397,8 +403,9 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
       found = true;
     }
   }
-  if (!found)
+  if (!found) {
     return false;
+  }
 
   min_norm = 8;
   found = false;
@@ -413,69 +420,78 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
   return found;
 }
 
-// Laue classes 4/m, 4/mmm, -3, -3m, 6/m, 6/mmm (laue_one_axis).
-bool laue_one_axis(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
-  Matrix3i prop_rot = kIdentity;
-  std::optional<int> principal;
+// The principal (c) axis of a one-axis Laue class: the proper rotation of
+// rot_order paired with its rotation-axis index. nullopt if no such operation
+// (or no axis for it) exists.
+struct Principal {
+  Matrix3i prop_rot;
+  int axis;
+};
+[[nodiscard]] std::optional<Principal> principal_axis(PointSymmetry const &ps,
+                                                      int rot_order) {
   for (Matrix3i const &r : ps) {
-    prop_rot = proper_rotation(r);
+    Matrix3i const prop_rot = proper_rotation(r);
     if ((rot_order == 4 && prop_rot.trace() == 1) ||
         (rot_order == 3 && prop_rot.trace() == 0)) {
-      principal = rotation_axis(prop_rot);
-      break;
+      return rotation_axis(prop_rot).transform(
+          [&](int axis) { return Principal{prop_rot, axis}; });
     }
   }
-  if (!principal)
-    return false;
-  axes[2] = {*principal, 1};
+  return std::nullopt;
+}
 
-  auto const ortho = orthogonal_axes(prop_rot, rot_order);
-  if (ortho.empty())
-    return false;
-
-  AxisTriple tmp;
-  tmp[2] = axes[2];
-  bool resolved = false;
+// The two in-plane axes (a, b) for a one-axis Laue class: the first orthogonal
+// axis whose image under prop_rot is, up to sign, another orthogonal axis,
+// chosen so the cell is not F-centred (|det| < 4). nullopt if none qualifies
+// (also covers an empty orthogonal-axis set).
+[[nodiscard]] std::optional<std::pair<SignedAxis, SignedAxis>>
+in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
   for (int first : ortho) {
-    tmp[0] = {first, 1};
-    Vector3i const axis_vec = prop_rot * rot_axis(first);
-    int second = 0;
-    int sign = 0;
+    Vector3i const axis_vec = p.prop_rot * rot_axis(first);
     for (int cand : ortho) {
-      sign = axis_sign(axis_vec, cand);
-      if (sign != 0) {
-        second = cand;
-        break;
+      int const sign = axis_sign(axis_vec, cand);
+      if (sign == 0) {
+        continue;
       }
-    }
-    if (sign == 0)
-      continue; // no matching second axis
-    tmp[1] = {second, sign};
-    if (std::abs(transformation_from_axes(tmp).determinant()) < 4) {
-      // < 4 avoids the F-centred (det 4) choice.
-      axes[0] = tmp[0];
-      axes[1] = tmp[1];
-      resolved = true;
-      break;
+      AxisTriple const tmp{{SignedAxis{first, 1}, SignedAxis{cand, sign},
+                            SignedAxis{p.axis, 1}}};
+      if (std::abs(transformation_from_axes(tmp).determinant()) < 4) {
+        return std::pair{SignedAxis{first, 1}, SignedAxis{cand, sign}};
+      }
+      break; // only the first matching second axis is considered per `first`
     }
   }
-  if (!resolved)
-    return false;
+  return std::nullopt;
+}
 
-  if (transformation_from_axes(axes).determinant() < 0)
-    std::swap(axes[0], axes[1]);
-  return true;
+// Laue classes 4/m, 4/mmm, -3, -3m, 6/m, 6/mmm (laue_one_axis).
+[[nodiscard]] std::optional<AxisTriple> laue_one_axis(PointSymmetry const &ps,
+                                                      int rot_order) {
+  return principal_axis(ps, rot_order).and_then([&](Principal const &p) {
+    return in_plane_axes(p, orthogonal_axes(p.prop_rot, rot_order))
+        .transform([&](std::pair<SignedAxis, SignedAxis> const &ab) {
+          AxisTriple axes{{ab.first, ab.second, SignedAxis{p.axis, 1}}};
+          if (transformation_from_axes(axes).determinant() < 0) {
+            std::swap(axes[0], axes[1]);
+          }
+          return axes;
+        });
+  });
 }
 
 void sort_axes(AxisTriple &axes) {
-  if (axes[1].index > axes[2].index)
+  if (axes[1].index > axes[2].index) {
     std::swap(axes[1], axes[2]);
-  if (axes[0].index > axes[1].index)
+  }
+  if (axes[0].index > axes[1].index) {
     std::swap(axes[0], axes[1]);
-  if (axes[1].index > axes[2].index)
+  }
+  if (axes[1].index > axes[2].index) {
     std::swap(axes[1], axes[2]);
-  if (transformation_from_axes(axes).determinant() < 0)
+  }
+  if (transformation_from_axes(axes).determinant() < 0) {
     std::swap(axes[1], axes[2]);
+  }
 }
 
 // Laue classes mmm, m-3, m-3m (lauennn, 3D path).
@@ -487,20 +503,21 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
     if ((prop_rot.trace() == -1 && rot_order == 2) ||
         (prop_rot.trace() == 1 && rot_order == 4)) {
       auto const axis = rotation_axis(prop_rot);
-      if (!axis)
+      if (!axis) {
         continue;
-      bool dup = false;
-      for (int i = 0; i < count; ++i)
-        if (idx[static_cast<std::size_t>(i)] == *axis)
-          dup = true;
-      if (!dup && count < 3)
+      }
+      auto const seen = std::ranges::subrange(idx.begin(), idx.begin() + count);
+      if (std::ranges::find(seen, *axis) == seen.end() && count < 3) {
         idx[static_cast<std::size_t>(count++)] = *axis;
+      }
     }
   }
-  if (count != 3)
+  if (count != 3) {
     return false; // mmm / m-3 / m-3m each have exactly three such axes
-  for (int i = 0; i < 3; ++i)
-    axes[static_cast<std::size_t>(i)] = {idx[static_cast<std::size_t>(i)], 1};
+  }
+  for (auto [a, id] : std::views::zip(axes, idx)) {
+    a = {id, 1};
+  }
   sort_axes(axes);
   return true;
 }
@@ -517,12 +534,22 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
     return lauennn(axes, ps, 2);
   case Laue::laue_4m:
   case Laue::laue_4mmm:
-    return laue_one_axis(axes, ps, 4);
+    return laue_one_axis(ps, 4)
+        .transform([&](AxisTriple const &a) {
+          axes = a;
+          return true;
+        })
+        .value_or(false);
   case Laue::laue_3:
   case Laue::laue_3m:
   case Laue::laue_6m:
   case Laue::laue_6mmm:
-    return laue_one_axis(axes, ps, 3);
+    return laue_one_axis(ps, 3)
+        .transform([&](AxisTriple const &a) {
+          axes = a;
+          return true;
+        })
+        .value_or(false);
   case Laue::laue_m3:
     return lauennn(axes, ps, 2);
   case Laue::laue_m3m:
@@ -535,13 +562,15 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
 } // namespace
 
 PointGroup pointgroup_by_number(int number) noexcept {
-  if (number < 1 || number > 32)
+  if (number < 1 || number > 32) {
     return {};
+  }
   PgEntry const &e = kPointgroupData[static_cast<std::size_t>(number)];
   return {number, e.symbol, e.schoenflies, e.holohedry, e.laue};
 }
 
-int identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
+inline int
+identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
   return pointgroup_number(unique_rotations(rotations));
 }
 
@@ -549,14 +578,16 @@ Result<PointgroupTransform>
 get_pointgroup(std::span<Matrix3i const> rotations) {
   PointSymmetry const ps = unique_rotations(rotations);
   int const pg_num = pointgroup_number(ps);
-  if (pg_num == 0)
+  if (pg_num == 0) {
     return leaf::new_error(e_pointgroup_not_found{});
+  }
 
   PointgroupTransform result;
   result.pointgroup = pointgroup_by_number(pg_num);
   AxisTriple axes;
-  if (!get_axes(axes, result.pointgroup.laue, ps))
+  if (!get_axes(axes, result.pointgroup.laue, ps)) {
     return leaf::new_error(e_pointgroup_not_found{});
+  }
   result.transformation = transformation_from_axes(axes);
   return result;
 }
@@ -564,8 +595,10 @@ get_pointgroup(std::span<Matrix3i const> rotations) {
 std::vector<Matrix3i> rotations_of(SymmetryOperations const &ops) {
   std::vector<Matrix3i> r;
   r.reserve(ops.size());
-  for (auto const &op : ops)
-    r.push_back(op.rotation);
+
+  std::ranges::transform(ops, std::back_inserter(r),
+                         &SymmetryOperation::rotation);
+
   return r;
 }
 
