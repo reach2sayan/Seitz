@@ -13,11 +13,13 @@
 #include <spglib/core/types.hpp>
 #include <spglib/core/version.hpp>
 #include <spglib/data/spg_database.hpp>
+#include <spglib/dataset.hpp>
 #include <spglib/math/fractional.hpp>
 #include <spglib/math/integer_matrix.hpp>
 #include <spglib/reduce/delaunay.hpp>
 #include <spglib/reduce/niggli.hpp>
 #include <spglib/spacegroup/hall_symbol.hpp>
+#include <spglib/spacegroup/spacegroup.hpp>
 #include <spglib/symmetry/find_symmetry.hpp>
 #include <spglib/symmetry/pointgroup.hpp>
 #include <spglib/symmetry/primitive.hpp>

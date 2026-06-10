@@ -47,7 +47,7 @@ argsort_by_distance(Matrix3d const &lattice, Positions const &pos,
 
 bool is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
                 double symprec) noexcept {
-  Vector3d diff = math::nearest_offset(a - b);
+  Vector3d const diff = math::nearest_offset(a - b);
   return (lattice * diff).norm() <= symprec;
 }
 

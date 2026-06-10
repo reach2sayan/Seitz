@@ -13,6 +13,14 @@ inline constexpr double kDefaultSymprec = 1e-5;
 // instead of wrapping them up to ~1.
 inline constexpr double kZeroPrec = 1e-10;
 
+// True when |lhs| is longer than |rhs| by more than the near-tie tolerance,
+// given their squared norms. Order is preserved on near-equal lengths, matching
+// the reference spglib's "> ... + ZERO_PREC" length comparisons.
+[[nodiscard]] constexpr bool sqnorm_longer(double lhs_sqnorm,
+                                           double rhs_sqnorm) {
+  return lhs_sqnorm > rhs_sqnorm + kZeroPrec;
+}
+
 // An angle tolerance in degrees, or std::nullopt to derive an effective value
 // from symprec (spglib expresses the latter as a negative angle tolerance).
 using AngleTolerance = std::optional<double>;

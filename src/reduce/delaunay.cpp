@@ -1,5 +1,6 @@
 #include <spglib/reduce/delaunay.hpp>
 
+#include <spglib/core/tolerance.hpp>
 #include <spglib/math/integer_matrix.hpp>
 
 #include <array>
@@ -12,7 +13,6 @@ namespace spglib::reduce {
 
 namespace {
 
-constexpr double kZeroPrec = 1e-10;
 constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
 
 // Extended Delaunay basis {b1, b2, b3, b4} with b4 = -(b1 + b2 + b3).
@@ -106,7 +106,115 @@ if_unimodular(Matrix3d const &red, Matrix3d const &lattice, double symprec) {
       });
 }
 
+// ---- 2D Delaunay (space-group monoclinic path, lattice rank 2) ----
+
+// Extended 2D basis {p, q, -(p+q)} for the plane spanned by columns j, k.
+// Overload of extended_basis distinguished by its two-vector argument list.
+[[nodiscard]] std::array<Vector3d, 3> extended_basis(Vector3d const &p,
+                                                     Vector3d const &q) {
+  return {p, q, Vector3d(-(p + q))};
+}
+
+// One rank-2 Delaunay step: if any pair has a positive dot product, fold the
+// third vector by +2*b[i], flip b[i], and report "not yet reduced"
+// (delaunay.c delaunay_reduce_basis_2D, lattice_rank == 2). The rank-2 / rank-3
+// overloads are distinguished by the basis array size.
+[[nodiscard]] bool reduce_step(std::array<Vector3d, 3> &b, double symprec) {
+  for (std::size_t i = 0; i < 2; ++i)
+    for (std::size_t j = i + 1; j < 3; ++j)
+      if (b[i].dot(b[j]) > symprec) {
+        for (std::size_t k = 0; k < 3; ++k)
+          if (k != i && k != j) {
+            b[k] += 2 * b[i];
+            break;
+          }
+        b[i] = -b[i];
+        return false;
+      }
+  return true;
+}
+
+[[nodiscard]] std::optional<std::array<Vector3d, 3>>
+reduce_basis(std::array<Vector3d, 3> b, double symprec) {
+  for (std::size_t attempt = 0; attempt < kMaxAttempts; ++attempt)
+    if (reduce_step(b, symprec)) {
+      return b;
+    }
+  return std::nullopt;
+}
+
+// From {b0, b1, b2, b0+b1} pick the two shortest in-plane vectors that, with
+// `unique_vec`, span a non-degenerate cell (delaunay.c
+// get_delaunay_shortest_vectors_2D, lattice_rank == 2). Returns {first,
+// second}. Overload distinguished from the rank-3 shortest_vectors by the
+// `unique_vec` argument.
+[[nodiscard]] std::array<Vector3d, 2>
+shortest_vectors(std::array<Vector3d, 3> const &basis,
+                 Vector3d const &unique_vec, double symprec) {
+  std::array<Vector3d, 4> b{basis[0], basis[1], basis[2],
+                            Vector3d(basis[0] + basis[1])};
+
+  // Bubble sort ascending by squared norm, preserving order on near-ties
+  // (matches the reference's "> ... + ZERO_PREC" comparator exactly; a plain
+  // std::ranges::sort would reorder near-equal vectors and change which one is
+  // picked below).
+  for (std::size_t pass = 0; pass < 3; ++pass)
+    for (std::size_t j = 0; j < 3; ++j)
+      if (sqnorm_longer(b[j].squaredNorm(), b[j + 1].squaredNorm())) {
+        std::swap(b[j], b[j + 1]);
+      }
+
+  std::array<Vector3d, 2> out{b[0], b[0]};
+  for (std::size_t i = 1; i < 4; ++i) {
+    Matrix3d m;
+    m.col(0) = b[0];
+    m.col(1) = unique_vec;
+    m.col(2) = b[i];
+    if (std::abs(m.determinant()) > symprec) {
+      out[1] = b[i];
+      break;
+    }
+  }
+  return out;
+}
+
 } // namespace
+
+Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, int unique_axis,
+                                 double symprec) {
+  // The two in-plane axes (j < k) are those other than the unique axis.
+  static constexpr std::array<std::array<int, 2>, 3> planes{{
+      {{1, 2}},
+      {{0, 2}},
+      {{0, 1}},
+  }};
+
+  const auto [j, k] = planes[unique_axis];
+  Vector3d const unique_vec = lattice.col(unique_axis);
+
+  auto const reduced =
+      reduce_basis(extended_basis(lattice.col(j), lattice.col(k)), symprec)
+          .transform([&](std::array<Vector3d, 3> const &b) {
+            return shortest_vectors(b, unique_vec, symprec);
+          });
+  if (!reduced) {
+    return leaf::new_error(e_delaunay_failed{});
+  }
+
+  Matrix3d red;
+  red.col(unique_axis) = unique_vec;
+  red.col(j) = (*reduced)[0];
+  red.col(k) = (*reduced)[1];
+
+  double const volume = red.determinant();
+  if (std::abs(volume) < symprec) {
+    return leaf::new_error(e_delaunay_failed{});
+  }
+  if (volume < 0.0) {
+    red.col(unique_axis) = -red.col(unique_axis);
+  }
+  return red;
+}
 
 Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, double symprec) {
   auto const reduced = reduce_basis(extended_basis(lattice), symprec)

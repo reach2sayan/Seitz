@@ -168,6 +168,77 @@ inline SpglibSpacegroupType reference_spacegroup_type(int hall_number) {
   return spg_get_spacegroup_type(hall_number);
 }
 
+// Reference space-group determination (spg_get_dataset). number == 0 signals
+// failure. Strings are copied out before the dataset is freed.
+struct RefDataset {
+  int number = 0;
+  int hall_number = 0;
+  std::string international; // short Hermann-Mauguin
+  std::string hall_symbol;
+  std::string choice;
+  std::string pointgroup;
+  int n_operations = 0;
+  SymmetryOperations operations;
+  int n_std_atoms = 0;
+  Matrix3d std_lattice;
+  Matrix3d std_rotation_matrix;
+  Matrix3d transformation_matrix;
+  Vector3d origin_shift;
+  // standardized cell positions/types and per-atom Wyckoff data
+  Positions std_positions;
+  std::vector<int> std_types;
+  std::vector<int> wyckoffs;
+  std::vector<int> equivalent_atoms;
+  std::vector<std::string> site_symmetry_symbols;
+};
+
+inline RefDataset reference_dataset(Cell const &cell, double symprec) {
+  CCell c(cell);
+  SpglibDataset *ds = spg_get_dataset(c.lattice, c.pos_mut(), c.types.data(),
+                                      c.num_atom(), symprec);
+  RefDataset out;
+  if (ds == nullptr) {
+    return out;
+  }
+  out.number = ds->spacegroup_number;
+  out.hall_number = ds->hall_number;
+  out.international = ds->international_symbol;
+  out.hall_symbol = ds->hall_symbol;
+  out.choice = ds->choice;
+  out.pointgroup = ds->pointgroup_symbol;
+  out.n_operations = ds->n_operations;
+  for (int s = 0; s < ds->n_operations; ++s) {
+    Matrix3i r;
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j)
+        r(i, j) = ds->rotations[s][i][j];
+    out.operations.push_back({r, Vector3d(ds->translations[s][0],
+                                          ds->translations[s][1],
+                                          ds->translations[s][2])});
+  }
+  from_c_lattice(out.std_lattice, ds->std_lattice);
+  from_c_lattice(out.std_rotation_matrix, ds->std_rotation_matrix);
+  from_c_lattice(out.transformation_matrix, ds->transformation_matrix);
+  out.origin_shift =
+      Vector3d(ds->origin_shift[0], ds->origin_shift[1], ds->origin_shift[2]);
+  out.n_std_atoms = ds->n_std_atoms;
+  out.std_positions = Positions(ds->n_std_atoms, 3);
+  out.std_types.resize(static_cast<std::size_t>(ds->n_std_atoms));
+  for (int i = 0; i < ds->n_std_atoms; ++i) {
+    out.std_positions.row(i) << ds->std_positions[i][0],
+        ds->std_positions[i][1], ds->std_positions[i][2];
+    out.std_types[static_cast<std::size_t>(i)] = ds->std_types[i];
+  }
+  out.wyckoffs.assign(ds->wyckoffs, ds->wyckoffs + ds->n_atoms);
+  out.equivalent_atoms.assign(ds->equivalent_atoms,
+                              ds->equivalent_atoms + ds->n_atoms);
+  for (int i = 0; i < ds->n_atoms; ++i) {
+    out.site_symmetry_symbols.emplace_back(ds->site_symmetry_symbols[i]);
+  }
+  spg_free_dataset(ds);
+  return out;
+}
+
 struct CPointgroup {
   int number;
   std::string symbol;

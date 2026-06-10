@@ -223,6 +223,24 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
   return ops;
 }
 
+SymmetryOperations reduce_symmetry(Cell const &cell,
+                                   SymmetryOperations const &operations,
+                                   double symprec,
+                                   AngleTolerance angle_tolerance) {
+  auto const lat_sym = lattice_symmetry(cell, symprec, angle_tolerance);
+  if (!lat_sym) {
+    return {};
+  }
+  OverlapChecker const checker(cell);
+  auto survives = [&](SymmetryOperation const &op) {
+    return std::ranges::any_of(
+               *lat_sym, [&](Matrix3i const &r) { return r == op.rotation; }) &&
+           checker.check_total_overlap(op.translation, op.rotation, symprec);
+  };
+  auto kept = operations | std::views::filter(survives);
+  return {kept.begin(), kept.end()};
+}
+
 std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
   std::optional<int> const min_index = index_with_least_atoms(cell);
   if (!min_index)

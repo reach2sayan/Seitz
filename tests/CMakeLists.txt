@@ -9,6 +9,7 @@ add_executable(cppcrystal_tests
         test_primitive.cpp
         test_database.cpp
         test_database_indexing.cpp
+        test_sitesym_database.cpp
         test_hall_symbol.cpp)
 target_link_libraries(cppcrystal_tests PRIVATE
         cppcrystal::cppcrystal
@@ -26,7 +27,8 @@ if (SPGLIB_BUILD_ORACLE_TESTS)
             test_oracle_symmetry.cpp
             test_oracle_pointgroup.cpp
             test_oracle_primitive.cpp
-            test_oracle_database.cpp)
+            test_oracle_database.cpp
+            test_oracle_spacegroup.cpp)
     target_link_libraries(cppcrystal_oracle_tests PRIVATE
             cppcrystal::cppcrystal
             Spglib::symspg

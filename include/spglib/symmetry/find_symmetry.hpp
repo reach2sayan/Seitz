@@ -25,6 +25,15 @@ lattice_symmetry(Cell const &cell, double symprec,
 find_symmetry(Cell const &cell, double symprec,
               AngleTolerance angle_tolerance = std::nullopt);
 
+// Re-filter `operations` at a (usually tighter) tolerance: keep only those
+// whose rotation is still a lattice symmetry of `cell` at `symprec` and whose
+// translation still maps the cell onto itself within `symprec`. Port of
+// symmetry.c sym_reduce_operation. Returns an empty set if the lattice symmetry
+// cannot be determined at this tolerance.
+[[nodiscard]] SymmetryOperations
+reduce_symmetry(Cell const &cell, SymmetryOperations const &operations,
+                double symprec, AngleTolerance angle_tolerance = std::nullopt);
+
 // Pure translations: every t for which (identity, t) maps the cell onto itself
 // (the centering translations, including the zero translation). These number
 // (cell size) / (primitive size). Port of sym_get_pure_translation.

@@ -12,14 +12,14 @@ namespace spglib::math {
 // Fold a coordinate into [0, 1) with a small negative tolerance (spglib
 // `mat_Dmod1`): a value within kZeroPrec below zero stays near zero rather than
 // wrapping up to ~1.
-[[nodiscard]] inline double mod1(double a) noexcept {
+[[nodiscard]] constexpr double mod1(double a) noexcept {
   double const b = a - nint(a);
   return b < -kZeroPrec ? b + 1.0 : b;
 }
 
 // Centered remainder in [-0.5, 0.5] (spglib `mat_rem1`) — the minimal-image
 // offset.
-[[nodiscard]] inline double rem1(double a) noexcept { return a - nint(a); }
+[[nodiscard]] constexpr double rem1(double a) noexcept { return a - nint(a); }
 
 [[nodiscard]] inline Vector3d mod1(Vector3d const &v) noexcept {
   return {mod1(v[0]), mod1(v[1]), mod1(v[2])};

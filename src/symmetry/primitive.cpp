@@ -37,12 +37,14 @@ constexpr double kTrimIncreaseRate = 2.0;
 [[nodiscard]] std::optional<Cell> smallest_lattice_cell(Cell const &cell,
                                                         double symprec) {
   auto const min_lat = reduce::delaunay_reduce(cell.lattice(), symprec);
-  if (!min_lat)
+  if (!min_lat) {
     return std::nullopt;
+  }
   Matrix3d const trans = min_lat->inverse() * cell.lattice();
   Positions pos(cell.size(), 3);
-  for (Index i = 0; i < cell.size(); ++i)
+  for (Index i = 0; i < cell.size(); ++i) {
     pos.row(i) = math::mod1(Vector3d(trans * cell.position(i))).transpose();
+  }
   return Cell(*min_lat, pos, cell.types());
 }
 
@@ -68,8 +70,9 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
         tmp.col(1) = cell.lattice() * cand[j];
         tmp.col(2) = cell.lattice() * cand[k];
         double const volume = std::abs(tmp.determinant());
-        if (volume <= symprec || math::nint(init_volume / volume) != multi)
+        if (volume <= symprec || math::nint(init_volume / volume) != multi) {
           continue;
+        }
 
         Matrix3d relative;
         relative.col(0) = cand[i];
@@ -80,14 +83,15 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
         auto const rel_inv = math::inverse(relative, symprec);
         if (rel_inv) {
           Matrix3i const inv_int = math::round_to_int(*rel_inv);
-          if (std::abs(inv_int.determinant()) == multi)
+          if (std::abs(inv_int.determinant()) == multi) {
             relative = inv_int.cast<double>().inverse();
+          }
         }
         Matrix3d const prim = cell.lattice() * relative;
         auto const reduced = reduce::delaunay_reduce(prim, symprec);
-        if (reduced)
-          return *reduced;
-        return std::nullopt; // matches spglib: first valid triple only
+        // matches spglib: first valid triple only
+        return reduced.has_value() ? std::optional<Matrix3d>(reduced.value())
+                                   : std::nullopt;
       }
   return std::nullopt;
 }
@@ -99,19 +103,22 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
   int const n = static_cast<int>(cell.size());
   int const ratio = std::abs(
       math::nint(cell.lattice().determinant() / trimmed_lattice.determinant()));
-  if (ratio == 0 || n % ratio != 0)
+  if (ratio == 0 || n % ratio != 0) {
     return std::nullopt;
+  }
 
   Matrix3i const tmat =
       math::round_to_int(Matrix3d(trimmed_lattice.inverse() * cell.lattice()));
-  if (std::abs(tmat.determinant()) != ratio)
+  if (std::abs(tmat.determinant()) != ratio) {
     return std::nullopt;
+  }
 
   // Atom positions expressed in the trimmed basis, folded into [0, 1).
   Positions pos(n, 3);
-  for (int i = 0; i < n; ++i)
+  for (int i = 0; i < n; ++i) {
     pos.row(i) = math::mod1(Vector3d(tmat.cast<double>() * cell.position(i)))
                      .transpose();
+  }
 
   // Overlap table with tolerance adjustment until each class has `ratio` atoms.
   std::vector<int> overlap(static_cast<std::size_t>(n));
@@ -121,13 +128,14 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
 
     for (int i = 0; i < n; ++i) {
       overlap[static_cast<std::size_t>(i)] = i;
-      for (int j = 0; j < n; ++j)
+      for (int j = 0; j < n; ++j) {
         if (cell.type(i) == cell.type(j) &&
             overlap[static_cast<std::size_t>(j)] == j &&
             is_overlap(row(pos, i), row(pos, j), trimmed_lattice, tol)) {
           overlap[static_cast<std::size_t>(i)] = j;
           break;
         }
+      }
     }
 
     bool retry = false;
@@ -179,8 +187,7 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
       double const pk = pos(k, l);
       if (std::abs(pk - pi) > 0.5) {
         tpos(j, l) += pi < pk ? pi + 1.0 : pi - 1.0;
-      }
-      else {
+      } else {
         tpos(j, l) += pi;
       }
     }
@@ -194,7 +201,7 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
 } // namespace
 
 Result<Primitive> find_primitive(Cell const &cell, double symprec,
-                                 AngleTolerance /*angle_tolerance*/) {
+                                 AngleTolerance angle_tolerance) {
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttempt;
        ++attempt, tolerance *= kReduceRate) {
@@ -210,7 +217,8 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
       }
       std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
       std::iota(mapping.begin(), mapping.end(), 0);
-      return Primitive{std::move(*smallest), std::move(mapping)};
+      return Primitive{std::move(*smallest), std::move(mapping), cell.lattice(),
+                       tolerance, angle_tolerance};
     }
 
     auto const prim_lat = primitive_lattice(cell, pure, tolerance);
@@ -221,7 +229,8 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
     if (!trimmed) {
       continue;
     }
-    return Primitive{std::move(trimmed->first), std::move(trimmed->second)};
+    return Primitive{std::move(trimmed->first), std::move(trimmed->second),
+                     cell.lattice(), tolerance, angle_tolerance};
   }
   return leaf::new_error(e_cell_standardization_failed{});
 }

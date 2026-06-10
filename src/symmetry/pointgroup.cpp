@@ -393,31 +393,20 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
     return false;
   }
 
-  int min_norm = 8;
-  bool found = false;
-  for (int idx : ortho) {
-    int const norm = rot_axis(idx).squaredNorm();
-    if (norm < min_norm) {
-      min_norm = norm;
-      axes[0] = {idx, 1};
-      found = true;
-    }
-  }
-  if (!found) {
+  // a and b: the two shortest orthogonal axes (distinct), min_element keeping
+  // the first occurrence on ties to match spglib's scan order.
+  auto const sqnorm = [](int idx) { return rot_axis(idx).squaredNorm(); };
+
+  axes[0] = {*std::ranges::min_element(ortho, {}, sqnorm), 1};
+
+  auto rest =
+      ortho | std::views::filter([&](int idx) { return idx != axes[0].index; });
+  auto const second = std::ranges::min_element(rest, {}, sqnorm);
+  if (second == rest.end()) {
     return false;
   }
-
-  min_norm = 8;
-  found = false;
-  for (int idx : ortho) {
-    int const norm = rot_axis(idx).squaredNorm();
-    if (norm < min_norm && idx != axes[0].index) {
-      min_norm = norm;
-      axes[2] = {idx, 1};
-      found = true;
-    }
-  }
-  return found;
+  axes[2] = {*second, 1};
+  return true;
 }
 
 // The principal (c) axis of a one-axis Laue class: the proper rotation of
@@ -446,9 +435,9 @@ struct Principal {
 // (also covers an empty orthogonal-axis set).
 [[nodiscard]] std::optional<std::pair<SignedAxis, SignedAxis>>
 in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
-  for (int first : ortho) {
+  for (int const first : ortho) {
     Vector3i const axis_vec = p.prop_rot * rot_axis(first);
-    for (int cand : ortho) {
+    for (int const cand : ortho) {
       int const sign = axis_sign(axis_vec, cand);
       if (sign == 0) {
         continue;

@@ -1,12 +1,9 @@
 #include <spglib/data/spg_database.hpp>
 
-#include <spglib/data/spacegroup_tables.hpp>
+#include <spglib/data/spacegroup_operation_tables.hpp>
 
 #include <array>
-#include <cassert>
 #include <cstdint>
-#include <ranges>
-#include <utility>
 
 namespace spglib::data {
 
@@ -25,8 +22,8 @@ constexpr auto kDecodedOps = [] {
   std::array<DecodedOp, kSymmetryOperations.size()> out{};
   for (std::size_t k = 0; k < kSymmetryOperations.size(); ++k) {
     int const encoded = kSymmetryOperations[k];
-    int r = encoded % 19683; // 3^9
-    int digit = 6561;        // 3^8
+    int const r = encoded % 19683; // 3^9
+    int digit = 6561;              // 3^8
     for (std::size_t e = 0; e < 9; ++e) {
       out[k].rot[e] = static_cast<std::int8_t>((r % (digit * 3)) / digit - 1);
       digit /= 3;
@@ -47,57 +44,37 @@ constexpr auto kDecodedOps = [] {
   rot << d.rot[0], d.rot[1], d.rot[2], d.rot[3], d.rot[4], d.rot[5], d.rot[6],
       d.rot[7], d.rot[8];
 
-  const Vector3d trans{d.trans_num[0] / 12.0, d.trans_num[1] / 12.0,
+  Vector3d const trans{d.trans_num[0] / 12.0, d.trans_num[1] / 12.0,
                        d.trans_num[2] / 12.0};
 
   return {rot, trans};
 }
 
-[[nodiscard]] Database build_database() {
-  Database db;
+// Materialise every Hall setting's operations once, indexed by Hall number
+// (1..530). Index 0 is the empty sentinel for out-of-range queries.
+[[nodiscard]] std::array<SymmetryOperations, kNumHallNumbers + 1>
+build_operations() {
+  std::array<SymmetryOperations, kNumHallNumbers + 1> ops;
   for (int hall = 1; hall <= kNumHallNumbers; ++hall) {
-    auto const &r = kSpacegroupTypes[static_cast<std::size_t>(hall)];
-    db.catalog.insert(SpacegroupType{
-        hall, r.number, r.schoenflies, r.hall_symbol, r.international,
-        r.international_full, r.international_short, r.choice,
-        static_cast<Centering>(r.centering), r.pointgroup_number});
-
     auto const &idx = kSymmetryOperationIndex[static_cast<std::size_t>(hall)];
-    SymmetryOperations ops;
-    ops.reserve(static_cast<std::size_t>(idx[0]));
-
-    std::ranges::transform(
-        std::views::iota(0, idx[0]), std::back_inserter(ops), [&](int i) {
-          return make_operation(
-              kDecodedOps[static_cast<std::size_t>(idx[1] + i)]);
-        });
-    db.operations.emplace(hall, std::move(ops));
+    SymmetryOperations v;
+    v.reserve(static_cast<std::size_t>(idx[0]));
+    for (int i = 0; i < idx[0]; ++i) {
+      v.push_back(
+          make_operation(kDecodedOps[static_cast<std::size_t>(idx[1] + i)]));
+    }
+    ops[static_cast<std::size_t>(hall)] = std::move(v);
   }
-  // Integrity check (debug only): every Hall setting must be present once. A
-  // duplicate key would have made a hashed_unique / flat_map insert silently
-  // fail, shrinking these below 530.
-  assert(db.catalog.size() == static_cast<std::size_t>(kNumHallNumbers));
-  assert(db.operations.size() == static_cast<std::size_t>(kNumHallNumbers));
-  return db;
+  return ops;
 }
 
 } // namespace
 
-Database const &database() {
-  static Database const db = build_database();
-  return db;
-}
-
-SymmetryOperations operations_from_database(int hall_number) {
-  auto const &ops = database().operations;
-  auto const it = ops.find(hall_number);
-  return it == ops.end() ? SymmetryOperations{} : it->second;
-}
-
-SpacegroupType spacegroup_type(int hall_number) {
-  auto const &by_hall = database().catalog.get<ByHall>();
-  auto const it = by_hall.find(hall_number);
-  return it == by_hall.end() ? SpacegroupType{} : *it;
+SymmetryOperations const &operations_from_database(int hall_number) {
+  static std::array<SymmetryOperations, kNumHallNumbers + 1> const ops =
+      build_operations();
+  bool const in_range = hall_number >= 1 && hall_number <= kNumHallNumbers;
+  return ops[static_cast<std::size_t>(in_range ? hall_number : 0)];
 }
 
 } // namespace spglib::data

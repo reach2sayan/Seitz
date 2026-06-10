@@ -19,7 +19,7 @@ TEST_CASE(
   int nonzero_shift = 0;
   int first_unmatched = 0;
   for (int hall = 1; hall <= data::kNumHallNumbers; ++hall) {
-    auto const &ops = data::database().operations.at(hall);
+    auto const &ops = data::operations_from_database(hall);
     auto const centering = data::spacegroup_type(hall).centering;
     auto const shift =
         spacegroup::match_hall_symbol(bravais, hall, centering, ops, 1e-5);
@@ -44,7 +44,7 @@ TEST_CASE(
 TEST_CASE("a representative selection of Hall settings match", "[hall]") {
   Matrix3d const bravais = Matrix3d::Identity() * 4.0;
   for (int hall : {1, 2, 3, 108, 349, 430, 462, 489, 523, 530}) {
-    auto const &ops = data::database().operations.at(hall);
+    auto const &ops = data::operations_from_database(hall);
     auto const centering = data::spacegroup_type(hall).centering;
     INFO("hall " << hall);
     CHECK(spacegroup::match_hall_symbol(bravais, hall, centering, ops, 1e-5)

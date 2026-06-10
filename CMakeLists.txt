@@ -31,6 +31,7 @@ add_library(cppcrystal)
 add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
 target_sources(cppcrystal PRIVATE
         src/version.cpp
+        src/dataset.cpp
         src/core/overlap.cpp
         src/reduce/delaunay.cpp
         src/reduce/niggli.cpp
@@ -38,7 +39,13 @@ target_sources(cppcrystal PRIVATE
         src/symmetry/pointgroup.cpp
         src/symmetry/primitive.cpp
         src/data/spg_database.cpp
-        src/spacegroup/hall_symbol.cpp)
+        src/data/sitesym_database.cpp
+        src/spacegroup/hall_symbol.cpp
+        src/spacegroup/spacegroup.cpp
+        src/refine/refinement.cpp
+        src/refine/site_symmetry.cpp
+        src/refine/standardize.cpp
+        src/refine/operations.cpp)
 target_include_directories(cppcrystal PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)

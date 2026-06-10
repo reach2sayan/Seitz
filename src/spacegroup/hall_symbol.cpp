@@ -1,6 +1,7 @@
 #include <spglib/spacegroup/hall_symbol.hpp>
 
 #include <spglib/core/overlap.hpp>
+#include <spglib/data/hall_classification.hpp>
 #include <spglib/data/hall_generators_view.hpp>
 #include <spglib/math/fractional.hpp>
 
@@ -132,7 +133,7 @@ unpack_generators(data::GeneratorSet const &g) {
                                     std::array<Matrix3i, 3> const &rot,
                                     std::array<Vector3d, 3> const &trans,
                                     Centering c, data::VSpUSet const &vspu) {
-  auto const &db_ops = data::database().operations.at(hall_number);
+  auto const &db_ops = data::operations_from_database(hall_number);
   data::DwVector dw = data::DwVector::Zero();
   for (std::size_t i = 0; i < 3; ++i) {
     if (rot[i].determinant() == 0) {
@@ -159,7 +160,7 @@ unpack_generators(data::GeneratorSet const &g) {
                                      Centering c,
                                      SymmetryOperations const &symmetry,
                                      double symprec) {
-  auto const &db_ops = data::database().operations.at(hall_number);
+  auto const &db_ops = data::operations_from_database(hall_number);
   boost::container::static_vector<std::uint8_t, 192> found(db_ops.size(), 0);
   for (const auto &op : symmetry) {
     const auto it = std::ranges::find_if(
@@ -196,7 +197,7 @@ unpack_generators(data::GeneratorSet const &g) {
                                   SymmetryOperations const &symmetry,
                                   Centering c, data::GeneratorSet const &gens,
                                   data::VSpUSet const &vspu, double symprec) {
-  auto const &db_ops = data::database().operations.at(hall_number);
+  auto const &db_ops = data::operations_from_database(hall_number);
   if (db_ops.size() != symmetry.size()) {
     return false;
   }
@@ -227,48 +228,16 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
   });
 }
 
-[[nodiscard]] constexpr bool is_rhombohedral_hall(int h) {
-  switch (h) {
-  case 433:
-  case 434:
-  case 436:
-  case 437:
-  case 444:
-  case 445:
-  case 450:
-  case 451:
-  case 452:
-  case 453:
-  case 458:
-  case 459:
-  case 460:
-  case 461:
-    return true;
-  default:
-    return false;
-  }
-}
-
-[[nodiscard]] bool is_rhombo_h_setting(int h) {
-  switch (h) {
-  case 433:
-  case 436:
-  case 444:
-  case 450:
-  case 452:
-  case 458:
-  case 460:
-    return true;
-  default:
-    return false;
-  }
-}
-
 [[nodiscard]] bool dispatch(Vector3d &shift, int hall_number,
                             Matrix3d const &prim, SymmetryOperations const &sym,
                             Centering c, double symprec) {
   using namespace data;
-  if (489 <= hall_number && hall_number <= 530) { // cubic
+  // Crystal system and the rhombohedral subsets are pure functions of the Hall
+  // number, precomputed once in data::kHallClass. The VSpU/generator choice
+  // below still depends on the runtime Centering c, so it stays here.
+  HallClass const &hc = hall_class(hall_number);
+  switch (hc.system) {
+  case Holohedry::cubic:
     if (c == Centering::primitive)
       return try_entries(shift, hall_number, prim, sym, c, cubic_generators,
                          cubic_VSpU, symprec);
@@ -279,13 +248,12 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
       return try_entries(shift, hall_number, prim, sym, c, cubic_generators,
                          cubic_F_VSpU, symprec);
     return false;
-  }
-  if (462 <= hall_number && hall_number <= 488) // hexagonal
+  case Holohedry::hexagonal:
     return try_entries(shift, hall_number, prim, sym, Centering::primitive,
                        hexa_generators, hexa_VSpU, symprec);
-  if (430 <= hall_number && hall_number <= 461) { // trigonal / rhombohedral
-    if (is_rhombohedral_hall(hall_number)) {
-      if (is_rhombo_h_setting(hall_number))
+  case Holohedry::trigonal:
+    if (hc.rhombohedral) {
+      if (hc.rhombo_hex_setting)
         return try_entries(shift, hall_number, prim, sym, Centering::r_center,
                            rhombo_h_generators, rhombo_h_VSpU, symprec);
       return try_entries(shift, hall_number, prim, sym, Centering::primitive,
@@ -293,8 +261,7 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
     }
     return try_entries(shift, hall_number, prim, sym, Centering::primitive,
                        trigo_generators, trigo_VSpU, symprec);
-  }
-  if (349 <= hall_number && hall_number <= 429) { // tetragonal
+  case Holohedry::tetragonal:
     if (c == Centering::primitive)
       return try_entries(shift, hall_number, prim, sym, c, tetra_generators,
                          tetra_VSpU, symprec);
@@ -302,8 +269,7 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
       return try_entries(shift, hall_number, prim, sym, c, tetra_generators,
                          tetra_I_VSpU, symprec);
     return false;
-  }
-  if (108 <= hall_number && hall_number <= 348) { // orthorhombic
+  case Holohedry::orthorhombic:
     switch (c) {
     case Centering::primitive:
       return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
@@ -326,8 +292,7 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
     default:
       return false;
     }
-  }
-  if (3 <= hall_number && hall_number <= 107) { // monoclinic
+  case Holohedry::monoclinic:
     switch (c) {
     case Centering::primitive:
       return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
@@ -347,11 +312,13 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
     default:
       return false;
     }
-  }
-  if (1 <= hall_number && hall_number <= 2) // triclinic
+  case Holohedry::triclinic:
     return try_entries(shift, hall_number, prim, sym, Centering::primitive,
                        tricli_generators, tricli_VSpU, symprec);
-  return false;
+  case Holohedry::none:
+  default:
+    return false;
+  }
 }
 
 } // namespace

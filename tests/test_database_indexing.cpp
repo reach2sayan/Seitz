@@ -1,14 +1,14 @@
-// Equivalence test guarding the database refactor: the new map-based access
-// (multi_index catalog + flat_map, via the public accessors) must agree with
-// the original direct constexpr-array indexing for every Hall number. This is
+// Equivalence test guarding the database refactor: the constexpr catalog +
+// lazily-built operations cache (via the public accessors) must agree with the
+// original direct constexpr-array indexing for every Hall number. This is
 // independent of the reference oracle, so it runs in the standalone suite.
 
-#include <spglib/data/spacegroup_tables.hpp> // raw tables (old indexing)
-#include <spglib/data/spg_database.hpp>      // accessors (new indexing)
+#include <spglib/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
+#include <spglib/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
+#include <spglib/data/spg_database.hpp>                // accessors (new indexing)
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <iterator>
 #include <string_view>
 
 using namespace spglib;
@@ -55,16 +55,16 @@ TEST_CASE("new map access matches old array indexing for all 530 Hall numbers",
   int op_mismatches = 0;
   int type_mismatches = 0;
   for (int hall = 1; hall <= data::kNumHallNumbers; ++hall) {
-    // --- operations: offset-decoded vs flat_map ---
+    // --- operations: offset-decoded vs lazily-built cache ---
     auto const old_ops = operations_by_offset(hall);
-    auto const &new_ops = data::database().operations.at(hall);
+    auto const &new_ops = data::operations_from_database(hall);
     bool ops_ok = old_ops.size() == new_ops.size();
     for (std::size_t s = 0; ops_ok && s < old_ops.size(); ++s)
       ops_ok = old_ops[s].rotation == new_ops[s].rotation &&
                old_ops[s].translation == new_ops[s].translation;
     op_mismatches += ops_ok ? 0 : 1;
 
-    // --- metadata: raw array entry vs multi_index catalog ---
+    // --- metadata: raw array entry vs constexpr catalog ---
     auto const &raw = data::kSpacegroupTypes[static_cast<std::size_t>(hall)];
     auto const t = data::spacegroup_type(hall);
     bool const type_ok =
@@ -87,13 +87,14 @@ TEST_CASE("the by-number catalog index enumerates every Hall setting",
           "[database]") {
   // Total settings across all 230 space-group numbers must be exactly 530, and
   // space group 3 (P2) has three Hall settings (b, c, a unique-axis choices).
-  auto const &by_number = data::database().catalog.get<data::ByNumber>();
   std::size_t total = 0;
   for (int n = 1; n <= 230; ++n) {
-    auto const range = by_number.equal_range(n);
-    total += static_cast<std::size_t>(std::distance(range.first, range.second));
+    total += data::kCatalog.with_number(n).size();
   }
   CHECK(total == static_cast<std::size_t>(data::kNumHallNumbers));
-  CHECK(std::distance(by_number.equal_range(3).first,
-                      by_number.equal_range(3).second) == 3);
+  CHECK(data::kCatalog.with_number(3).size() == 3);
+
+  // The catalog is a genuine constant expression.
+  static_assert(data::spacegroup_type(1).number == 1);
+  static_assert(data::kCatalog.with_number(3).size() == 3);
 }

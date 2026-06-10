@@ -14,4 +14,15 @@ namespace spglib::reduce {
 [[nodiscard]] Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice,
                                                double symprec);
 
+// 2D Delaunay reduction within the plane spanned by the two axes other than
+// `unique_axis`; the unique axis column is left untouched. Space-group path
+// only (aperiodic_axis = -1, lattice rank 2). Returns the reduced lattice
+// (columns = basis vectors), made right-handed by flipping the unique axis if
+// needed. Port of delaunay.c del_layer_delaunay_reduce_2D. The extra
+// `unique_axis` argument distinguishes this from the 3D overload above.
+//
+// Errors with e_delaunay_failed when the reduced cell is degenerate.
+[[nodiscard]] Result<Matrix3d>
+delaunay_reduce(Matrix3d const &lattice, int unique_axis, double symprec);
+
 } // namespace spglib::reduce
