@@ -1,6 +1,7 @@
 #include <spglib/symmetry/find_symmetry.hpp>
 
 #include <spglib/core/overlap.hpp>
+#include <spglib/core/validation.hpp>
 #include <spglib/math/fractional.hpp>
 #include <spglib/math/integer_matrix.hpp>
 #include <spglib/reduce/delaunay.hpp>
@@ -205,6 +206,9 @@ Result<PointSymmetry> lattice_symmetry(Cell const &cell, double symprec,
 
 Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
                                          AngleTolerance angle_tolerance) {
+  if (auto valid = validate_cell(cell); !valid) {
+    return valid.error();
+  }
   BOOST_LEAF_AUTO(lat_sym, lattice_symmetry(cell, symprec, angle_tolerance));
   if (lat_sym.empty())
     return leaf::new_error(e_symmetry_operation_search_failed{});

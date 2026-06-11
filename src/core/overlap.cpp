@@ -59,7 +59,8 @@ OverlapChecker::OverlapChecker(Cell const &cell)
       argsort_by_distance(cell.lattice(), cell.positions(), cell.types());
   for (auto const [i, src] : perm | std::views::enumerate) {
     pos_sorted_.row(i) = cell.positions().row(src);
-    types_sorted_[static_cast<std::size_t>(i)] = cell.types()[src];
+    types_sorted_[static_cast<std::size_t>(i)] =
+        cell.types()[static_cast<std::size_t>(src)];
   }
 }
 

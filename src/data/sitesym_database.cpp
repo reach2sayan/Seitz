@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <ranges>
 #include <string_view>
 
 namespace spglib::data {
@@ -60,13 +61,14 @@ static_assert(kWyckoffDecoded[1].rot ==
 static_assert(kWyckoffDecoded[1].trans_num ==
               std::array<std::int8_t, 3>{0, 0, 0});
 
-// Per-Hall Wyckoff ranges, precomputed once at compile time from kPositionWyckoff
-// (the hall_number domain is fixed at 1..530). Index 0 is the out-of-range
-// sentinel ({0, 0}); valid Hall numbers index directly. kPositionWyckoff has
-// kNumHalls + 2 entries (0..531), so this table holds kNumHalls + 1.
+// Per-Hall Wyckoff ranges, precomputed once at compile time from
+// kPositionWyckoff (the hall_number domain is fixed at 1..530). Index 0 is the
+// out-of-range sentinel ({0, 0}); valid Hall numbers index directly.
+// kPositionWyckoff has kNumHalls + 2 entries (0..531), so this table holds
+// kNumHalls + 1.
 constexpr auto kWyckoffRanges = [] {
   std::array<WyckoffRange, kPositionWyckoff.size() - 1> t{};
-  for (std::size_t h = 1; h < t.size(); ++h) {
+  for (std::size_t const h : std::views::iota(std::size_t{1}, t.size())) {
     int const start = kPositionWyckoff[h];
     t[h] = WyckoffRange{start, kPositionWyckoff[h + 1] - start};
   }
@@ -89,13 +91,12 @@ WyckoffCoordinate wyckoff_coordinate(int index) {
 
 WyckoffRange wyckoff_indices(int hall_number) {
   bool const in_range =
-      hall_number >= 1 && static_cast<std::size_t>(hall_number) < kWyckoffRanges.size();
+      hall_number >= 1 &&
+      static_cast<std::size_t>(hall_number) < kWyckoffRanges.size();
   return kWyckoffRanges[static_cast<std::size_t>(in_range ? hall_number : 0)];
 }
 
 std::string_view site_symmetry_symbol(int index) {
-  // The table is pre-trimmed at generation time (spglib's spgdb_remove_space is
-  // applied in tools/transcribe_sitesym_database.py), so this is a plain lookup.
   return kSiteSymmetrySymbols[static_cast<std::size_t>(index)];
 }
 

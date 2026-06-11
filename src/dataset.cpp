@@ -1,5 +1,6 @@
 #include <spglib/dataset.hpp>
 
+#include <spglib/core/validation.hpp>
 #include <spglib/refine/operations.hpp>
 #include <spglib/refine/refinement.hpp>
 #include <spglib/refine/standardize.hpp>
@@ -24,6 +25,9 @@ constexpr double kReduceRateOuter = 0.9; // determination.c REDUCE_RATE_OUTER
 
 Result<Dataset> get_dataset(Cell const &cell, double symprec,
                             AngleTolerance angle_tolerance, int hall_number) {
+  if (auto valid = validate_cell(cell); !valid) {
+    return valid.error();
+  }
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttemptOuter;
        ++attempt, tolerance *= kReduceRateOuter) {

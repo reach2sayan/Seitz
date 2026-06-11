@@ -21,11 +21,15 @@ namespace {
 with_origin_shift(SymmetryOperations const &conv_sym, Vector3d const &shift) {
   SymmetryOperations out;
   out.reserve(conv_sym.size());
-  for (auto const &op : conv_sym) {
-    Matrix3d const r_minus_e =
-        op.rotation.cast<double>() - Matrix3d::Identity();
-    out.push_back({op.rotation, Vector3d(op.translation + r_minus_e * shift)});
-  }
+  std::ranges::transform(
+      conv_sym, std::back_inserter(out), [&](const auto &op) {
+        const Matrix3d r_minus_e =
+            op.rotation.template cast<double>() - Matrix3d::Identity();
+
+        return SymmetryOperation{op.rotation,
+                                 Vector3d(op.translation + r_minus_e * shift)};
+      });
+
   return out;
 }
 
@@ -78,11 +82,18 @@ primitive_db_symmetry(Matrix3d const &t_mat,
 [[nodiscard]] std::vector<Vector3d>
 lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
   std::vector<Vector3d> out;
-  for (int i = 0; i < frame[0]; ++i)
-    for (int j = 0; j < frame[1]; ++j)
+  out.reserve(static_cast<std::size_t>(frame[0]) *
+              static_cast<std::size_t>(frame[1]) *
+              static_cast<std::size_t>(frame[2]));
+
+  for (int i = 0; i < frame[0]; ++i) {
+    for (int j = 0; j < frame[1]; ++j) {
       for (int k = 0; k < frame[2]; ++k) {
-        out.push_back(math::mod1(Vector3d(inv_tmat * Vector3d(i, j, k))));
+        out.emplace_back(math::mod1(Vector3d(inv_tmat * Vector3d(i, j, k))));
       }
+    }
+  }
+
   return out;
 }
 
@@ -91,13 +102,17 @@ lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
 unique_translations(Matrix3d const &lattice,
                     std::vector<Vector3d> const &candidates, double symprec) {
   std::vector<Vector3d> out;
-  for (auto const &t : candidates) {
-    if (std::ranges::none_of(out, [&](Vector3d const &u) {
-          return is_overlap(t, u, lattice, symprec);
-        })) {
-      out.push_back(t);
+  out.reserve(candidates.size());
+  for (const auto &t : candidates) {
+    const bool duplicate = std::ranges::any_of(out, [&](const Vector3d &u) {
+      return is_overlap(t, u, lattice, symprec);
+    });
+
+    if (!duplicate) {
+      out.emplace_back(t);
     }
   }
+
   return out;
 }
 
@@ -108,6 +123,7 @@ symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
                           Matrix3d const &lattice,
                           SymmetryOperations const &prim_sym, double symprec) {
   SymmetryOperations out;
+  out.reserve(prim_sym.size());
   for (auto const &op : prim_sym) {
     Matrix3d const rot_d =
         inv_tmat * op.rotation.cast<double>() * t_mat.cast<double>();
@@ -115,9 +131,10 @@ symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
     Matrix3d const lat_i = lattice * rot_i.cast<double>();
     Matrix3d const lat_d = lattice * rot_d;
     if ((lat_i - lat_d).cwiseAbs().maxCoeff() <= symprec) {
-      out.push_back({rot_i, Vector3d(inv_tmat * op.translation)});
+      out.emplace_back(rot_i, Vector3d(inv_tmat * op.translation));
     }
   }
+  out.shrink_to_fit();
   return out;
 }
 
@@ -129,9 +146,10 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
   out.reserve(pure_trans.size() * t_sym.size());
   for (Vector3d const &p : pure_trans) {
     for (auto const &op : t_sym) {
-      out.push_back({op.rotation, math::mod1(Vector3d(op.translation + p))});
+      out.emplace_back(op.rotation, math::mod1(Vector3d(op.translation + p)));
     }
   }
+  out.shrink_to_fit();
   return out;
 }
 

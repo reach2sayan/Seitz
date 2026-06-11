@@ -59,33 +59,51 @@ make_matrices(double const (&data)[Rows][3][3]) {
 // First 36 entries of change_of_basis_monocli (the 3D bulk choices; layer
 // entries 36..47 are out of scope).
 [[nodiscard]] std::array<Matrix3d, 36> const &change_of_basis_monocli() {
-  static double const d[36][3][3] = {
-      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},     {{0, 0, 1}, {0, -1, 0}, {1, 0, 0}},
-      {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},     {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}},
-      {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},     {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
-      {{-1, 0, 1}, {0, 1, 0}, {-1, 0, 0}},   {{1, 0, -1}, {0, -1, 0}, {0, 0, -1}},
-      {{0, 1, -1}, {1, 0, 0}, {0, 0, -1}},   {{-1, -1, 0}, {0, 0, 1}, {-1, 0, 0}},
-      {{1, -1, 0}, {0, 0, 1}, {0, -1, 0}},   {{0, 1, 1}, {1, 0, 0}, {0, 1, 0}},
-      {{0, 0, -1}, {0, 1, 0}, {1, 0, -1}},   {{-1, 0, 0}, {0, -1, 0}, {-1, 0, 1}},
-      {{0, -1, 0}, {1, 0, 0}, {0, -1, 1}},   {{0, 1, 0}, {0, 0, 1}, {1, 1, 0}},
-      {{-1, 0, 0}, {0, 0, 1}, {-1, 1, 0}},   {{0, 0, -1}, {1, 0, 0}, {0, -1, -1}},
-      {{1, 0, 0}, {0, -1, 0}, {0, 0, -1}},   {{0, 0, -1}, {0, 1, 0}, {1, 0, 0}},
-      {{0, 0, 1}, {-1, 0, 0}, {0, -1, 0}},   {{-1, 0, 0}, {0, 0, -1}, {0, -1, 0}},
-      {{0, 1, 0}, {0, 0, -1}, {-1, 0, 0}},   {{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}},
-      {{-1, 0, -1}, {0, -1, 0}, {-1, 0, 0}}, {{1, 0, 1}, {0, 1, 0}, {0, 0, 1}},
-      {{0, -1, -1}, {-1, 0, 0}, {0, 0, -1}}, {{1, -1, 0}, {0, 0, -1}, {1, 0, 0}},
-      {{-1, -1, 0}, {0, 0, -1}, {0, -1, 0}}, {{0, -1, 1}, {-1, 0, 0}, {0, -1, 0}},
-      {{0, 0, 1}, {0, -1, 0}, {1, 0, 1}},    {{-1, 0, 0}, {0, 1, 0}, {-1, 0, -1}},
-      {{0, 1, 0}, {-1, 0, 0}, {0, 1, 1}},    {{0, 1, 0}, {0, 0, -1}, {-1, 1, 0}},
-      {{1, 0, 0}, {0, 0, -1}, {1, 1, 0}},    {{0, 0, -1}, {-1, 0, 0}, {0, 1, -1}},
+  static double constexpr d[36][3][3] = {
+      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+      {{0, 0, 1}, {0, -1, 0}, {1, 0, 0}},
+      {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
+      {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}},
+      {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},
+      {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
+      {{-1, 0, 1}, {0, 1, 0}, {-1, 0, 0}},
+      {{1, 0, -1}, {0, -1, 0}, {0, 0, -1}},
+      {{0, 1, -1}, {1, 0, 0}, {0, 0, -1}},
+      {{-1, -1, 0}, {0, 0, 1}, {-1, 0, 0}},
+      {{1, -1, 0}, {0, 0, 1}, {0, -1, 0}},
+      {{0, 1, 1}, {1, 0, 0}, {0, 1, 0}},
+      {{0, 0, -1}, {0, 1, 0}, {1, 0, -1}},
+      {{-1, 0, 0}, {0, -1, 0}, {-1, 0, 1}},
+      {{0, -1, 0}, {1, 0, 0}, {0, -1, 1}},
+      {{0, 1, 0}, {0, 0, 1}, {1, 1, 0}},
+      {{-1, 0, 0}, {0, 0, 1}, {-1, 1, 0}},
+      {{0, 0, -1}, {1, 0, 0}, {0, -1, -1}},
+      {{1, 0, 0}, {0, -1, 0}, {0, 0, -1}},
+      {{0, 0, -1}, {0, 1, 0}, {1, 0, 0}},
+      {{0, 0, 1}, {-1, 0, 0}, {0, -1, 0}},
+      {{-1, 0, 0}, {0, 0, -1}, {0, -1, 0}},
+      {{0, 1, 0}, {0, 0, -1}, {-1, 0, 0}},
+      {{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}},
+      {{-1, 0, -1}, {0, -1, 0}, {-1, 0, 0}},
+      {{1, 0, 1}, {0, 1, 0}, {0, 0, 1}},
+      {{0, -1, -1}, {-1, 0, 0}, {0, 0, -1}},
+      {{1, -1, 0}, {0, 0, -1}, {1, 0, 0}},
+      {{-1, -1, 0}, {0, 0, -1}, {0, -1, 0}},
+      {{0, -1, 1}, {-1, 0, 0}, {0, -1, 0}},
+      {{0, 0, 1}, {0, -1, 0}, {1, 0, 1}},
+      {{-1, 0, 0}, {0, 1, 0}, {-1, 0, -1}},
+      {{0, 1, 0}, {-1, 0, 0}, {0, 1, 1}},
+      {{0, 1, 0}, {0, 0, -1}, {-1, 1, 0}},
+      {{1, 0, 0}, {0, 0, -1}, {1, 1, 0}},
+      {{0, 0, -1}, {-1, 0, 0}, {0, 1, -1}},
   };
-  static auto const table = make_matrices<36>(d);
+  static auto table = make_matrices<36>(d);
   return table;
 }
 
 [[nodiscard]] std::array<Centering, 36> const &change_of_centering_monocli() {
   using enum Centering;
-  static std::array<Centering, 36> const t = {
+  static constexpr std::array<Centering, 36> const t = {
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
       a_face, b_face, b_face, body,   body,   body,   body,   body,   body,
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
@@ -93,8 +111,8 @@ make_matrices(double const (&data)[Rows][3][3]) {
   return t;
 }
 
-[[nodiscard]] std::array<int, 36> const &change_of_unique_axis_monocli() {
-  static std::array<int, 36> const t = {1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
+[[nodiscard]] constexpr std::array<int, 36> const &change_of_unique_axis_monocli() {
+  static constexpr std::array<int, 36> const t = {1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
                                         1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
                                         1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0};
   return t;
@@ -131,41 +149,53 @@ make_matrices(double const (&data)[Rows][3][3]) {
 }
 
 [[nodiscard]] std::array<Matrix3d, 6> const &change_of_basis_rhombo() {
-  static double const d[6][3][3] = {
-      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},     {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
-      {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},     {{0, 0, -1}, {0, -1, 0}, {-1, 0, 0}},
-      {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}},  {{-1, 0, 0}, {0, 0, -1}, {0, -1, 0}}};
+  static double const d[6][3][3] = {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+                                    {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
+                                    {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},
+                                    {{0, 0, -1}, {0, -1, 0}, {-1, 0, 0}},
+                                    {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}},
+                                    {{-1, 0, 0}, {0, 0, -1}, {0, -1, 0}}};
   static auto const table = make_matrices<6>(d);
   return table;
 }
 
 [[nodiscard]] std::array<Matrix3d, 6> const &change_of_basis_rhombo_hex() {
-  static double const d[6][3][3] = {
-      {{1, 0, 1}, {-1, 1, 1}, {0, -1, 1}},   {{0, -1, 1}, {1, 0, 1}, {-1, 1, 1}},
-      {{-1, 1, 1}, {0, -1, 1}, {1, 0, 1}},   {{0, 1, -1}, {1, -1, -1}, {-1, 0, -1}},
-      {{1, -1, -1}, {-1, 0, -1}, {0, 1, -1}}, {{-1, 0, -1}, {0, 1, -1}, {1, -1, -1}}};
+  static double const d[6][3][3] = {{{1, 0, 1}, {-1, 1, 1}, {0, -1, 1}},
+                                    {{0, -1, 1}, {1, 0, 1}, {-1, 1, 1}},
+                                    {{-1, 1, 1}, {0, -1, 1}, {1, 0, 1}},
+                                    {{0, 1, -1}, {1, -1, -1}, {-1, 0, -1}},
+                                    {{1, -1, -1}, {-1, 0, -1}, {0, 1, -1}},
+                                    {{-1, 0, -1}, {0, 1, -1}, {1, -1, -1}}};
   static auto const table = make_matrices<6>(d);
   return table;
 }
 
 [[nodiscard]] std::array<Matrix3d, 8> const &change_of_basis_C4() {
-  static double const d[8][3][3] = {
-      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},   {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
-      {{-1, 0, 0}, {0, -1, 0}, {0, 0, 1}}, {{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}},
-      {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},  {{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}},
-      {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}}, {{1, 0, 0}, {0, -1, 0}, {0, 0, -1}}};
+  static double const d[8][3][3] = {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+                                    {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
+                                    {{-1, 0, 0}, {0, -1, 0}, {0, 0, 1}},
+                                    {{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}},
+                                    {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
+                                    {{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}},
+                                    {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}},
+                                    {{1, 0, 0}, {0, -1, 0}, {0, 0, -1}}};
   static auto const table = make_matrices<8>(d);
   return table;
 }
 
 [[nodiscard]] std::array<Matrix3d, 12> const &change_of_basis_C6() {
-  static double const d[12][3][3] = {
-      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},   {{1, -1, 0}, {1, 0, 0}, {0, 0, 1}},
-      {{0, -1, 0}, {1, -1, 0}, {0, 0, 1}}, {{-1, 0, 0}, {0, -1, 0}, {0, 0, 1}},
-      {{-1, 1, 0}, {-1, 0, 0}, {0, 0, 1}}, {{0, 1, 0}, {-1, 1, 0}, {0, 0, 1}},
-      {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},  {{-1, 1, 0}, {0, 1, 0}, {0, 0, -1}},
-      {{-1, 0, 0}, {-1, 1, 0}, {0, 0, -1}}, {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}},
-      {{1, -1, 0}, {0, -1, 0}, {0, 0, -1}}, {{1, 0, 0}, {1, -1, 0}, {0, 0, -1}}};
+  static double const d[12][3][3] = {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
+                                     {{1, -1, 0}, {1, 0, 0}, {0, 0, 1}},
+                                     {{0, -1, 0}, {1, -1, 0}, {0, 0, 1}},
+                                     {{-1, 0, 0}, {0, -1, 0}, {0, 0, 1}},
+                                     {{-1, 1, 0}, {-1, 0, 0}, {0, 0, 1}},
+                                     {{0, 1, 0}, {-1, 1, 0}, {0, 0, 1}},
+                                     {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
+                                     {{-1, 1, 0}, {0, 1, 0}, {0, 0, -1}},
+                                     {{-1, 0, 0}, {-1, 1, 0}, {0, 0, -1}},
+                                     {{0, -1, 0}, {-1, 0, 0}, {0, 0, -1}},
+                                     {{1, -1, 0}, {0, -1, 0}, {0, 0, -1}},
+                                     {{1, 0, 0}, {1, -1, 0}, {0, 0, -1}}};
   static auto const table = make_matrices<12>(d);
   return table;
 }
@@ -173,33 +203,35 @@ make_matrices(double const (&data)[Rows][3][3]) {
 // ---- correction / fixed matrices -------------------------------------------
 
 [[nodiscard]] Matrix3d const &monocli_i2c() {
-  static Matrix3d const m = (Matrix3d() << 1, 0, -1, 0, 1, 0, 1, 0, 0).finished();
+  static Matrix3d const m =
+      (Matrix3d() << 1, 0, -1, 0, 1, 0, 1, 0, 0).finished();
   return m;
 }
 [[nodiscard]] Matrix3d const &monocli_a2c() {
-  static Matrix3d const m = (Matrix3d() << 0, 0, 1, 0, -1, 0, 1, 0, 0).finished();
+  static Matrix3d const m =
+      (Matrix3d() << 0, 0, 1, 0, -1, 0, 1, 0, 0).finished();
   return m;
 }
 [[nodiscard]] Matrix3d const &a2c() {
-  static Matrix3d const m = (Matrix3d() << 0, 0, 1, 1, 0, 0, 0, 1, 0).finished();
+  static Matrix3d const m =
+      (Matrix3d() << 0, 0, 1, 1, 0, 0, 0, 1, 0).finished();
   return m;
 }
 [[nodiscard]] Matrix3d const &b2c() {
-  static Matrix3d const m = (Matrix3d() << 0, 1, 0, 0, 0, 1, 1, 0, 0).finished();
+  static Matrix3d const m =
+      (Matrix3d() << 0, 1, 0, 0, 0, 1, 1, 0, 0).finished();
   return m;
 }
 [[nodiscard]] Matrix3d const &rhombo_obverse() {
-  static Matrix3d const m =
-      (Matrix3d() << 2. / 3, -1. / 3, -1. / 3, 1. / 3, 1. / 3, -2. / 3, 1. / 3,
-       1. / 3, 1. / 3)
-          .finished();
+  static Matrix3d const m = (Matrix3d() << 2. / 3, -1. / 3, -1. / 3, 1. / 3,
+                             1. / 3, -2. / 3, 1. / 3, 1. / 3, 1. / 3)
+                                .finished();
   return m;
 }
 [[nodiscard]] Matrix3d const &rhomb_reverse() {
-  static Matrix3d const m =
-      (Matrix3d() << 1. / 3, -2. / 3, 1. / 3, 2. / 3, -1. / 3, -1. / 3, 1. / 3,
-       1. / 3, 1. / 3)
-          .finished();
+  static Matrix3d const m = (Matrix3d() << 1. / 3, -2. / 3, 1. / 3, 2. / 3,
+                             -1. / 3, -1. / 3, 1. / 3, 1. / 3, 1. / 3)
+                                .finished();
   return m;
 }
 
@@ -289,20 +321,24 @@ is_equivalent_lattice(int mode, Matrix3d const &lattice, Matrix3d const &orig,
 // get_base_center: detect the base-centering type encoded in an integer
 // transformation matrix.
 [[nodiscard]] Centering get_base_center(Matrix3i const &tmat) {
-  for (int i = 0; i < 3; ++i) // C center
-    if (tmat(i, 0) == 0 && tmat(i, 1) == 0 && std::abs(tmat(i, 2)) == 1) {
-      return Centering::c_face;
-    }
-  for (int i = 0; i < 3; ++i) // A center
-    if (std::abs(tmat(i, 0)) == 1 && tmat(i, 1) == 0 && tmat(i, 2) == 0) {
-      return Centering::a_face;
-    }
-  for (int i = 0; i < 3; ++i) // B center
-    if (tmat(i, 0) == 0 && std::abs(tmat(i, 1)) == 1 && tmat(i, 2) == 0) {
-      return Centering::b_face;
-    }
+  auto const axis = std::views::iota(0, 3);
+  if (std::ranges::any_of(axis, [&](int i) { // C center
+        return tmat(i, 0) == 0 && tmat(i, 1) == 0 && std::abs(tmat(i, 2)) == 1;
+      })) {
+    return Centering::c_face;
+  }
+  if (std::ranges::any_of(axis, [&](int i) { // A center
+        return std::abs(tmat(i, 0)) == 1 && tmat(i, 1) == 0 && tmat(i, 2) == 0;
+      })) {
+    return Centering::a_face;
+  }
+  if (std::ranges::any_of(axis, [&](int i) { // B center
+        return tmat(i, 0) == 0 && std::abs(tmat(i, 1)) == 1 && tmat(i, 2) == 0;
+      })) {
+    return Centering::b_face;
+  }
   // body center: every row's absolute coordinate sum is 2
-  bool const body = std::ranges::all_of(std::views::iota(0, 3), [&](int i) {
+  bool const body = std::ranges::all_of(axis, [&](int i) {
     return std::abs(tmat(i, 0)) + std::abs(tmat(i, 1)) + std::abs(tmat(i, 2)) ==
            2;
   });
@@ -459,9 +495,8 @@ struct MatchResult {
 [[nodiscard]] std::optional<MatchResult>
 try_hall(Matrix3d const &conv_lattice, int hall_number, Centering centering,
          SymmetryOperations const &symmetry, double symprec) {
-  auto const shift =
-      match_hall_symbol(conv_lattice, hall_number, centering, symmetry,
-                        symprec);
+  auto const shift = match_hall_symbol(conv_lattice, hall_number, centering,
+                                       symmetry, symprec);
   if (!shift) {
     return std::nullopt;
   }
@@ -516,10 +551,9 @@ match_db_rhombo(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
         Centering::r_center, conv_symmetry, symprec);
   }
   // rhombohedral (a=b=c) setting
-  return match_db_change_of_basis_loop(conv_lattice, orig_lattice,
-                                       change_of_basis_rhombo(), hall_number,
-                                       Centering::primitive, conv_symmetry,
-                                       symprec);
+  return match_db_change_of_basis_loop(
+      conv_lattice, orig_lattice, change_of_basis_rhombo(), hall_number,
+      Centering::primitive, conv_symmetry, symprec);
 }
 
 [[nodiscard]] std::optional<MatchResult>
@@ -541,11 +575,10 @@ match_db_others(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                                        centering, conv_symmetry, symprec);
 }
 
-[[nodiscard]] std::optional<MatchResult>
-match_db_cubic_in_loop(Matrix3d const &conv_lattice,
-                       Matrix3d const *orig_lattice, Matrix3d const &change,
-                       int hall_number, Centering centering,
-                       SymmetryOperations const &conv_symmetry, double symprec) {
+[[nodiscard]] std::optional<MatchResult> match_db_cubic_in_loop(
+    Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
+    Matrix3d const &change, int hall_number, Centering centering,
+    SymmetryOperations const &conv_symmetry, double symprec) {
   Matrix3d change_of_basis = change;
   Matrix3d changed_lattice = conv_lattice * change_of_basis;
 
@@ -579,9 +612,9 @@ match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
     }
   }
   for (Matrix3d const &change : change_of_basis_ortho()) {
-    if (auto r = match_db_cubic_in_loop(conv_lattice, nullptr, change,
-                                        hall_number, centering, conv_symmetry,
-                                        symprec)) {
+    if (auto r =
+            match_db_cubic_in_loop(conv_lattice, nullptr, change, hall_number,
+                                   centering, conv_symmetry, symprec)) {
       return r;
     }
   }
@@ -681,15 +714,16 @@ struct MonocliCandidate {
   std::array<double, 2> norms_squared{0.0, 0.0};
 };
 
-[[nodiscard]] MonocliCandidate match_db_monocli_in_loop(
-    Matrix3d conv_lattice, int change_of_basis_index,
-    Matrix3d const *orig_lattice, bool check_norms, int hall_number,
-    Centering centering, SymmetryOperations const &conv_symmetry,
-    double symprec) {
+[[nodiscard]] MonocliCandidate
+match_db_monocli_in_loop(Matrix3d conv_lattice, int change_of_basis_index,
+                         Matrix3d const *orig_lattice, bool check_norms,
+                         int hall_number, Centering centering,
+                         SymmetryOperations const &conv_symmetry,
+                         double symprec) {
   auto const idx = static_cast<std::size_t>(change_of_basis_index);
-  Centering const changed_centering =
-      (centering == Centering::c_face) ? change_of_centering_monocli()[idx]
-                                       : centering;
+  Centering const changed_centering = (centering == Centering::c_face)
+                                          ? change_of_centering_monocli()[idx]
+                                          : centering;
 
   Matrix3d change_of_basis = change_of_basis_monocli()[idx];
   conv_lattice = conv_lattice * change_of_basis;
@@ -734,9 +768,8 @@ struct MonocliCandidate {
 
   SymmetryOperations const changed_symmetry = get_conventional_symmetry(
       change_of_basis, Centering::primitive, conv_symmetry);
-  auto const shift = match_hall_symbol(conv_lattice, hall_number,
-                                       changed_centering, changed_symmetry,
-                                       symprec);
+  auto const shift = match_hall_symbol(
+      conv_lattice, hall_number, changed_centering, changed_symmetry, symprec);
   if (!shift) {
     return {};
   }
@@ -754,12 +787,11 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                            group_number == 11;
 
   std::array<MonocliCandidate, 36> found;
-  std::ranges::transform(
-      std::views::iota(0, 36), found.begin(), [&](int i) {
-        return match_db_monocli_in_loop(conv_lattice, i, orig_lattice,
-                                        check_norms, hall_number, centering,
-                                        conv_symmetry, symprec);
-      });
+  std::ranges::transform(std::views::iota(0, 36), found.begin(), [&](int i) {
+    return match_db_monocli_in_loop(conv_lattice, i, orig_lattice, check_norms,
+                                    hall_number, centering, conv_symmetry,
+                                    symprec);
+  });
 
   auto is_found = [](MonocliCandidate const &c) { return c.status != 0; };
   if (std::ranges::none_of(found, is_found)) {
@@ -795,9 +827,9 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
 // match_hall_symbol_db: dispatch by holohedry to the per-system matcher.
 [[nodiscard]] std::optional<MatchResult>
 match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
-                     int hall_number, int pointgroup_number, Holohedry holohedry,
-                     Centering centering, SymmetryOperations const &symmetry,
-                     double symprec) {
+                     int hall_number, int pointgroup_number,
+                     Holohedry holohedry, Centering centering,
+                     SymmetryOperations const &symmetry, double symprec) {
   data::SpacegroupType const sg = data::spacegroup_type(hall_number);
   if (pointgroup_number != sg.pointgroup_number) {
     return std::nullopt;
@@ -876,9 +908,10 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
   // Delaunay) and update the integer transformation.
   if (laue == Laue::laue_1 || laue == Laue::laue_2m) {
     Matrix3d const conv_tmp = prim_lat * tmat_int.cast<double>();
-    auto const updated = (laue == Laue::laue_1)
-                             ? change_basis_tricli(conv_tmp, prim_lat, symprec)
-                             : change_basis_monocli(conv_tmp, prim_lat, symprec);
+    auto const updated =
+        (laue == Laue::laue_1)
+            ? change_basis_tricli(conv_tmp, prim_lat, symprec)
+            : change_basis_monocli(conv_tmp, prim_lat, symprec);
     if (!updated) {
       return std::nullopt;
     }
@@ -893,15 +926,15 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
   Matrix3d const tmat = tmat_int.cast<double>() * centering->correction_mat;
   Matrix3d const conv_lattice = prim_lat * tmat;
 
-  SymmetryOperations const conv_symmetry = get_initial_conventional_symmetry(
-      centering->centering, tmat, symmetry);
+  SymmetryOperations const conv_symmetry =
+      get_initial_conventional_symmetry(centering->centering, tmat, symmetry);
 
   Matrix3d const &orig_lattice = primitive.orig_lattice;
   for (int const hall_number : candidates) {
-    auto const match = match_hall_symbol_db(
-        conv_lattice, &orig_lattice, hall_number, ptg->pointgroup.number,
-        ptg->pointgroup.holohedry, centering->centering, conv_symmetry,
-        symprec);
+    auto const match =
+        match_hall_symbol_db(conv_lattice, &orig_lattice, hall_number,
+                             ptg->pointgroup.number, ptg->pointgroup.holohedry,
+                             centering->centering, conv_symmetry, symprec);
     if (match) {
       return SearchResult{hall_number, match->conv_lattice,
                           match->origin_shift};
@@ -950,11 +983,10 @@ iterative_search_hall_number(std::span<int const> candidates,
   return true;
 }
 
-[[nodiscard]] Result<Spacegroup>
-search_spacegroup_with_symmetry(std::span<int const> candidates,
-                                Primitive const &primitive,
-                                SymmetryOperations const &symmetry,
-                                double symprec, AngleTolerance angle_tolerance) {
+[[nodiscard]] Result<Spacegroup> search_spacegroup_with_symmetry(
+    std::span<int const> candidates, Primitive const &primitive,
+    SymmetryOperations const &symmetry, double symprec,
+    AngleTolerance angle_tolerance) {
   if (!point_symmetry_intact(symmetry)) {
     return leaf::new_error(e_spacegroup_search_failed{});
   }
@@ -980,10 +1012,69 @@ Result<Spacegroup> search_spacegroup(Primitive const &primitive,
   if (hall_number != 0) {
     std::array<int, 1> const candidate = {hall_number};
     return search_spacegroup_with_symmetry(candidate, primitive, symmetry,
-                                            symprec, angle_tolerance);
+                                           symprec, angle_tolerance);
   }
   return search_spacegroup_with_symmetry(spacegroup_to_hall_number(), primitive,
                                          symmetry, symprec, angle_tolerance);
 }
+
+Result<Spacegroup>
+search_spacegroup_with_symmetry(SymmetryOperations const &operations,
+                                Matrix3d const &prim_lattice, double symprec) {
+  // A single notional atom at the origin; only the lattice matters here.
+  Positions pos(1, 3);
+  pos.setZero();
+  symmetry::Primitive const primitive{Cell(prim_lattice, pos, Types{1}),
+                                      std::vector<int>{0}, prim_lattice,
+                                      symprec, std::nullopt};
+  return search_spacegroup_with_symmetry(spacegroup_to_hall_number(), primitive,
+                                         operations, symprec, std::nullopt);
+}
+
+template <LatticeSetting Setting>
+Result<Spacegroup>
+spacegroup_type_from_symmetry(SymmetryOperations const &operations,
+                              Matrix3d const &lattice, double symprec) {
+  auto const prim = symmetry::primitive_symmetry(operations, symprec);
+  if (!prim) {
+    return leaf::new_error(e_spacegroup_search_failed{});
+  }
+  SymmetryOperations const &prim_sym = prim->first;
+  Matrix3d const &t_mat = prim->second;
+
+  Matrix3d prim_lat;
+  if constexpr (Setting == LatticeSetting::conventional) {
+    prim_lat = lattice * t_mat.inverse();
+  } else {
+    prim_lat = lattice;
+  }
+
+  // Niggli-reduce the primitive cell (required by the Hall-symbol matcher),
+  // then bring the operations into that reduced basis (=
+  // ref_get_primitive_symmetry; the rotations are already distinct, so it is
+  // just the change of basis).
+  BOOST_LEAF_AUTO(red_lat, reduce::niggli_reduce(prim_lat, symprec));
+  Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
+  Matrix3d const inv2 = t_mat2.inverse();
+  SymmetryOperations red_sym;
+  red_sym.reserve(prim_sym.size());
+  for (auto const &op : prim_sym) {
+    Matrix3d const rot_d = t_mat2 * op.rotation.cast<double>() * inv2;
+    red_sym.push_back(
+        {math::round_to_int(rot_d), Vector3d(t_mat2 * op.translation)});
+  }
+
+  return search_spacegroup_with_symmetry(red_sym, red_lat, symprec);
+}
+
+// Both lattice-setting specializations are used (the conventional one mirrors
+// spg_get_spacegroup_type_from_symmetry, the primitive one
+// spg_get_hall_number_from_symmetry).
+template Result<Spacegroup>
+spacegroup_type_from_symmetry<LatticeSetting::conventional>(
+    SymmetryOperations const &, Matrix3d const &, double);
+template Result<Spacegroup>
+spacegroup_type_from_symmetry<LatticeSetting::primitive>(
+    SymmetryOperations const &, Matrix3d const &, double);
 
 } // namespace spglib::spacegroup

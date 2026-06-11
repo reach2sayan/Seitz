@@ -189,7 +189,7 @@ Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, int unique_axis,
       {{0, 1}},
   }};
 
-  const auto [j, k] = planes[unique_axis];
+  const auto [j, k] = planes[static_cast<std::size_t>(unique_axis)];
   Vector3d const unique_vec = lattice.col(unique_axis);
 
   auto const reduced =

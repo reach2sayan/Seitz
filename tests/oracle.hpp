@@ -265,4 +265,162 @@ reference_pointgroup(std::vector<Matrix3i> const &rotations) {
   return {num, std::string(symbol), t};
 }
 
+// Reference grid-point index of a grid address (spg_get_dense_grid_point_from_
+// address).
+inline std::size_t reference_grid_point_from_address(Vector3i const &address,
+                                                     Vector3i const &mesh) {
+  int const a[3] = {address[0], address[1], address[2]};
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  return spg_get_dense_grid_point_from_address(a, m);
+}
+
+struct RefIrMesh {
+  std::size_t num_ir = 0;
+  std::vector<std::size_t> ir_mapping_table;
+  std::vector<Vector3i> grid_address;
+};
+
+// Convert a list of integer rotations to the C [][3][3] layout.
+inline std::vector<std::array<std::array<int, 3>, 3>>
+to_c_rotations(std::vector<Matrix3i> const &rotations) {
+  std::vector<std::array<std::array<int, 3>, 3>> out(rotations.size());
+  for (std::size_t s = 0; s < rotations.size(); ++s)
+    for (int i = 0; i < 3; ++i)
+      for (int j = 0; j < 3; ++j)
+        out[s][static_cast<std::size_t>(i)][static_cast<std::size_t>(j)] =
+            rotations[s](i, j);
+  return out;
+}
+
+inline RefIrMesh extract_ir_mesh(std::vector<std::array<int, 3>> const &ga,
+                                 std::vector<std::size_t> const &mapping,
+                                 std::size_t num_ir) {
+  RefIrMesh out;
+  out.num_ir = num_ir;
+  out.ir_mapping_table = mapping;
+  out.grid_address.reserve(ga.size());
+  for (auto const &a : ga)
+    out.grid_address.emplace_back(a[0], a[1], a[2]);
+  return out;
+}
+
+// Reference irreducible reciprocal mesh of a structure
+// (spg_get_dense_ir_reciprocal_mesh).
+inline RefIrMesh reference_ir_reciprocal_mesh(Cell const &cell,
+                                              Vector3i const &mesh,
+                                              Vector3i const &is_shift,
+                                              bool time_reversal,
+                                              double symprec) {
+  CCell c(cell);
+  auto const prod = static_cast<std::size_t>(mesh[0]) *
+                    static_cast<std::size_t>(mesh[1]) *
+                    static_cast<std::size_t>(mesh[2]);
+  std::vector<std::array<int, 3>> ga(prod);
+  std::vector<std::size_t> mapping(prod);
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  int const s[3] = {is_shift[0], is_shift[1], is_shift[2]};
+  std::size_t const num_ir = spg_get_dense_ir_reciprocal_mesh(
+      reinterpret_cast<int(*)[3]>(ga.data()), mapping.data(), m, s,
+      time_reversal ? 1 : 0, c.lattice, c.pos(), c.types.data(), c.num_atom(),
+      symprec);
+  return extract_ir_mesh(ga, mapping, num_ir);
+}
+
+// Reference q-stabilized mesh (spg_get_dense_stabilized_reciprocal_mesh).
+inline RefIrMesh reference_stabilized_reciprocal_mesh(
+    Vector3i const &mesh, Vector3i const &is_shift, bool time_reversal,
+    std::vector<Matrix3i> const &rotations,
+    std::vector<Vector3d> const &qpoints) {
+  auto const prod = static_cast<std::size_t>(mesh[0]) *
+                    static_cast<std::size_t>(mesh[1]) *
+                    static_cast<std::size_t>(mesh[2]);
+  std::vector<std::array<int, 3>> ga(prod);
+  std::vector<std::size_t> mapping(prod);
+  auto rot = to_c_rotations(rotations);
+  std::vector<std::array<double, 3>> q(qpoints.size());
+  for (std::size_t k = 0; k < qpoints.size(); ++k)
+    q[k] = {qpoints[k][0], qpoints[k][1], qpoints[k][2]};
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  int const s[3] = {is_shift[0], is_shift[1], is_shift[2]};
+  std::size_t const num_ir = spg_get_dense_stabilized_reciprocal_mesh(
+      reinterpret_cast<int(*)[3]>(ga.data()), mapping.data(), m, s,
+      time_reversal ? 1 : 0, static_cast<int>(rotations.size()),
+      reinterpret_cast<int(*)[3][3]>(rot.data()),
+      static_cast<int>(qpoints.size()),
+      reinterpret_cast<double(*)[3]>(q.data()));
+  return extract_ir_mesh(ga, mapping, num_ir);
+}
+
+// Reference grid points reached from an address by each reciprocal rotation
+// (spg_get_dense_grid_points_by_rotations).
+inline std::vector<std::size_t> reference_grid_points_by_rotations(
+    Vector3i const &address_orig, std::vector<Matrix3i> const &rot_reciprocal,
+    Vector3i const &mesh, Vector3i const &is_shift) {
+  std::vector<std::size_t> out(rot_reciprocal.size());
+  auto rot = to_c_rotations(rot_reciprocal);
+  int const a[3] = {address_orig[0], address_orig[1], address_orig[2]};
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  int const s[3] = {is_shift[0], is_shift[1], is_shift[2]};
+  spg_get_dense_grid_points_by_rotations(
+      out.data(), a, static_cast<int>(rot_reciprocal.size()),
+      reinterpret_cast<int(*)[3][3]>(rot.data()), m, s);
+  return out;
+}
+
+struct RefBzGrid {
+  std::size_t num_bzgp = 0;
+  std::vector<Vector3i> bz_grid_address;     // size num_bzgp
+  std::vector<std::size_t> bz_map;           // size 8*prod(mesh), num_bzmesh = unmapped
+  std::size_t num_bzmesh = 0;                // the "unmapped" sentinel value
+};
+
+// Reference BZ relocation (spg_relocate_dense_BZ_grid_address). bz_grid_address
+// is allocated to the worst case (8*prod(mesh)) and trimmed to num_bzgp.
+inline RefBzGrid reference_relocate_BZ(std::vector<Vector3i> const &grid_address,
+                                       Vector3i const &mesh,
+                                       Matrix3d const &rec_lattice,
+                                       Vector3i const &is_shift) {
+  auto const num_bzmesh = static_cast<std::size_t>(2 * mesh[0]) *
+                          static_cast<std::size_t>(2 * mesh[1]) *
+                          static_cast<std::size_t>(2 * mesh[2]);
+  std::vector<std::array<int, 3>> ga(grid_address.size());
+  for (std::size_t i = 0; i < grid_address.size(); ++i)
+    ga[i] = {grid_address[i][0], grid_address[i][1], grid_address[i][2]};
+  std::vector<std::array<int, 3>> bz_ga(num_bzmesh);
+  std::vector<std::size_t> bz_map(num_bzmesh);
+  double rl[3][3];
+  to_c_lattice(rl, rec_lattice);
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  int const s[3] = {is_shift[0], is_shift[1], is_shift[2]};
+  std::size_t const num_bzgp = spg_relocate_dense_BZ_grid_address(
+      reinterpret_cast<int(*)[3]>(bz_ga.data()), bz_map.data(),
+      reinterpret_cast<int(*)[3]>(ga.data()), m, rl, s);
+
+  RefBzGrid out;
+  out.num_bzgp = num_bzgp;
+  out.num_bzmesh = num_bzmesh;
+  out.bz_map = bz_map;
+  out.bz_grid_address.reserve(num_bzgp);
+  for (std::size_t i = 0; i < num_bzgp; ++i)
+    out.bz_grid_address.emplace_back(bz_ga[i][0], bz_ga[i][1], bz_ga[i][2]);
+  return out;
+}
+
+// Reference BZ grid points reached by each reciprocal rotation
+// (spg_get_dense_BZ_grid_points_by_rotations).
+inline std::vector<std::size_t> reference_BZ_grid_points_by_rotations(
+    Vector3i const &address_orig, std::vector<Matrix3i> const &rot_reciprocal,
+    Vector3i const &mesh, Vector3i const &is_shift,
+    std::vector<std::size_t> const &bz_map) {
+  std::vector<std::size_t> out(rot_reciprocal.size());
+  auto rot = to_c_rotations(rot_reciprocal);
+  int const a[3] = {address_orig[0], address_orig[1], address_orig[2]};
+  int const m[3] = {mesh[0], mesh[1], mesh[2]};
+  int const s[3] = {is_shift[0], is_shift[1], is_shift[2]};
+  spg_get_dense_BZ_grid_points_by_rotations(
+      out.data(), a, static_cast<int>(rot_reciprocal.size()),
+      reinterpret_cast<int(*)[3][3]>(rot.data()), m, s, bz_map.data());
+  return out;
+}
+
 } // namespace spglib::oracle

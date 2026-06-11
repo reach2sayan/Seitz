@@ -40,6 +40,13 @@ target_sources(cppcrystal PRIVATE
         src/symmetry/primitive.cpp
         src/data/spg_database.cpp
         src/data/sitesym_database.cpp
+        src/data/msg_database.cpp
+        src/spin/spin.cpp
+        src/magnetic/magnetic_spacegroup.cpp
+        src/magnetic_dataset.cpp
+        src/kpoint/grid.cpp
+        src/kpoint/reciprocal_mesh.cpp
+        src/kpoint/brillouin_zone.cpp
         src/spacegroup/hall_symbol.cpp
         src/spacegroup/spacegroup.cpp
         src/refine/refinement.cpp
@@ -53,7 +60,22 @@ target_compile_features(cppcrystal PUBLIC cxx_std_23)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::headers)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(cppcrystal PRIVATE -Wall -Wextra -Wpedantic)
+    # Hardening warning set (Phase 9). The conversion warnings are applied to the
+    # library only — the oracle tests bridge to the reference C API
+    # (reinterpret_cast, size_t<->int), which would drown them in noise.
+    target_compile_options(cppcrystal PRIVATE
+            -Wall -Wextra -Wpedantic
+            -Wshadow -Wcast-align -Wdouble-promotion -Wnull-dereference
+            -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
+endif ()
+
+# The magnetic database decodes all 76683 operations + the alternative
+# transformations into constexpr tables at compile time; that exceeds Clang's
+# default -fconstexpr-steps budget (GCC's default is far higher and needs no
+# flag). Raise it for this one translation unit only.
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set_source_files_properties(src/data/msg_database.cpp
+            PROPERTIES COMPILE_OPTIONS "-fconstexpr-steps=64000000")
 endif ()
 
 if (SPGLIB_USE_MKL)

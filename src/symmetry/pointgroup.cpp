@@ -301,7 +301,7 @@ unique_rotations(std::span<Matrix3i const> rotations) {
   }
   for (const auto [i, pg_data] : kPointgroupData | std::views::enumerate) {
     if (pg_data.table == table) {
-      return i;
+      return static_cast<int>(i);
     }
   }
   return 0;

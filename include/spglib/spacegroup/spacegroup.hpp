@@ -33,4 +33,30 @@ struct Spacegroup {
 search_spacegroup(symmetry::Primitive const &primitive, int hall_number,
                   double symprec, AngleTolerance angle_tolerance);
 
+// Whether the `lattice` given to spacegroup_type_from_symmetry is the
+// conventional cell (recover the primitive setting via the t_mat implied by the
+// operations) or already a primitive cell. Replaces spglib's
+// `transform_lattice_by_tmat` int flag — it is a compile-time template
+// argument, so the branch is resolved at compile time.
+enum class LatticeSetting { conventional, primitive };
+
+// Determine the space group directly from a set of symmetry operations (no
+// atomic positions). Port of spglib.c get_hall_number_from_symmetry: build the
+// primitive symmetry (symmetry::primitive_symmetry), Niggli-reduce the implied
+// primitive lattice, and match it against the Hall database.
+// `LatticeSetting::conventional` mirrors spg_get_spacegroup_type_from_symmetry;
+// `LatticeSetting::primitive` (with an identity lattice) mirrors
+// spg_get_hall_number_from_symmetry. Errors with e_spacegroup_search_failed.
+template <LatticeSetting Setting = LatticeSetting::conventional>
+[[nodiscard]] Result<Spacegroup>
+spacegroup_type_from_symmetry(SymmetryOperations const &operations,
+                              Matrix3d const &lattice, double symprec);
+
+// Determine the space group of a primitive cell given by a lattice and its
+// symmetry operations (a single notional atom at the origin). Port of
+// spacegroup.c spa_search_spacegroup_with_symmetry.
+[[nodiscard]] Result<Spacegroup>
+search_spacegroup_with_symmetry(SymmetryOperations const &operations,
+                                Matrix3d const &prim_lattice, double symprec);
+
 } // namespace spglib::spacegroup

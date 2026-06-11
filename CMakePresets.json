@@ -39,6 +39,14 @@
       "cacheVariables": {
         "SPGLIB_BUILD_ORACLE_TESTS": "ON"
       }
+    },
+    {
+      "name": "oracle-asan",
+      "displayName": "Debug + oracle + Address/UB sanitizers",
+      "inherits": "oracle",
+      "cacheVariables": {
+        "SPGLIB_ENABLE_SANITIZERS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -57,6 +65,10 @@
     {
       "name": "oracle",
       "configurePreset": "oracle"
+    },
+    {
+      "name": "oracle-asan",
+      "configurePreset": "oracle-asan"
     }
   ],
   "testPresets": [
@@ -77,6 +89,13 @@
     {
       "name": "oracle",
       "configurePreset": "oracle",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "oracle-asan",
+      "configurePreset": "oracle-asan",
       "output": {
         "outputOnFailure": true
       }

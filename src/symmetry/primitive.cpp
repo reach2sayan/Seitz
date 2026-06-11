@@ -6,10 +6,15 @@
 #include <spglib/reduce/delaunay.hpp>
 #include <spglib/symmetry/find_symmetry.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <iterator>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <utility>
+#include <vector>
 
 // Port of primitive.c (3D space-group path) + the cell-trimming helpers from
 // cell.c (trim_cell / get_overlap_table / translate_atoms_in_trimmed_lattice).
@@ -143,12 +148,9 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
       if (overlap[static_cast<std::size_t>(i)] != i) {
         continue;
       }
-      int count = 0;
-      for (int j = 0; j < n; ++j) {
-        if (overlap[static_cast<std::size_t>(j)] == i) {
-          ++count;
-        }
-      }
+      auto const count = std::ranges::count_if(
+          std::views::iota(0, n),
+          [&](int j) { return overlap[static_cast<std::size_t>(j)] == i; });
       if (count < ratio) {
         tol *= kTrimIncreaseRate;
         retry = true;
@@ -198,6 +200,66 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
   return std::make_pair(Cell(trimmed_lattice, tpos, trimmed_types), mapping);
 }
 
+// The translations of a symmetry-operation set whose rotation is the identity
+// (primitive.c collect_pure_translations, the symmetry-set variant).
+[[nodiscard]] std::vector<Vector3d>
+operation_pure_translations(SymmetryOperations const &operations) {
+  std::vector<Vector3d> out;
+  std::ranges::copy(operations | std::views::filter([](auto const &op) {
+                      return op.rotation == Matrix3i::Identity();
+                    }) | std::views::transform(&SymmetryOperation::translation),
+                    std::back_inserter(out));
+  return out;
+}
+
+// The primitive lattice in "translation space": a unit cell whose atoms sit at
+// the pure translations is reduced to its primitive cell; that cell's lattice
+// is the (primitive-to-conventional)^-1 transformation. std::nullopt unless the
+// translations span exactly one primitive point. Port of
+// get_primitive_in_translation_space.
+[[nodiscard]] std::optional<Matrix3d>
+primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
+                               std::size_t symmetry_size, double symprec) {
+  std::size_t const np = pure_trans.size();
+  if (np == 0 || symmetry_size % np != 0) {
+    return std::nullopt;
+  }
+  Positions pos(static_cast<Index>(np), 3);
+  for (auto const [i, t] : pure_trans | std::views::enumerate) {
+    pos.row(static_cast<Index>(i)) = t.transpose();
+  }
+  Cell const cell(Matrix3d::Identity(), pos, Types(np, 1));
+  auto const prim = find_primitive(cell, symprec);
+  if (!prim || prim->cell.size() != 1) {
+    return std::nullopt;
+  }
+  return prim->cell.lattice();
+}
+
+// The first occurrence of each distinct rotation, keeping its translation,
+// until `primsym_size` are collected. std::nullopt if the number of distinct
+// rotations differs from `primsym_size`. Port of collect_primitive_symmetry.
+[[nodiscard]] std::optional<SymmetryOperations>
+collect_primitive_operations(SymmetryOperations const &operations,
+                             std::size_t primsym_size) {
+  SymmetryOperations out;
+  for (auto const &op : operations) {
+    if (std::ranges::any_of(out, [&](SymmetryOperation const &o) {
+          return o.rotation == op.rotation;
+        })) {
+      continue;
+    }
+    if (out.size() == primsym_size) {
+      return std::nullopt; // more distinct rotations than expected
+    }
+    out.push_back(op);
+  }
+  if (out.size() != primsym_size) {
+    return std::nullopt;
+  }
+  return out;
+}
+
 } // namespace
 
 Result<Primitive> find_primitive(Cell const &cell, double symprec,
@@ -233,6 +295,68 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
                      cell.lattice(), tolerance, angle_tolerance};
   }
   return leaf::new_error(e_cell_standardization_failed{});
+}
+
+std::optional<Matrix3d> primitive_lattice_vectors(
+    Cell const &cell, std::vector<Vector3d> const &pure_trans, double symprec) {
+  return primitive_lattice(cell, pure_trans, symprec);
+}
+
+std::optional<std::pair<SymmetryOperations, Matrix3d>>
+primitive_symmetry(SymmetryOperations const &operations, double symprec) {
+  auto const pure_trans = operation_pure_translations(operations);
+  if (pure_trans.empty()) {
+    return std::nullopt;
+  }
+  std::size_t const primsym_size = operations.size() / pure_trans.size();
+
+  // t_mat transforms primitive -> conventional; t_mat_inv is its inverse,
+  // recovered as the primitive lattice in translation space.
+  auto const t_mat_inv =
+      primitive_in_translation_space(pure_trans, operations.size(), symprec);
+  if (!t_mat_inv) {
+    return std::nullopt;
+  }
+  Matrix3d const t_mat = t_mat_inv->inverse();
+
+  auto prim = collect_primitive_operations(operations, primsym_size);
+  if (!prim) {
+    return std::nullopt;
+  }
+
+  // (T, 0) (R, t) (T, 0)^-1 = (T R T^-1, T t).
+  for (auto &op : *prim) {
+    Matrix3d const rot_d = t_mat * op.rotation.cast<double>() * (*t_mat_inv);
+    op.rotation = math::round_to_int(rot_d);
+    op.translation = t_mat * op.translation;
+  }
+  return std::make_pair(std::move(*prim), t_mat);
+}
+
+Result<Primitive>
+find_primitive_with_pure_translations(Cell const &cell,
+                                      std::vector<Vector3d> const &pure_trans,
+                                      double symprec) {
+  if (pure_trans.size() == 1) {
+    auto smallest = smallest_lattice_cell(cell, symprec);
+    if (!smallest) {
+      return leaf::new_error(e_cell_standardization_failed{});
+    }
+    std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
+    std::iota(mapping.begin(), mapping.end(), 0);
+    return Primitive{std::move(*smallest), std::move(mapping), cell.lattice(),
+                     symprec, std::nullopt};
+  }
+  auto const prim_lat = primitive_lattice(cell, pure_trans, symprec);
+  if (!prim_lat) {
+    return leaf::new_error(e_cell_standardization_failed{});
+  }
+  auto trimmed = trim_cell(*prim_lat, cell, symprec);
+  if (!trimmed) {
+    return leaf::new_error(e_cell_standardization_failed{});
+  }
+  return Primitive{std::move(trimmed->first), std::move(trimmed->second),
+                   cell.lattice(), symprec, std::nullopt};
 }
 
 } // namespace spglib::symmetry

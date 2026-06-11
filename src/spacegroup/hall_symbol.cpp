@@ -167,7 +167,8 @@ unpack_generators(data::GeneratorSet const &g) {
         db_ops | std::views::enumerate, [&](const auto &entry) {
           const auto [idx, db_op] = entry;
 
-          if (found[idx] || op.rotation != db_op.rotation) {
+          if (found[static_cast<std::size_t>(idx)] ||
+              op.rotation != db_op.rotation) {
             return false;
           }
 
@@ -185,7 +186,7 @@ unpack_generators(data::GeneratorSet const &g) {
       return false;
     }
 
-    found[std::get<0>(*it)] = 1;
+    found[static_cast<std::size_t>(std::get<0>(*it))] = 1;
   }
 
   return true;
