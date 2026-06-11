@@ -37,4 +37,15 @@ refine_cell(Cell const &cell, double symprec = kDefaultSymprec,
   return standardize_cell(cell, {}, symprec, angle_tolerance);
 }
 
+// Reduce `cell` to its standardized (idealized) primitive setting — spglib's
+// spg_find_primitive, exactly standardize_cell with to_primitive set. Note this
+// is distinct from symmetry::find_primitive (= prm_get_primitive), which returns
+// the Primitive struct rather than the standardized cell.
+[[nodiscard]] inline Result<Cell>
+find_primitive(Cell const &cell, double symprec = kDefaultSymprec,
+               AngleTolerance angle_tolerance = std::nullopt) {
+  return standardize_cell(cell, {.to_primitive = true}, symprec,
+                          angle_tolerance);
+}
+
 } // namespace spglib

@@ -170,3 +170,38 @@ TEST_CASE("standardize: strained cell, no_idealize preserves input geometry",
                               {11, 11, 11, 11, 17, 17, 17, 17});
   check_all(cell, 1e-2);
 }
+
+TEST_CASE("standardize: find_primitive / refine_cell convenience wrappers",
+          "[oracle][standardize]") {
+  // The two named wrappers must be bit-identical to the standardize_cell calls
+  // they delegate to. find_primitive == spg_find_primitive (to_primitive,
+  // idealized); refine_cell == spg_refine_cell (conventional, idealized) — both
+  // already oracle-checked via check_all above, so equality with their delegate
+  // transitively proves the wrapper.
+  Cell const nacl = make_cell(5.64 * Matrix3d::Identity(),
+                              {{0, 0, 0},
+                               {0, 0.5, 0.5},
+                               {0.5, 0, 0.5},
+                               {0.5, 0.5, 0},
+                               {0.5, 0.5, 0.5},
+                               {0.5, 0, 0},
+                               {0, 0.5, 0},
+                               {0, 0, 0.5}},
+                              {11, 11, 11, 11, 17, 17, 17, 17});
+
+  auto const same_cell = [](Cell const &a, Cell const &b) {
+    return a.size() == b.size() &&
+           (a.lattice() - b.lattice()).cwiseAbs().maxCoeff() < 1e-12 &&
+           (a.positions() - b.positions()).cwiseAbs().maxCoeff() < 1e-12 &&
+           a.types() == b.types();
+  };
+
+  Cell const prim = must(spglib::find_primitive(nacl));
+  Cell const prim_ref =
+      must(spglib::standardize_cell(nacl, {.to_primitive = true}));
+  CHECK(same_cell(prim, prim_ref));
+
+  Cell const refined = must(spglib::refine_cell(nacl));
+  Cell const refined_ref = must(spglib::standardize_cell(nacl, {}));
+  CHECK(same_cell(refined, refined_ref));
+}
