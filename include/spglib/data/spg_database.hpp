@@ -162,6 +162,19 @@ spacegroup_type(int hall_number) noexcept {
                          : kCatalog.at(hall_number);
 }
 
+// The first (default) layer Hall setting (-1..-116) for a layer-group number
+// (1..80); 0 if out of range. constexpr — the number -> hall map is resolved at
+// compile time rather than scanned at run time.
+[[nodiscard]] constexpr int layer_default_hall(int layer_number) noexcept {
+  for (int neg = 1; neg <= kNumLayerHallNumbers; ++neg) {
+    if (kLayerCatalog.by_neg_hall[static_cast<std::size_t>(neg)].number ==
+        layer_number) {
+      return -neg;
+    }
+  }
+  return 0;
+}
+
 // The symmetry operations for a Hall number (1..530); empty if out of range.
 // Returns a reference into a lazily-built, immutable per-Hall cache; the
 // operations are decoded from compile-time data on first use.

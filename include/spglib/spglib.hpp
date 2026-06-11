@@ -7,6 +7,7 @@
 #include <spglib/analysis/magnetic_symmetry_analyzer.hpp>
 #include <spglib/analysis/symmetry_analyzer.hpp>
 #include <spglib/core/cell.hpp>
+#include <spglib/core/centering.hpp>
 #include <spglib/core/error.hpp>
 #include <spglib/core/magnetic_cell.hpp>
 #include <spglib/core/magnetic_symmetry_operation.hpp>
@@ -24,6 +25,7 @@
 #include <spglib/generate/wyckoff_combinations.hpp>
 #include <spglib/group/space_group.hpp>
 #include <spglib/group/wyckoff_position.hpp>
+#include <spglib/standardize.hpp>
 #include <spglib/kpoint/brillouin_zone.hpp>
 #include <spglib/kpoint/grid.hpp>
 #include <spglib/kpoint/reciprocal_mesh.hpp>

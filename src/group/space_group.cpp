@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 
 #include <algorithm>
+#include <iterator>
 #include <span>
 #include <string>
 #include <utility>
@@ -82,10 +83,43 @@ Result<SpaceGroup> SpaceGroup::from_hall_number(int hall_number) {
   std::vector<data::WyckoffEntry> const entries =
       data::wyckoff_entries(hall_number);
   sg.positions_.reserve(entries.size());
-  for (auto const &entry : entries) {
-    sg.positions_.push_back(build_position(entry, sg.operations_));
-  }
+  std::ranges::transform(entries, std::back_inserter(sg.positions_),
+                         [&](data::WyckoffEntry const &entry) {
+                           return build_position(entry, sg.operations_);
+                         });
   return sg;
+}
+
+Result<SpaceGroup> SpaceGroup::from_layer_hall(int hall_number) {
+  data::SpacegroupType const type = data::spacegroup_type(hall_number);
+  if (hall_number >= 0 || type.number == 0) {
+    return leaf::new_error(e_message{
+        "SpaceGroup::from_layer_hall: layer hall number out of range "
+        "(expected -1..-116)"});
+  }
+
+  SpaceGroup lg;
+  lg.type_ = type;
+  lg.operations_ = data::operations_from_database(hall_number);
+
+  std::vector<data::WyckoffEntry> const entries =
+      data::wyckoff_entries(hall_number);
+  lg.positions_.reserve(entries.size());
+  std::ranges::transform(
+      entries, std::back_inserter(lg.positions_),
+      [&](const auto &entry) { return build_position(entry, lg.operations_); });
+  return lg;
+}
+
+Result<SpaceGroup> SpaceGroup::from_layer_number(int layer_number) {
+  // The layer-group number -> default-Hall map is resolved at compile time.
+  int const hall = data::layer_default_hall(layer_number);
+  if (hall == 0) {
+    return leaf::new_error(e_message{
+        "SpaceGroup::from_layer_number: layer-group number out of range "
+        "(expected 1..80)"});
+  }
+  return from_layer_hall(hall);
 }
 
 Result<SpaceGroup> SpaceGroup::from_number(int spacegroup_number) {

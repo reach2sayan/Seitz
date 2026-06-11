@@ -254,6 +254,39 @@ inline RefDataset reference_layer_dataset(Cell const &cell, int aperiodic_axis,
                                                aperiodic_axis, symprec));
 }
 
+// Reference cell standardization (spg_standardize_cell). The function rewrites
+// the lattice/positions/types in place and returns the new atom count; the
+// arrays must hold the worst case (a primitive input expanding to a centered
+// conventional cell), so they are sized to 4 * num_atom.
+inline Cell reference_standardize_cell(Cell const &cell, bool to_primitive,
+                                       bool no_idealize, double symprec) {
+  int const n = static_cast<int>(cell.size());
+  double lattice[3][3];
+  to_c_lattice(lattice, cell.lattice());
+  std::vector<std::array<double, 3>> position(static_cast<std::size_t>(4 * n));
+  std::vector<int> types(static_cast<std::size_t>(4 * n));
+  for (int i = 0; i < n; ++i) {
+    position[static_cast<std::size_t>(i)] = {cell.positions()(i, 0),
+                                             cell.positions()(i, 1),
+                                             cell.positions()(i, 2)};
+    types[static_cast<std::size_t>(i)] = cell.types()[static_cast<std::size_t>(i)];
+  }
+  int const new_n = spg_standardize_cell(
+      lattice, reinterpret_cast<double(*)[3]>(position.data()), types.data(), n,
+      to_primitive ? 1 : 0, no_idealize ? 1 : 0, symprec);
+  Matrix3d out_lattice;
+  from_c_lattice(out_lattice, lattice);
+  Positions pos(new_n, 3);
+  Types out_types(static_cast<std::size_t>(new_n));
+  for (int i = 0; i < new_n; ++i) {
+    pos.row(i) << position[static_cast<std::size_t>(i)][0],
+        position[static_cast<std::size_t>(i)][1],
+        position[static_cast<std::size_t>(i)][2];
+    out_types[static_cast<std::size_t>(i)] = types[static_cast<std::size_t>(i)];
+  }
+  return Cell(out_lattice, pos, out_types);
+}
+
 struct CPointgroup {
   int number;
   std::string symbol;

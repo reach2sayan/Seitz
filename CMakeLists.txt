@@ -36,10 +36,13 @@ target_sources(cppcrystal PRIVATE
         src/analysis/magnetic_symmetry_analyzer.cpp
         src/group/space_group.cpp
         src/group/wyckoff_position.cpp
+        src/group/subgroup_graph.cpp
         src/generate/wyckoff_combinations.cpp
         src/generate/random_lattice.cpp
+        src/generate/distance_check.cpp
         src/generate/crystal_builder.cpp
         src/core/overlap.cpp
+        src/core/centering.cpp
         src/reduce/delaunay.cpp
         src/reduce/niggli.cpp
         src/symmetry/find_symmetry.cpp
@@ -48,6 +51,7 @@ target_sources(cppcrystal PRIVATE
         src/data/spg_database.cpp
         src/data/sitesym_database.cpp
         src/data/msg_database.cpp
+        src/data/element_data.cpp
         src/spin/spin.cpp
         src/magnetic/magnetic_spacegroup.cpp
         src/magnetic_dataset.cpp
@@ -59,6 +63,7 @@ target_sources(cppcrystal PRIVATE
         src/refine/refinement.cpp
         src/refine/site_symmetry.cpp
         src/refine/standardize.cpp
+        src/refine/standardize_cell.cpp
         src/refine/operations.cpp)
 target_include_directories(cppcrystal PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -98,6 +103,15 @@ endif ()
 if (SPGLIB_BUILD_DEMO)
     add_executable(cppcrystal_demo main.cpp)
     target_link_libraries(cppcrystal_demo PRIVATE cppcrystal::cppcrystal)
+endif ()
+
+# Offline generator for the baked t-subgroup table (data/subgroup_relations.hpp).
+# Not built by default — it re-runs the slow in-house derivation. Build with
+# -DSPGLIB_BUILD_TOOLS=ON, run it, and redirect stdout over the header.
+option(SPGLIB_BUILD_TOOLS "Build offline data generators" OFF)
+if (SPGLIB_BUILD_TOOLS)
+    add_executable(generate_subgroup_relations tools/generate_subgroup_relations.cpp)
+    target_link_libraries(generate_subgroup_relations PRIVATE cppcrystal::cppcrystal)
 endif ()
 
 if (SPGLIB_BUILD_TESTS)

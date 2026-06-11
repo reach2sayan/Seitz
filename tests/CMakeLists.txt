@@ -14,7 +14,8 @@ add_executable(cppcrystal_tests
         test_kpoint.cpp
         test_error_paths.cpp
         test_oo.cpp
-        test_layer.cpp)
+        test_layer.cpp
+        test_standardize.cpp)
 target_link_libraries(cppcrystal_tests PRIVATE
         cppcrystal::cppcrystal
         Catch2::Catch2WithMain)
@@ -39,6 +40,7 @@ if (SPGLIB_BUILD_ORACLE_TESTS)
             test_oracle_magnetic.cpp
             test_oracle_magnetic_dataset.cpp
             test_oracle_layer_dataset.cpp
+            test_oracle_standardize.cpp
             test_oracle_kpoint_grid.cpp
             test_oracle_kpoint_mesh.cpp
             test_oracle_kpoint_bz.cpp

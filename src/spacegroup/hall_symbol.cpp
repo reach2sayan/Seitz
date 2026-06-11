@@ -1,5 +1,6 @@
 #include <spglib/spacegroup/hall_symbol.hpp>
 
+#include <spglib/core/centering.hpp>
 #include <spglib/core/overlap.hpp>
 #include <spglib/data/hall_classification.hpp>
 #include <spglib/data/hall_generators_view.hpp>
@@ -23,48 +24,8 @@ using data::Centering;
 
 namespace {
 
-// Centering change-of-basis matrices (hall_symbol.c) as lookup tables indexed
-// by the Centering enum. M (integer) and its inverse M_inv (note M_inv^-1 == M,
-// which lets transform_rotation avoid a matrix inverse). PRIMITIVE and any
-// unused entry are the identity.
-constexpr std::size_t kCenteringCount = 9; // Centering::error .. r_center
-
-[[nodiscard]] Matrix3i const &centering_matrix(Centering c) {
-  static auto const table = [] {
-    std::array<Matrix3i, kCenteringCount> t;
-    t.fill(Matrix3i::Identity());
-    auto at = [&](Centering cc) -> Matrix3i & {
-      return t[static_cast<std::size_t>(cc)];
-    };
-    at(Centering::body) << 0, 1, 1, 1, 0, 1, 1, 1, 0;
-    at(Centering::face) << -1, 1, 1, 1, -1, 1, 1, 1, -1;
-    at(Centering::a_face) << 1, 0, 0, 0, 1, 1, 0, -1, 1;
-    at(Centering::b_face) << 1, 0, 1, 0, 1, 0, -1, 0, 1;
-    at(Centering::c_face) << 1, -1, 0, 1, 1, 0, 0, 0, 1;
-    at(Centering::r_center) << 1, 0, 1, -1, 1, 1, 0, -1, 1;
-    return t;
-  }();
-  return table[static_cast<std::size_t>(c)];
-}
-
-[[nodiscard]] Matrix3d const &centering_matrix_inv(Centering c) {
-  static auto const table = [] {
-    std::array<Matrix3d, kCenteringCount> t;
-    t.fill(Matrix3d::Identity());
-    auto at = [&](Centering cc) -> Matrix3d & {
-      return t[static_cast<std::size_t>(cc)];
-    };
-    at(Centering::body) << -0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, -0.5;
-    at(Centering::face) << 0.0, 0.5, 0.5, 0.5, 0.0, 0.5, 0.5, 0.5, 0.0;
-    at(Centering::a_face) << 1.0, 0.0, 0.0, 0.0, 0.5, -0.5, 0.0, 0.5, 0.5;
-    at(Centering::b_face) << 0.5, 0.0, -0.5, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5;
-    at(Centering::c_face) << 0.5, 0.5, 0.0, -0.5, 0.5, 0.0, 0.0, 0.0, 1.0;
-    at(Centering::r_center) << 2. / 3, -1. / 3, -1. / 3, 1. / 3, 1. / 3,
-        -2. / 3, 1. / 3, 1. / 3, 1. / 3;
-    return t;
-  }();
-  return table[static_cast<std::size_t>(c)];
-}
+// Centering change-of-basis matrices live in core/centering.hpp (shared with the
+// space-group search and cell standardization).
 
 // trans expressed in the primitive setting: M . trans (transform_translation).
 [[nodiscard]] Vector3d transform_translation(Centering c,

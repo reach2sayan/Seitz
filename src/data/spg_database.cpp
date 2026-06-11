@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <ranges>
 
 namespace spglib::data {
 
@@ -77,12 +78,11 @@ build_layer_operations() {
   for (int neg = 1; neg <= kNumLayerHallNumbers; ++neg) {
     auto const &idx =
         kLayerSymmetryOperationIndex[static_cast<std::size_t>(neg)];
-    SymmetryOperations v;
-    v.reserve(static_cast<std::size_t>(idx[0]));
-    for (int i = 0; i < idx[0]; ++i) {
-      v.push_back(
-          make_operation(kDecodedOps[static_cast<std::size_t>(idx[1] + i)]));
-    }
+    SymmetryOperations v(static_cast<std::size_t>(idx[0]));
+
+    std::ranges::transform(std::views::iota(0, idx[0]), v.begin(), [&](int i) {
+      return make_operation(kDecodedOps[static_cast<std::size_t>(idx[1] + i)]);
+    });
     ops[static_cast<std::size_t>(neg)] = std::move(v);
   }
   return ops;

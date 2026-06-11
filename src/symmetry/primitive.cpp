@@ -340,6 +340,12 @@ collect_primitive_operations(SymmetryOperations const &operations,
 
 } // namespace
 
+std::optional<std::pair<Cell, std::vector<int>>>
+trim_to_lattice(Matrix3d const &trimmed_lattice, Cell const &cell,
+                double symprec) {
+  return trim_cell(trimmed_lattice, cell, cell.aperiodic_axis(), symprec);
+}
+
 Result<Primitive> find_primitive(Cell const &cell, double symprec,
                                  AngleTolerance angle_tolerance) {
   std::optional<int> const aperiodic_axis = cell.aperiodic_axis();

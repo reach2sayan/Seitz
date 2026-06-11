@@ -35,8 +35,6 @@ public:
     return symbol_;
   }
 
-  // Number of free coordinates of the position (0 for a fully fixed point, up
-  // to 3 for the general position).
   [[nodiscard]] int degrees_of_freedom() const noexcept { return dof_; }
 
   // The site-symmetry group: the operations that fix a generic point of the
@@ -44,6 +42,19 @@ public:
   // conventional operations of the space group.
   [[nodiscard]] std::span<SymmetryOperation const> operations() const noexcept {
     return site_symmetry_;
+  }
+
+  // The coset representatives that generate the orbit (one per orbit point), and
+  // the projector onto the position's canonical coordinate. Together they let a
+  // caller expand the orbit with custom folding — the layer-crystal generator
+  // uses them to build an orbit without wrapping the non-periodic c axis (which
+  // get_all_positions folds, breaking c-flipping operations in a layer cell).
+  [[nodiscard]] std::span<SymmetryOperation const>
+  orbit_operations() const noexcept {
+    return orbit_ops_;
+  }
+  [[nodiscard]] Vector3d canonical_coordinate(Vector3d const &xyz) const {
+    return repr_rotation_.cast<double>() * xyz + repr_translation_;
   }
 
   // Expand a single free coordinate into the full symmetry orbit (one row per

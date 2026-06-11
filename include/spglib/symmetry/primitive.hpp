@@ -66,4 +66,14 @@ find_primitive_with_pure_translations(Cell const &cell,
                                       std::vector<Vector3d> const &pure_trans,
                                       double symprec);
 
+// Fold the atoms of `cell` into the given (smaller) `trimmed_lattice`,
+// de-duplicating translationally-equivalent atoms and averaging their
+// positions. Returns the trimmed cell together with the input->trimmed atom
+// mapping, or std::nullopt if the atoms do not divide evenly into the lattice.
+// The aperiodic axis (for layer cells) is read from `cell`. Port of cell.c
+// trim_cell; exposed for cell standardization (transform-to-primitive).
+[[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
+trim_to_lattice(Matrix3d const &trimmed_lattice, Cell const &cell,
+                double symprec);
+
 } // namespace spglib::symmetry

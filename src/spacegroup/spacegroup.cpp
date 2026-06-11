@@ -1,5 +1,6 @@
 #include <spglib/spacegroup/spacegroup.hpp>
 
+#include <spglib/core/centering.hpp>
 #include <spglib/core/point_group.hpp>
 #include <spglib/core/tolerance.hpp>
 #include <spglib/data/hall_classification.hpp>
@@ -424,26 +425,8 @@ struct CenteringResult {
   }
 }
 
-// get_centering_shifts: the (multiplicity - 1) non-trivial centering
-// translations for a centering type (the trivial zero shift is implicit).
-[[nodiscard]] std::vector<Vector3d> centering_shifts(Centering centering) {
-  switch (centering) {
-  case Centering::a_face:
-    return {{0.0, 0.5, 0.5}};
-  case Centering::b_face:
-    return {{0.5, 0.0, 0.5}};
-  case Centering::c_face:
-    return {{0.5, 0.5, 0.0}};
-  case Centering::body:
-    return {{0.5, 0.5, 0.5}};
-  case Centering::r_center:
-    return {{2. / 3, 1. / 3, 1. / 3}, {1. / 3, 2. / 3, 2. / 3}};
-  case Centering::face:
-    return {{0.0, 0.5, 0.5}, {0.5, 0.0, 0.5}, {0.5, 0.5, 0.0}};
-  default:
-    return {};
-  }
-}
+// centering_shifts (the non-trivial centering translations) lives in
+// core/centering.hpp, shared with cell standardization.
 
 // ---- conventional symmetry -------------------------------------------------
 
