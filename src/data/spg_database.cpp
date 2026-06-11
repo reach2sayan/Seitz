@@ -68,9 +68,36 @@ build_operations() {
   return ops;
 }
 
+// Layer-group settings (negative hall numbers -1..-116) index a parallel
+// {count, offset} table whose offsets point into the SAME kSymmetryOperations
+// array. Materialised once, indexed by -hall (1..116); index 0 is the sentinel.
+[[nodiscard]] std::array<SymmetryOperations, kNumLayerHallNumbers + 1>
+build_layer_operations() {
+  std::array<SymmetryOperations, kNumLayerHallNumbers + 1> ops;
+  for (int neg = 1; neg <= kNumLayerHallNumbers; ++neg) {
+    auto const &idx =
+        kLayerSymmetryOperationIndex[static_cast<std::size_t>(neg)];
+    SymmetryOperations v;
+    v.reserve(static_cast<std::size_t>(idx[0]));
+    for (int i = 0; i < idx[0]; ++i) {
+      v.push_back(
+          make_operation(kDecodedOps[static_cast<std::size_t>(idx[1] + i)]));
+    }
+    ops[static_cast<std::size_t>(neg)] = std::move(v);
+  }
+  return ops;
+}
+
 } // namespace
 
 SymmetryOperations const &operations_from_database(int hall_number) {
+  if (hall_number < 0) {
+    static std::array<SymmetryOperations, kNumLayerHallNumbers + 1> const
+        layer_ops = build_layer_operations();
+    int const neg = -hall_number;
+    bool const in_range = neg >= 1 && neg <= kNumLayerHallNumbers;
+    return layer_ops[static_cast<std::size_t>(in_range ? neg : 0)];
+  }
   static std::array<SymmetryOperations, kNumHallNumbers + 1> const ops =
       build_operations();
   bool const in_range = hall_number >= 1 && hall_number <= kNumHallNumbers;

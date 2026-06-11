@@ -42,6 +42,27 @@ struct HallClass {
   return Holohedry::none;
 }
 
+// Crystal system from a point-group number (1..32), by the standard contiguous
+// ranges. Used to classify layer-group Hall settings (negative hall numbers),
+// which carry no 3D hall-range bucket but do carry a point-group number.
+[[nodiscard]] constexpr Holohedry holohedry_from_pointgroup(int pg) noexcept {
+  if (pg < 1 || pg > 32)
+    return Holohedry::none;
+  if (pg <= 2)
+    return Holohedry::triclinic;
+  if (pg <= 5)
+    return Holohedry::monoclinic;
+  if (pg <= 8)
+    return Holohedry::orthorhombic;
+  if (pg <= 15)
+    return Holohedry::tetragonal;
+  if (pg <= 20)
+    return Holohedry::trigonal;
+  if (pg <= 27)
+    return Holohedry::hexagonal;
+  return Holohedry::cubic;
+}
+
 // R-centered (rhombohedral) subset of the trigonal range (hall_symbol.c).
 [[nodiscard]] constexpr bool is_rhombohedral_hall(int h) noexcept {
   switch (h) {

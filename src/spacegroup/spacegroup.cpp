@@ -148,6 +148,24 @@ make_matrices(double const (&data)[Rows][3][3]) {
   return t[static_cast<std::size_t>(sg_number - 16)];
 }
 
+// layer_num_axis_choices_ortho, indexed by (layer-group number - 19); the 30
+// orthorhombic layer groups are numbers 19..48 (spacegroup.c).
+[[nodiscard]] int layer_num_axis_choices_ortho(int lg_number) {
+  static constexpr std::array<int, 30> t = {
+      2, 1,                         // 19-20
+      2, 2, 2, 1, 2, 2, 1, 1, 1, 1, // 21-30
+      1, 1, 1, 1, 1, 1, 2, 1, 2, 1, // 31-40
+      1, 1, 1, 2, 1, 2, 2, 2};      // 41-48
+  return t[static_cast<std::size_t>(lg_number - 19)];
+}
+
+// The number of orthorhombic axis choices for a setting, dispatching on the sign
+// of the hall number (3D space group vs. layer group).
+[[nodiscard]] int num_axis_choices_ortho_for(int hall_number, int number) {
+  return hall_number < 0 ? layer_num_axis_choices_ortho(number)
+                         : num_axis_choices_ortho(number);
+}
+
 [[nodiscard]] std::array<Matrix3d, 6> const &change_of_basis_rhombo() {
   static double const d[6][3][3] = {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
                                     {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
@@ -254,6 +272,20 @@ make_matrices(double const (&data)[Rows][3][3]) {
       490, 491, 492, 493, 494, 495, 497, 498, 500, 501, 502, 503, 504, 505, 506,
       507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 520, 521, 523,
       524, 525, 527, 529, 530};
+  return t;
+}
+
+// layer_group_to_hall_number[116]: the (negative) layer Hall settings searched
+// for a layer cell, one representative per setting (spacegroup.c).
+[[nodiscard]] std::span<int const> layer_group_to_hall_number() {
+  static constexpr std::array<int, 80> t = {
+      -1,   -2,   -3,   -4,   -5,   -8,   -9,   -12,  -14,  -16,  -18,  -20,
+      -22,  -24,  -26,  -28,  -30,  -32,  -34,  -35,  -37,  -38,  -39,  -40,
+      -42,  -43,  -44,  -46,  -48,  -50,  -52,  -54,  -56,  -58,  -60,  -62,
+      -64,  -65,  -67,  -68,  -70,  -72,  -74,  -76,  -77,  -79,  -80,  -81,
+      -82,  -83,  -84,  -85,  -87,  -88,  -89,  -90,  -91,  -92,  -93,  -94,
+      -95,  -96,  -98,  -99,  -101, -102, -103, -104, -105, -106, -107, -108,
+      -109, -110, -111, -112, -113, -114, -115, -116};
   return t;
 }
 
@@ -468,13 +500,18 @@ change_basis_tricli(Matrix3d const &conv_lattice,
   return math::round_to_int(tmat);
 }
 
-// change_basis_monocli: 2D-Delaunay-reduce the a,c plane (unique axis b) and
-// update the integer transformation matrix. 3D path only (aperiodic = -1).
+// change_basis_monocli: 2D-Delaunay-reduce the plane orthogonal to the kept
+// axis and update the integer transformation matrix. For a 3D monoclinic cell
+// the kept axis is the unique axis b; for a layer the kept axis is the aperiodic
+// axis (in its conventional position), so the reduction acts on the periodic
+// plane (reference del_layer_delaunay_reduce_2D, oblique case).
 [[nodiscard]] std::optional<Matrix3i>
 change_basis_monocli(Matrix3d const &conv_lattice,
-                     Matrix3d const &primitive_lattice, double symprec) {
+                     Matrix3d const &primitive_lattice, double symprec,
+                     std::optional<int> aperiodic_axis_conv) {
+  int const keep_axis = aperiodic_axis_conv.value_or(1);
   auto const smallest =
-      reduce::delaunay_reduce(conv_lattice, /*unique_axis=*/1, symprec);
+      reduce::delaunay_reduce(conv_lattice, keep_axis, symprec);
   if (!smallest) {
     return std::nullopt;
   }
@@ -685,9 +722,12 @@ match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                int hall_number, Centering centering,
                SymmetryOperations const &symmetry, int num_free_axes,
                double symprec) {
-  // 3D: try all six axis permutations {abc, bca, cab, ba-c, a-cb, -cba}.
+  // 3D tries all six axis permutations {abc, bca, cab, ba-c, a-cb, -cba}; a
+  // layer group (hall < 0) tries only abc and ba-c (step 3), the two that keep
+  // the aperiodic axis at c (spacegroup.c match_hall_symbol_db_ortho).
+  int const step = hall_number < 0 ? 3 : 1;
   if (orig_lattice && orig_lattice->determinant() > symprec) {
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 6; i += step) {
       if (auto r = match_db_ortho_in_loop(conv_lattice, orig_lattice, i,
                                           hall_number, centering, symmetry,
                                           num_free_axes, symprec)) {
@@ -695,7 +735,7 @@ match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
       }
     }
   }
-  for (int i = 0; i < 6; ++i) {
+  for (int i = 0; i < 6; i += step) {
     if (auto r = match_db_ortho_in_loop(conv_lattice, nullptr, i, hall_number,
                                         centering, symmetry, num_free_axes,
                                         symprec)) {
@@ -841,10 +881,12 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                             centering, symmetry, symprec);
 
   case Holohedry::orthorhombic: {
-    int const num_free_axes = num_axis_choices_ortho(sg.number);
+    int const num_free_axes = num_axis_choices_ortho_for(hall_number, sg.number);
     // Two-axis case: first fix the principal axis for the representative Hall
-    // symbol, then match the requested one in the resulting basis.
-    if (num_free_axes == 2) {
+    // symbol, then match the requested one in the resulting basis. This
+    // representative-Hall two-step is a 3D-only refinement; layer groups match
+    // directly with the c-preserving axis choices.
+    if (hall_number > 0 && num_free_axes == 2) {
       auto const rep = match_db_ortho(
           conv_lattice, orig_lattice,
           spacegroup_to_hall_number()[static_cast<std::size_t>(sg.number - 1)],
@@ -895,7 +937,8 @@ struct SearchResult {
 search_hall_number(std::span<int const> candidates, Primitive const &primitive,
                    SymmetryOperations const &symmetry, double symprec) {
   std::vector<Matrix3i> const rotations = symmetry::rotations_of(symmetry);
-  auto const ptg = symmetry::get_pointgroup(rotations);
+  auto const ptg =
+      symmetry::get_pointgroup(rotations, primitive.cell.aperiodic_axis());
   if (!ptg || ptg->pointgroup.number == 0) {
     return std::nullopt;
   }
@@ -908,10 +951,21 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
   // Delaunay) and update the integer transformation.
   if (laue == Laue::laue_1 || laue == Laue::laue_2m) {
     Matrix3d const conv_tmp = prim_lat * tmat_int.cast<double>();
+    // For a layer, locate the aperiodic axis in the conventional setting (the
+    // column the primitive aperiodic axis maps to under tmat_int) so the
+    // monoclinic reduction keeps it and reduces the periodic plane.
+    std::optional<int> aperiodic_conv;
+    if (auto const ap = primitive.cell.aperiodic_axis()) {
+      for (int i = 0; i < 3; ++i) {
+        if (tmat_int(*ap, i) != 0) {
+          aperiodic_conv = i;
+        }
+      }
+    }
     auto const updated =
         (laue == Laue::laue_1)
             ? change_basis_tricli(conv_tmp, prim_lat, symprec)
-            : change_basis_monocli(conv_tmp, prim_lat, symprec);
+            : change_basis_monocli(conv_tmp, prim_lat, symprec, aperiodic_conv);
     if (!updated) {
       return std::nullopt;
     }
@@ -1014,8 +1068,13 @@ Result<Spacegroup> search_spacegroup(Primitive const &primitive,
     return search_spacegroup_with_symmetry(candidate, primitive, symmetry,
                                            symprec, angle_tolerance);
   }
-  return search_spacegroup_with_symmetry(spacegroup_to_hall_number(), primitive,
-                                         symmetry, symprec, angle_tolerance);
+  // A layer cell (aperiodic axis set) searches the 80 layer-group settings;
+  // a 3D cell searches the 230 space groups.
+  std::span<int const> const candidates =
+      primitive.cell.aperiodic_axis() ? layer_group_to_hall_number()
+                                      : spacegroup_to_hall_number();
+  return search_spacegroup_with_symmetry(candidates, primitive, symmetry,
+                                         symprec, angle_tolerance);
 }
 
 Result<Spacegroup>

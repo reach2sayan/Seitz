@@ -483,8 +483,120 @@ void sort_axes(AxisTriple &axes) {
   }
 }
 
-// Laue classes mmm, m-3, m-3m (lauennn, 3D path).
-bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
+// The aperiodic-axis component of candidate axis `idx` (rot_axes[idx][ap]).
+[[nodiscard]] constexpr int aperiodic_component(int idx, int aperiodic_axis) {
+  return kRotAxes[idx][aperiodic_axis];
+}
+
+// layer_check_and_sort_axes: of the three chosen axes, exactly two must lie in
+// the periodic plane (aperiodic component 0) and one along the aperiodic axis
+// (component +/-1). Move the aperiodic axis to c, then orient for a positive
+// determinant. False for an invalid (e.g. inclined) configuration.
+[[nodiscard]] bool layer_sort_axes(AxisTriple &axes, int aperiodic_axis) {
+  int lattice_rank = 0;
+  int arank = 0;
+  int axis_pos = -1;
+  for (int i = 0; i < 3; ++i) {
+    int const c = aperiodic_component(axes[static_cast<std::size_t>(i)].index,
+                                      aperiodic_axis);
+    if (c == 0) {
+      ++lattice_rank;
+    } else if (c == 1 || c == -1) {
+      axis_pos = i;
+      ++arank;
+    }
+  }
+  if (lattice_rank != 2 || arank != 1) {
+    return false;
+  }
+  std::swap(axes[static_cast<std::size_t>(axis_pos)], axes[2]);
+  if (transformation_from_axes(axes).determinant() < 0) {
+    std::swap(axes[0], axes[1]);
+  }
+  return true;
+}
+
+// Layer LAUE2M: unlike the 3D case the two-fold axis becomes axis a (its
+// position relative to the aperiodic axis distinguishes oblique vs. rectangular
+// monoclinic layers); the remaining two axes are chosen accordingly
+// (layer_laue2m).
+[[nodiscard]] bool layer_laue2m(AxisTriple &axes, PointSymmetry const &ps,
+                                int aperiodic_axis) {
+  Matrix3i prop_rot = kIdentity;
+  std::optional<int> two_fold;
+  for (Matrix3i const &r : ps) {
+    prop_rot = proper_rotation(r);
+    if (prop_rot.trace() == -1) {
+      two_fold = rotation_axis(prop_rot);
+      break;
+    }
+  }
+  if (!two_fold) {
+    return false;
+  }
+  axes[0] = {*two_fold, 1};
+
+  auto const ortho = orthogonal_axes(prop_rot, 2);
+  if (ortho.empty()) {
+    return false;
+  }
+  auto const sqnorm = [](int idx) { return rot_axis(idx).squaredNorm(); };
+  auto shortest = [&](auto &&range) -> std::optional<int> {
+    auto const it = std::ranges::min_element(range, {}, sqnorm);
+    if (it == std::ranges::end(range)) {
+      return std::nullopt;
+    }
+    return *it;
+  };
+
+  int const a0 = aperiodic_component(*two_fold, aperiodic_axis);
+  if (a0 == 1 || a0 == -1) {
+    // Monoclinic/oblique: the two-fold is along the aperiodic axis; a and b are
+    // the two shortest orthogonal axes.
+    auto const first = shortest(ortho);
+    if (!first) {
+      return false;
+    }
+    auto const second = shortest(ortho | std::views::filter([&](int idx) {
+                               return idx != axes[1].index;
+                             }));
+    if (!second) {
+      return false;
+    }
+    axes[1] = {*first, 1};
+    axes[2] = {*second, 1};
+  } else if (a0 == 0) {
+    // Monoclinic/rectangular: the second axis lies in the periodic plane, the
+    // third along the aperiodic axis.
+    auto const in_plane =
+        shortest(ortho | std::views::filter([&](int idx) {
+                   return aperiodic_component(idx, aperiodic_axis) == 0;
+                 }));
+    if (!in_plane) {
+      return false;
+    }
+
+    auto const out_plane =
+        shortest(ortho | std::views::filter([&](int idx) {
+                   int const c = aperiodic_component(idx, aperiodic_axis);
+                   return c == 1 || c == -1;
+                 }));
+    if (!out_plane) {
+      return false;
+    }
+
+    axes[1] = {*in_plane, 1};
+    axes[2] = {*out_plane, 1};
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// Laue classes mmm, m-3, m-3m (lauennn). For a layer cell the three axes are
+// reordered so the aperiodic axis is c (layer_check_and_sort_axes).
+bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
+             std::optional<int> aperiodic_axis) {
   std::array<int, 3> idx{};
   int count = 0;
   for (Matrix3i const &r : ps) {
@@ -507,22 +619,29 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
   for (auto [a, id] : std::views::zip(axes, idx)) {
     a = {id, 1};
   }
+  if (aperiodic_axis) {
+    return layer_sort_axes(axes, *aperiodic_axis);
+  }
   sort_axes(axes);
   return true;
 }
 
 [[nodiscard]] bool get_axes(AxisTriple &axes, Laue laue,
-                            PointSymmetry const &ps) {
+                            PointSymmetry const &ps,
+                            std::optional<int> aperiodic_axis) {
   switch (laue) {
   case Laue::laue_1:
     axes = {SignedAxis{0, 1}, SignedAxis{1, 1}, SignedAxis{2, 1}};
     return true;
   case Laue::laue_2m:
-    return laue2m(axes, ps);
+    return aperiodic_axis ? layer_laue2m(axes, ps, *aperiodic_axis)
+                          : laue2m(axes, ps);
   case Laue::laue_mmm:
-    return lauennn(axes, ps, 2);
+    return lauennn(axes, ps, 2, aperiodic_axis);
   case Laue::laue_4m:
   case Laue::laue_4mmm:
+    // The 4-fold axis is the aperiodic axis for a layer; laue_one_axis already
+    // places it at c, so no aperiodic-specific handling is needed.
     return laue_one_axis(ps, 4)
         .transform([&](AxisTriple const &a) {
           axes = a;
@@ -540,9 +659,9 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order) {
         })
         .value_or(false);
   case Laue::laue_m3:
-    return lauennn(axes, ps, 2);
+    return lauennn(axes, ps, 2, aperiodic_axis);
   case Laue::laue_m3m:
-    return lauennn(axes, ps, 4);
+    return lauennn(axes, ps, 4, aperiodic_axis);
   default:
     return false;
   }
@@ -563,18 +682,22 @@ identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
   return pointgroup_number(unique_rotations(rotations));
 }
 
-Result<PointgroupTransform>
-get_pointgroup(std::span<Matrix3i const> rotations) {
+Result<PointgroupTransform> get_pointgroup(std::span<Matrix3i const> rotations,
+                                           std::optional<int> aperiodic_axis) {
   PointSymmetry const ps = unique_rotations(rotations);
   int const pg_num = pointgroup_number(ps);
   if (pg_num == 0) {
+    return leaf::new_error(e_pointgroup_not_found{});
+  }
+  // Layer groups have no cubic point groups (numbers 28..32).
+  if (aperiodic_axis && pg_num >= 28) {
     return leaf::new_error(e_pointgroup_not_found{});
   }
 
   PointgroupTransform result;
   result.pointgroup = pointgroup_by_number(pg_num);
   AxisTriple axes;
-  if (!get_axes(axes, result.pointgroup.laue, ps)) {
+  if (!get_axes(axes, result.pointgroup.laue, ps, aperiodic_axis)) {
     return leaf::new_error(e_pointgroup_not_found{});
   }
   result.transformation = transformation_from_axes(axes);

@@ -179,7 +179,7 @@ magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
 
 // Transform magnetic operations by (tmat, shift) without de-duplicating:
 //   (W, w) -> (tmat, shift) (W, w) (tmat, shift)^-1
-// i.e. W' = tmat W tmat^-1, w' = mod1(shift - W' shift + tmat w). Port of
+// i.e. W' = tmat W tmat^-1, w' = wrap(shift - W' shift + tmat w). Port of
 // get_distinct_changed_magnetic_symmetry.
 [[nodiscard]] MagneticSymmetryOperations
 distinct_changed_magnetic_symmetry(
@@ -192,7 +192,7 @@ distinct_changed_magnetic_symmetry(
       sym_msg, std::back_inserter(changed), [&](auto const &op) {
         Matrix3i const rot = math::round_to_int(
             tmat * op.rotation.template cast<double>() * tmat_inv);
-        Vector3d const trans = math::mod1(Vector3d(
+        Vector3d const trans = math::wrap_to_unit_cell(Vector3d(
             shift - rot.cast<double>() * shift + tmat * op.translation));
         return MagneticSymmetryOperation{rot, trans, op.time_reversal};
       });
@@ -222,7 +222,7 @@ changed_pure_translations(Matrix3d const &tmat,
   if (std::abs(det - 1.0) <= symprec) {
     std::ranges::transform(
         pure_trans, std::back_inserter(out),
-        [&](auto const &t) { return math::mod1(Vector3d(tmat * t)); });
+        [&](auto const &t) { return math::wrap_to_unit_cell(Vector3d(tmat * t)); });
   } else {
     // det(tmat) need not be integer; find the least common denominator of the
     // matrix entries, then enumerate added lattice points.
@@ -244,7 +244,7 @@ changed_pure_translations(Matrix3d const &tmat,
     for (auto const &[n0, n1, n2, t] : std::views::cartesian_product(
              lattice_pts, lattice_pts, lattice_pts, pure_trans)) {
       Vector3d const shifted = t + Vector3d(n0, n1, n2);
-      Vector3d const transformed = math::mod1(Vector3d(tmat * shifted));
+      Vector3d const transformed = math::wrap_to_unit_cell(Vector3d(tmat * shifted));
       if (!contains_vector(transformed, out, symprec)) {
         out.push_back(transformed);
       }
@@ -301,7 +301,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
       for (auto const &factor : changed_factors) {
         // (I, ti)(Pj, tj)(Pk, tk) = (Pj Pk, Pj tk + tj + ti).
         Matrix3i const rot = rep.rotation * factor.rotation;
-        Vector3d const trans = math::mod1(
+        Vector3d const trans = math::wrap_to_unit_cell(
             Vector3d(rep.rotation.cast<double>() * factor.translation +
                      rep.translation + pure));
         changed.push_back(
@@ -324,7 +324,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
     return std::ranges::any_of(b, [&](MagneticSymmetryOperation const &ob) {
       return oa.rotation == ob.rotation &&
              oa.time_reversal == ob.time_reversal &&
-             math::rem1(Vector3d(oa.translation - ob.translation))
+             math::nearest_offset(Vector3d(oa.translation - ob.translation))
                      .cwiseAbs()
                      .maxCoeff() < symprec;
     });
@@ -528,7 +528,7 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
       auto const uip = static_cast<std::size_t>(ip);
       types[uip] = prim_cell.type(i);
       positions.row(ip) =
-          math::mod1(Vector3d(pos_std + (*changed_pure)[p])).transpose();
+          math::wrap_to_unit_cell(Vector3d(pos_std + (*changed_pure)[p])).transpose();
       if (collinear) {
         scalars[uip] = mcell.scalar(orig);
       } else {

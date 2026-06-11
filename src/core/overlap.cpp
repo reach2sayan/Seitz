@@ -13,23 +13,38 @@ namespace {
   return p.row(i).transpose();
 }
 
+// Minimal-image fractional offset of `diff`. For a layer cell the aperiodic
+// axis is not periodic, so its component is left as the raw difference; only
+// the two periodic components are folded (cel_layer_is_overlap).
+[[nodiscard]] Vector3d minimal_image(Vector3d const &diff,
+                                     std::optional<int> aperiodic_axis) noexcept {
+  Vector3d off = math::nearest_offset(diff);
+  if (aperiodic_axis) {
+    off[*aperiodic_axis] = diff[*aperiodic_axis];
+  }
+  return off;
+}
+
 // Squared Cartesian distance from a fractional position to its nearest lattice
 // point. This key is invariant under integer lattice translations, so it is
-// stable under the (mod 1) translation part of a symmetry operation.
-[[nodiscard]] double lattice_point_distance_sq(Matrix3d const &lattice,
-                                               Vector3d const &frac) noexcept {
-  return (lattice * math::nearest_offset(frac)).squaredNorm();
+// stable under the (mod 1) translation part of a symmetry operation. For a
+// layer cell only the periodic directions span lattice points.
+[[nodiscard]] double
+lattice_point_distance_sq(Matrix3d const &lattice, Vector3d const &frac,
+                          std::optional<int> aperiodic_axis) noexcept {
+  return (lattice * minimal_image(frac, aperiodic_axis)).squaredNorm();
 }
 
 // Permutation sorting atoms by (type, distance-to-nearest-lattice-point), the
 // ordering spglib uses to cluster coincident atoms (overlap.c perm_argsort).
 [[nodiscard]] std::vector<int>
 argsort_by_distance(Matrix3d const &lattice, Positions const &pos,
-                    std::vector<int> const &types) {
+                    std::vector<int> const &types,
+                    std::optional<int> aperiodic_axis) {
   int const n = static_cast<int>(types.size());
   std::vector<double> dist(static_cast<std::size_t>(n));
   std::ranges::transform(std::views::iota(0, n), dist.begin(), [&](int i) {
-    return lattice_point_distance_sq(lattice, row(pos, i));
+    return lattice_point_distance_sq(lattice, row(pos, i), aperiodic_axis);
   });
 
   std::vector<int> perm(static_cast<std::size_t>(n));
@@ -46,17 +61,18 @@ argsort_by_distance(Matrix3d const &lattice, Positions const &pos,
 } // namespace
 
 bool is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
-                double symprec) noexcept {
-  Vector3d const diff = math::nearest_offset(a - b);
+                double symprec, std::optional<int> aperiodic_axis) noexcept {
+  Vector3d const diff = minimal_image(a - b, aperiodic_axis);
   return (lattice * diff).norm() <= symprec;
 }
 
 OverlapChecker::OverlapChecker(Cell const &cell)
     : lattice_(cell.lattice()), pos_sorted_(cell.size(), 3),
       types_sorted_(static_cast<std::size_t>(cell.size())),
-      size_(static_cast<int>(cell.size())) {
-  auto const perm =
-      argsort_by_distance(cell.lattice(), cell.positions(), cell.types());
+      size_(static_cast<int>(cell.size())),
+      aperiodic_axis_(cell.aperiodic_axis()) {
+  auto const perm = argsort_by_distance(cell.lattice(), cell.positions(),
+                                        cell.types(), aperiodic_axis_);
   for (auto const [i, src] : perm | std::views::enumerate) {
     pos_sorted_.row(i) = cell.positions().row(src);
     types_sorted_[static_cast<std::size_t>(i)] =
@@ -76,7 +92,7 @@ bool OverlapChecker::possible_overlap(Vector3d const &trans,
     return std::ranges::any_of(std::views::iota(0, size_), [&](int i) {
       return is_overlap_same_type(pr, row(pos_sorted_, i), tr,
                                   types_sorted_[static_cast<std::size_t>(i)],
-                                  lattice_, symprec);
+                                  lattice_, symprec, aperiodic_axis_);
     });
   });
 }
@@ -114,7 +130,7 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
       if (is_overlap_same_type(row(pos_sorted_, io), row(rotated, ir),
                                types_sorted_[static_cast<std::size_t>(io)],
                                types_sorted_[static_cast<std::size_t>(ir)],
-                               lattice_, symprec)) {
+                               lattice_, symprec, aperiodic_axis_)) {
         found[static_cast<std::size_t>(ir)] = 1;
         break;
       }

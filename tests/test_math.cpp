@@ -18,21 +18,24 @@ TEST_CASE("nint rounds half away from zero", "[math]") {
   CHECK(math::nint(0.0) == 0);
 }
 
-TEST_CASE("mod1 folds a coordinate into the unit interval", "[math]") {
-  CHECK(math::mod1(0.2) == Approx(0.2));
-  CHECK(math::mod1(1.2) == Approx(0.2));
-  CHECK(math::mod1(-0.2) == Approx(0.8));
-  CHECK(math::mod1(2.0) == Approx(0.0));
-  CHECK(math::mod1(-1.0) == Approx(0.0));
+TEST_CASE("wrap_to_unit_cell folds a coordinate into the unit interval",
+          "[math]") {
+  CHECK(math::wrap_to_unit_cell(0.2) == Approx(0.2));
+  CHECK(math::wrap_to_unit_cell(1.2) == Approx(0.2));
+  CHECK(math::wrap_to_unit_cell(-0.2) == Approx(0.8));
+  CHECK(math::wrap_to_unit_cell(2.0) == Approx(0.0));
+  CHECK(math::wrap_to_unit_cell(-1.0) == Approx(0.0));
   // Just below zero stays near zero, not near one.
-  CHECK(math::mod1(-1e-11) == Approx(0.0).margin(1e-9));
+  CHECK(math::wrap_to_unit_cell(-1e-11) == Approx(0.0).margin(1e-9));
 }
 
-TEST_CASE("rem1 returns the centered remainder", "[math]") {
-  CHECK(math::rem1(0.3) == Approx(0.3));
-  CHECK(math::rem1(0.7) == Approx(-0.3));
-  CHECK(math::rem1(-0.7) == Approx(0.3));
-  CHECK(math::rem1(3.25) == Approx(0.25));
+TEST_CASE("nearest_offset returns the centered remainder x - nint(x)",
+          "[math]") {
+  Vector3d const off = math::nearest_offset(Vector3d(0.3, 0.7, 3.25));
+  CHECK(off[0] == Approx(0.3));
+  CHECK(off[1] == Approx(-0.3));
+  CHECK(off[2] == Approx(0.25));
+  CHECK(math::nearest_offset(Vector3d(-0.7, 0.0, 0.0))[0] == Approx(0.3));
 }
 
 TEST_CASE("is_int_matrix respects symprec", "[math]") {

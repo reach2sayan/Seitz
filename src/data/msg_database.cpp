@@ -26,16 +26,17 @@ struct DecodedOp {
 // when filling the decoded tables below.
 [[nodiscard]] constexpr DecodedOp decode_packed(int encoded) noexcept {
   DecodedOp d{};
-  int const r = encoded % (3*3*3*3*3*3*3*3*3);// 19683; // 3^9
-  int digit = (3*3*3*3*3*3*3*3);              // 3^8
-  for (std::size_t e = 0; e < 9; ++e) {
-    d.rot[e] = static_cast<std::int8_t>((r % (digit * 3)) / digit - 1);
+  constexpr auto factor = 3*3*3*3*3*3*3*3*3;
+  int const r = encoded % factor;// 19683; // 3^9
+  int digit = factor/3;              // 3^8
+  for (auto& x : d.rot) {
+    x = static_cast<std::int8_t>((r % (digit * 3)) / digit - 1);
     digit /= 3;
   }
-  int const t = encoded / 19683;
-  digit = 144; // 12^2
-  for (std::size_t e = 0; e < 3; ++e) {
-    d.trans_num[e] = static_cast<std::int8_t>((t % (digit * 12)) / digit);
+  int const t = encoded / factor;
+  digit = 12*12; // 12^2
+  for (auto& x : d.trans_num) {
+    x = static_cast<std::int8_t>((t % (digit * 12)) / digit);
     digit /= 12;
   }
   return d;

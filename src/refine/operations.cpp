@@ -6,7 +6,6 @@
 #include <spglib/math/integer_matrix.hpp>
 
 #include <algorithm>
-#include <array>
 
 // Port of the refined-operation recovery chain in refinement.c (3D path).
 namespace spglib::refine {
@@ -58,23 +57,17 @@ primitive_db_symmetry(Matrix3d const &t_mat,
 // get_surrounding_frame: bounding-box extent of the parallelepiped spanned by
 // the columns of the integer transformation matrix.
 [[nodiscard]] Vector3i surrounding_frame(Matrix3i const &t_mat) {
-  std::array<Vector3i, 8> const corners = {
-      Vector3i::Zero(),
-      t_mat.col(0),
-      t_mat.col(1),
-      t_mat.col(2),
-      Vector3i(t_mat.col(1) + t_mat.col(2)),
-      Vector3i(t_mat.col(2) + t_mat.col(0)),
-      Vector3i(t_mat.col(0) + t_mat.col(1)),
-      Vector3i(t_mat.col(0) + t_mat.col(1) + t_mat.col(2))};
+  Eigen::Matrix<int, 3, 8> corners;
+  corners.col(0).setZero();
+  corners.col(1) = t_mat.col(0);
+  corners.col(2) = t_mat.col(1);
+  corners.col(3) = t_mat.col(2);
+  corners.col(4) = t_mat.col(1) + t_mat.col(2);
+  corners.col(5) = t_mat.col(2) + t_mat.col(0);
+  corners.col(6) = t_mat.col(0) + t_mat.col(1);
+  corners.col(7) = t_mat.col(0) + t_mat.col(1) + t_mat.col(2);
 
-  Vector3i frame;
-  for (int i = 0; i < 3; ++i) {
-    auto const coord = [i](Vector3i const &c) { return c[i]; };
-    auto const [min, max] = std::ranges::minmax(corners, {}, coord);
-    frame[i] = coord(max) - coord(min);
-  }
-  return frame;
+  return corners.rowwise().maxCoeff() - corners.rowwise().minCoeff();
 }
 
 // get_lattice_translations: every integer point of the surrounding frame mapped
@@ -89,7 +82,7 @@ lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
   for (int i = 0; i < frame[0]; ++i) {
     for (int j = 0; j < frame[1]; ++j) {
       for (int k = 0; k < frame[2]; ++k) {
-        out.emplace_back(math::mod1(Vector3d(inv_tmat * Vector3d(i, j, k))));
+        out.emplace_back(math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
       }
     }
   }
@@ -146,7 +139,7 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
   out.reserve(pure_trans.size() * t_sym.size());
   for (Vector3d const &p : pure_trans) {
     for (auto const &op : t_sym) {
-      out.emplace_back(op.rotation, math::mod1(Vector3d(op.translation + p)));
+      out.emplace_back(op.rotation, math::wrap_to_unit_cell(Vector3d(op.translation + p)));
     }
   }
   out.shrink_to_fit();

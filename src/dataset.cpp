@@ -91,9 +91,20 @@ Result<Dataset> get_dataset(Cell const &cell, double symprec,
 
         .primitive_lattice = primitive->cell.lattice(),
         .mapping_to_primitive = primitive->mapping_table,
+        .aperiodic_axis = cell.aperiodic_axis(),
     };
   }
   return leaf::new_error(e_spacegroup_search_failed{});
+}
+
+Result<Dataset> get_layer_dataset(Cell const &cell, int aperiodic_axis,
+                                  double symprec,
+                                  AngleTolerance angle_tolerance) {
+  Cell layer_cell = cell;
+  layer_cell.set_aperiodic_axis(aperiodic_axis);
+  // hall_number 0: search the layer settings (dispatch keys off the aperiodic
+  // axis carried by the cell, not a positive Hall number).
+  return get_dataset(layer_cell, symprec, angle_tolerance, /*hall_number=*/0);
 }
 
 } // namespace spglib

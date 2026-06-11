@@ -3,6 +3,7 @@
 #include <spglib/core/types.hpp>
 
 #include <string_view>
+#include <vector>
 
 // Decoder for the site-symmetry / Wyckoff database (generated tables in
 // data/sitesym_tables.hpp). Port of sitesym_database.c's ssmdb_* accessors,
@@ -35,5 +36,22 @@ struct WyckoffRange {
 // The trailing space padding is removed at generation time, so the view points
 // straight into static storage.
 [[nodiscard]] std::string_view site_symmetry_symbol(int index);
+
+// One Wyckoff position of a Hall setting: its global database index (the key for
+// wyckoff_coordinate / site_symmetry_symbol) paired with its Wyckoff letter.
+// The database lists positions from the general position downward, so the letter
+// is the reverse offset within the Hall range (0 = 'a' = the most special
+// position) — see wyckoff_entries.
+struct WyckoffEntry {
+  int global_index;
+  int letter; // 0 = 'a'
+};
+
+// The Wyckoff positions of a Hall number (1..530), ordered by ascending letter
+// (a, b, c, ...). Bundles index + letter so callers iterate one list of objects
+// rather than re-deriving the letter offset from a WyckoffRange. Empty out of
+// range. The letter convention (count - offset - 1) matches the one used when
+// assigning Dataset::wyckoffs in refine/site_symmetry.cpp.
+[[nodiscard]] std::vector<WyckoffEntry> wyckoff_entries(int hall_number);
 
 } // namespace spglib::data

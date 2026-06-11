@@ -60,6 +60,10 @@ def main():
 
     position_wyckoff = parse_ints(
         extract_array_body(text, "static int const position_wyckoff[]"))
+    # Layer-group Wyckoff ranges (negative hall numbers), indexing into the SAME
+    # coordinates_first / multiplicities / site_symmetry_symbols arrays.
+    position_layer_wyckoff = parse_ints(
+        extract_array_body(text, "static int const position_layer_wyckoff[]"))
     coordinates_first = parse_ints(
         extract_array_body(text, "static int const coordinates_first[]"))
     multiplicities = parse_ints(
@@ -91,6 +95,16 @@ def main():
           % len(position_wyckoff))
         for i in range(0, len(position_wyckoff), 12):
             w("    " + ", ".join(str(x) for x in position_wyckoff[i:i + 12])
+              + ",\n")
+        w("}};\n\n")
+
+        w("// Layer-group Wyckoff-position ranges, indexed by the negation of the\n")
+        w("// (negative) layer hall number; offsets point into the same\n")
+        w("// coordinate/multiplicity/symbol arrays as the 3D table.\n")
+        w("inline constexpr std::array<int, %d> kPositionLayerWyckoff = {{\n"
+          % len(position_layer_wyckoff))
+        for i in range(0, len(position_layer_wyckoff), 12):
+            w("    " + ", ".join(str(x) for x in position_layer_wyckoff[i:i + 12])
               + ",\n")
         w("}};\n\n")
 

@@ -115,11 +115,51 @@ inline constexpr SpacegroupCatalog kCatalog = [] {
   return c;
 }();
 
-// The setting for a Hall number (1..530); a zero-valued SpacegroupType (number
-// 0) if out of range. constexpr — usable in constant expressions.
+// Number of layer-group Hall settings (80 layer groups, 116 settings). Layer
+// groups use a negative-hall-number convention (settings -1..-116), mirroring
+// reference spglib, so they share the symmetry-operation array and the bulk of
+// the matching machinery with the 3D space groups.
+inline constexpr int kNumLayerHallNumbers = 116;
+
+// The layer-group analogue of SpacegroupCatalog, indexed by the negation of the
+// (negative) layer hall number: by_neg_hall[-hall]. Index 0 is the sentinel.
+struct LayerCatalog {
+  std::array<SpacegroupType, kNumLayerHallNumbers + 1> by_neg_hall{};
+
+  // The setting for a layer hall number (-1..-116); the sentinel otherwise.
+  [[nodiscard]] constexpr SpacegroupType const &at(int hall) const noexcept {
+    int const neg = -hall;
+    bool const in_range = neg >= 1 && neg <= kNumLayerHallNumbers;
+    return by_neg_hall[static_cast<std::size_t>(in_range ? neg : 0)];
+  }
+};
+
+inline constexpr LayerCatalog kLayerCatalog = [] {
+  LayerCatalog c{};
+  for (std::size_t i = 0; i < kLayerGroupTypes.size(); ++i) {
+    auto const &r = kLayerGroupTypes[i];
+    c.by_neg_hall[i] = SpacegroupType{-static_cast<int>(i),
+                                      r.number,
+                                      r.schoenflies,
+                                      r.hall_symbol,
+                                      r.international,
+                                      r.international_full,
+                                      r.international_short,
+                                      r.choice,
+                                      static_cast<Centering>(r.centering),
+                                      r.pointgroup_number};
+  }
+  return c;
+}();
+
+// The setting for a Hall number; a zero-valued SpacegroupType (number 0) if out
+// of range. Positive hall numbers (1..530) select 3D space groups; negative
+// hall numbers (-1..-116) select layer-group settings. constexpr — usable in
+// constant expressions.
 [[nodiscard]] constexpr SpacegroupType
 spacegroup_type(int hall_number) noexcept {
-  return kCatalog.at(hall_number);
+  return hall_number < 0 ? kLayerCatalog.at(hall_number)
+                         : kCatalog.at(hall_number);
 }
 
 // The symmetry operations for a Hall number (1..530); empty if out of range.

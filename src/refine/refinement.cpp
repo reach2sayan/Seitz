@@ -222,7 +222,7 @@ spacegroup::Spacegroup find_similar_bravais_lattice(spacegroup::Spacegroup sg,
     double const length = p.norm();
     if (length < shortest_length - symprec) {
       shortest_length = length;
-      shortest_p = math::mod1(p);
+      shortest_p = math::wrap_to_unit_cell(p);
     }
   }
 

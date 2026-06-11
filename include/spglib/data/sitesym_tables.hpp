@@ -59,6 +59,22 @@ inline constexpr std::array<int, 532> kPositionWyckoff = {{
     3440, 3448, 3460, 3468,
 }};
 
+// Layer-group Wyckoff-position ranges, indexed by the negation of the
+// (negative) layer hall number; offsets point into the same
+// coordinate/multiplicity/symbol arrays as the 3D table.
+inline constexpr std::array<int, 118> kPositionLayerWyckoff = {{
+    0, 3468, 3469, 3474, 3479, 3481, 3482, 3483, 3484, 3494, 3499, 3504,
+    3509, 3512, 3515, 3516, 3517, 3519, 3521, 3524, 3527, 3528, 3529, 3531,
+    3533, 3542, 3551, 3555, 3559, 3563, 3567, 3570, 3573, 3579, 3585, 3598,
+    3602, 3606, 3609, 3617, 3626, 3630, 3634, 3637, 3643, 3649, 3655, 3658,
+    3661, 3663, 3665, 3668, 3671, 3674, 3677, 3679, 3681, 3682, 3683, 3685,
+    3687, 3691, 3695, 3698, 3701, 3719, 3730, 3741, 3749, 3757, 3765, 3774,
+    3783, 3789, 3795, 3799, 3803, 3809, 3813, 3817, 3823, 3835, 3845, 3849,
+    3855, 3863, 3868, 3873, 3883, 3888, 3895, 3899, 3909, 3914, 3923, 3929,
+    3943, 3952, 3961, 3969, 3977, 3985, 3989, 3994, 4002, 4007, 4012, 4016,
+    4024, 4031, 4035, 4043, 4051, 4060, 4066, 4076, 4084, 4096,
+}};
+
 // Encoded representative coordinate (rotation base-45 + translation
 // base-24) per Wyckoff position; see data/sitesym_database.cpp.
 inline constexpr std::array<int, 4096> kCoordinatesFirst = {{

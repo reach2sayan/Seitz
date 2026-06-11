@@ -1,11 +1,4 @@
-# Centralised dependency resolution.
-#   find_package  -> system libraries (Eigen, Boost, Catch2, MKL)
-#   FetchContent  -> the reference spglib build, used only as a test oracle
-
 find_package(Eigen3 3.4 REQUIRED NO_MODULE)
-
-# Header-only Boost libraries we rely on (LEAF, Container, MultiIndex) are all
-# reachable through the Boost::headers target, so no COMPONENTS are needed yet.
 find_package(Boost 1.83 REQUIRED CONFIG)
 
 if (SPGLIB_USE_MKL)

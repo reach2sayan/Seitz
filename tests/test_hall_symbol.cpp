@@ -30,7 +30,7 @@ TEST_CASE(
       continue;
     }
     // Shift folded to [0,1) must be ~0 for the canonical setting.
-    Vector3d const folded = math::mod1(*shift);
+    Vector3d const folded = math::wrap_to_unit_cell(*shift);
     if (folded.cwiseAbs().maxCoeff() > 1e-6 &&
         (folded.array() - 1.0).abs().maxCoeff() > 1e-6)
       ++nonzero_shift;

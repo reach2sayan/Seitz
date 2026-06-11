@@ -74,6 +74,17 @@ constexpr auto kWyckoffRanges = [] {
   }
   return t;
 }();
+
+// Layer-group Wyckoff ranges, indexed by -(negative layer hall number). Built
+// the same way from kPositionLayerWyckoff; index 0 is the sentinel.
+constexpr auto kLayerWyckoffRanges = [] {
+  std::array<WyckoffRange, kPositionLayerWyckoff.size() - 1> t{};
+  for (std::size_t const h : std::views::iota(std::size_t{1}, t.size())) {
+    int const start = kPositionLayerWyckoff[h];
+    t[h] = WyckoffRange{start, kPositionLayerWyckoff[h + 1] - start};
+  }
+  return t;
+}();
 } // namespace
 
 WyckoffCoordinate wyckoff_coordinate(int index) {
@@ -90,6 +101,12 @@ WyckoffCoordinate wyckoff_coordinate(int index) {
 }
 
 WyckoffRange wyckoff_indices(int hall_number) {
+  if (hall_number < 0) {
+    int const neg = -hall_number;
+    bool const in_range =
+        static_cast<std::size_t>(neg) < kLayerWyckoffRanges.size();
+    return kLayerWyckoffRanges[static_cast<std::size_t>(in_range ? neg : 0)];
+  }
   bool const in_range =
       hall_number >= 1 &&
       static_cast<std::size_t>(hall_number) < kWyckoffRanges.size();
@@ -98,6 +115,20 @@ WyckoffRange wyckoff_indices(int hall_number) {
 
 std::string_view site_symmetry_symbol(int index) {
   return kSiteSymmetrySymbols[static_cast<std::size_t>(index)];
+}
+
+std::vector<WyckoffEntry> wyckoff_entries(int hall_number) {
+  WyckoffRange const range = wyckoff_indices(hall_number);
+  std::vector<WyckoffEntry> entries;
+  entries.reserve(static_cast<std::size_t>(range.count));
+  // The database lists positions general-first; the letter is the reverse
+  // offset (count - offset - 1), so 'a' is the most special position. Emit in
+  // ascending-letter order (a, b, c, ...) by walking the range backwards.
+  for (int offset = range.count - 1; offset >= 0; --offset) {
+    entries.push_back(
+        WyckoffEntry{range.start + offset, range.count - offset - 1});
+  }
+  return entries;
 }
 
 } // namespace spglib::data

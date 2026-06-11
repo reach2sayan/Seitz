@@ -6,6 +6,7 @@
 #include <spglib/core/tolerance.hpp>
 #include <spglib/core/types.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +60,10 @@ struct Dataset {
   // atom to its primitive atom.
   Matrix3d primitive_lattice{Matrix3d::Identity()};
   std::vector<int> mapping_to_primitive;
+
+  // The aperiodic axis (0/1/2) for a layer-group result, or std::nullopt for a
+  // 3D space-group result. In the standardized cell this is always axis 2 (c).
+  std::optional<int> aperiodic_axis;
 };
 
 // Determine the space group of `cell` and standardize it. Port of spglib.c
@@ -71,5 +76,15 @@ struct Dataset {
 [[nodiscard]] Result<Dataset>
 get_dataset(Cell const &cell, double symprec = kDefaultSymprec,
             AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);
+
+// Determine the LAYER group of `cell` — a 2D-periodic crystal with the given
+// `aperiodic_axis` (0/1/2 = a/b/c). Port of spglib's spg_get_layer_dataset. The
+// returned Dataset uses the negative-Hall-number convention (hall_number in
+// -1..-116) and layer-group number (1..80); its aperiodic_axis field is set.
+// Equivalent to setting the aperiodic axis on `cell` and calling get_dataset.
+[[nodiscard]] Result<Dataset>
+get_layer_dataset(Cell const &cell, int aperiodic_axis,
+                  double symprec = kDefaultSymprec,
+                  AngleTolerance angle_tolerance = std::nullopt);
 
 } // namespace spglib

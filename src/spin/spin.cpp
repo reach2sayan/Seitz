@@ -324,9 +324,7 @@ MagneticCell idealized_cell(std::vector<int> const &permutations,
       // Subtract the input position so the accumulated residual stays small;
       // the per-component nint removes the lattice translation.
       Vector3d const diff = pos_tmp - cell.position(i);
-      for (int s = 0; s < 3; ++s) {
-        pos_res[s] += diff[s] - math::nint(diff[s]);
-      }
+      pos_res += math::nearest_offset(diff);
       if (collinear) {
         double const t = apply_to_scalar(mcell.scalar(j), rc, op.time_reversal,
                                          with_time_reversal, is_axial);

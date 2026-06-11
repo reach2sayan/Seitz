@@ -49,7 +49,7 @@ using SymmetryOperations = std::vector<SymmetryOperation>;
   if (a.rotation != b.rotation) {
     return false;
   }
-  Vector3d const d = math::rem1(Vector3d(a.translation - b.translation));
+  Vector3d const d = math::nearest_offset(Vector3d(a.translation - b.translation));
   return d.cwiseAbs().maxCoeff() <= symprec;
 }
 

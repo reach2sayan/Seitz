@@ -128,6 +128,20 @@ unpack_generators(data::GeneratorSet const &g) {
   return true;
 }
 
+// Fold a fractional 3-vector into the cell. For a layer setting (hall_number <
+// 0) the conventional c axis (index 2) is the aperiodic axis and is not
+// periodic, so its component is left raw rather than folded into [0, 1) — this
+// is what lets a layer offset along its aperiodic axis be re-centered onto the
+// database convention (reference get_origin_shift: `hall_number > 0 ? Dmod1 :
+// raw` on the third component).
+[[nodiscard]] Vector3d wrap_shift(Vector3d const &v, int hall_number) {
+  Vector3d out = math::wrap_to_unit_cell(v);
+  if (hall_number < 0) {
+    out[2] = v[2];
+  }
+  return out;
+}
+
 // shift = VSpU . dw (get_origin_shift), with dw assembled per generator.
 [[nodiscard]] bool get_origin_shift(Vector3d &shift, int hall_number,
                                     std::array<Matrix3i, 3> const &rot,
@@ -144,12 +158,11 @@ unpack_generators(data::GeneratorSet const &g) {
       return false;
     }
 
-    // hall_number is always > 0 here (3D; layer groups, hall_number < 0, would
-    // leave the c component un-folded — out of scope).
-    dw.segment<3>(static_cast<Eigen::Index>(i * 3)) = math::mod1(tmp);
+    dw.segment<3>(static_cast<Eigen::Index>(i * 3)) =
+        wrap_shift(tmp, hall_number);
   }
 
-  shift = math::mod1(data::vspu_matrix(vspu) * dw);
+  shift = wrap_shift(data::vspu_matrix(vspu) * dw, hall_number);
   return true;
 }
 
@@ -161,6 +174,10 @@ unpack_generators(data::GeneratorSet const &g) {
                                      SymmetryOperations const &symmetry,
                                      double symprec) {
   auto const &db_ops = data::operations_from_database(hall_number);
+  // For a layer setting the aperiodic axis (conventional c = 2) is not periodic,
+  // so the overlap test must not fold it (reference cel_layer_is_overlap).
+  std::optional<int> const aperiodic_axis =
+      hall_number < 0 ? std::optional<int>(2) : std::nullopt;
   boost::container::static_vector<std::uint8_t, 192> found(db_ops.size(), 0);
   for (const auto &op : symmetry) {
     const auto it = std::ranges::find_if(
@@ -179,7 +196,8 @@ unpack_generators(data::GeneratorSet const &g) {
           const Vector3d shift_rot =
               transform_rotation(c, db_op.rotation) * shift;
 
-          return is_overlap(diff, shift_rot, primitive_lattice, symprec);
+          return is_overlap(diff, shift_rot, primitive_lattice, symprec,
+                            aperiodic_axis);
         });
 
     if (it == std::ranges::end(db_ops | std::views::enumerate)) {
@@ -235,8 +253,16 @@ try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
   using namespace data;
   // Crystal system and the rhombohedral subsets are pure functions of the Hall
   // number, precomputed once in data::kHallClass. The VSpU/generator choice
-  // below still depends on the runtime Centering c, so it stays here.
-  HallClass const &hc = hall_class(hall_number);
+  // below still depends on the runtime Centering c, so it stays here. Layer
+  // groups (negative hall numbers) carry no 3D hall-range bucket, so their
+  // crystal system is derived from the point-group number; they are never
+  // rhombohedral and reuse the same per-system generator families.
+  HallClass const hc =
+      hall_number < 0
+          ? HallClass{holohedry_from_pointgroup(
+                          spacegroup_type(hall_number).pointgroup_number),
+                      false, false}
+          : hall_class(hall_number);
   switch (hc.system) {
   case Holohedry::cubic:
     if (c == Centering::primitive)

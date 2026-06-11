@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 
 // Port of site_symmetry.c (3D space-group path). Determines the exact
 // (symmetrized) location of each conventional-cell atom from its site symmetry
@@ -28,17 +29,16 @@ constexpr double kIncreaseRate = 1.05; // site_symmetry.c INCREASE_RATE
 [[nodiscard]] Vector3d set_exact_location(Vector3d const &position,
                                           SymmetryOperations const &conv_sym,
                                           Matrix3d const &lattice,
-                                          double symprec) {
+                                          double symprec,
+                                          std::optional<int> aperiodic_axis) {
   Matrix3d sum_rot = Matrix3d::Zero();
   Vector3d sum_trans = Vector3d::Zero();
   int num = 0;
   for (auto const &op : conv_sym) {
     Vector3d const pos = apply(op, position);
-    if (is_overlap(pos, position, lattice, symprec)) {
+    if (is_overlap(pos, position, lattice, symprec, aperiodic_axis)) {
       sum_rot += op.rotation.cast<double>();
-      Vector3d const wrap = (pos - position).unaryExpr([](double x) {
-        return static_cast<double>(math::nint(x));
-      });
+      Vector3d const wrap = math::round_to_int(pos - position).cast<double>();
       sum_trans += op.translation - wrap;
       ++num;
     }
@@ -59,13 +59,14 @@ struct Equivalent {
 find_equivalent(int i, std::vector<int> const &indep_atoms,
                 std::vector<Vector3d> const &positions, Cell const &conv_prim,
                 SymmetryOperations const &conv_sym, double symprec) {
+  std::optional<int> const aperiodic_axis = conv_prim.aperiodic_axis();
   for (int const j : indep_atoms) {
     for (auto const &op : conv_sym) {
       Vector3d const pos = apply(op, positions[static_cast<std::size_t>(j)]);
       if (is_overlap_same_type(pos, conv_prim.position(i), conv_prim.type(j),
-                               conv_prim.type(i), conv_prim.lattice(),
-                               symprec)) {
-        return Equivalent{math::mod1(pos), j};
+                               conv_prim.type(i), conv_prim.lattice(), symprec,
+                               aperiodic_axis)) {
+        return Equivalent{math::wrap_to_unit_cell(pos), j};
       }
     }
   }
@@ -83,6 +84,7 @@ struct Positions {
                                             SymmetryOperations const &conv_sym,
                                             double symprec) {
   auto const n = static_cast<std::size_t>(conv_prim.size());
+  std::optional<int> const aperiodic_axis = conv_prim.aperiodic_axis();
   std::vector<Vector3d> positions(n);
   std::vector<int> equivalent_atoms(n);
   std::vector<int> indep_atoms;
@@ -97,7 +99,8 @@ struct Positions {
       equivalent_atoms[ui] = i;
       indep_atoms.push_back(i);
       positions[ui] = set_exact_location(conv_prim.position(i), conv_sym,
-                                         conv_prim.lattice(), symprec);
+                                         conv_prim.lattice(), symprec,
+                                         aperiodic_axis);
     }
   }
   return {std::move(positions), std::move(equivalent_atoms)};
@@ -114,7 +117,8 @@ struct WyckoffLabel {
 [[nodiscard]] std::optional<WyckoffLabel>
 get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
-                     int hall_number, double symprec) {
+                     int hall_number, double symprec,
+                     std::optional<int> aperiodic_axis) {
   std::vector<Vector3d> orbit;
   orbit.reserve(conv_sym.size());
   std::ranges::transform(conv_sym, std::back_inserter(orbit),
@@ -128,9 +132,9 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
     for (auto const &oj : orbit) {
       int num_sitesym = 0;
       for (auto const &ok : orbit) {
-        if (is_overlap(oj, ok, lattice, symprec)) {
+        if (is_overlap(oj, ok, lattice, symprec, aperiodic_axis)) {
           Vector3d const mapped = wc.rotation.cast<double>() * ok + wc.translation;
-          if (is_overlap(ok, mapped, lattice, symprec)) {
+          if (is_overlap(ok, mapped, lattice, symprec, aperiodic_axis)) {
             ++num_sitesym;
           }
         }
@@ -157,6 +161,7 @@ set_wyckoff_labels(std::vector<int> &wyckoffs,
                    Cell const &conv_prim, SymmetryOperations const &conv_sym,
                    int num_pure_trans, int hall_number, double symprec) {
   auto const n = static_cast<std::size_t>(conv_prim.size());
+  std::optional<int> const aperiodic_axis = conv_prim.aperiodic_axis();
 
   std::vector<int> nums_equiv(n, 0);
   for (int const e : equivalent_atoms) {
@@ -170,7 +175,7 @@ set_wyckoff_labels(std::vector<int> &wyckoffs,
     }
     auto const label = get_wyckoff_notation(
         positions[ui], conv_sym, nums_equiv[ui] * num_pure_trans,
-        conv_prim.lattice(), hall_number, symprec);
+        conv_prim.lattice(), hall_number, symprec, aperiodic_axis);
     if (!label) {
       return false;
     }

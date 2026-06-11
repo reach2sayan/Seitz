@@ -4,7 +4,7 @@ project(CppCrystal VERSION 0.1.0 LANGUAGES CXX
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -32,6 +32,13 @@ add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
 target_sources(cppcrystal PRIVATE
         src/version.cpp
         src/dataset.cpp
+        src/analysis/symmetry_analyzer.cpp
+        src/analysis/magnetic_symmetry_analyzer.cpp
+        src/group/space_group.cpp
+        src/group/wyckoff_position.cpp
+        src/generate/wyckoff_combinations.cpp
+        src/generate/random_lattice.cpp
+        src/generate/crystal_builder.cpp
         src/core/overlap.cpp
         src/reduce/delaunay.cpp
         src/reduce/niggli.cpp
@@ -88,13 +95,11 @@ if (SPGLIB_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_link_options(cppcrystal PUBLIC -fsanitize=address,undefined)
 endif ()
 
-# ---- demo ----
 if (SPGLIB_BUILD_DEMO)
     add_executable(cppcrystal_demo main.cpp)
     target_link_libraries(cppcrystal_demo PRIVATE cppcrystal::cppcrystal)
 endif ()
 
-# ---- tests ----
 if (SPGLIB_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

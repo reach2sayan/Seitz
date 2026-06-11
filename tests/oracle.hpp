@@ -192,10 +192,9 @@ struct RefDataset {
   std::vector<std::string> site_symmetry_symbols;
 };
 
-inline RefDataset reference_dataset(Cell const &cell, double symprec) {
-  CCell c(cell);
-  SpglibDataset *ds = spg_get_dataset(c.lattice, c.pos_mut(), c.types.data(),
-                                      c.num_atom(), symprec);
+// Copy an spglib dataset into RefDataset and free it. Shared by the 3D and
+// layer entry points (both return the same SpglibDataset).
+inline RefDataset convert_dataset(SpglibDataset *ds) {
   RefDataset out;
   if (ds == nullptr) {
     return out;
@@ -237,6 +236,22 @@ inline RefDataset reference_dataset(Cell const &cell, double symprec) {
   }
   spg_free_dataset(ds);
   return out;
+}
+
+inline RefDataset reference_dataset(Cell const &cell, double symprec) {
+  CCell c(cell);
+  return convert_dataset(spg_get_dataset(c.lattice, c.pos_mut(),
+                                         c.types.data(), c.num_atom(), symprec));
+}
+
+// Reference layer-group determination (spg_get_layer_dataset), returning the
+// same SpglibDataset shape with a negative hall_number and layer-group number.
+inline RefDataset reference_layer_dataset(Cell const &cell, int aperiodic_axis,
+                                          double symprec) {
+  CCell c(cell);
+  return convert_dataset(spg_get_layer_dataset(c.lattice, c.pos_mut(),
+                                               c.types.data(), c.num_atom(),
+                                               aperiodic_axis, symprec));
 }
 
 struct CPointgroup {

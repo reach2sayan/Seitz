@@ -7,6 +7,7 @@
 #include <spglib/symmetry/find_symmetry.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <iterator>
@@ -38,33 +39,112 @@ constexpr double kTrimIncreaseRate = 2.0;
   return p.row(i).transpose();
 }
 
+// Fold a fractional coordinate into the cell, but leave the aperiodic axis (if
+// any) at its raw value — layer cells are not periodic along it.
+[[nodiscard]] Vector3d wrap_periodic(Vector3d const &v,
+                                     std::optional<int> aperiodic_axis) {
+  Vector3d out;
+  for (int j = 0; j < 3; ++j) {
+    out[j] = (aperiodic_axis && j == *aperiodic_axis)
+                 ? v[j]
+                 : math::wrap_to_unit_cell(v[j]);
+  }
+  return out;
+}
+
+// The Delaunay reduction appropriate to the cell: 2D (periodic plane only) for
+// a layer cell, full 3D otherwise.
+[[nodiscard]] Result<Matrix3d>
+reduce_lattice(Matrix3d const &lattice, std::optional<int> aperiodic_axis,
+               double symprec) {
+  return aperiodic_axis
+             ? reduce::delaunay_reduce(lattice, *aperiodic_axis, symprec)
+             : reduce::delaunay_reduce(lattice, symprec);
+}
+
 // get_cell_with_smallest_lattice: the multiplicity-one case.
-[[nodiscard]] std::optional<Cell> smallest_lattice_cell(Cell const &cell,
-                                                        double symprec) {
-  auto const min_lat = reduce::delaunay_reduce(cell.lattice(), symprec);
+[[nodiscard]] std::optional<Cell>
+smallest_lattice_cell(Cell const &cell, std::optional<int> aperiodic_axis,
+                      double symprec) {
+  auto const min_lat = reduce_lattice(cell.lattice(), aperiodic_axis, symprec);
   if (!min_lat) {
     return std::nullopt;
   }
   Matrix3d const trans = min_lat->inverse() * cell.lattice();
   Positions pos(cell.size(), 3);
   for (Index i = 0; i < cell.size(); ++i) {
-    pos.row(i) = math::mod1(Vector3d(trans * cell.position(i))).transpose();
+    pos.row(i) =
+        wrap_periodic(Vector3d(trans * cell.position(i)), aperiodic_axis)
+            .transpose();
   }
-  return Cell(*min_lat, pos, cell.types());
+  return Cell(*min_lat, pos, cell.types(), aperiodic_axis);
 }
 
 // find_primitive_lattice_vectors + cleaning + Delaunay reduce. Picks the first
 // triple of {pure translations, unit vectors} spanning the primitive volume.
+// Clean a candidate relative lattice (whose |det| should equal `multi`) via its
+// exact integer inverse, then reduce and return the primitive lattice. Shared by
+// the 3D and layer paths.
+[[nodiscard]] std::optional<Matrix3d>
+finish_primitive_lattice(Matrix3d relative, Matrix3d const &cell_lattice,
+                         int multi, std::optional<int> aperiodic_axis,
+                         double symprec) {
+  auto const rel_inv = math::inverse(relative, symprec);
+  if (rel_inv) {
+    Matrix3i const inv_int = math::round_to_int(*rel_inv);
+    if (std::abs(inv_int.determinant()) == multi) {
+      relative = inv_int.cast<double>().inverse();
+    }
+  }
+  Matrix3d const prim = cell_lattice * relative;
+  auto const reduced = reduce_lattice(prim, aperiodic_axis, symprec);
+  return reduced.has_value() ? std::optional<Matrix3d>(reduced.value())
+                             : std::nullopt;
+}
+
 [[nodiscard]] std::optional<Matrix3d>
 primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
-                  double symprec) {
+                  std::optional<int> aperiodic_axis, double symprec) {
   int const multi = static_cast<int>(pure_trans.size());
+  double const init_volume = std::abs(cell.lattice().determinant());
+
+  if (aperiodic_axis) {
+    // Layer: the third basis vector is fixed to the aperiodic lattice vector
+    // (the cell is not periodic along it); the two periodic vectors are chosen
+    // from the in-plane pure translations and the other two unit vectors. The
+    // aperiodic axis is kept at its own column index so the 2D reduction below
+    // leaves it untouched. (primitive.c find_primitive_lattice_vectors, layer.)
+    int const ap = *aperiodic_axis;
+    std::vector<Vector3d> cand = pure_trans; // in-plane, includes zero
+    for (int a = 0; a < 3; ++a) {
+      if (a != ap) {
+        cand.push_back(Vector3d::Unit(a));
+      }
+    }
+    std::array<int, 2> const periodic{ap == 0 ? 1 : 0, ap == 2 ? 1 : 2};
+    std::size_t const n = cand.size();
+    for (std::size_t i = 0; i < n; ++i) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        Matrix3d relative;
+        relative.col(ap) = Vector3d::Unit(ap);
+        relative.col(periodic[0]) = cand[i];
+        relative.col(periodic[1]) = cand[j];
+        double const volume =
+            std::abs((cell.lattice() * relative).determinant());
+        if (volume <= symprec || math::nint(init_volume / volume) != multi) {
+          continue;
+        }
+        return finish_primitive_lattice(relative, cell.lattice(), multi,
+                                        aperiodic_axis, symprec);
+      }
+    }
+    return std::nullopt;
+  }
+
   std::vector<Vector3d> cand = pure_trans; // includes the zero translation
   cand.push_back(Vector3d::UnitX());
   cand.push_back(Vector3d::UnitY());
   cand.push_back(Vector3d::UnitZ());
-
-  double const init_volume = std::abs(cell.lattice().determinant());
   std::size_t const n = cand.size();
 
   for (std::size_t i = 0; i < n; ++i)
@@ -83,20 +163,9 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
         relative.col(0) = cand[i];
         relative.col(1) = cand[j];
         relative.col(2) = cand[k];
-        // Clean the relative lattice via its exact integer inverse, if
-        // possible.
-        auto const rel_inv = math::inverse(relative, symprec);
-        if (rel_inv) {
-          Matrix3i const inv_int = math::round_to_int(*rel_inv);
-          if (std::abs(inv_int.determinant()) == multi) {
-            relative = inv_int.cast<double>().inverse();
-          }
-        }
-        Matrix3d const prim = cell.lattice() * relative;
-        auto const reduced = reduce::delaunay_reduce(prim, symprec);
         // matches spglib: first valid triple only
-        return reduced.has_value() ? std::optional<Matrix3d>(reduced.value())
-                                   : std::nullopt;
+        return finish_primitive_lattice(relative, cell.lattice(), multi,
+                                        std::nullopt, symprec);
       }
   return std::nullopt;
 }
@@ -104,7 +173,8 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
 // trim_cell + get_overlap_table: fold atoms into the trimmed lattice, de-dup
 // translationally-equivalent ones, average positions.
 [[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
-trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
+trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
+          std::optional<int> aperiodic_axis, double symprec) {
   int const n = static_cast<int>(cell.size());
   int const ratio = std::abs(
       math::nint(cell.lattice().determinant() / trimmed_lattice.determinant()));
@@ -118,10 +188,12 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
     return std::nullopt;
   }
 
-  // Atom positions expressed in the trimmed basis, folded into [0, 1).
+  // Atom positions expressed in the trimmed basis, folded into [0, 1) on the
+  // periodic axes (the aperiodic axis is left raw for a layer cell).
   Positions pos(n, 3);
   for (int i = 0; i < n; ++i) {
-    pos.row(i) = math::mod1(Vector3d(tmat.cast<double>() * cell.position(i)))
+    pos.row(i) = wrap_periodic(Vector3d(tmat.cast<double>() * cell.position(i)),
+                               aperiodic_axis)
                      .transpose();
   }
 
@@ -136,7 +208,8 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
       for (int j = 0; j < n; ++j) {
         if (cell.type(i) == cell.type(j) &&
             overlap[static_cast<std::size_t>(j)] == j &&
-            is_overlap(row(pos, i), row(pos, j), trimmed_lattice, tol)) {
+            is_overlap(row(pos, i), row(pos, j), trimmed_lattice, tol,
+                       aperiodic_axis)) {
           overlap[static_cast<std::size_t>(i)] = j;
           break;
         }
@@ -195,9 +268,14 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell, double symprec) {
     }
   }
   int const multi = n / tn;
-  tpos = tpos.unaryExpr([multi](double x) { return math::mod1(x / multi); });
+  for (int i = 0; i < tn; ++i) {
+    tpos.row(i) =
+        wrap_periodic(Vector3d(tpos.row(i).transpose() / multi), aperiodic_axis)
+            .transpose();
+  }
 
-  return std::make_pair(Cell(trimmed_lattice, tpos, trimmed_types), mapping);
+  return std::make_pair(
+      Cell(trimmed_lattice, tpos, trimmed_types, aperiodic_axis), mapping);
 }
 
 // The translations of a symmetry-operation set whose rotation is the identity
@@ -264,6 +342,7 @@ collect_primitive_operations(SymmetryOperations const &operations,
 
 Result<Primitive> find_primitive(Cell const &cell, double symprec,
                                  AngleTolerance angle_tolerance) {
+  std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttempt;
        ++attempt, tolerance *= kReduceRate) {
@@ -273,7 +352,7 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
     }
 
     if (pure.size() == 1) {
-      auto smallest = smallest_lattice_cell(cell, tolerance);
+      auto smallest = smallest_lattice_cell(cell, aperiodic_axis, tolerance);
       if (!smallest) {
         continue;
       }
@@ -283,11 +362,12 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
                        tolerance, angle_tolerance};
     }
 
-    auto const prim_lat = primitive_lattice(cell, pure, tolerance);
+    auto const prim_lat =
+        primitive_lattice(cell, pure, aperiodic_axis, tolerance);
     if (!prim_lat) {
       continue;
     }
-    auto trimmed = trim_cell(*prim_lat, cell, tolerance);
+    auto trimmed = trim_cell(*prim_lat, cell, aperiodic_axis, tolerance);
     if (!trimmed) {
       continue;
     }
@@ -299,7 +379,7 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
 
 std::optional<Matrix3d> primitive_lattice_vectors(
     Cell const &cell, std::vector<Vector3d> const &pure_trans, double symprec) {
-  return primitive_lattice(cell, pure_trans, symprec);
+  return primitive_lattice(cell, pure_trans, cell.aperiodic_axis(), symprec);
 }
 
 std::optional<std::pair<SymmetryOperations, Matrix3d>>
@@ -337,8 +417,9 @@ Result<Primitive>
 find_primitive_with_pure_translations(Cell const &cell,
                                       std::vector<Vector3d> const &pure_trans,
                                       double symprec) {
+  std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
   if (pure_trans.size() == 1) {
-    auto smallest = smallest_lattice_cell(cell, symprec);
+    auto smallest = smallest_lattice_cell(cell, aperiodic_axis, symprec);
     if (!smallest) {
       return leaf::new_error(e_cell_standardization_failed{});
     }
@@ -347,11 +428,12 @@ find_primitive_with_pure_translations(Cell const &cell,
     return Primitive{std::move(*smallest), std::move(mapping), cell.lattice(),
                      symprec, std::nullopt};
   }
-  auto const prim_lat = primitive_lattice(cell, pure_trans, symprec);
+  auto const prim_lat =
+      primitive_lattice(cell, pure_trans, aperiodic_axis, symprec);
   if (!prim_lat) {
     return leaf::new_error(e_cell_standardization_failed{});
   }
-  auto trimmed = trim_cell(*prim_lat, cell, symprec);
+  auto trimmed = trim_cell(*prim_lat, cell, aperiodic_axis, symprec);
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
   }
