@@ -7,16 +7,7 @@
 
 namespace spglib::generate {
 
-// Minimum-distance validity for a generated structure (PyXtal
-// check_short_distances). Two atoms of types t_i and t_j may be no closer than
-// `scale * (r_cov(t_i) + r_cov(t_j))`, where r_cov is the covalent radius
-// (data::covalent_radius). The check covers periodic images and an atom against
-// its own images, so a too-small cell is rejected as well as overlapping atoms.
 struct DistanceTolerance {
-  // Fraction of the summed covalent radii that sets the minimum allowed
-  // separation. < 1 because a generic (non-bonded) contact in a generated
-  // crystal need not reach a full bond length; the default rejects only genuine
-  // clashes while leaving realistic packings valid.
   double scale = 0.7;
   double fallback_radius = 1.0;
 };

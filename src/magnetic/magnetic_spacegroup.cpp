@@ -419,7 +419,7 @@ Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
   Matrix3d tmat_cor = Matrix3d::Identity();
   Vector3d shift_cor = Vector3d::Zero();
 
-  for (int uni = (*range)[0]; uni <= (*range)[1] && !matched_uni; ++uni) {
+  for (int uni = (*range).first; uni <= (*range).second && !matched_uni; ++uni) {
     if (data::magnetic_spacegroup_type(uni).type != type) {
       continue;
     }

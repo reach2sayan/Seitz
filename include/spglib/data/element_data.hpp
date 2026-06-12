@@ -6,12 +6,6 @@
 #include <optional>
 #include <string_view>
 
-// Accessors over the curated element table (generated element_tables.hpp:
-// covalent radii from Cordero et al. 2008). Atom "types" in this codebase are
-// atomic numbers, so these are looked up directly by type. The covalent radius
-// is the primary datum; the atomic volume used to size a generated cell is
-// derived from it as a sphere volume (the PyXtal radius-based estimate), so no
-// second table is sourced.
 namespace spglib::data {
 
 // True iff `z` is a tabulated atomic number (1..kNumElements).
@@ -29,8 +23,6 @@ covalent_radius(int z) noexcept {
   return kCovalentRadii[static_cast<std::size_t>(z - 1)];
 }
 
-// Estimated atomic volume (cubic angstrom) of atomic number `z`, the volume of
-// a sphere of its covalent radius. std::nullopt for an untabulated element.
 [[nodiscard]] constexpr std::optional<double>
 atomic_volume(int z) noexcept {
   auto const r = covalent_radius(z);

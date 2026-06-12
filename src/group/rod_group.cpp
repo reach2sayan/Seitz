@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numeric>
+#include <ranges>
 #include <span>
 #include <vector>
 
@@ -27,26 +29,17 @@ constexpr double kTol = 1e-6;
   }
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeThinU);
   Eigen::VectorXd const sv = svd.singularValues();
-  int rank = 0;
-  for (int i = 0; i < sv.size(); ++i) {
-    if (sv[i] > kTol) {
-      ++rank;
-    }
-  }
+  auto const rank =
+      std::ranges::count_if(sv, [](double x) { return x > kTol; });
   return svd.matrixU().leftCols(rank);
 }
 
 [[nodiscard]] Eigen::MatrixXd null_space(Eigen::MatrixXd const &m) {
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeFullV);
   Eigen::VectorXd const sv = svd.singularValues();
-  int const n = static_cast<int>(m.cols());
-  int rank = 0;
-  for (int i = 0; i < sv.size(); ++i) {
-    if (sv[i] > kTol) {
-      ++rank;
-    }
-  }
-  return svd.matrixV().rightCols(n - rank);
+  auto const rank =
+      std::ranges::count_if(sv, [](double x) { return x > kTol; });
+  return svd.matrixV().rightCols(m.cols() - rank);
 }
 
 // Orthonormal basis of the intersection of two column spaces.
@@ -218,11 +211,12 @@ intersect(RodLocus const &a, RodLocus const &b, int axis) {
 
 [[nodiscard]] Vector3d generic_point(RodLocus const &l) {
   static constexpr std::array<double, 3> kSeed = {0.1357, 0.2468, 0.3791};
-  Vector3d p = l.point;
-  for (int i = 0; i < l.dim(); ++i) {
-    p += kSeed[static_cast<std::size_t>(i)] * l.dir.col(i);
-  }
-  return p;
+  auto const idx = std::views::iota(0, l.dim());
+  return std::accumulate(idx.begin(), idx.end(), Vector3d{l.point},
+                         [&](Vector3d const &acc, int i) -> Vector3d {
+                           return acc + kSeed[static_cast<std::size_t>(i)] *
+                                            l.dir.col(i);
+                         });
 }
 
 // The image of a locus under an operation (a locus of the same dimension; the
@@ -249,11 +243,13 @@ struct Derived {
 } // namespace
 
 Vector3d RodWyckoff::sample(std::span<double const> params) const {
-  Vector3d p = locus_origin_;
-  for (int i = 0; i < dof_ && i < static_cast<int>(params.size()); ++i) {
-    p += params[static_cast<std::size_t>(i)] * locus_basis_.col(i);
-  }
-  return p;
+  auto const idx =
+      std::views::iota(0, std::min(dof_, static_cast<int>(params.size())));
+  return std::accumulate(idx.begin(), idx.end(), Vector3d{locus_origin_},
+                         [&](Vector3d const &acc, int i) -> Vector3d {
+                           return acc + params[static_cast<std::size_t>(i)] *
+                                            locus_basis_.col(i);
+                         });
 }
 
 Result<RodGroup> RodGroup::from_number(int number) {

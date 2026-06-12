@@ -34,10 +34,6 @@ struct MagneticSpacegroupType {
   int type = 0;   // construction type 1..4 (type-I..IV)
 };
 
-// A compile-time catalog of the 1651 UNI settings — the magnetic analogue of
-// SpacegroupCatalog. Lookup by UNI number is a direct index (UNI numbers are
-// the contiguous range 1..1651). Index 0 is a zero-valued sentinel returned for
-// out-of-range UNI numbers.
 struct MagneticSpacegroupCatalog {
   std::array<MagneticSpacegroupType, kNumUniNumbers + 1> by_uni{};
 
@@ -59,38 +55,23 @@ inline constexpr MagneticSpacegroupCatalog kMagneticCatalog = [] {
   return c;
 }();
 
-// The type for a UNI number (1..1651); a zero-valued MagneticSpacegroupType if
-// out of range. Port of msgdb_get_magnetic_spacegroup_type.
 [[nodiscard]] constexpr MagneticSpacegroupType
 magnetic_spacegroup_type(int uni_number) noexcept {
   return kMagneticCatalog.at(uni_number);
 }
 
-// The {smallest, largest} UNI number whose family space group has the given
-// Hall number (1..530); std::nullopt out of range. Port of
-// msgdb_get_uni_candidates.
-[[nodiscard]] constexpr std::optional<std::array<int, 2>>
+[[nodiscard]] constexpr std::optional<std::pair<int, int>>
 uni_candidates(int hall_number) noexcept {
   if (hall_number < 1 || hall_number > kNumHallNumbers) {
     return std::nullopt;
   }
   auto const &m = kMagneticHallMapping[static_cast<std::size_t>(hall_number)];
-  return std::array<int, 2>{m[0], m[1]};
+  return std::pair<int, int>{m[0], m[1]};
 }
 
-// The magnetic symmetry operations for a UNI number (1..1651), in the setting
-// selected by `hall_number`. `hall_number == 0` uses the smallest Hall setting
-// for that UNI (the default). Returns an empty vector if the (UNI, Hall) pair
-// is out of range. Port of msgdb_get_spacegroup_operations: the operations are
-// decoded from compile-time data on each call (the key space is 2D and sparse,
-// so unlike the non-magnetic database there is no per-key cache).
 [[nodiscard]] MagneticSymmetryOperations
 magnetic_operations_from_database(int uni_number, int hall_number = 0);
 
-// The alternative standardized-setting transformations for a UNI number, in the
-// setting selected by `hall_number` (0 = smallest). The identity transformation
-// is always the first element. Empty if out of range. Port of
-// msgdb_get_std_transformations.
 [[nodiscard]] SymmetryOperations
 magnetic_std_transformations(int uni_number, int hall_number = 0);
 

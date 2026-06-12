@@ -47,13 +47,10 @@ constexpr int kRelativeAxes[26][3] = {
 // matches the reference axes[r][c].
 [[nodiscard]] bool couples_aperiodic(Matrix3i const &axes,
                                      int aperiodic_axis) noexcept {
-  for (int p = 0; p < 3; ++p) {
-    if (p != aperiodic_axis &&
-        (axes(p, aperiodic_axis) != 0 || axes(aperiodic_axis, p) != 0)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(std::views::iota(0, 3), [&](int p) {
+    return p != aperiodic_axis &&
+           (axes(p, aperiodic_axis) != 0 || axes(aperiodic_axis, p) != 0);
+  });
 }
 
 // symmetry.c is_identity_metric, angle_tolerance < 0 path uses the sin-based

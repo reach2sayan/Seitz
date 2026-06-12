@@ -92,7 +92,7 @@ TEST_CASE("magnetic operations match reference across all Hall settings",
   for (int hall = 1; hall <= spglib::data::kNumHallNumbers; ++hall) {
     auto const range = spglib::data::uni_candidates(hall);
     REQUIRE(range.has_value());
-    for (int uni = (*range)[0]; uni <= (*range)[1]; ++uni) {
+    for (int uni = (*range).first; uni <= (*range).second; ++uni) {
       INFO("UNI number " << uni << ", Hall number " << hall);
       auto const got =
           spglib::data::magnetic_operations_from_database(uni, hall);

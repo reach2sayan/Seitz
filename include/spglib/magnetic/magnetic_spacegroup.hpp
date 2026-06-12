@@ -14,8 +14,7 @@
 namespace spglib::magnetic {
 
 // Construction type of a magnetic space group (Bärnighausen / BNS types I–IV).
-// Replaces spglib's bare int `type` 1..4. Numeric values match the database
-// `type` field so the two can be bridged at the boundary.
+// Replaces spglib's bare int `type` 1..4.
 enum class MagneticType { type_i = 1, type_ii = 2, type_iii = 3, type_iv = 4 };
 
 // The identification result — port of magnetic_spacegroup.h MagneticTypeIdentification

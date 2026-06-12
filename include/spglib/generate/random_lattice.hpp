@@ -9,10 +9,6 @@
 
 namespace spglib::generate {
 
-// The seven crystal systems, which fix the free lattice parameters. Derived from
-// the international space-group number, not the centering (the centering selects
-// the Bravais lattice within a system but does not change which of a, b, c,
-// alpha, beta, gamma are independent).
 enum class CrystalSystem {
   triclinic,
   monoclinic,
@@ -23,28 +19,20 @@ enum class CrystalSystem {
   cubic,
 };
 
-// The crystal system of an international space-group number (1..230), by the
-// standard contiguous ranges. Pure integer logic, so it is evaluated at compile
-// time wherever the number is a constant expression.
 [[nodiscard]] constexpr CrystalSystem
 crystal_system(int spacegroup_number) noexcept {
   int const n = spacegroup_number;
   if (n <= 2) {
     return CrystalSystem::triclinic;
-  }
-  if (n <= 15) {
+  } else if (n <= 15) {
     return CrystalSystem::monoclinic;
-  }
-  if (n <= 74) {
+  } else if (n <= 74) {
     return CrystalSystem::orthorhombic;
-  }
-  if (n <= 142) {
+  } else if (n <= 142) {
     return CrystalSystem::tetragonal;
-  }
-  if (n <= 167) {
+  } else if (n <= 167) {
     return CrystalSystem::trigonal;
-  }
-  if (n <= 194) {
+  } else if (n <= 194) {
     return CrystalSystem::hexagonal;
   }
   return CrystalSystem::cubic;

@@ -8,10 +8,7 @@
 
 namespace spglib::data {
 
-// Number of tabulated elements (atomic numbers 1..96).
 inline constexpr int kNumElements = 96;
-
-// Element symbol indexed by (atomic_number - 1).
 inline constexpr std::array<std::string_view, 96> kElementSymbols = {{
     "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
     "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
@@ -24,8 +21,6 @@ inline constexpr std::array<std::string_view, 96> kElementSymbols = {{
     "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
     "Pa", "U", "Np", "Pu", "Am", "Cm",
 }};
-
-// Single-bond covalent radius (angstrom) indexed by (atomic_number - 1).
 inline constexpr std::array<double, 96> kCovalentRadii = {{
     0.31, 0.28, 1.28, 0.96, 0.84, 0.76, 0.71, 0.66,
     0.57, 0.58, 1.66, 1.41, 1.21, 1.11, 1.07, 1.05,

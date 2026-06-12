@@ -8,14 +8,7 @@
 
 namespace spglib::generate {
 
-// A target composition: atom type -> number of atoms. A map (not parallel
-// type/count arrays) so the two are never indexed in lockstep.
 using Composition = std::map<int, int>;
-
-// One way to place a composition on the Wyckoff positions of a space group: each
-// element's count is realized as a multiset of chosen positions. A non-owning
-// pointer into the SpaceGroup's positions identifies each choice (the SpaceGroup
-// must outlive the combination).
 struct WyckoffCombination {
   struct Placement {
     int type;                                 // atom type

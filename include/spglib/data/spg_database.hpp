@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <ranges>
 #include <span>
 #include <string_view>
 
@@ -19,7 +20,8 @@
 // catalog, and expose the symmetry operations through a lazily-built cache (the
 // ops carry Eigen, which is not a literal type, so they cannot live in a
 // constexpr global). Port of the spgdb_* functions in spg_database.c. Layer
-// groups are out of scope.
+// groups (negative Hall numbers -1..-116) share this machinery and are decoded
+// into the parallel constexpr kLayerCatalog below.
 namespace spglib::data {
 
 // Bravais centering (spglib Centering enum).
@@ -121,6 +123,24 @@ inline constexpr SpacegroupCatalog kCatalog = [] {
 // the matching machinery with the 3D space groups.
 inline constexpr int kNumLayerHallNumbers = 116;
 
+// Number of distinct layer groups (the 116 settings collapse onto 80 numbers).
+inline constexpr int kNumLayerGroups = 80;
+
+[[nodiscard]] constexpr int num_layer_groups() noexcept {
+  return kNumLayerGroups;
+}
+
+// Whether `hall_number` names a layer-group Hall setting (-1..-116), the layer
+// analogue of a positive 3D Hall number being in 1..530.
+[[nodiscard]] constexpr bool layer_hall_in_range(int hall_number) noexcept {
+  return hall_number <= -1 && hall_number >= -kNumLayerHallNumbers;
+}
+
+// Whether `layer_number` is a valid layer-group number (1..80).
+[[nodiscard]] constexpr bool layer_number_in_range(int layer_number) noexcept {
+  return layer_number >= 1 && layer_number <= kNumLayerGroups;
+}
+
 // The layer-group analogue of SpacegroupCatalog, indexed by the negation of the
 // (negative) layer hall number: by_neg_hall[-hall]. Index 0 is the sentinel.
 struct LayerCatalog {
@@ -175,9 +195,45 @@ spacegroup_type(int hall_number) noexcept {
   return 0;
 }
 
-// The symmetry operations for a Hall number (1..530); empty if out of range.
-// Returns a reference into a lazily-built, immutable per-Hall cache; the
-// operations are decoded from compile-time data on first use.
+// Compile-time integrity guards on the layer catalog: the settings must cover
+// the layer-group numbers 1..80 in ascending blocks, with every number resolving
+// to a default Hall setting. These break the build if the generated layer tables
+// ever drift (the layer counterpart of hall_classification.hpp's guards).
+namespace detail {
+constexpr bool layer_catalog_well_formed = [] {
+  // The 116 settings (index 0 is the sentinel), as a range projected on number.
+  auto const settings = kLayerCatalog.by_neg_hall | std::views::drop(1);
+  return kLayerGroupTypes.size() ==
+             static_cast<std::size_t>(kNumLayerHallNumbers) + 1 &&
+         // Every setting names a layer group 1..80...
+         std::ranges::all_of(settings,
+                             [](SpacegroupType const &t) {
+                               return t.number >= 1 &&
+                                      t.number <= kNumLayerGroups;
+                             }) &&
+         // ...grouped in non-decreasing blocks (so layer_default_hall finds the
+         // first / canonical setting of each)...
+         std::ranges::is_sorted(settings, {}, &SpacegroupType::number) &&
+         // ...peaking at 80, with every number resolving to a default setting.
+         std::ranges::max(settings, {}, &SpacegroupType::number).number ==
+             kNumLayerGroups &&
+         std::ranges::all_of(std::views::iota(1, kNumLayerGroups + 1),
+                             [](int number) {
+                               return layer_default_hall(number) != 0;
+                             });
+}();
+} // namespace detail
+
+static_assert(detail::layer_catalog_well_formed);
+static_assert(num_layer_groups() == 80);
+static_assert(layer_default_hall(1) == -1);  // p1 is the first setting
+static_assert(layer_default_hall(80) != 0);  // last number resolves
+static_assert(layer_default_hall(81) == 0);  // out of range
+static_assert(spacegroup_type(-1).number == 1);
+static_assert(spacegroup_type(-kNumLayerHallNumbers).number == kNumLayerGroups);
+static_assert(spacegroup_type(0).number == 0);    // sentinel
+static_assert(spacegroup_type(-117).number == 0); // out of range
+
 [[nodiscard]] SymmetryOperations const &
 operations_from_database(int hall_number);
 

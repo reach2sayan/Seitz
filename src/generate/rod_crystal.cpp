@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <random>
 #include <span>
 #include <utility>
@@ -17,7 +18,6 @@ namespace spglib::generate {
 
 namespace {
 
-// --- Distance check, rod flavour --------------------------------------------
 // Only the periodic axis is periodic (the rod inverse of distance_check, where
 // at most one axis is aperiodic). Folds just that component; the two aperiodic
 // axes keep their raw difference and are not searched over neighbouring cells.
@@ -243,12 +243,13 @@ random_rod_crystal(group::RodGroup const &rg, Composition const &comp,
   // and sets the c (here periodic) length: exactly the geometry a rod needs
   // (only the periodic/aperiodic interpretation differs).
   constexpr double kVacuum = 18.0; // angstrom, the aperiodic padding scale
-  double linear = 0.0;
-  for (auto const &[type, count] : comp) {
-    double const r =
-        data::covalent_radius(type).value_or(options.distance.fallback_radius);
-    linear += static_cast<double>(count) * 2.0 * r;
-  }
+  double const linear = std::accumulate(
+      comp.begin(), comp.end(), 0.0, [&](double sum, auto const &entry) {
+        auto const &[type, count] = entry;
+        double const r = data::covalent_radius(type).value_or(
+            options.distance.fallback_radius);
+        return sum + static_cast<double>(count) * 2.0 * r;
+      });
   double const repeat = options.size_factor * linear; // 1D packing along c
   double const area = kVacuum * kVacuum;               // vacuum cross-section
 

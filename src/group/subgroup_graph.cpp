@@ -94,9 +94,7 @@ point_group_rotations(SymmetryOperations const &ops) {
 [[nodiscard]] std::vector<Matrix3i> matrices_of(RotationSet const &s) {
   std::vector<Matrix3i> out;
   out.reserve(s.size());
-  for (auto const &k : s) {
-    out.push_back(matrix_of(k));
-  }
+  std::ranges::transform(s, std::back_inserter(out), matrix_of);
   return out;
 }
 

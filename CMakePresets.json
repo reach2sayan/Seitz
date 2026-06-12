@@ -21,7 +21,8 @@
       "binaryDir": "${sourceDir}/cmake-build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "SPGLIB_BUILD_TESTS": "ON"
+        "SPGLIB_BUILD_TESTS": "ON",
+        "SPGLIB_BUILD_ORACLE_TESTS": "ON"
       }
     },
     {

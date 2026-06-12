@@ -38,11 +38,8 @@ point_group_reciprocal(std::vector<Matrix3i> const &rotations,
                              })>
       seen;
   std::vector<Matrix3i> unique;
-  for (const auto& m : candidates) {
-    if (seen.insert(m).second) {
-      unique.push_back(m);
-    }
-  }
+  std::ranges::copy_if(candidates, std::back_inserter(unique),
+                       [&](Matrix3i const &m) { return seen.insert(m).second; });
   return unique;
 }
 

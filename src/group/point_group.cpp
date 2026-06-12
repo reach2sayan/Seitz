@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <numeric>
+#include <ranges>
 #include <span>
 #include <vector>
 
@@ -41,12 +43,8 @@ struct Subspace {
   }
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeThinU);
   Eigen::VectorXd const sv = svd.singularValues();
-  int rank = 0;
-  for (int i = 0; i < sv.size(); ++i) {
-    if (sv[i] > kTol) {
-      ++rank;
-    }
-  }
+  auto const rank =
+      std::ranges::count_if(sv, [](double x) { return x > kTol; });
   return svd.matrixU().leftCols(rank);
 }
 
@@ -55,14 +53,10 @@ struct Subspace {
 [[nodiscard]] Eigen::MatrixXd null_space(Eigen::MatrixXd const &m) {
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeFullV);
   Eigen::VectorXd const sv = svd.singularValues();
-  int const n = static_cast<int>(m.cols());
-  int rank = 0;
-  for (int i = 0; i < sv.size(); ++i) {
-    if (sv[i] > kTol) {
-      ++rank;
-    }
-  }
-  int const nullity = n - rank;
+  auto const n = m.cols();
+  auto const rank =
+      std::ranges::count_if(sv, [](double x) { return x > kTol; });
+  auto const nullity = n - rank;
   // The last `nullity` columns of V correspond to the smallest singular values.
   return svd.matrixV().rightCols(nullity);
 }
@@ -107,12 +101,9 @@ struct Subspace {
 // the subspace; trivially true for the origin).
 [[nodiscard]] bool fixes(Matrix3i const &rot, Subspace const &s) {
   Matrix3d const r = rot.cast<double>();
-  for (int i = 0; i < s.dim(); ++i) {
-    if ((r * s.basis.col(i) - s.basis.col(i)).cwiseAbs().maxCoeff() > kTol) {
-      return false;
-    }
-  }
-  return true;
+  return std::ranges::none_of(std::views::iota(0, s.dim()), [&](int i) {
+    return (r * s.basis.col(i) - s.basis.col(i)).cwiseAbs().maxCoeff() > kTol;
+  });
 }
 
 // The image of a subspace under an operation (a new subspace of the same
@@ -182,11 +173,13 @@ coset_representatives(std::span<SymmetryOperation const> ops,
 } // namespace
 
 Vector3d PointWyckoff::sample(std::span<double const> params) const {
-  Vector3d p = Vector3d::Zero();
-  for (int i = 0; i < dof_ && i < static_cast<int>(params.size()); ++i) {
-    p += params[static_cast<std::size_t>(i)] * locus_basis_.col(i);
-  }
-  return p;
+  auto const idx =
+      std::views::iota(0, std::min(dof_, static_cast<int>(params.size())));
+  return std::accumulate(idx.begin(), idx.end(), Vector3d{Vector3d::Zero()},
+                         [&](Vector3d const &acc, int i) -> Vector3d {
+                           return acc + params[static_cast<std::size_t>(i)] *
+                                            locus_basis_.col(i);
+                         });
 }
 
 Result<PointGroup> PointGroup::from_number(int number) {

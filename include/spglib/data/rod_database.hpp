@@ -1,35 +1,55 @@
 #pragma once
 
 #include <spglib/core/symmetry_operation.hpp>
+#include <spglib/data/rod_group_tables.hpp>
 
+#include <cstddef>
+#include <ranges>
 #include <string_view>
 
 namespace spglib::data {
 
-// Decoder for the rod-group (1D-periodic subperiodic group) operation tables in
-// the generated header data/rod_group_tables.hpp (produced by
-// tools/transcribe_rod_groups.py from PyXtal's Group(n, dim=1)).
-//
-// Rod groups are not in spglib, so unlike the layer groups (reached through
-// spglib's negative-Hall datasets) they have no SpacegroupType metadata and no
-// site-symmetry database — only their symmetry operations are tabulated, and the
-// rod Wyckoff positions are derived in-house from those operations (group::
-// RodGroup), the same way group::PointGroup derives the 0D point-group Wyckoffs.
+// Whether `rod_number` is a valid rod-group number (1..75).
+[[nodiscard]] constexpr bool rod_number_in_range(int rod_number) noexcept {
+  return rod_number >= 1 && rod_number <= kNumRodGroups;
+}
 
-// Number of rod groups (75).
-[[nodiscard]] int num_rod_groups() noexcept;
-
-// The single periodic axis (0=a, 1=b, 2=c). PyXtal's convention is c (= 2): the
-// orbit expansion folds only this component; the other two are aperiodic.
-[[nodiscard]] int rod_periodic_axis() noexcept;
+[[nodiscard]] constexpr int num_rod_groups() noexcept { return kNumRodGroups; }
+[[nodiscard]] constexpr int rod_periodic_axis() noexcept {
+  return kRodPeriodicAxis;
+}
 
 // Hermann-Mauguin symbol of rod group `rod_number` (1..75); empty out of range.
-[[nodiscard]] std::string_view rod_symbol(int rod_number) noexcept;
+[[nodiscard]] constexpr std::string_view rod_symbol(int rod_number) noexcept {
+  if (!rod_number_in_range(rod_number)) {
+    return {};
+  }
+  return kRodGroupSymbols[static_cast<std::size_t>(rod_number - 1)];
+}
 
-// The symmetry operations of rod group `rod_number` (1..75): one period's worth
-// of factor-group representatives (the pure unit translation along the periodic
-// axis is implicit, as in the space-group operation tables). Empty out of range.
-// Port-style analogue of data::operations_from_database for the rod tables.
+namespace detail {
+constexpr bool rod_offsets_well_formed = [] {
+  if (kRodGroupSymbols.size() != static_cast<std::size_t>(kNumRodGroups)) {
+    return false;
+  }
+  if (kRodOperationOffset.front() != 0 ||
+      kRodOperationOffset.back() != static_cast<int>(kRodOperations.size())) {
+    return false;
+  }
+  return std::ranges::adjacent_find(kRodOperationOffset,
+                                    std::ranges::greater_equal{}) ==
+         kRodOperationOffset.end();
+}();
+} // namespace detail
+
+static_assert(detail::rod_offsets_well_formed);
+static_assert(num_rod_groups() == 75);
+static_assert(rod_periodic_axis() == 2);
+static_assert(rod_symbol(0).empty());  // out of range (below)
+static_assert(rod_symbol(76).empty()); // out of range (above)
+static_assert(rod_symbol(1) == "p1");
+static_assert(rod_symbol(75) == "p6/mmc");
+
 [[nodiscard]] SymmetryOperations rod_operations_from_database(int rod_number);
 
 } // namespace spglib::data

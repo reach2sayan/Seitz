@@ -26,11 +26,8 @@ struct Spacegroup {
   [[nodiscard]] int hall_number() const noexcept { return type.hall_number; }
 };
 
-// Determine the space group of a primitive cell. Port of spacegroup.c
-// spa_search_spacegroup (3D space-group path). `hall_number == 0` searches all
+// Determine the space group of a primitive cell. `hall_number == 0` searches all
 // 230 space groups; a non-zero value restricts the search to that Hall setting.
-//
-// Errors with e_spacegroup_search_failed when no Hall setting matches.
 [[nodiscard]] Result<Spacegroup>
 search_spacegroup(symmetry::Primitive const &primitive, int hall_number,
                   double symprec, AngleTolerance angle_tolerance);

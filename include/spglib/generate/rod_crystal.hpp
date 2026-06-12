@@ -12,12 +12,6 @@
 
 namespace spglib::generate {
 
-// A generated 1D-periodic (rod) crystal: the cell periodic along one axis, plus
-// the per-axis periodicity descriptor. The two aperiodic axes are vacuum
-// directions, so Cell's single std::optional<int> aperiodic_axis cannot describe
-// it — the CellPeriodicity carries the full {aperiodic, aperiodic, periodic}
-// pattern instead. Validate by op-invariance under the rod group's operations
-// (folding only the periodic axis).
 struct GeneratedRodCrystal {
   Cell cell;
   CellPeriodicity periodicity;
@@ -31,10 +25,6 @@ struct RandomRodOptions {
   std::optional<std::uint64_t> seed = std::nullopt;
   int attempts_per_combination = 50;
   DistanceTolerance distance = {};
-  // Restrict placement to the general position. SKELETON NOTE: until the special
-  // rod Wyckoff positions are derived (see rod_group.cpp), the general position
-  // is the only one available, so this is effectively always in force; the flag
-  // is kept for parity with the 2D/0D generators and for when specials land.
   bool general_position_only = false;
 };
 

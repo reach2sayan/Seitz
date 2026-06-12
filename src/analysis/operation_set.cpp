@@ -15,9 +15,10 @@ Result<spacegroup::Spacegroup>
 OperationSet::spacegroup_type(Matrix3d const &lattice, double symprec,
                               spacegroup::LatticeSetting setting) const {
   using spacegroup::LatticeSetting;
-  if (setting == LatticeSetting::primitive)
+  if (setting == LatticeSetting::primitive) {
     return spacegroup::spacegroup_type_from_symmetry<LatticeSetting::primitive>(
         ops_, lattice, symprec);
+  }
   return spacegroup::spacegroup_type_from_symmetry<LatticeSetting::conventional>(
       ops_, lattice, symprec);
 }
