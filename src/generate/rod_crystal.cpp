@@ -172,14 +172,17 @@ list_rod_combinations(group::RodGroup const &rg, Composition const &comp,
   Types types;
   for (auto const &placement : combo) {
     int const dof = placement.position->degrees_of_freedom();
-    // SKELETON: only the general position (dof 3, identity locus) exists, so the
-    // sampled parameters map directly to (x, y, z). When special positions land,
-    // build the seed on the locus and respect the periodic axis there too.
+    // Each free coordinate is sampled by the kind of its locus direction (the
+    // basis is axis-separated): a direction along the periodic axis spans the
+    // full [0, 1) repeat; an aperiodic (cross-section) direction is confined to
+    // the centred band. The locus origin supplies any fixed offset (special
+    // positions), so this works for the general position and the specials alike.
     std::array<double, 3> params{};
     for (int i = 0; i < dof; ++i) {
+      Vector3d const dir = placement.position->free_direction(i);
+      bool const along_periodic = std::abs(dir[periodic_axis]) > 0.5;
       params[static_cast<std::size_t>(i)] =
-          (i == periodic_axis) ? unit(rng)
-                               : kCrossSection * (2.0 * unit(rng) - 1.0);
+          along_periodic ? unit(rng) : kCrossSection * (2.0 * unit(rng) - 1.0);
     }
     Vector3d const q = placement.position->sample(
         std::span<double const>(params.data(), static_cast<std::size_t>(dof)));
@@ -263,6 +266,7 @@ random_rod_crystal(group::RodGroup const &rg, Composition const &comp,
       Matrix3d const lattice =
           random_layer_lattice(rg.operations(), area, c_length, rng());
       Cell cell = assemble_rod(combo, lattice, periodic_axis, rng);
+      cell.set_periodicity(periodicity); // self-describing: {aperiodic,aperiodic,periodic}
       if (rod_distances_valid(cell, periodic_axis, options.distance)) {
         return GeneratedRodCrystal{std::move(cell), periodicity};
       }

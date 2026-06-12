@@ -469,20 +469,26 @@ bool rod_is_invariant(generate::GeneratedRodCrystal const &gen,
 }
 } // namespace
 
-TEST_CASE("RodGroup exposes the database operations and a general position",
-          "[rod]") {
+TEST_CASE("orbit-stabilizer invariant holds for all 75 rod groups", "[rod]") {
   REQUIRE(data::num_rod_groups() == 75);
   for (int number = 1; number <= 75; ++number) {
     INFO("rod group " << number);
     auto rg = must(group::RodGroup::from_number(number));
     REQUIRE(rg.number() == number);
     REQUIRE(rg.periodic_axis() == 2);
-    REQUIRE(rg.order() > 0);
-    // SKELETON: only the general position is derived so far; it has multiplicity
-    // equal to the group order and three free coordinates.
-    REQUIRE(rg.wyckoffs().size() == 1);
-    REQUIRE(rg.wyckoffs().back().multiplicity() == rg.order());
+    int const order = rg.order();
+    REQUIRE(order > 0);
+    REQUIRE_FALSE(rg.wyckoffs().empty());
+
+    // The general position (last) is fully free with multiplicity == order;
+    // every position satisfies multiplicity * |site symmetry| == order.
+    REQUIRE(rg.wyckoffs().back().multiplicity() == order);
     REQUIRE(rg.wyckoffs().back().degrees_of_freedom() == 3);
+    for (auto const &wp : rg.wyckoffs()) {
+      REQUIRE(wp.multiplicity() *
+                  static_cast<int>(wp.operations().size()) ==
+              order);
+    }
   }
 }
 
@@ -504,6 +510,27 @@ TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
                                                AxisKind::aperiodic,
                                                AxisKind::periodic});
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
+    REQUIRE(rod_is_invariant(gen, rg));
+  }
+}
+
+TEST_CASE("rod special positions are derived and generate invariant structures",
+          "[rod]") {
+  // The affine fixed-locus arrangement yields special positions (atoms on the
+  // rod axis / cross-section special points), not just the general one. Placing
+  // atoms on the most special position must still produce a structure invariant
+  // under every operation.
+  for (int number : {8, 13, 23, 37}) { // p112, p222, p4, p-42m
+    auto rg = must(group::RodGroup::from_number(number));
+    INFO("rod group " << number << " (" << rg.symbol() << ") with "
+                      << rg.wyckoffs().size() << " Wyckoff positions");
+    REQUIRE(rg.wyckoffs().size() >= 2); // at least one special + the general
+    auto const &special = rg.wyckoffs().front();
+    REQUIRE(special.multiplicity() < rg.order()); // genuinely special
+
+    generate::Composition const comp{{6, special.multiplicity()}};
+    auto gen = must(generate::random_rod_crystal(
+        rg, comp, {.size_factor = 2.0, .seed = 5u}));
     REQUIRE(rod_is_invariant(gen, rg));
   }
 }

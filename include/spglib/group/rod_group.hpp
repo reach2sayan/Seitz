@@ -46,6 +46,14 @@ public:
   // free parameters: origin + sum_i params[i] * basis.col(i).
   [[nodiscard]] Vector3d sample(std::span<double const> params) const;
 
+  // The i-th free direction of the locus (fractional), 0 <= i < dof. The basis
+  // is axis-separated: a direction is either the periodic axis (so a free
+  // coordinate spanning the repeat) or lies in the aperiodic cross-section — the
+  // generator uses this to decide how to sample each free coordinate.
+  [[nodiscard]] Vector3d free_direction(int i) const {
+    return locus_basis_.col(i);
+  }
+
 private:
   friend class RodGroup;
   RodWyckoff(int multiplicity, int dof, char letter, Vector3d locus_origin,
@@ -72,12 +80,12 @@ private:
 // group::SpaceGroup (3D), SpaceGroup::from_layer_* (2D) and group::PointGroup
 // (0D).
 //
-// SKELETON STATUS: only the general position is derived so far (always correct,
-// and sufficient for general_position_only generation — the same path the layer
-// generator self-validates on). Special positions require the affine
-// fixed-locus arrangement (the translation-bearing generalisation of
-// group::PointGroup's subspace arrangement) and the real rod table to validate;
-// see the TODO in rod_group.cpp.
+// The Wyckoff positions (general AND special) are derived from the operations by
+// the affine fixed-locus arrangement (rod_group.cpp) — the translation-bearing
+// generalisation of group::PointGroup's linear subspace arrangement, with the
+// periodic axis handled modulo the rod lattice: each operation's fixed locus is
+// the affine solution of (R - I) p = -t + n*e_axis, the loci are closed under
+// intersection, and one Wyckoff position is emitted per orbit of loci.
 class RodGroup {
 public:
   // Build by rod-group number (1..75). Requires the generated rod tables

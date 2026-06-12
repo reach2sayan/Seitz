@@ -1,5 +1,6 @@
 #pragma once
 
+#include <spglib/core/periodicity.hpp>
 #include <spglib/core/types.hpp>
 #include <spglib/math/integer_matrix.hpp>
 
@@ -17,10 +18,20 @@ enum class SiteTensor { none = -1, collinear = 0, noncollinear = 1 };
 class Cell {
 public:
   Cell() = default;
+  // The legacy constructor: a 3D cell (default) or a single aperiodic axis (a
+  // layer group's c). Retained so existing call sites are unchanged; it sets the
+  // per-axis periodicity accordingly.
   Cell(Matrix3d lattice, Positions positions, Types types,
        std::optional<int> aperiodic_axis = std::nullopt)
       : lattice_(std::move(lattice)), positions_(std::move(positions)),
-        types_(std::move(types)), aperiodic_axis_(aperiodic_axis) {}
+        types_(std::move(types)),
+        periodicity_(periodicity_from_aperiodic_axis(aperiodic_axis)) {}
+  // The general constructor: an explicit per-axis periodicity, the only form
+  // that can describe a rod (two aperiodic axes) or a 0D cluster.
+  Cell(Matrix3d lattice, Positions positions, Types types,
+       CellPeriodicity periodicity)
+      : lattice_(std::move(lattice)), positions_(std::move(positions)),
+        types_(std::move(types)), periodicity_(periodicity) {}
 
   [[nodiscard]] Index size() const noexcept {
     return static_cast<Index>(types_.size());
@@ -32,10 +43,18 @@ public:
   }
   [[nodiscard]] Types const &types() const noexcept { return types_; }
 
-  // std::nullopt for a 3D space-group search; the aperiodic axis index (0..2)
-  // for a layer group.
+  // The full per-axis periodicity (the canonical descriptor).
+  [[nodiscard]] CellPeriodicity const &periodicity() const noexcept {
+    return periodicity_;
+  }
+
+  // The single aperiodic axis if there is exactly one (a layer group's c),
+  // std::nullopt otherwise — i.e. for a 3D cell (all periodic) AND for the
+  // rod/cluster cases with more than one aperiodic axis, which this legacy view
+  // cannot represent (use periodicity() there). Backward-compatible with the
+  // previous std::optional<int> field for space-group / layer code.
   [[nodiscard]] std::optional<int> aperiodic_axis() const noexcept {
-    return aperiodic_axis_;
+    return single_aperiodic_axis(periodicity_);
   }
 
   // Fractional position / type of atom i.
@@ -66,14 +85,17 @@ public:
   [[nodiscard]] Positions &positions() noexcept { return positions_; }
   [[nodiscard]] Types &types() noexcept { return types_; }
   void set_aperiodic_axis(std::optional<int> axis) noexcept {
-    aperiodic_axis_ = axis;
+    periodicity_ = periodicity_from_aperiodic_axis(axis);
+  }
+  void set_periodicity(CellPeriodicity periodicity) noexcept {
+    periodicity_ = periodicity;
   }
 
 private:
   Matrix3d lattice_{Matrix3d::Identity()};
   Positions positions_{};
   Types types_{};
-  std::optional<int> aperiodic_axis_;
+  CellPeriodicity periodicity_{all_periodic()};
 };
 
 } // namespace spglib
