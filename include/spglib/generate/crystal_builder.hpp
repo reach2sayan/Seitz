@@ -2,8 +2,10 @@
 
 #include <spglib/core/cell.hpp>
 #include <spglib/core/error.hpp>
+#include <spglib/core/types.hpp>
 #include <spglib/generate/distance_check.hpp>
 #include <spglib/generate/wyckoff_combinations.hpp>
+#include <spglib/group/point_group.hpp>
 #include <spglib/group/space_group.hpp>
 
 #include <cstdint>
@@ -69,5 +71,50 @@ random_crystal(group::SpaceGroup const &sg, Composition const &comp,
 [[nodiscard]] Result<GeneratedCrystal>
 random_layer_crystal(group::SpaceGroup const &lg, Composition const &comp,
                      RandomCrystalOptions const &options = {});
+
+// A generated 0D cluster: Cartesian atomic coordinates (row i = atom i) with
+// their types, plus the metric `basis` that realises the point group's geometry.
+// A point-group operation acts on the cluster in Cartesian space as
+// `basis * rotation * basis.inverse()`; the cluster (as a point set) is invariant
+// under every such operation. There is no lattice — the cluster is non-periodic.
+struct GeneratedCluster {
+  Positions coordinates;
+  Types types;
+  Matrix3d basis;
+};
+
+// Controls for random_cluster. A struct rather than positional flags so callers
+// name what they set.
+struct RandomClusterOptions {
+  // Multiplies the element-aware size estimate (the cluster's characteristic
+  // extent), so a larger factor spreads atoms further apart.
+  double size_factor = 1.0;
+  // Deterministic seed; std::nullopt selects a fixed default seed.
+  std::optional<std::uint64_t> seed = std::nullopt;
+  // Free-coordinate / metric resampling attempts per Wyckoff combination before
+  // falling back to the next combination.
+  int attempts_per_combination = 50;
+  // Minimum-distance acceptance criterion (non-periodic, all-pairs).
+  DistanceTolerance distance = {};
+  // Restrict placement to the general position (generic points only), so the
+  // cluster realises exactly the target point group with no accidental extra
+  // symmetry from atoms confined to an axis or mirror plane. Requires the total
+  // atom count to be a multiple of the general-position multiplicity.
+  bool general_position_only = false;
+};
+
+// Generate a random 0D cluster with the symmetry of the point group `pg` and the
+// given composition (PyXtal's molecular/cluster generation, dim = 0). It
+// enumerates the compatible Wyckoff assignments, samples them in a random order,
+// and for each one repeatedly draws a metric-compatible basis (so non-cubic
+// point groups get the right geometry) and random free coordinates, accepting
+// the first cluster whose interatomic distances pass `options.distance`.
+//
+// Deterministic in `options.seed`. Errors when the composition is incompatible
+// with the point group's Wyckoff positions, or when no combination yields a
+// distance-valid cluster within the attempt budget.
+[[nodiscard]] Result<GeneratedCluster>
+random_cluster(group::PointGroup const &pg, Composition const &comp,
+               RandomClusterOptions const &options = {});
 
 } // namespace spglib::generate

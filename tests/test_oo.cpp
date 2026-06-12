@@ -5,15 +5,20 @@
 // through the analyzer.
 #include <spglib/analysis/symmetry_analyzer.hpp>
 #include <spglib/core/overlap.hpp>
+#include <spglib/data/rod_database.hpp>
 #include <spglib/dataset.hpp>
 #include <spglib/generate/crystal_builder.hpp>
 #include <spglib/generate/distance_check.hpp>
+#include <spglib/generate/rod_crystal.hpp>
+#include <spglib/group/point_group.hpp>
+#include <spglib/group/rod_group.hpp>
 #include <spglib/group/space_group.hpp>
 #include <spglib/group/subgroup_graph.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <set>
 #include <stdexcept>
 #include <utility>
@@ -306,4 +311,209 @@ TEST_CASE("SymmetryAnalyzer memoizes a consistent dataset", "[analysis]") {
   auto ds = must(analyzer.dataset());
   REQUIRE(ds.spacegroup_number == first);
   REQUIRE(must(analyzer.operations()).size() == ds.operations.size());
+}
+
+namespace {
+// A generated cluster carries the full point-group symmetry iff, in Cartesian
+// space, every operation R_cart = basis . R . basis^-1 maps the atom set onto
+// itself (each atom onto an atom of the same type).
+bool cluster_is_invariant(generate::GeneratedCluster const &gen,
+                          group::PointGroup const &pg, double tol = 1e-6) {
+  Matrix3d const inv = gen.basis.inverse();
+  Index const n = static_cast<Index>(gen.types.size());
+  for (auto const &op : pg.operations()) {
+    Matrix3d const rc = gen.basis * op.rotation.cast<double>() * inv;
+    for (Index i = 0; i < n; ++i) {
+      Vector3d const image = rc * gen.coordinates.row(i).transpose();
+      bool matched = false;
+      for (Index j = 0; j < n && !matched; ++j) {
+        if (gen.types[static_cast<std::size_t>(i)] ==
+                gen.types[static_cast<std::size_t>(j)] &&
+            (image - gen.coordinates.row(j).transpose()).norm() < tol) {
+          matched = true;
+        }
+      }
+      if (!matched) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+} // namespace
+
+TEST_CASE("orbit-stabilizer invariant holds for all 32 point groups",
+          "[cluster]") {
+  for (int number = 1; number <= 32; ++number) {
+    INFO("point group " << number);
+    auto pg = must(group::PointGroup::from_number(number));
+    REQUIRE(pg.number() == number);
+    int const order = pg.order();
+    REQUIRE(order > 0);
+    REQUIRE_FALSE(pg.wyckoffs().empty());
+
+    // The origin is always a fixed point (multiplicity 1); the general position
+    // (last) has multiplicity equal to the group order.
+    REQUIRE(pg.wyckoffs().front().multiplicity() == 1);
+    REQUIRE(pg.wyckoffs().back().multiplicity() == order);
+    REQUIRE(pg.wyckoffs().back().degrees_of_freedom() == 3);
+
+    for (auto const &wp : pg.wyckoffs()) {
+      REQUIRE(wp.multiplicity() *
+                  static_cast<int>(wp.operations().size()) ==
+              order);
+    }
+  }
+}
+
+TEST_CASE("point-group orders match the textbook values", "[cluster]") {
+  auto order_of = [](int number) {
+    return must(group::PointGroup::from_number(number)).order();
+  };
+  REQUIRE(order_of(1) == 1);   // 1   (C1)
+  REQUIRE(order_of(2) == 2);   // -1  (Ci)
+  REQUIRE(order_of(5) == 4);   // 2/m (C2h)
+  REQUIRE(order_of(8) == 8);   // mmm (D2h)
+  REQUIRE(order_of(16) == 3);  // 3   (C3)
+  REQUIRE(order_of(20) == 12); // -3m (D3d)
+  REQUIRE(order_of(25) == 12); // 6mm (C6v)
+  REQUIRE(order_of(27) == 24); // 6/mmm (D6h)
+  REQUIRE(order_of(32) == 48); // m-3m (Oh)
+}
+
+TEST_CASE("from_number rejects out-of-range point groups", "[cluster]") {
+  bool errored = leaf::try_handle_all(
+      [&]() -> Result<bool> {
+        BOOST_LEAF_AUTO(pg, group::PointGroup::from_number(33));
+        (void)pg;
+        return false;
+      },
+      [](leaf::error_info const &) { return true; });
+  REQUIRE(errored);
+}
+
+TEST_CASE("generated clusters carry their full point-group symmetry",
+          "[cluster]") {
+  // The direct self-validation: a generated 0D cluster must be invariant under
+  // EVERY operation of its point group, in Cartesian space. Spans all crystal
+  // systems including the trigonal/hexagonal metrics, where the integer
+  // operations are only isometries in the correct (non-orthogonal) basis.
+  for (int number : {1, 2, 8, 16, 20, 25, 32}) {
+    INFO("point group " << number);
+    auto pg = must(group::PointGroup::from_number(number));
+    int const m = pg.wyckoffs().back().multiplicity();
+    generate::Composition const comp{{6, m}, {7, m}};
+
+    auto gen = must(generate::random_cluster(
+        pg, comp,
+        {.size_factor = 3.0, .seed = 17u, .general_position_only = true}));
+    REQUIRE(gen.types.size() == static_cast<std::size_t>(2 * m));
+    REQUIRE(generate::cluster_distances_valid(gen.coordinates, gen.types));
+    REQUIRE(cluster_is_invariant(gen, pg));
+  }
+}
+
+TEST_CASE("cluster generation is deterministic in the seed", "[cluster]") {
+  auto pg = must(group::PointGroup::from_number(32)); // m-3m
+  generate::Composition const comp{{6, 48}};
+  auto a = must(generate::random_cluster(pg, comp, {.seed = 123u}));
+  auto b = must(generate::random_cluster(pg, comp, {.seed = 123u}));
+  REQUIRE(a.coordinates.isApprox(b.coordinates));
+  REQUIRE(a.types == b.types);
+}
+
+TEST_CASE("incompatible cluster composition is rejected", "[cluster]") {
+  auto pg = must(group::PointGroup::from_number(32)); // m-3m, order 48
+  // 5 atoms cannot tile the available multiplicities (1, ..., 48) of m-3m.
+  generate::Composition const comp{{6, 5}};
+  bool errored = leaf::try_handle_all(
+      [&]() -> Result<bool> {
+        BOOST_LEAF_AUTO(gen, generate::random_cluster(pg, comp));
+        (void)gen;
+        return false;
+      },
+      [](leaf::error_info const &) { return true; });
+  REQUIRE(errored);
+}
+
+namespace {
+// A generated rod carries the full rod-group symmetry iff every operation maps
+// the fractional atom set onto itself, folding ONLY the periodic axis (the two
+// aperiodic axes are compared raw — a flip a -> -a must land at the Cartesian
+// image, not the wrapped 1 - a).
+bool rod_is_invariant(generate::GeneratedRodCrystal const &gen,
+                      group::RodGroup const &rg, double tol = 1e-4) {
+  int const axis = rg.periodic_axis();
+  Cell const &cell = gen.cell;
+  Index const n = cell.size();
+  for (auto const &op : rg.operations()) {
+    for (Index i = 0; i < n; ++i) {
+      Vector3d const image = op.apply(cell.position(i));
+      bool matched = false;
+      for (Index j = 0; j < n && !matched; ++j) {
+        if (cell.type(i) != cell.type(j)) {
+          continue;
+        }
+        Vector3d d = image - cell.position(j);
+        d[axis] -= std::round(d[axis]); // fold only the periodic axis
+        if (d.cwiseAbs().maxCoeff() < tol) {
+          matched = true;
+        }
+      }
+      if (!matched) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+} // namespace
+
+TEST_CASE("RodGroup exposes the database operations and a general position",
+          "[rod]") {
+  REQUIRE(data::num_rod_groups() == 75);
+  for (int number = 1; number <= 75; ++number) {
+    INFO("rod group " << number);
+    auto rg = must(group::RodGroup::from_number(number));
+    REQUIRE(rg.number() == number);
+    REQUIRE(rg.periodic_axis() == 2);
+    REQUIRE(rg.order() > 0);
+    // SKELETON: only the general position is derived so far; it has multiplicity
+    // equal to the group order and three free coordinates.
+    REQUIRE(rg.wyckoffs().size() == 1);
+    REQUIRE(rg.wyckoffs().back().multiplicity() == rg.order());
+    REQUIRE(rg.wyckoffs().back().degrees_of_freedom() == 3);
+  }
+}
+
+TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
+  // Direct self-validation of the general-position path: the generated 1D
+  // structure must be invariant under EVERY rod operation, folding only the
+  // periodic axis. Spans the trivial group, a perpendicular 2-fold (c-flipping),
+  // a screw axis, and the higher-symmetry axial groups.
+  for (int number : {1, 3, 13, 23, 24, 53}) {
+    INFO("rod group " << number);
+    auto rg = must(group::RodGroup::from_number(number));
+    int const m = rg.wyckoffs().back().multiplicity();
+    generate::Composition const comp{{6, m}, {7, m}};
+
+    auto gen = must(generate::random_rod_crystal(
+        rg, comp,
+        {.size_factor = 2.0, .seed = 31u, .general_position_only = true}));
+    REQUIRE(gen.periodicity == CellPeriodicity{AxisKind::aperiodic,
+                                               AxisKind::aperiodic,
+                                               AxisKind::periodic});
+    REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
+    REQUIRE(rod_is_invariant(gen, rg));
+  }
+}
+
+TEST_CASE("rod generation is deterministic in the seed", "[rod]") {
+  auto rg = must(group::RodGroup::from_number(23)); // p4
+  int const m = rg.wyckoffs().back().multiplicity();
+  generate::Composition const comp{{6, m}};
+  auto a = must(generate::random_rod_crystal(rg, comp, {.seed = 7u}));
+  auto b = must(generate::random_rod_crystal(rg, comp, {.seed = 7u}));
+  REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
+  REQUIRE(a.cell.types() == b.cell.types());
 }

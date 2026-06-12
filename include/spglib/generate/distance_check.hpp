@@ -39,4 +39,13 @@ minimum_image_distance(Vector3d const &a, Vector3d const &b,
 [[nodiscard]] bool distances_valid(Cell const &cell,
                                    DistanceTolerance tol = {}) noexcept;
 
+// True iff every pair of atoms in a non-periodic cluster is at least its
+// type-pair minimum distance apart. `coordinates` are Cartesian (row i = atom
+// i), `types[i]` the type of atom i. The 0D analogue of distances_valid: no
+// lattice and no periodic images, so it is a plain all-pairs Euclidean check —
+// used by the point-group cluster generator (generate::random_cluster).
+[[nodiscard]] bool cluster_distances_valid(Positions const &coordinates,
+                                           Types const &types,
+                                           DistanceTolerance tol = {}) noexcept;
+
 } // namespace spglib::generate

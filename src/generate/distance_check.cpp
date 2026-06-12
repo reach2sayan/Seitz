@@ -79,4 +79,26 @@ bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
   return true;
 }
 
+bool cluster_distances_valid(Positions const &coordinates, Types const &types,
+                             DistanceTolerance tol) noexcept {
+  Index const n = static_cast<Index>(types.size());
+  std::vector<double> radius(static_cast<std::size_t>(n));
+  std::ranges::transform(types, radius.begin(),
+                         [&](int type) { return radius_of(type, tol); });
+
+  for (Index i = 0; i < n; ++i) {
+    double const ri = radius[static_cast<std::size_t>(i)];
+    for (Index j = i + 1; j < n; ++j) {
+      double const min_dist =
+          tol.scale * (ri + radius[static_cast<std::size_t>(j)]);
+      double const dist =
+          (coordinates.row(i) - coordinates.row(j)).norm();
+      if (dist < min_dist) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 } // namespace spglib::generate

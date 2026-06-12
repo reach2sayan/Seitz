@@ -5,8 +5,10 @@
 #include <spglib/math/fractional.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <random>
+#include <span>
 #include <vector>
 
 namespace spglib::generate {
@@ -179,6 +181,185 @@ random_layer_crystal(group::SpaceGroup const &lg, Composition const &comp,
   return leaf::new_error(e_message{
       "generate::random_layer_crystal: no distance-valid structure found within "
       "the attempt budget for any compatible Wyckoff assignment"});
+}
+
+namespace {
+
+// One placement in a cluster: an atom type on a chosen point-group Wyckoff
+// position (non-owning pointer into the PointGroup, which must outlive it).
+struct ClusterPlacement {
+  int type;
+  group::PointWyckoff const *position{};
+};
+using ClusterCombination = std::vector<ClusterPlacement>;
+
+// Depth-first enumerator of point-group Wyckoff assignments — the 0D analogue of
+// list_wyckoff_combinations: a 0-DOF (fixed) position is one orbit, usable at
+// most once across the whole cluster; a position with free coordinates may be
+// reused.
+struct ClusterEnumerator {
+  std::span<group::PointWyckoff const> positions;
+  std::vector<std::pair<int, int>> const &elements; // (type, count)
+  std::size_t max_combinations;
+
+  std::vector<bool> used_special;
+  ClusterCombination placements;
+  std::vector<ClusterCombination> out;
+
+  [[nodiscard]] bool full() const { return out.size() >= max_combinations; }
+
+  void recurse(std::size_t elem, std::size_t pos, int remaining) {
+    if (full()) {
+      return;
+    }
+    if (remaining == 0) {
+      if (elem + 1 == elements.size()) {
+        out.push_back(placements);
+      } else {
+        recurse(elem + 1, 0, elements[elem + 1].second);
+      }
+      return;
+    }
+    if (pos >= positions.size()) {
+      return;
+    }
+
+    group::PointWyckoff const &wp = positions[pos];
+    int const mult = wp.multiplicity();
+    bool const fixed = wp.degrees_of_freedom() == 0;
+    int const max_copies =
+        fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
+
+    for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
+         ++copies) {
+      if (full()) {
+        return;
+      }
+      for (int k = 0; k < copies; ++k) {
+        placements.push_back({elements[elem].first, &wp});
+      }
+      if (fixed && copies == 1) {
+        used_special[pos] = true;
+      }
+      recurse(elem, pos + 1, remaining - copies * mult);
+      if (fixed && copies == 1) {
+        used_special[pos] = false;
+      }
+      for (int k = 0; k < copies; ++k) {
+        placements.pop_back();
+      }
+    }
+  }
+};
+
+[[nodiscard]] std::vector<ClusterCombination>
+list_cluster_combinations(group::PointGroup const &pg, Composition const &comp,
+                          std::size_t max_combinations = 1000) {
+  std::vector<std::pair<int, int>> elements;
+  for (auto const &[type, count] : comp) {
+    if (count > 0) {
+      elements.emplace_back(type, count);
+    }
+  }
+  if (elements.empty() || max_combinations == 0) {
+    return {};
+  }
+  ClusterEnumerator e{pg.wyckoffs(),
+                      elements,
+                      max_combinations,
+                      std::vector<bool>(pg.wyckoffs().size(), false),
+                      {},
+                      {}};
+  e.recurse(0, 0, elements.front().second);
+  return std::move(e.out);
+}
+
+// Assemble one cluster: each placement's free coordinate is drawn uniformly in
+// fractional space and expanded over its orbit, then mapped to Cartesian by the
+// metric basis. The result is non-periodic.
+[[nodiscard]] std::pair<Positions, Types>
+assemble_cluster(ClusterCombination const &combo, Matrix3d const &basis,
+                 std::mt19937_64 &rng) {
+  std::uniform_real_distribution<double> coord(-0.5, 0.5);
+
+  std::vector<Vector3d> rows;
+  Types types;
+  for (auto const &placement : combo) {
+    int const dof = placement.position->degrees_of_freedom();
+    std::array<double, 3> params{};
+    for (int i = 0; i < dof; ++i) {
+      params[static_cast<std::size_t>(i)] = coord(rng);
+    }
+    Vector3d const q = placement.position->sample(
+        std::span<double const>(params.data(), static_cast<std::size_t>(dof)));
+    for (auto const &op : placement.position->orbit_operations()) {
+      Vector3d const frac = op.rotation.cast<double>() * q;
+      rows.push_back(basis * frac);
+      types.push_back(placement.type);
+    }
+  }
+
+  Positions coordinates(static_cast<Index>(rows.size()), 3);
+  for (Index i = 0; i < static_cast<Index>(rows.size()); ++i) {
+    coordinates.row(i) = rows[static_cast<std::size_t>(i)].transpose();
+  }
+  return {std::move(coordinates), std::move(types)};
+}
+
+} // namespace
+
+Result<GeneratedCluster> random_cluster(group::PointGroup const &pg,
+                                        Composition const &comp,
+                                        RandomClusterOptions const &options) {
+  std::vector<ClusterCombination> combos = list_cluster_combinations(pg, comp);
+  if (combos.empty()) {
+    return leaf::new_error(e_message{
+        "generate::random_cluster: composition is not compatible with the "
+        "Wyckoff positions of the requested point group"});
+  }
+
+  if (options.general_position_only) {
+    group::PointWyckoff const *general = &pg.wyckoffs().back();
+    std::erase_if(combos, [&](ClusterCombination const &combo) {
+      return std::ranges::any_of(combo, [&](ClusterPlacement const &p) {
+        return p.position != general;
+      });
+    });
+    if (combos.empty()) {
+      return leaf::new_error(e_message{
+          "generate::random_cluster: general_position_only requires the atom "
+          "count to be a multiple of the general-position multiplicity"});
+    }
+  }
+
+  std::mt19937_64 rng(options.seed.value_or(0));
+  std::ranges::shuffle(combos, rng);
+
+  // The point group's crystal system fixes which metric the cluster is realised
+  // in (so trigonal/hexagonal clusters get the correct, non-orthogonal geometry
+  // and the integer operations become true Cartesian isometries).
+  CrystalSystem const system =
+      crystal_system(pg.representative_spacegroup());
+  double const base_volume =
+      options.size_factor * estimated_cell_volume(comp);
+
+  for (auto const &combo : combos) {
+    for (int attempt = 0; attempt < options.attempts_per_combination;
+         ++attempt) {
+      // Grow the metric on repeated failure to spread atoms apart.
+      double const volume = base_volume * (1.0 + 0.2 * attempt);
+      Matrix3d const basis = random_lattice(system, volume, rng());
+      auto [coordinates, types] = assemble_cluster(combo, basis, rng);
+      if (cluster_distances_valid(coordinates, types, options.distance)) {
+        return GeneratedCluster{std::move(coordinates), std::move(types),
+                                basis};
+      }
+    }
+  }
+
+  return leaf::new_error(e_message{
+      "generate::random_cluster: no distance-valid cluster found within the "
+      "attempt budget for any compatible Wyckoff assignment"});
 }
 
 } // namespace spglib::generate
