@@ -236,8 +236,9 @@ CppCrystal stands on two existing projects and is grateful to both.
 Both upstream licenses (BSD-3-Clause and MIT) are permissive and impose no
 copyleft, so this combined and derived work is distributed under the
 BSD-3-Clause license. The original spglib and PyXtal copyright notices are
-retained where their code and data are reused.
-
-The data tables generated under `tools/` transcribe the corresponding tables
-from spglib; they carry spglib's copyright and are used under its BSD-3-Clause
-license.
+retained for the portions derived from them — the symmetry core and the
+`spacegroup_*` / `msg_*` / `sitesym_*` / `hall_generators*` data tables from
+spglib, and the rod-group tables (`rod_group_tables.hpp`) from PyXtal. The full
+verbatim notices are in the [THIRD-PARTY NOTICES](LICENSE) section of the
+license file. The element covalent-radius data is from Cordero et al. (2008),
+cited there.
