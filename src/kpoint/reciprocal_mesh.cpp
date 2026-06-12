@@ -170,10 +170,11 @@ ir_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
 
   std::array<std::int64_t, 3> divisor{};
   if (!normal) {
-    for (int j = 0; j < 3; ++j) {
-      divisor[static_cast<std::size_t>(j)] =
-          static_cast<std::int64_t>(mesh[(j + 1) % 3]) * mesh[(j + 2) % 3];
-    }
+    divisor = std::array<std::int64_t, 3>{
+        static_cast<std::int64_t>(mesh[1]) * mesh[2],
+        static_cast<std::int64_t>(mesh[2]) * mesh[0],
+        static_cast<std::int64_t>(mesh[0]) * mesh[1],
+    };
   }
 
   std::vector<std::size_t> mapping(n);

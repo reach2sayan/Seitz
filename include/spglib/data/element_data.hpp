@@ -49,9 +49,6 @@ element_symbol(int z) noexcept {
   return kElementSymbols[static_cast<std::size_t>(z - 1)];
 }
 
-// Atomic number of a chemical symbol (case-sensitive, e.g. "Na" -> 11);
-// std::nullopt if the symbol is not tabulated. Backed by a Boost.Bimap built
-// once from the generated table (see src/data/element_data.cpp).
 [[nodiscard]] std::optional<int> atomic_number(std::string_view symbol);
 
 } // namespace spglib::data

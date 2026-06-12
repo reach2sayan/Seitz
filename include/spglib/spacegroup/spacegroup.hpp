@@ -7,6 +7,8 @@
 #include <spglib/data/spg_database.hpp>
 #include <spglib/symmetry/primitive.hpp>
 
+// For the object-oriented entry points wrapping a bare operation set, prefer
+// spglib::analysis::OperationSet::{spacegroup_type, search_spacegroup}.
 namespace spglib::spacegroup {
 
 // The determined space group of a (primitive) cell: the database metadata

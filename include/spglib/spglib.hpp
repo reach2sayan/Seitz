@@ -5,6 +5,7 @@
 // port progresses (cell, symmetry, spacegroup, magnetic, kpoints, ...).
 
 #include <spglib/analysis/magnetic_symmetry_analyzer.hpp>
+#include <spglib/analysis/operation_set.hpp>
 #include <spglib/analysis/symmetry_analyzer.hpp>
 #include <spglib/core/cell.hpp>
 #include <spglib/core/centering.hpp>
@@ -29,6 +30,7 @@
 #include <spglib/kpoint/brillouin_zone.hpp>
 #include <spglib/kpoint/grid.hpp>
 #include <spglib/kpoint/reciprocal_mesh.hpp>
+#include <spglib/kpoint/reciprocal_mesh_builder.hpp>
 #include <spglib/magnetic/magnetic_spacegroup.hpp>
 #include <spglib/magnetic_dataset.hpp>
 #include <spglib/math/fractional.hpp>
@@ -37,6 +39,7 @@
 #include <spglib/reduce/niggli.hpp>
 #include <spglib/spacegroup/hall_symbol.hpp>
 #include <spglib/spacegroup/spacegroup.hpp>
+#include <spglib/warmup.hpp>
 #include <spglib/spin/spin.hpp>
 #include <spglib/symmetry/find_symmetry.hpp>
 #include <spglib/symmetry/pointgroup.hpp>

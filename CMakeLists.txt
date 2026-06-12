@@ -31,9 +31,11 @@ add_library(cppcrystal)
 add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
 target_sources(cppcrystal PRIVATE
         src/version.cpp
+        src/warmup.cpp
         src/dataset.cpp
         src/analysis/symmetry_analyzer.cpp
         src/analysis/magnetic_symmetry_analyzer.cpp
+        src/analysis/operation_set.cpp
         src/group/space_group.cpp
         src/group/wyckoff_position.cpp
         src/group/subgroup_graph.cpp
@@ -57,6 +59,7 @@ target_sources(cppcrystal PRIVATE
         src/magnetic_dataset.cpp
         src/kpoint/grid.cpp
         src/kpoint/reciprocal_mesh.cpp
+        src/kpoint/reciprocal_mesh_builder.cpp
         src/kpoint/brillouin_zone.cpp
         src/spacegroup/hall_symbol.cpp
         src/spacegroup/spacegroup.cpp
@@ -69,7 +72,8 @@ target_include_directories(cppcrystal PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(cppcrystal PUBLIC cxx_std_23)
-target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::headers)
+find_package(Threads REQUIRED)
+target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::headers Threads::Threads)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Hardening warning set (Phase 9). The conversion warnings are applied to the

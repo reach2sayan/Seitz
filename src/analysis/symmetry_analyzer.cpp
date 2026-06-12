@@ -59,6 +59,24 @@ Result<SymmetryOperations> SymmetryAnalyzer::operations() const {
   return ds->operations;
 }
 
+Result<SymmetryOperations> SymmetryAnalyzer::cell_operations() const {
+  if (!cell_operations_) {
+    BOOST_LEAF_AUTO(ops, symmetry::find_symmetry(cell_, tol_.symprec,
+                                                 tol_.angle_tolerance));
+    cell_operations_ = std::move(ops);
+  }
+  return *cell_operations_;
+}
+
+Result<PointSymmetry> SymmetryAnalyzer::lattice_symmetry() const {
+  if (!lattice_symmetry_) {
+    BOOST_LEAF_AUTO(ps, symmetry::lattice_symmetry(cell_, tol_.symprec,
+                                                   tol_.angle_tolerance));
+    lattice_symmetry_ = std::move(ps);
+  }
+  return *lattice_symmetry_;
+}
+
 Result<data::SpacegroupType> SymmetryAnalyzer::spacegroup_type() const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
   return data::spacegroup_type(ds->hall_number);
@@ -90,6 +108,11 @@ Result<Cell> SymmetryAnalyzer::standardized_cell() const {
   return Cell{ds->std_lattice, ds->std_positions, ds->std_types};
 }
 
+Result<Cell> SymmetryAnalyzer::standardized_cell(
+    StandardizeOptions options) const {
+  return standardize_cell(cell_, options, tol_.symprec, tol_.angle_tolerance);
+}
+
 Result<symmetry::Primitive> SymmetryAnalyzer::primitive() const {
   BOOST_LEAF_AUTO(prim, cached_primitive());
   return *prim;
@@ -103,6 +126,14 @@ Result<Cell> SymmetryAnalyzer::primitive_cell() const {
 Result<spacegroup::Spacegroup> SymmetryAnalyzer::spacegroup() const {
   BOOST_LEAF_AUTO(sg, cached_spacegroup());
   return *sg;
+}
+
+Result<void> SymmetryAnalyzer::warm() const {
+  BOOST_LEAF_CHECK(cached_dataset());
+  BOOST_LEAF_CHECK(cached_spacegroup()); // also fills cached_primitive()
+  BOOST_LEAF_CHECK(cell_operations());
+  BOOST_LEAF_CHECK(lattice_symmetry());
+  return {};
 }
 
 } // namespace spglib::analysis

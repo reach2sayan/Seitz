@@ -6,6 +6,9 @@
 #include <spglib/core/symmetry_operation.hpp>
 #include <spglib/core/tolerance.hpp>
 
+// For the object-oriented entry points over a single cell, prefer
+// spglib::analysis::SymmetryAnalyzer::lattice_symmetry() and ::cell_operations(),
+// which own the cell and memoize these results.
 namespace spglib::symmetry {
 
 // Point group of the lattice: the rotations (in the cell's own basis) that map

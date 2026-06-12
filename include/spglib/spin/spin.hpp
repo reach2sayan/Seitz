@@ -39,7 +39,9 @@ struct MagneticSymmetrySearch {
 //     (spglib's `mag_symprec < 0` default).
 // `sym_nonspin` is the spatial symmetry (e.g. from symmetry::find_symmetry).
 // Errors with e_magnetic_symmetry_search_failed when the orbits or the
-// primitive lattice cannot be resolved.
+// primitive lattice cannot be resolved. For the object-oriented entry point that
+// derives the spatial symmetry for you and memoizes, prefer
+// spglib::analysis::MagneticSymmetryAnalyzer::symmetry_search().
 [[nodiscard]] Result<MagneticSymmetrySearch>
 operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
                              MagneticCell const &mcell, bool with_time_reversal,
@@ -50,7 +52,8 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
 // The pure translations of a magnetic symmetry: the translations whose rotation
 // is the identity and which are not time-reversal operations (the type-IV
 // anti-translations are excluded). Includes the zero translation. Port of
-// spn_collect_pure_translations_from_magnetic_symmetry.
+// spn_collect_pure_translations_from_magnetic_symmetry. For the object-oriented
+// form, prefer spglib::analysis::MagneticOperationSet::pure_translations().
 [[nodiscard]] std::vector<Vector3d>
 collect_pure_translations(MagneticSymmetryOperations const &operations);
 

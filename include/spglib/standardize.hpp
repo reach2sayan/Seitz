@@ -24,6 +24,9 @@ struct StandardizeOptions {
 //   {true,  true } primitive,    input geometry preserved
 // Errors with e_spacegroup_search_failed / e_cell_standardization_failed when
 // determination fails (same conditions as get_dataset).
+//
+// For the object-oriented entry point, prefer
+// spglib::analysis::SymmetryAnalyzer::standardized_cell(options).
 [[nodiscard]] Result<Cell>
 standardize_cell(Cell const &cell, StandardizeOptions options = {},
                  double symprec = kDefaultSymprec,

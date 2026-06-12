@@ -34,7 +34,9 @@ struct MagneticTypeIdentification {
 
 // Identify the magnetic space-group type of `magnetic_symmetry` in `lattice`.
 // Port of msg_identify_magnetic_space_group_type. Errors with
-// e_magnetic_symmetry_search_failed when no UNI number matches.
+// e_magnetic_symmetry_search_failed when no UNI number matches. For the
+// object-oriented form, prefer
+// spglib::analysis::MagneticOperationSet::identify_spacegroup_type(lattice, ...).
 [[nodiscard]] Result<MagneticTypeIdentification>
 identify_magnetic_spacegroup_type(
     Matrix3d const &lattice,

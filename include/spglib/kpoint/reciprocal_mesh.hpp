@@ -51,6 +51,8 @@ ir_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
 // get_dataset, build the reciprocal point group (with time reversal if
 // requested), then reduce the mesh. Port of spglib.c get_(dense_)ir_reciprocal_
 // mesh. Errors via get_dataset (e_spacegroup_search_failed / …).
+// For the object-oriented entry point, prefer
+// spglib::kpoint::ReciprocalMeshBuilder::irreducible(...).
 [[nodiscard]] Result<IrReciprocalMesh>
 ir_reciprocal_mesh(Cell const &cell, Vector3i const &mesh,
                    Vector3i const &is_shift, bool time_reversal,

@@ -73,6 +73,9 @@ struct Dataset {
 //
 // Errors with e_spacegroup_search_failed / e_cell_standardization_failed when
 // determination fails at every attempted tolerance.
+//
+// For the object-oriented entry point that owns the cell and memoizes this and
+// every derived query, prefer spglib::analysis::SymmetryAnalyzer::dataset().
 [[nodiscard]] Result<Dataset>
 get_dataset(Cell const &cell, double symprec = kDefaultSymprec,
             AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);

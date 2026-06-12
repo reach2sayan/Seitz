@@ -1,5 +1,7 @@
 #include <spglib/analysis/magnetic_symmetry_analyzer.hpp>
 
+#include <spglib/symmetry/find_symmetry.hpp>
+
 #include <utility>
 
 namespace spglib::analysis {
@@ -34,6 +36,21 @@ Result<MagneticSymmetryOperations> MagneticSymmetryAnalyzer::operations()
   return ds->operations;
 }
 
+Result<spin::MagneticSymmetrySearch>
+MagneticSymmetryAnalyzer::symmetry_search() const {
+  if (!symmetry_search_) {
+    BOOST_LEAF_AUTO(sym_nonspin,
+                    symmetry::find_symmetry(cell_.cell(), tol_.symprec,
+                                            tol_.angle_tolerance));
+    BOOST_LEAF_AUTO(search, spin::operations_with_site_tensors(
+                                sym_nonspin, cell_, /*with_time_reversal=*/true,
+                                is_axial_, tol_.symprec, tol_.angle_tolerance,
+                                mag_symprec_));
+    symmetry_search_ = std::move(search);
+  }
+  return *symmetry_search_;
+}
+
 Result<int> MagneticSymmetryAnalyzer::uni_number() const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
   return ds->uni_number;
@@ -59,6 +76,12 @@ Result<MagneticCell> MagneticSymmetryAnalyzer::standardized_cell() const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
   return MagneticCell{Cell{ds->std_lattice, ds->std_positions, ds->std_types},
                       ds->std_tensors};
+}
+
+Result<void> MagneticSymmetryAnalyzer::warm() const {
+  BOOST_LEAF_CHECK(cached_dataset());
+  BOOST_LEAF_CHECK(symmetry_search());
+  return {};
 }
 
 } // namespace spglib::analysis
