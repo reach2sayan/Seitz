@@ -19,9 +19,9 @@ struct ExactPositions {
 };
 
 // Exact positions + Wyckoff assignment for the atoms of `conv_prim` (positions
-// expressed wrt the idealized conventional lattice). Port of site_symmetry.c
-// ssm_get_exact_positions (3D path). `conv_sym` are the conventional database
-// operations of the Hall setting. Returns std::nullopt if the Wyckoff labels
+// expressed wrt the idealized conventional lattice). `conv_sym` are the
+// conventional database operations of the Hall setting. Returns std::nullopt if
+// the Wyckoff labels
 // could not be resolved at any of the attempted tolerances.
 [[nodiscard]] std::optional<ExactPositions>
 exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,

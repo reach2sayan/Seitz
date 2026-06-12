@@ -12,23 +12,22 @@
 #include <optional>
 #include <ranges>
 
-// Port of the symmetry-operation search in symmetry.c (3D space-group path):
+// The symmetry-operation search:
 //   1. Delaunay-reduce the lattice and enumerate the lattice point group by
 //      trying every unimodular integer matrix built from 26 candidate axes that
-//      preserves the metric (get_lattice_symmetry).
-//   2. Transform those rotations into the input cell's basis
-//      (transform_pointsymmetry).
+//      preserves the metric.
+//   2. Transform those rotations into the input cell's basis.
 //   3. For each rotation, find the translations that map the cell onto itself
-//      (get_translation / get_space_group_operations) via the OverlapChecker.
+//      via the OverlapChecker.
 namespace spglib::symmetry {
 
 namespace {
 
-constexpr int kNumAttempt = 100; // symmetry.c NUM_ATTEMPT
+constexpr int kNumAttempt = 100;
 constexpr double kAngleReduceRate = 0.95;
 constexpr double kSinDtheta2Cutoff = 1e-12;
 
-// symmetry.c relative_axes: 26 candidate lattice vectors.
+// 26 candidate lattice vectors.
 constexpr int kRelativeAxes[26][3] = {
     {1, 0, 0},   {0, 1, 0},   {0, 0, 1},  {-1, 0, 0},  {0, -1, 0},
     {0, 0, -1},  {0, 1, 1},   {1, 0, 1},  {1, 1, 0},   {0, -1, -1},
@@ -42,9 +41,8 @@ constexpr int kRelativeAxes[26][3] = {
 
 // For a layer group the aperiodic axis must map to itself: no candidate axis
 // matrix may couple the aperiodic axis with the periodic plane. True if the
-// off-diagonal block for `aperiodic_axis` has any nonzero entry (symmetry.c's
-// per-axis switch). Candidate vectors are the columns of `axes`, so axes(r,c)
-// matches the reference axes[r][c].
+// off-diagonal block for `aperiodic_axis` has any nonzero entry. Candidate
+// vectors are the columns of `axes`.
 [[nodiscard]] bool couples_aperiodic(Matrix3i const &axes,
                                      int aperiodic_axis) noexcept {
   return std::ranges::any_of(std::views::iota(0, 3), [&](int p) {
@@ -53,7 +51,7 @@ constexpr int kRelativeAxes[26][3] = {
   });
 }
 
-// symmetry.c is_identity_metric, angle_tolerance < 0 path uses the sin-based
+// Whether two metric tensors agree. An unset angle_tolerance uses the sin-based
 // criterion; a positive angle_tolerance compares angles in degrees.
 [[nodiscard]] bool is_identity_metric(Matrix3d const &rotated,
                                       Matrix3d const &orig, double symprec,
@@ -134,9 +132,9 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
   return found;
 }
 
-// transform_pointsymmetry: bring rotations from the Delaunay basis
-// (original_lat) into the cell basis (new_lat) by the similarity transform b^-1
-// . R . b with b = original_lat^-1 . new_lat.
+// Bring rotations from the Delaunay basis (original_lat) into the cell basis
+// (new_lat) by the similarity transform b^-1 . R . b with
+// b = original_lat^-1 . new_lat.
 [[nodiscard]] Result<PointSymmetry>
 transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
                         Matrix3d const &original_lat) {
@@ -160,7 +158,7 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
 }
 
 // First-occurrence index of the least-frequent atom type, or nullopt for an
-// empty cell (symmetry.c get_index_with_least_atoms).
+// empty cell.
 [[nodiscard]] std::optional<int> index_with_least_atoms(Cell const &cell) {
   int const n = static_cast<int>(cell.size());
   if (n == 0)
@@ -172,7 +170,7 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
     ++frequency[cell.type(i)];
 
   // Return the first atom whose type is the rarest. Scanning in index order
-  // reproduces spglib's tie-break: among equally-rare types, smallest index.
+  // gives the tie-break: among equally-rare types, smallest index.
   int const min_frequency = std::ranges::min(frequency | std::views::values);
   for (int i = 0; i < n; ++i)
     if (frequency.at(cell.type(i)) == min_frequency)
@@ -181,8 +179,7 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
   return std::nullopt; // unreachable: min_frequency came from the cell itself
 }
 
-// Translations t such that x -> rot . x + t maps the cell onto itself
-// (symmetry.c get_translation, is_identity = 0).
+// Translations t such that x -> rot . x + t maps the cell onto itself.
 [[nodiscard]] std::vector<Vector3d>
 translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
                           Matrix3i const &rot, int min_index, double symprec,
@@ -197,7 +194,7 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
     Vector3d const trans = cell.position(i) - origin;
     if (checker.check_total_overlap(trans, rot, symprec)) {
       // Layer translations live in the periodic plane; the aperiodic component
-      // is kept raw rather than folded into [0, 1) (symmetry.c get_layer_translation).
+      // is kept raw rather than folded into [0, 1).
       Vector3d wrapped;
       for (int j = 0; j < 3; ++j) {
         wrapped[j] = (aperiodic_axis && j == *aperiodic_axis)
@@ -216,8 +213,7 @@ Result<PointSymmetry> lattice_symmetry(Cell const &cell, double symprec,
                                        AngleTolerance angle_tolerance) {
   std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
   // A layer cell reduces only the two periodic lattice vectors, leaving the
-  // aperiodic axis fixed (del_layer_delaunay_reduce); a 3D cell uses the full
-  // Delaunay reduction.
+  // aperiodic axis fixed; a 3D cell uses the full Delaunay reduction.
   auto const min_lattice =
       aperiodic_axis
           ? reduce::delaunay_reduce(cell.lattice(), *aperiodic_axis, symprec)

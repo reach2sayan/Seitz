@@ -11,8 +11,7 @@
 namespace spglib {
 
 // Per-site magnetic tensors. The rank is carried by the variant alternative, so
-// there is no separate `tensor_rank` field to keep in sync (spglib's C `Cell`
-// carries `tensor_rank` + a flat `tensors` array; here the type *is* the rank):
+// there is no separate `tensor_rank` field to keep in sync:
 //   - collinear     : one scalar magnetic moment per atom.
 //   - non-collinear : one 3-vector magnetic moment per atom, stored as an N x 3
 //     row-major block (the `Positions` layout) so each moment's three
@@ -34,8 +33,8 @@ noncollinear_tensors(std::initializer_list<Vector3d> moments) {
 }
 
 // A crystal cell plus per-site magnetic tensors — the input to the magnetic
-// symmetry search (spin.c). Wraps a plain Cell rather than extending it, since
-// site tensors are only meaningful for magnetic structures.
+// symmetry search. Wraps a plain Cell rather than extending it, since site
+// tensors are only meaningful for magnetic structures.
 class MagneticCell {
 public:
   MagneticCell(Cell cell, SiteTensors tensors)

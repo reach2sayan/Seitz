@@ -13,17 +13,16 @@ namespace spglib::data {
 namespace {
 
 // Decoded form of one packed (non-magnetic) operation: rotation as 9 row-major
-// elements in {-1,0,1}, translation as 3 base-12 numerators (value n/12). This
-// is spglib's spgdb_decode_symmetry encoding (rotation base-3, translation
-// base-12), unpacked once at compile time so no decoding happens at runtime.
-// Same literal type used by spg_database.cpp's kDecodedOps.
+// elements in {-1,0,1}, translation as 3 base-12 numerators (value n/12). The
+// packed encoding (rotation base-3, translation base-12) is unpacked once at
+// compile time so no decoding happens at runtime.
 struct DecodedOp {
   std::array<std::int8_t, 9> rot;
   std::array<std::int8_t, 3> trans_num;
 };
 
-// Unpack one packed spgdb operation. constexpr so it can run at compile time
-// when filling the decoded tables below.
+// Unpack one packed operation. constexpr so it can run at compile time when
+// filling the decoded tables below.
 [[nodiscard]] constexpr DecodedOp decode_packed(int encoded) noexcept {
   DecodedOp d{};
   constexpr auto factor = 3*3*3*3*3*3*3*3*3;
@@ -43,7 +42,7 @@ struct DecodedOp {
 }
 
 // 34012224 = 3^9 * 12^3, the base separating the time-reversal flag from the
-// packed spgdb operation (msg_database.c msgdb_get_magnetic_operation).
+// packed spatial operation.
 constexpr int kTimeReversalBase =
     (3 * 3 * 3 * 3 * 3 * 3 * 3 * 3 * 3) * (12 * 12 * 12);
 
@@ -54,8 +53,8 @@ struct DecodedMagneticOp {
   bool time_reversal;
 };
 
-// Every magnetic operation, decoded once at compile time. Mirrors
-// spg_database.cpp's kDecodedOps so no base-3/12 arithmetic runs at runtime.
+// Every magnetic operation, decoded once at compile time so no base-3/12
+// arithmetic runs at runtime.
 constexpr auto kDecodedMagneticOps = [] {
   std::array<DecodedMagneticOp, kMagneticOperations.size()> out{};
   for (std::size_t k = 0; k < kMagneticOperations.size(); ++k) {
@@ -88,8 +87,7 @@ constexpr auto kDecodedAltTransformations = [] {
 }();
 
 // Materialise an Eigen-valued spatial operation from decoded data. The only
-// place Eigen appears (it is not a literal type, so this cannot be constexpr);
-// same body as spg_database.cpp's make_operation.
+// place Eigen appears (it is not a literal type, so this cannot be constexpr).
 [[nodiscard]] SymmetryOperation make_spatial(DecodedOp const &d) noexcept {
   Matrix3i rot;
   rot << d.rot[0], d.rot[1], d.rot[2], d.rot[3], d.rot[4], d.rot[5], d.rot[6],
@@ -107,7 +105,7 @@ make_magnetic(DecodedMagneticOp const &d) noexcept {
 
 // Offset from a UNI number's smallest Hall setting to `hall_number`; the
 // default (hall_number == 0) is offset 0. std::nullopt if the UNI number or the
-// resulting offset is out of range. Port of get_hall_number_offset.
+// resulting offset is out of range.
 [[nodiscard]] std::optional<int> hall_number_offset(int uni_number,
                                                     int hall_number) noexcept {
   if (uni_number < 1 || uni_number > kNumUniNumbers) {

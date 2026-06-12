@@ -20,7 +20,7 @@ constexpr int kRow2 = kRowBase * kRowBase;
 // row-major entries in {-2..2}/{-1..1}, translation as 3 base-24 numerators
 // (value n/24), plus the multiplicity. The whole encoded table is unpacked once
 // at compile time so wyckoff_coordinate only assembles Eigen at runtime, never
-// decodes. Mirrors the kDecodedOps pattern in spg_database.cpp.
+// decodes.
 struct WyckoffLit {
   std::array<std::int8_t, 9> rot;
   std::array<std::int8_t, 3> trans_num;

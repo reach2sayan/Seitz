@@ -15,7 +15,7 @@ namespace {
 
 // Minimal-image fractional offset of `diff`. For a layer cell the aperiodic
 // axis is not periodic, so its component is left as the raw difference; only
-// the two periodic components are folded (cel_layer_is_overlap).
+// the two periodic components are folded.
 [[nodiscard]] Vector3d minimal_image(Vector3d const &diff,
                                      std::optional<int> aperiodic_axis) noexcept {
   Vector3d off = math::nearest_offset(diff);
@@ -36,7 +36,7 @@ lattice_point_distance_sq(Matrix3d const &lattice, Vector3d const &frac,
 }
 
 // Permutation sorting atoms by (type, distance-to-nearest-lattice-point), the
-// ordering spglib uses to cluster coincident atoms (overlap.c perm_argsort).
+// ordering used to cluster coincident atoms.
 [[nodiscard]] std::vector<int>
 argsort_by_distance(Matrix3d const &lattice, Positions const &pos,
                     std::vector<int> const &types,
@@ -114,7 +114,7 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   }
 
   // Greedy matching: every original atom must overlap a not-yet-matched rotated
-  // atom (overlap.c check_total_overlap_for_sorted).
+  // atom.
   std::vector<char> found(static_cast<std::size_t>(size_), 0);
   int search_start = 0;
   for (int io = 0; io < size_; ++io) {

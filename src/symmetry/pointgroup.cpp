@@ -7,7 +7,7 @@
 #include <ranges>
 #include <utility>
 
-// Port of pointgroup.c (3D space-group path). Two static tables drive it:
+// Two static tables drive point-group identification:
 //   * kPointgroupData: for each of the 32 point groups, the histogram of
 //     rotation types {-6,-4,-3,-2,-1,1,2,3,4,6} plus its
 //     symbols/holohedry/Laue.
@@ -269,7 +269,7 @@ rotation_type(Matrix3i const &rot) noexcept {
   }
 }
 
-// De-duplicate rotations by value (ptg_get_pointsymmetry).
+// De-duplicate rotations by value.
 [[nodiscard]] PointSymmetry
 unique_rotations(std::span<Matrix3i const> rotations) {
   PointSymmetry out;
@@ -312,8 +312,7 @@ unique_rotations(std::span<Matrix3i const> rotations) {
 }
 
 // Index into kRotAxes that is the rotation axis (eigenvector) of a proper
-// rotation; std::nullopt for the identity / when none matches
-// (get_rotation_axis).
+// rotation; std::nullopt for the identity / when none matches.
 [[nodiscard]] std::optional<int> rotation_axis(Matrix3i const &proper_rot) {
   if (proper_rot != kIdentity) {
     for (int i = 0; i < kNumRotAxes; ++i) {
@@ -326,8 +325,7 @@ unique_rotations(std::span<Matrix3i const> rotations) {
   return std::nullopt;
 }
 
-// Indices of kRotAxes orthogonal to the axis of proper_rot
-// (get_orthogonal_axis).
+// Indices of kRotAxes orthogonal to the axis of proper_rot.
 [[nodiscard]] std::vector<int> orthogonal_axes(Matrix3i const &proper_rot,
                                                int rot_order) {
   Matrix3i sum_rot = kIdentity;
@@ -354,17 +352,15 @@ unique_rotations(std::span<Matrix3i const> rotations) {
   return 0;
 }
 
-// A chosen conventional axis: an index into kRotAxes plus a direction sign.
-// Replaces spglib's convention of encoding a negated axis as index +
-// kNumRotAxes.
+// A chosen conventional axis: an index into kRotAxes plus a direction sign
+// (rather than encoding a negated axis as index + kNumRotAxes).
 struct SignedAxis {
   int index = 0; // 0..kNumRotAxes-1
   int sign = 1;  // +1 or -1
 };
 using AxisTriple = std::array<SignedAxis, 3>;
 
-// Build the integer transformation matrix whose columns are the chosen axes
-// (set_transformation_matrix).
+// Build the integer transformation matrix whose columns are the chosen axes.
 [[nodiscard]] Matrix3i transformation_from_axes(AxisTriple const &axes) {
   Matrix3i tmat;
   for (auto const &[j, a] : axes | std::views::enumerate) {
@@ -393,8 +389,8 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
     return false;
   }
 
-  // a and b: the two shortest orthogonal axes (distinct), min_element keeping
-  // the first occurrence on ties to match spglib's scan order.
+  // a and b: the two shortest orthogonal axes (distinct); min_element keeps the
+  // first occurrence on ties (the index-order tie-break).
   auto const sqnorm = [](int idx) { return rot_axis(idx).squaredNorm(); };
 
   axes[0] = {*std::ranges::min_element(ortho, {}, sqnorm), 1};
@@ -453,7 +449,7 @@ in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
   return std::nullopt;
 }
 
-// Laue classes 4/m, 4/mmm, -3, -3m, 6/m, 6/mmm (laue_one_axis).
+// Laue classes 4/m, 4/mmm, -3, -3m, 6/m, 6/mmm.
 [[nodiscard]] std::optional<AxisTriple> laue_one_axis(PointSymmetry const &ps,
                                                       int rot_order) {
   return principal_axis(ps, rot_order).and_then([&](Principal const &p) {
@@ -488,10 +484,10 @@ void sort_axes(AxisTriple &axes) {
   return kRotAxes[idx][aperiodic_axis];
 }
 
-// layer_check_and_sort_axes: of the three chosen axes, exactly two must lie in
-// the periodic plane (aperiodic component 0) and one along the aperiodic axis
-// (component +/-1). Move the aperiodic axis to c, then orient for a positive
-// determinant. False for an invalid (e.g. inclined) configuration.
+// Of the three chosen axes, exactly two must lie in the periodic plane
+// (aperiodic component 0) and one along the aperiodic axis (component +/-1).
+// Move the aperiodic axis to c, then orient for a positive determinant. False
+// for an invalid (e.g. inclined) configuration.
 [[nodiscard]] bool layer_sort_axes(AxisTriple &axes, int aperiodic_axis) {
   int lattice_rank = 0;
   int arank = 0;
@@ -518,8 +514,7 @@ void sort_axes(AxisTriple &axes) {
 
 // Layer LAUE2M: unlike the 3D case the two-fold axis becomes axis a (its
 // position relative to the aperiodic axis distinguishes oblique vs. rectangular
-// monoclinic layers); the remaining two axes are chosen accordingly
-// (layer_laue2m).
+// monoclinic layers); the remaining two axes are chosen accordingly.
 [[nodiscard]] bool layer_laue2m(AxisTriple &axes, PointSymmetry const &ps,
                                 int aperiodic_axis) {
   Matrix3i prop_rot = kIdentity;
@@ -593,8 +588,8 @@ void sort_axes(AxisTriple &axes) {
   return true;
 }
 
-// Laue classes mmm, m-3, m-3m (lauennn). For a layer cell the three axes are
-// reordered so the aperiodic axis is c (layer_check_and_sort_axes).
+// Laue classes mmm, m-3, m-3m. For a layer cell the three axes are reordered so
+// the aperiodic axis is c.
 bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
              std::optional<int> aperiodic_axis) {
   std::array<int, 3> idx{};

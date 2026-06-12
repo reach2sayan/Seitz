@@ -20,16 +20,11 @@
 #include <span>
 #include <vector>
 
-// Port of spacegroup.c (3D space-group path): given a primitive cell's symmetry
-// operations, find the Hall number, conventional/bravais lattice and origin
-// shift. The pipeline mirrors the reference:
-//   get_pointgroup -> (tricli/monocli basis cleanup) -> get_centering ->
-//   build conventional symmetry -> loop candidate Hall numbers calling
-//   match_hall_symbol_db, which permutes axis/setting choices and ultimately
-//   defers to spacegroup::match_hall_symbol (= hal_match_hall_symbol_db).
-//
-// Layer-group branches (hall_number < 0, aperiodic_axis >= 0) are out of scope;
-// this is the bulk 3D path only.
+// Given a primitive cell's symmetry operations, find the Hall number,
+// conventional/bravais lattice and origin shift: identify the point group, clean
+// up the triclinic/monoclinic basis, determine the centering, build the
+// conventional symmetry, then loop candidate Hall numbers permuting axis/setting
+// choices and matching against the Hall database.
 namespace spglib::spacegroup {
 
 using data::Centering;
@@ -37,9 +32,9 @@ using symmetry::Primitive;
 
 namespace {
 
-constexpr int kNumAttempt = 100;     // spacegroup.c NUM_ATTEMPT
-constexpr double kReduceRate = 0.95; // spacegroup.c REDUCE_RATE
-constexpr double kIntPrec = 0.1;     // spacegroup.c INT_PREC
+constexpr int kNumAttempt = 100;
+constexpr double kReduceRate = 0.95;
+constexpr double kIntPrec = 0.1;
 
 // ---- matrix-of-doubles table builder ---------------------------------------
 
@@ -55,10 +50,10 @@ make_matrices(double const (&data)[Rows][3][3]) {
   return out;
 }
 
-// ---- change-of-basis tables (spacegroup.c) ---------------------------------
+// ---- change-of-basis tables ------------------------------------------------
 
-// First 36 entries of change_of_basis_monocli (the 3D bulk choices; layer
-// entries 36..47 are out of scope).
+// The 36 monoclinic change-of-basis choices (3D bulk; layer entries 36..47 are
+// out of scope).
 [[nodiscard]] std::array<Matrix3d, 36> const &change_of_basis_monocli() {
   static double constexpr d[36][3][3] = {
       {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
@@ -140,7 +135,8 @@ make_matrices(double const (&data)[Rows][3][3]) {
   return t;
 }
 
-// num_axis_choices_ortho, indexed by (space-group number - 16), numbers 16..74.
+// Number of orthorhombic axis choices, indexed by (space-group number - 16),
+// numbers 16..74.
 [[nodiscard]] int num_axis_choices_ortho(int sg_number) {
   static constexpr std::array<int, 59> t = {
       6, 2, 2, 6, 2, 2, 6, 6, 6, 2, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2,
@@ -149,8 +145,8 @@ make_matrices(double const (&data)[Rows][3][3]) {
   return t[static_cast<std::size_t>(sg_number - 16)];
 }
 
-// layer_num_axis_choices_ortho, indexed by (layer-group number - 19); the 30
-// orthorhombic layer groups are numbers 19..48 (spacegroup.c).
+// Number of orthorhombic layer-group axis choices, indexed by (layer-group
+// number - 19); the 30 orthorhombic layer groups are numbers 19..48.
 [[nodiscard]] int layer_num_axis_choices_ortho(int lg_number) {
   static constexpr std::array<int, 30> t = {
       2, 1,                         // 19-20
@@ -277,7 +273,7 @@ make_matrices(double const (&data)[Rows][3][3]) {
 }
 
 // layer_group_to_hall_number[116]: the (negative) layer Hall settings searched
-// for a layer cell, one representative per setting (spacegroup.c).
+// for a layer cell, one representative per setting.
 [[nodiscard]] std::span<int const> layer_group_to_hall_number() {
   static constexpr std::array<int, 80> t = {
       -1,   -2,   -3,   -4,   -5,   -8,   -9,   -12,  -14,  -16,  -18,  -20,
@@ -292,7 +288,7 @@ make_matrices(double const (&data)[Rows][3][3]) {
 
 // ---- small matrix predicates -----------------------------------------------
 
-// |a - b| <= symprec elementwise (mat_check_identity_matrix_d3).
+// |a - b| <= symprec elementwise.
 [[nodiscard]] bool matrices_close(Matrix3d const &a, Matrix3d const &b,
                                   double symprec) {
   return (a - b).cwiseAbs().maxCoeff() <= symprec;
@@ -301,8 +297,7 @@ make_matrices(double const (&data)[Rows][3][3]) {
 // ---- is_equivalent_lattice -------------------------------------------------
 
 // Isometric transform tmat such that orig = lattice * tmat, if the two lattices
-// are equivalent under `mode`; nullopt otherwise (spacegroup.c
-// is_equivalent_lattice).
+// are equivalent under `mode`; nullopt otherwise.
 //   mode 0: tmat == identity
 //   mode 1: |tmat| == identity (axis flips allowed)
 //   mode 2: tmat integer & unimodular & metric tensors agree
@@ -351,8 +346,7 @@ is_equivalent_lattice(int mode, Matrix3d const &lattice, Matrix3d const &orig,
 
 // ---- centering -------------------------------------------------------------
 
-// get_base_center: detect the base-centering type encoded in an integer
-// transformation matrix.
+// Detect the base-centering type encoded in an integer transformation matrix.
 [[nodiscard]] Centering get_base_center(Matrix3i const &tmat) {
   auto const axis = std::views::iota(0, 3);
   if (std::ranges::any_of(axis, [&](int i) { // C center
@@ -383,8 +377,8 @@ struct CenteringResult {
   Matrix3d correction_mat;
 };
 
-// get_centering: centering type + correction matrix from the determinant
-// (multiplicity) of the integer transformation matrix and the Laue class.
+// Centering type + correction matrix from the determinant (multiplicity) of the
+// integer transformation matrix and the Laue class.
 [[nodiscard]] std::optional<CenteringResult> get_centering(Matrix3i const &tmat,
                                                            Laue laue) {
   Matrix3d correction = Matrix3d::Identity();
@@ -430,9 +424,9 @@ struct CenteringResult {
 
 // ---- conventional symmetry -------------------------------------------------
 
-// get_conventional_symmetry: recover the conventional-cell operations from the
-// primitive ones via the similarity transform C S C^-1 (C = tmat), then
-// replicate them across the centering translations.
+// Recover the conventional-cell operations from the primitive ones via the
+// similarity transform C S C^-1 (C = tmat), then replicate them across the
+// centering translations.
 [[nodiscard]] SymmetryOperations
 get_conventional_symmetry(Matrix3d const &tmat, Centering centering,
                           SymmetryOperations const &primitive_sym) {
@@ -456,8 +450,8 @@ get_conventional_symmetry(Matrix3d const &tmat, Centering centering,
   return out;
 }
 
-// get_initial_conventional_symmetry: rhombohedral (R_CENTER) keeps the
-// primitive a=b=c basis, so its conventional symmetry is built as PRIMITIVE.
+// Rhombohedral (R_CENTER) keeps the primitive a=b=c basis, so its conventional
+// symmetry is built as PRIMITIVE.
 [[nodiscard]] SymmetryOperations
 get_initial_conventional_symmetry(Centering centering, Matrix3d const &tmat,
                                   SymmetryOperations const &symmetry) {
@@ -468,8 +462,8 @@ get_initial_conventional_symmetry(Centering centering, Matrix3d const &tmat,
 
 // ---- triclinic / monoclinic basis cleanup ----------------------------------
 
-// change_basis_tricli: Niggli-reduce the conventional lattice and update the
-// integer transformation matrix to the smallest right-handed basis.
+// Niggli-reduce the conventional lattice and update the integer transformation
+// matrix to the smallest right-handed basis.
 [[nodiscard]] std::optional<Matrix3i>
 change_basis_tricli(Matrix3d const &conv_lattice,
                     Matrix3d const &primitive_lattice, double symprec) {
@@ -483,11 +477,10 @@ change_basis_tricli(Matrix3d const &conv_lattice,
   return math::round_to_int(tmat);
 }
 
-// change_basis_monocli: 2D-Delaunay-reduce the plane orthogonal to the kept
-// axis and update the integer transformation matrix. For a 3D monoclinic cell
-// the kept axis is the unique axis b; for a layer the kept axis is the aperiodic
-// axis (in its conventional position), so the reduction acts on the periodic
-// plane (reference del_layer_delaunay_reduce_2D, oblique case).
+// 2D-Delaunay-reduce the plane orthogonal to the kept axis and update the
+// integer transformation matrix. For a 3D monoclinic cell the kept axis is the
+// unique axis b; for a layer the kept axis is the aperiodic axis (in its
+// conventional position), so the reduction acts on the periodic plane.
 [[nodiscard]] std::optional<Matrix3i>
 change_basis_monocli(Matrix3d const &conv_lattice,
                      Matrix3d const &primitive_lattice, double symprec,
@@ -511,7 +504,7 @@ struct MatchResult {
   Matrix3d conv_lattice;
 };
 
-// Thin wrapper over spacegroup::match_hall_symbol (= hal_match_hall_symbol_db).
+// Thin wrapper over match_hall_symbol returning a MatchResult.
 [[nodiscard]] std::optional<MatchResult>
 try_hall(Matrix3d const &conv_lattice, int hall_number, Centering centering,
          SymmetryOperations const &symmetry, double symprec) {
@@ -641,8 +634,8 @@ match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   return std::nullopt;
 }
 
-// Norm-ordering preference among the free axes (match_hall_symbol_db_ortho_in_
-// loop). Returns false if the choice violates the required |a|<=|b|<=|c| order.
+// Norm-ordering preference among the free axes. Returns false if the choice
+// violates the required |a|<=|b|<=|c| order.
 [[nodiscard]] bool ortho_axis_norms_ok(Matrix3d const &lattice,
                                        int axis_choice_index,
                                        int num_free_axes) {
@@ -707,7 +700,7 @@ match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                double symprec) {
   // 3D tries all six axis permutations {abc, bca, cab, ba-c, a-cb, -cba}; a
   // layer group (hall < 0) tries only abc and ba-c (step 3), the two that keep
-  // the aperiodic axis at c (spacegroup.c match_hall_symbol_db_ortho).
+  // the aperiodic axis at c.
   int const step = hall_number < 0 ? 3 : 1;
   if (orig_lattice && orig_lattice->determinant() > symprec) {
     for (int i = 0; i < 6; i += step) {
@@ -847,7 +840,7 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   return MatchResult{chosen->origin_shift, chosen->conv_lattice};
 }
 
-// match_hall_symbol_db: dispatch by holohedry to the per-system matcher.
+// Dispatch by holohedry to the per-system matcher.
 [[nodiscard]] std::optional<MatchResult>
 match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                      int hall_number, int pointgroup_number,
@@ -914,8 +907,8 @@ struct SearchResult {
   Vector3d origin_shift;
 };
 
-// search_hall_number: for the given operations, find the conventional setting
-// and the first matching Hall number among the candidates.
+// For the given operations, find the conventional setting and the first
+// matching Hall number among the candidates.
 [[nodiscard]] std::optional<SearchResult>
 search_hall_number(std::span<int const> candidates, Primitive const &primitive,
                    SymmetryOperations const &symmetry, double symprec) {
@@ -980,8 +973,8 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
   return std::nullopt;
 }
 
-// iterative_search_hall_number: try once, then progressively tighten the
-// operation set (sym_reduce_operation) until a Hall number is found.
+// Try once, then progressively tighten the operation set (reduce_symmetry)
+// until a Hall number is found.
 [[nodiscard]] std::optional<SearchResult>
 iterative_search_hall_number(std::span<int const> candidates,
                              Primitive const &primitive,
@@ -1006,8 +999,8 @@ iterative_search_hall_number(std::span<int const> candidates,
   return std::nullopt;
 }
 
-// ptg_get_pointsymmetry sanity check: in a primitive cell every operation must
-// carry a distinct rotation.
+// Sanity check: in a primitive cell every operation must carry a distinct
+// rotation.
 [[nodiscard]] bool point_symmetry_intact(SymmetryOperations const &symmetry) {
   std::vector<Matrix3i> seen;
   for (auto const &op : symmetry) {
@@ -1092,9 +1085,8 @@ spacegroup_type_from_symmetry(SymmetryOperations const &operations,
   }
 
   // Niggli-reduce the primitive cell (required by the Hall-symbol matcher),
-  // then bring the operations into that reduced basis (=
-  // ref_get_primitive_symmetry; the rotations are already distinct, so it is
-  // just the change of basis).
+  // then bring the operations into that reduced basis (the rotations are already
+  // distinct, so it is just the change of basis).
   BOOST_LEAF_AUTO(red_lat, reduce::niggli_reduce(prim_lat, symprec));
   Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
   Matrix3d const inv2 = t_mat2.inverse();
@@ -1109,9 +1101,7 @@ spacegroup_type_from_symmetry(SymmetryOperations const &operations,
   return search_spacegroup_with_symmetry(red_sym, red_lat, symprec);
 }
 
-// Both lattice-setting specializations are used (the conventional one mirrors
-// spg_get_spacegroup_type_from_symmetry, the primitive one
-// spg_get_hall_number_from_symmetry).
+// Both lattice-setting specializations are used.
 template Result<Spacegroup>
 spacegroup_type_from_symmetry<LatticeSetting::conventional>(
     SymmetryOperations const &, Matrix3d const &, double);

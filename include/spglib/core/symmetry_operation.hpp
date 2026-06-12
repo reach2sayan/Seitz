@@ -11,8 +11,6 @@ namespace spglib {
 
 // A space-group symmetry operation acting on fractional coordinates:
 //   x -> rotation . x + translation.
-// Replaces spglib's parallel `Symmetry.rot[]` / `Symmetry.trans[]` arrays with
-// a single value type, collected in a std::vector (see SymmetryOperations).
 struct SymmetryOperation {
   Matrix3i rotation{Matrix3i::Identity()};
   Vector3d translation{Vector3d::Zero()};

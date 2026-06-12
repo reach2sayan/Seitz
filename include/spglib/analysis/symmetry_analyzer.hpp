@@ -18,31 +18,24 @@
 namespace spglib::analysis {
 
 // A persistent, stateful view over a Cell + tolerances that lazily computes and
-// memoizes the symmetry analysis — the modern-C++ analogue of pymatgen's
-// SpacegroupAnalyzer. The functional core (get_dataset, find_primitive,
-// search_spacegroup) is left untouched; this facade owns the inputs once and
-// caches each pipeline stage so that repeated queries do not recompute.
+// memoizes the symmetry analysis: owns the inputs once and caches each pipeline
+// stage so repeated queries do not recompute. Immutable after construction (no
+// setters); to analyze at a different tolerance, build a new analyzer. The
+// caches are `mutable` so the const getters stay logically const.
 //
-// The analyzer is immutable after construction: inputs are owned by value and
-// there are no setters. To analyze at a different tolerance, build a new
-// analyzer. Memoization makes the const getters logically const; the caches are
-// `mutable`.
-//
-// Thread-safety: the shared global tables this delegates to (the Hall operation
-// database etc.) are primed once by spglib::warmup() and are then race-free for
-// concurrent reads. The per-instance caches are NOT — concurrent first-calls race
-// on the `mutable` optionals. To share one instance read-only across threads,
-// call warm() once on a single thread first; afterwards every getter is served
-// from a populated cache and does no writing.
+// Thread-safety: the per-instance caches are NOT race-free — concurrent
+// first-calls race on the `mutable` optionals. To share one instance read-only
+// across threads, call warm() once on a single thread first; afterwards every
+// getter is served from a populated cache and does no writing. (The shared
+// global tables are primed separately by spglib::warmup().)
 //
 // boost::leaf::result is move-only, so the caches store the success *value*
-// (std::optional<T>) rather than the Result. Each getter returns a freshly
-// constructed Result; on error nothing is cached and the next call re-runs
-// (errors are exceptional, so this costs nothing on the happy path).
+// (std::optional<T>) rather than the Result; on error nothing is cached and the
+// next call re-runs.
 class SymmetryAnalyzer {
 public:
-  // PyXtal-style named factory (no overloaded constructors). `hall_number == 0`
-  // searches all 230 space groups; a non-zero value fixes the Hall setting.
+  // Named factory (no overloaded constructors). `hall_number == 0` searches all
+  // 230 space groups; a non-zero value fixes the Hall setting.
   [[nodiscard]] static SymmetryAnalyzer
   from_cell(Cell cell, double symprec = kDefaultSymprec,
             AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);
@@ -70,9 +63,9 @@ public:
   [[nodiscard]] Result<SymmetryOperations> operations() const;
 
   // All space-group operations of the input cell exactly as given, including the
-  // centering translations of a non-primitive cell (symmetry::find_symmetry —
-  // the raw sym_get_operation result). Distinct from operations(), which are the
-  // dataset's operations in the input basis. Cached independently.
+  // centering translations of a non-primitive cell (symmetry::find_symmetry).
+  // Distinct from operations(), which are the dataset's operations in the input
+  // basis. Cached independently.
   [[nodiscard]] Result<SymmetryOperations> cell_operations() const;
 
   // The lattice point group: the rotations (in the cell basis) that map the

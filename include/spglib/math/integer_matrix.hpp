@@ -7,17 +7,14 @@
 #include <cmath>
 #include <optional>
 
-// Small numerical helpers that survive the move from C to Eigen. The bulk of
-// spglib's mathfunc.c (matrix multiply/add/transpose/determinant/trace) is
-// gone, replaced by Eigen operators at the call site. What remains here are the
-// few routines whose *exact* semantics the symmetry search depends on: spglib's
-// integer rounding, its checked real inverse, and an exact inverse for the
-// unimodular integer rotation matrices.
+// Small numerical helpers backing the symmetry search, where exact semantics
+// matter: integer rounding, a checked real inverse, and an exact inverse for
+// the unimodular integer rotation matrices. General matrix arithmetic uses
+// Eigen operators at the call site.
 namespace spglib::math {
 
-// Round to the nearest integer, ties away from zero. Exact port of spglib's
-// `mat_Nint`, including its truncation behaviour, so detection matches the
-// reference.
+// Round to the nearest integer, ties away from zero (matching the truncation
+// behaviour the symmetry search depends on).
 [[nodiscard]] constexpr int nint(double a) noexcept {
   return a < 0.0 ? static_cast<int>(a - 0.5) : static_cast<int>(a + 0.5);
 }
@@ -37,8 +34,7 @@ nearest_offset(Eigen::MatrixBase<Derived> const &a) noexcept {
   return a.unaryExpr([](double x) { return x - nint(x); });
 }
 
-// True iff every entry of `a` is within `symprec` of an integer
-// (spglib `mat_is_int_matrix`).
+// True iff every entry of `a` is within `symprec` of an integer.
 [[nodiscard]] inline bool is_int_matrix(const Matrix3d &a,
                                         double symprec) noexcept {
   return a.unaryExpr([](double x) {
@@ -47,13 +43,12 @@ nearest_offset(Eigen::MatrixBase<Derived> const &a) noexcept {
 }
 
 // Metric (Gram) tensor L^T . L for a lattice whose columns are the basis
-// vectors (spglib `mat_get_metric`).
+// vectors.
 [[nodiscard]] inline Matrix3d metric_tensor(Matrix3d const &lattice) noexcept {
   return lattice.transpose() * lattice;
 }
 
-// Checked real inverse: std::nullopt when |det| < precision
-// (spglib `mat_inverse_matrix_d3`).
+// Checked real inverse: std::nullopt when |det| < precision.
 [[nodiscard]] inline std::optional<Matrix3d>
 inverse(Matrix3d const &a, double precision) noexcept {
   double const det = a.determinant();
@@ -63,8 +58,7 @@ inverse(Matrix3d const &a, double precision) noexcept {
   return a.inverse();
 }
 
-// b^-1 . a . b (spglib `mat_get_similar_matrix_d3`); nullopt when b is
-// singular.
+// b^-1 . a . b; nullopt when b is singular.
 [[nodiscard]] inline std::optional<Matrix3d>
 similar(Matrix3d const &a, Matrix3d const &b, double precision) noexcept {
   auto const binv = inverse(b, precision);
@@ -76,7 +70,7 @@ similar(Matrix3d const &a, Matrix3d const &b, double precision) noexcept {
 
 // Exact integer inverse of a unimodular matrix (|det| == 1); std::nullopt
 // otherwise. Lets us invert integer rotation matrices with no floating-point
-// round-trip. The adjugate entries match spglib's mat_inverse_matrix_d3 layout.
+// round-trip.
 [[nodiscard]] inline std::optional<Matrix3i>
 integer_inverse(Matrix3i const &a) noexcept {
   int const det = a.determinant();

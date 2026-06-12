@@ -20,8 +20,8 @@ namespace {
 
 constexpr double kTol = 1e-6;
 
-// --- Linear-algebra helpers (the affine generalisation of the point-group
-// subspace arrangement in point_group.cpp) ----------------------------------
+// --- Linear-algebra helpers (the affine generalisation of a linear subspace
+// arrangement) --------------------------------------------------------------
 
 [[nodiscard]] Eigen::MatrixXd column_space(Eigen::MatrixXd const &m) {
   if (m.cols() == 0) {
@@ -293,8 +293,8 @@ Result<RodGroup> RodGroup::from_number(int number) {
   // 2. One Wyckoff position per orbit of loci under the group (conjugate
   //    stabilisers). For the representative locus, compute its orbit (distinct
   //    images of a generic point, mod lattice), site symmetry and coset
-  //    representatives — as SpaceGroup::build_position, with the periodic axis
-  //    folded and the aperiodic axes left raw.
+  //    representatives, with the periodic axis folded and the aperiodic axes
+  //    left raw.
   std::vector<bool> assigned(loci.size(), false);
   std::vector<Derived> derived;
   for (std::size_t i = 0; i < loci.size(); ++i) {

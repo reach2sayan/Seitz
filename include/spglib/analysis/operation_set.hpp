@@ -18,13 +18,11 @@
 namespace spglib::analysis {
 
 // An immutable wrapper that gives a bare SymmetryOperations vector an object
-// identity: the homeless free functions that take SymmetryOperations as their
-// de-facto `this` (rotations_of, primitive_symmetry, spacegroup_type_from_
-// symmetry, search_spacegroup_with_symmetry) become methods here. The functional
-// core is left untouched; this facade forwards to it. Read-only projections are
-// cheap and an OperationSet is usually transient, so nothing is memoized. Lives
-// in analysis/ (the heavy-include sink), never core/, to avoid a core ->
-// spacegroup -> core cycle.
+// identity: the free functions that take SymmetryOperations as their de-facto
+// `this` (rotations_of, primitive_symmetry, spacegroup_type_from_symmetry,
+// search_spacegroup_with_symmetry) become methods here. Nothing is memoized
+// (projections are cheap, an OperationSet is usually transient). Lives in
+// analysis/, never core/, to avoid a core -> spacegroup -> core cycle.
 class OperationSet {
 public:
   [[nodiscard]] static OperationSet from_operations(SymmetryOperations ops) {
@@ -68,7 +66,7 @@ private:
 
 // The magnetic counterpart of OperationSet: an immutable wrapper over a
 // MagneticSymmetryOperations vector, exposing the free functions that take it as
-// their `this` (collect_pure_translations, identify_magnetic_spacegroup_type).
+// their `this`.
 class MagneticOperationSet {
 public:
   [[nodiscard]] static MagneticOperationSet

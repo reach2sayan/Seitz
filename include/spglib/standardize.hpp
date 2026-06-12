@@ -6,7 +6,7 @@
 
 namespace spglib {
 
-// Flags controlling cell standardization (spglib spg_standardize_cell).
+// Flags controlling cell standardization.
 struct StandardizeOptions {
   // Return the standardized primitive cell instead of the conventional one.
   bool to_primitive = false;
@@ -16,8 +16,8 @@ struct StandardizeOptions {
   bool no_idealize = false;
 };
 
-// Standardize `cell` to its conventional or primitive setting. Port of spglib's
-// spg_standardize_cell (3D space-group path). The four flag combinations:
+// Standardize `cell` to its conventional or primitive setting (3D space-group
+// path). The four flag combinations:
 //   {false, false} conventional, idealized   (== the dataset std_* cell)
 //   {true,  false} primitive,    idealized
 //   {false, true } conventional, input geometry preserved (no idealization)
@@ -32,18 +32,18 @@ standardize_cell(Cell const &cell, StandardizeOptions options = {},
                  double symprec = kDefaultSymprec,
                  AngleTolerance angle_tolerance = std::nullopt);
 
-// Symmetrize `cell` into its idealized conventional setting — spglib's
-// spg_refine_cell, exactly standardize_cell with the default options.
+// Symmetrize `cell` into its idealized conventional setting — exactly
+// standardize_cell with the default options.
 [[nodiscard]] inline Result<Cell>
 refine_cell(Cell const &cell, double symprec = kDefaultSymprec,
             AngleTolerance angle_tolerance = std::nullopt) {
   return standardize_cell(cell, {}, symprec, angle_tolerance);
 }
 
-// Reduce `cell` to its standardized (idealized) primitive setting — spglib's
-// spg_find_primitive, exactly standardize_cell with to_primitive set. Note this
-// is distinct from symmetry::find_primitive (= prm_get_primitive), which returns
-// the Primitive struct rather than the standardized cell.
+// Reduce `cell` to its standardized (idealized) primitive setting — exactly
+// standardize_cell with to_primitive set. Note this is distinct from
+// symmetry::find_primitive, which returns the Primitive struct rather than the
+// standardized cell.
 [[nodiscard]] inline Result<Cell>
 find_primitive(Cell const &cell, double symprec = kDefaultSymprec,
                AngleTolerance angle_tolerance = std::nullopt) {

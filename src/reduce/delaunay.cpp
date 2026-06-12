@@ -13,7 +13,7 @@ namespace spglib::reduce {
 
 namespace {
 
-constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
+constexpr int kMaxAttempts = 1000;
 
 // Extended Delaunay basis {b1, b2, b3, b4} with b4 = -(b1 + b2 + b3).
 [[nodiscard]] std::array<Vector3d, 4> extended_basis(Matrix3d const &lattice) {
@@ -23,7 +23,7 @@ constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
 
 // One Delaunay reduction step on the extended basis: if any pair has a positive
 // dot product, fold and flip and report "not yet reduced". Returns true when no
-// positive dot product remains (delaunay.c delaunay_reduce_basis, rank 3).
+// positive dot product remains.
 [[nodiscard]] bool reduce_step(std::array<Vector3d, 4> &b, double symprec) {
   for (std::size_t i = 0; i < 3; ++i)
     for (std::size_t j = i + 1; j < 4; ++j)
@@ -40,8 +40,7 @@ constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
 }
 
 // Fold the extended basis until no pair has a positive dot product; nullopt if
-// it has not converged within kMaxAttempts steps (delaunay.c
-// delaunay_reduce_basis, rank 3).
+// it has not converged within kMaxAttempts steps.
 [[nodiscard]] std::optional<std::array<Vector3d, 4>>
 reduce_basis(std::array<Vector3d, 4> b, double symprec) {
   for (std::size_t attempt = 0; attempt < kMaxAttempts; ++attempt)
@@ -52,8 +51,7 @@ reduce_basis(std::array<Vector3d, 4> b, double symprec) {
 }
 
 // From the candidate set {b1, b2, b1+b2, b3, b4, b2+b3, b3+b1}, pick the three
-// shortest linearly independent vectors (delaunay.c
-// get_delaunay_shortest_vectors, rank 3) into basis[0..2].
+// shortest linearly independent vectors into basis[0..2].
 [[nodiscard]] std::array<Vector3d, 4>
 shortest_vectors(std::array<Vector3d, 4> basis, double symprec) {
   std::array<Vector3d, 7> b{basis[0],           basis[1], basis[0] + basis[1],
@@ -116,9 +114,8 @@ if_unimodular(Matrix3d const &red, Matrix3d const &lattice, double symprec) {
 }
 
 // One rank-2 Delaunay step: if any pair has a positive dot product, fold the
-// third vector by +2*b[i], flip b[i], and report "not yet reduced"
-// (delaunay.c delaunay_reduce_basis_2D, lattice_rank == 2). The rank-2 / rank-3
-// overloads are distinguished by the basis array size.
+// third vector by +2*b[i], flip b[i], and report "not yet reduced". The rank-2
+// / rank-3 overloads are distinguished by the basis array size.
 [[nodiscard]] bool reduce_step(std::array<Vector3d, 3> &b, double symprec) {
   for (std::size_t i = 0; i < 2; ++i)
     for (std::size_t j = i + 1; j < 3; ++j)
@@ -144,20 +141,17 @@ reduce_basis(std::array<Vector3d, 3> b, double symprec) {
 }
 
 // From {b0, b1, b2, b0+b1} pick the two shortest in-plane vectors that, with
-// `unique_vec`, span a non-degenerate cell (delaunay.c
-// get_delaunay_shortest_vectors_2D, lattice_rank == 2). Returns {first,
-// second}. Overload distinguished from the rank-3 shortest_vectors by the
-// `unique_vec` argument.
+// `unique_vec`, span a non-degenerate cell. Returns {first, second}. Overload
+// distinguished from the rank-3 shortest_vectors by the `unique_vec` argument.
 [[nodiscard]] std::array<Vector3d, 2>
 shortest_vectors(std::array<Vector3d, 3> const &basis,
                  Vector3d const &unique_vec, double symprec) {
   std::array<Vector3d, 4> b{basis[0], basis[1], basis[2],
                             Vector3d(basis[0] + basis[1])};
 
-  // Bubble sort ascending by squared norm, preserving order on near-ties
-  // (matches the reference's "> ... + ZERO_PREC" comparator exactly; a plain
-  // std::ranges::sort would reorder near-equal vectors and change which one is
-  // picked below).
+  // Bubble sort ascending by squared norm, preserving order on near-ties: a
+  // plain std::ranges::sort would reorder near-equal vectors and change which
+  // one is picked below.
   for (std::size_t pass = 0; pass < 3; ++pass)
     for (std::size_t j = 0; j < 3; ++j)
       if (sqnorm_longer(b[j].squaredNorm(), b[j + 1].squaredNorm())) {

@@ -15,8 +15,8 @@ namespace spglib::kpoint {
 namespace {
 
 // The 125 reciprocal-lattice offsets searched per grid point (the ±2 cube,
-// ordered 0,1,2,-2,-1 on each axis). Transcribed verbatim from kpoint.c
-// bz_search_space; kept Eigen-free (literal type) and mapped to Vector3i at use.
+// ordered 0,1,2,-2,-1 on each axis). Kept Eigen-free (literal type) and mapped
+// to Vector3i at use.
 inline constexpr std::array<std::array<int, 3>, 125> kBzSearchSpace = {{
     {0, 0, 0},   {0, 0, 1},   {0, 0, 2},   {0, 0, -2},   {0, 0, -1},
     {0, 1, 0},   {0, 1, 1},   {0, 1, 2},   {0, 1, -2},   {0, 1, -1},
@@ -51,7 +51,7 @@ inline constexpr std::array<std::array<int, 3>, 125> kBzSearchSpace = {{
 }
 
 // Adaptive tolerance for merging BZ-boundary points: 0.01 * max over axes of
-// |reciprocal vector|^2 / mesh^2. Port of get_tolerance_for_BZ_reduction.
+// |reciprocal vector|^2 / mesh^2.
 [[nodiscard]] double bz_tolerance(Matrix3d const &rec_lattice,
                                   Vector3i const &mesh) {
   auto const lengths = std::views::iota(0, 3) |

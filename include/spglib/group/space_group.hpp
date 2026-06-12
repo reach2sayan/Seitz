@@ -11,29 +11,28 @@
 
 namespace spglib::group {
 
-// A space group as a standalone, structure-free object (PyXtal's Group): built
-// from a Hall number (or international number), it owns its conventional
-// symmetry operations and its Wyckoff positions as first-class objects. Unlike
-// the analysis path, no atomic structure is involved — this is the queryable
-// catalog face of the symmetry database, the foundation for crystal generation
-// and group-relation work.
+// A space group as a standalone, structure-free object: built from a Hall
+// number (or international number), it owns its conventional symmetry
+// operations and its Wyckoff positions as first-class objects. No atomic
+// structure is involved — this is the queryable catalog face of the symmetry
+// database, the foundation for crystal generation and group-relation work.
 //
 // Wyckoff positions are exposed as a span of objects rather than parallel
 // arrays of letters / multiplicities / symbols.
 class SpaceGroup {
 public:
-  // PyXtal-style named factories.
+  // Named factories.
   [[nodiscard]] static Result<SpaceGroup> from_hall_number(int hall_number);
   // Build from an international number (1..230), choosing the default (first)
   // Hall setting for that number.
   [[nodiscard]] static Result<SpaceGroup> from_number(int spacegroup_number);
 
-  // Build a *layer group* (2D-periodic) as a structure-free object. The same
-  // machinery serves layer groups via the reference's negative-Hall-number
-  // convention (settings -1..-116 for the 80 layer groups), so `number()` then
-  // returns the layer-group number (1..80) and `hall_number()` the negative
-  // setting. `from_layer_hall` takes a negative hall (-1..-116); `from_layer_
-  // number` takes a layer-group number (1..80) and picks its first setting.
+  // Build a *layer group* (2D-periodic) as a structure-free object. Layer
+  // groups use a negative-Hall-number convention (settings -1..-116 for the 80
+  // layer groups), so `number()` then returns the layer-group number (1..80)
+  // and `hall_number()` the negative setting. `from_layer_hall` takes a
+  // negative hall (-1..-116); `from_layer_number` takes a layer-group number
+  // (1..80) and picks its first setting.
   [[nodiscard]] static Result<SpaceGroup> from_layer_hall(int hall_number);
   [[nodiscard]] static Result<SpaceGroup> from_layer_number(int layer_number);
 

@@ -14,10 +14,10 @@ struct SubgroupRelation {
 };
 
 // The translationengleiche (lattice-preserving) maximal-subgroup graph of the
-// 230 space groups (PyXtal's group-subgroup relations, the t-subgroup part).
+// 230 space groups (the t-subgroup part of the group-subgroup relations).
 //
-// Derived entirely in-house — no external maximal-subgroup tables. For each
-// space group the maximal subgroups of its point group are enumerated; the
+// Derived without external maximal-subgroup tables. For each space group the
+// maximal subgroups of its point group are enumerated; the
 // operations that survive each one form a t-subgroup, which is identified back
 // to a space-group number by the (oracle-validated) determination from a set of
 // operations (spacegroup_type_from_symmetry). Klassengleiche (cell-multiplying)
@@ -70,7 +70,7 @@ struct TSubgroupEdge {
   int index;
 };
 
-// Re-derive the whole t-subgroup edge list in-house (enumerate each space
+// Re-derive the whole t-subgroup edge list from scratch (enumerate each space
 // group's maximal point-subgroups and identify the surviving operations via the
 // determination). This is the SLOW offline path used only to regenerate the
 // baked table data/subgroup_relations.hpp (see

@@ -9,10 +9,10 @@
 namespace spglib {
 
 // True when fractional positions a and b coincide modulo the lattice, measured
-// by Cartesian minimal-image distance <= symprec (spglib cel_is_overlap /
-// has_overlap). With `aperiodic_axis` set (layer groups), that axis is NOT
-// periodic: only the two periodic components are folded to the minimal image;
-// the aperiodic component keeps its raw difference (cel_layer_is_overlap).
+// by Cartesian minimal-image distance <= symprec. With `aperiodic_axis` set
+// (layer groups), that axis is NOT periodic: only the two periodic components
+// are folded to the minimal image; the aperiodic component keeps its raw
+// difference.
 [[nodiscard]] bool is_overlap(Vector3d const &a, Vector3d const &b,
                               Matrix3d const &lattice, double symprec,
                               std::optional<int> aperiodic_axis =
@@ -27,8 +27,8 @@ is_overlap_same_type(Vector3d const &a, Vector3d const &b, int type_a,
 }
 
 // Precomputes a distance-sorted copy of a cell so that many candidate symmetry
-// operations can be tested efficiently against it. Port of overlap.c's
-// OverlapChecker, minus the layer-group path (space groups only).
+// operations can be tested efficiently against it. Space groups only (no
+// layer-group path).
 class OverlapChecker {
 public:
   explicit OverlapChecker(Cell const &cell);

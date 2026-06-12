@@ -10,14 +10,13 @@
 #include <optional>
 #include <vector>
 
-// Magnetic symmetry from per-site tensors. Port of spin.c (3D path). Given the
-// non-magnetic (spatial) symmetry of a cell and its per-site magnetic moments,
-// this filters/splits those operations into the magnetic symmetry operations
-// that also preserve the moments (optionally up to time reversal).
+// Magnetic symmetry from per-site tensors (3D path). Given the non-magnetic
+// (spatial) symmetry of a cell and its per-site magnetic moments, this
+// filters/splits those operations into the magnetic symmetry operations that
+// also preserve the moments (optionally up to time reversal).
 namespace spglib::spin {
 
-// The result of the magnetic symmetry search (spin.c
-// spn_get_operations_with_site_tensors), in the *input* cell's basis.
+// The result of the magnetic symmetry search, in the *input* cell's basis.
 struct MagneticSymmetrySearch {
   MagneticSymmetryOperations operations;
   // equivalent_atoms[i] = representative atom of i's magnetic orbit.
@@ -35,8 +34,7 @@ struct MagneticSymmetrySearch {
 //   - is_axial: site tensors of rank 1 transform as axial vectors
 //     (v' = |det R| R v) rather than ordinary vectors (v' = R v). Collinear
 //     scalars pick up a |det R| factor when is_axial.
-//   - mag_symprec: tolerance for comparing moments; std::nullopt uses `symprec`
-//     (spglib's `mag_symprec < 0` default).
+//   - mag_symprec: tolerance for comparing moments; std::nullopt uses `symprec`.
 // `sym_nonspin` is the spatial symmetry (e.g. from symmetry::find_symmetry).
 // Errors with e_magnetic_symmetry_search_failed when the orbits or the
 // primitive lattice cannot be resolved. For the object-oriented entry point that
@@ -51,17 +49,16 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
 
 // The pure translations of a magnetic symmetry: the translations whose rotation
 // is the identity and which are not time-reversal operations (the type-IV
-// anti-translations are excluded). Includes the zero translation. Port of
-// spn_collect_pure_translations_from_magnetic_symmetry. For the object-oriented
-// form, prefer spglib::analysis::MagneticOperationSet::pure_translations().
+// anti-translations are excluded). Includes the zero translation. For the
+// object-oriented form, prefer
+// spglib::analysis::MagneticOperationSet::pure_translations().
 [[nodiscard]] std::vector<Vector3d>
 collect_pure_translations(MagneticSymmetryOperations const &operations);
 
 // The idealized magnetic cell: each atom's position and site tensor is replaced
 // by the average, over all magnetic operations, of the operation applied to the
-// atom that maps onto it. Port of spin.c spn_get_idealized_cell.
-// `permutations[p * size + i]` is the image of atom i under operation p (as
-// returned by operations_with_site_tensors).
+// atom that maps onto it. `permutations[p * size + i]` is the image of atom i
+// under operation p (as returned by operations_with_site_tensors).
 [[nodiscard]] MagneticCell
 idealized_cell(std::vector<int> const &permutations, MagneticCell const &mcell,
                MagneticSymmetryOperations const &operations,

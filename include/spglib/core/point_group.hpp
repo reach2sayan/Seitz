@@ -8,7 +8,7 @@
 
 namespace spglib {
 
-// Crystal system / holohedry (spglib Holohedry enum).
+// Crystal system / holohedry.
 enum class Holohedry {
   none,
   triclinic,
@@ -20,7 +20,7 @@ enum class Holohedry {
   cubic,
 };
 
-// Laue class (spglib Laue enum).
+// Laue class.
 enum class Laue {
   none,
   laue_1,    // -1

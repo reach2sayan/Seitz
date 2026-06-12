@@ -10,14 +10,12 @@ namespace spglib::kpoint {
 
 // Object-oriented entry point for the crystal irreducible-mesh reduction: a
 // persistent view over a Cell + tolerances that builds the irreducible
-// reciprocal mesh. The functional core (ir_reciprocal_mesh) is left untouched;
-// this facade owns the inputs once so a caller can reduce several meshes of the
-// same crystal without re-threading the cell and tolerances. Lives in kpoint/
-// (not on SymmetryAnalyzer) so the IrReciprocalMesh / kpoint includes stay out
-// of the core analysis header.
+// reciprocal mesh, so a caller can reduce several meshes of the same crystal
+// without re-threading the cell and tolerances. Lives in kpoint/ (not on
+// SymmetryAnalyzer) so the kpoint includes stay out of the core analysis header.
 //
-// Immutable after construction; no setters. Unlike SymmetryAnalyzer this does
-// not memoize — each call takes a different mesh, so there is nothing to cache.
+// Immutable after construction; no setters. Does not memoize — each call takes a
+// different mesh, so there is nothing to cache.
 class ReciprocalMeshBuilder {
 public:
   [[nodiscard]] static ReciprocalMeshBuilder

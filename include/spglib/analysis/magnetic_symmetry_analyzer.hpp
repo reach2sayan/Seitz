@@ -15,12 +15,10 @@ namespace spglib::analysis {
 
 // The magnetic counterpart of SymmetryAnalyzer: a persistent view over a
 // MagneticCell + tolerances that lazily computes and memoizes the magnetic
-// space-group analysis by delegating to get_magnetic_dataset. Same design as
-// SymmetryAnalyzer — immutable after construction, value-owned inputs, the
-// success value cached (boost::leaf::result is move-only). The per-instance
-// caches are not thread-safe; call warm() once on a single thread to make the
-// const instance shareable read-only across threads (shared global tables are
-// primed separately by spglib::warmup()).
+// space-group analysis via get_magnetic_dataset. Same design as SymmetryAnalyzer
+// — immutable after construction, value-owned inputs, the success value cached.
+// The per-instance caches are not thread-safe; call warm() once on a single
+// thread to make the const instance shareable read-only across threads.
 class MagneticSymmetryAnalyzer {
 public:
   // `is_axial` selects axial-vector transformation of the rank-1 tensors;

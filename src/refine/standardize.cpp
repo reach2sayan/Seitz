@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <optional>
 
-// Port of the get_Wyckoff_positions assembly (refinement.c, 3D path):
+// Wyckoff-position assembly (3D path):
 //   conventional primitive cell -> exact Wyckoff positions -> expansion across
 //   the centering translations into the bravais cell -> per-input-atom Wyckoff
 //   / equivalence data (including the supercell broken-symmetry case).
@@ -20,8 +20,7 @@ using data::operations_from_database;
 namespace {
 
 // In the conventional/standardized setting a layer group always has its
-// aperiodic axis as c (axis 2); a 3D group has none. Port of refinement.c's
-// `conv_prim->aperiodic_axis = hall_number > 0 ? -1 : 2`.
+// aperiodic axis as c (axis 2); a 3D group has none.
 [[nodiscard]] std::optional<int> conventional_aperiodic_axis(int hall_number) {
   return hall_number < 0 ? std::optional<int>(2) : std::nullopt;
 }
@@ -33,8 +32,8 @@ namespace {
   }));
 }
 
-// get_conventional_primitive: primitive atoms expressed wrt the (idealized)
-// conventional lattice, shifted by the origin shift and folded into the cell.
+// Primitive atoms expressed wrt the (idealized) conventional lattice, shifted
+// by the origin shift and folded into the cell.
 [[nodiscard]] Cell conventional_primitive(spacegroup::Spacegroup const &sg,
                                           Cell const &primitive,
                                           Matrix3d const &std_lattice,
@@ -53,8 +52,8 @@ namespace {
   return Cell(std_lattice, std::move(pos), primitive.types(), aperiodic_axis);
 }
 
-// expand_positions_in_bravais: replicate the exact conventional-primitive atoms
-// across the pure translations to build the full bravais cell.
+// Replicate the exact conventional-primitive atoms across the pure translations
+// to build the full bravais cell.
 struct Bravais {
   Cell cell;
   std::vector<int> wyckoffs;
@@ -102,7 +101,7 @@ struct Bravais {
   return b;
 }
 
-// search_equivalent_atom: lowest-indexed atom that an operation maps `i` onto.
+// Lowest-indexed atom that an operation maps `i` onto.
 [[nodiscard]] int search_equivalent_atom(int i, Cell const &cell,
                                          SymmetryOperations const &operations,
                                          double symprec) {
@@ -121,8 +120,8 @@ struct Bravais {
   return i;
 }
 
-// set_equivalent_atoms_broken_symmetry: equivalence by the actual found
-// operations (used when the input cell breaks the ideal multiplicity).
+// Equivalence by the actual found operations (used when the input cell breaks
+// the ideal multiplicity).
 [[nodiscard]] std::vector<int>
 equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
@@ -145,8 +144,8 @@ equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
   return equiv;
 }
 
-// set_crystallographic_orbits: representative input-cell atom per atom, derived
-// from the primitive-cell equivalence classes.
+// Representative input-cell atom per atom, derived from the primitive-cell
+// equivalence classes.
 [[nodiscard]] std::vector<int>
 crystallographic_orbits(Cell const &primitive, Cell const &cell,
                         std::vector<int> const &equiv_prim,

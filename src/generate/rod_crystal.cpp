@@ -69,8 +69,6 @@ namespace {
   return true;
 }
 
-// --- Wyckoff-assignment enumeration (the rod analogue of the 0D/2D ones) -----
-
 struct RodPlacement {
   int type;
   group::RodWyckoff const *position{};

@@ -11,9 +11,9 @@ namespace spglib::group {
 
 class SpaceGroup;
 
-// A single Wyckoff position of a space group, as a queryable object (PyXtal's
-// Wyckoff_position). Constructed only by SpaceGroup, which owns it. Holds the
-// position's multiplicity, Wyckoff letter, site-symmetry symbol, the
+// A single Wyckoff position of a space group, as a queryable object.
+// Constructed only by SpaceGroup, which owns it. Holds the position's
+// multiplicity, Wyckoff letter, site-symmetry symbol, the
 // site-symmetry group operations (the stabilizer of a generic point of the
 // position), and enough information to expand a free coordinate into the full
 // crystallographic orbit.
@@ -62,7 +62,6 @@ public:
   // position's canonical coordinate, so a point that is only approximately on
   // the position still yields the exact orbit. Row count equals multiplicity()
   // for a generic `xyz` (fewer if `xyz` lands on a higher-symmetry coincidence).
-  // PyXtal Wyckoff_position.get_all_positions analogue.
   [[nodiscard]] Positions get_all_positions(Vector3d const &xyz) const;
 
 private:

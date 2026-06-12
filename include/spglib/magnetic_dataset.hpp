@@ -12,9 +12,8 @@
 
 namespace spglib {
 
-// The result of a magnetic space-group determination — the modern-C++ value
-// analogue of spglib's SpglibMagneticDataset (3D path). Carries the magnetic
-// space-group identity, the magnetic operations of the input cell, the
+// The result of a magnetic space-group determination (3D path). Carries the
+// magnetic space-group identity, the magnetic operations of the input cell, the
 // standardized cell (with site tensors), and the per-atom equivalence data.
 struct MagneticDataset {
   int uni_number = 0; // 1..1651
@@ -46,12 +45,9 @@ struct MagneticDataset {
 };
 
 // Determine the magnetic space group of `cell` (positions + per-site magnetic
-// tensors) and standardize it. Port of spglib.c spg_get_magnetic_dataset (3D
-// path), wiring spin::operations_with_site_tensors (with time reversal) ->
-// magnetic::identify_magnetic_spacegroup_type -> spin::idealized_cell ->
-// magnetic::transform_cell. `is_axial` selects axial-vector transformation of
-// the rank-1 tensors; `mag_symprec` (std::nullopt -> symprec) is the moment
-// tolerance. Errors with e_magnetic_symmetry_search_failed /
+// tensors) and standardize it (3D path). `is_axial` selects axial-vector
+// transformation of the rank-1 tensors; `mag_symprec` (std::nullopt -> symprec)
+// is the moment tolerance. Errors with e_magnetic_symmetry_search_failed /
 // e_cell_standardization_failed on failure.
 [[nodiscard]] Result<MagneticDataset>
 get_magnetic_dataset(MagneticCell const &cell, bool is_axial,

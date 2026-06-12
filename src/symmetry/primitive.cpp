@@ -17,8 +17,7 @@
 #include <utility>
 #include <vector>
 
-// Port of primitive.c (3D space-group path) + the cell-trimming helpers from
-// cell.c (trim_cell / get_overlap_table / translate_atoms_in_trimmed_lattice).
+// Find the primitive cell, plus the cell-trimming helpers:
 //   1. Collect the pure translations of the cell.
 //   2. If there is only the trivial one, the cell is already primitive; just
 //      Delaunay-reduce its lattice.
@@ -29,9 +28,9 @@ namespace spglib::symmetry {
 
 namespace {
 
-constexpr int kNumAttempt = 20; // primitive.c get_primitive
+constexpr int kNumAttempt = 20;
 constexpr double kReduceRate = 0.95;
-constexpr int kTrimNumAttempt = 100; // cell.c trim
+constexpr int kTrimNumAttempt = 100;
 constexpr double kTrimReduceRate = 0.95;
 constexpr double kTrimIncreaseRate = 2.0;
 
@@ -62,7 +61,7 @@ reduce_lattice(Matrix3d const &lattice, std::optional<int> aperiodic_axis,
              : reduce::delaunay_reduce(lattice, symprec);
 }
 
-// get_cell_with_smallest_lattice: the multiplicity-one case.
+// The multiplicity-one case: reduce the lattice and fold the atoms into it.
 [[nodiscard]] std::optional<Cell>
 smallest_lattice_cell(Cell const &cell, std::optional<int> aperiodic_axis,
                       double symprec) {
@@ -80,11 +79,9 @@ smallest_lattice_cell(Cell const &cell, std::optional<int> aperiodic_axis,
   return Cell(*min_lat, pos, cell.types(), aperiodic_axis);
 }
 
-// find_primitive_lattice_vectors + cleaning + Delaunay reduce. Picks the first
-// triple of {pure translations, unit vectors} spanning the primitive volume.
 // Clean a candidate relative lattice (whose |det| should equal `multi`) via its
-// exact integer inverse, then reduce and return the primitive lattice. Shared by
-// the 3D and layer paths.
+// exact integer inverse, then Delaunay-reduce and return the primitive lattice.
+// Shared by the 3D and layer paths.
 [[nodiscard]] std::optional<Matrix3d>
 finish_primitive_lattice(Matrix3d relative, Matrix3d const &cell_lattice,
                          int multi, std::optional<int> aperiodic_axis,
@@ -113,7 +110,7 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
     // (the cell is not periodic along it); the two periodic vectors are chosen
     // from the in-plane pure translations and the other two unit vectors. The
     // aperiodic axis is kept at its own column index so the 2D reduction below
-    // leaves it untouched. (primitive.c find_primitive_lattice_vectors, layer.)
+    // leaves it untouched.
     int const ap = *aperiodic_axis;
     std::vector<Vector3d> cand = pure_trans; // in-plane, includes zero
     for (int a = 0; a < 3; ++a) {
@@ -163,15 +160,15 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
         relative.col(0) = cand[i];
         relative.col(1) = cand[j];
         relative.col(2) = cand[k];
-        // matches spglib: first valid triple only
+        // first valid triple only
         return finish_primitive_lattice(relative, cell.lattice(), multi,
                                         std::nullopt, symprec);
       }
   return std::nullopt;
 }
 
-// trim_cell + get_overlap_table: fold atoms into the trimmed lattice, de-dup
-// translationally-equivalent ones, average positions.
+// Fold atoms into the trimmed lattice, de-dup translationally-equivalent ones,
+// average positions.
 [[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
 trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
           std::optional<int> aperiodic_axis, double symprec) {
@@ -278,8 +275,7 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
       Cell(trimmed_lattice, tpos, trimmed_types, aperiodic_axis), mapping);
 }
 
-// The translations of a symmetry-operation set whose rotation is the identity
-// (primitive.c collect_pure_translations, the symmetry-set variant).
+// The translations of a symmetry-operation set whose rotation is the identity.
 [[nodiscard]] std::vector<Vector3d>
 operation_pure_translations(SymmetryOperations const &operations) {
   std::vector<Vector3d> out;
@@ -293,8 +289,7 @@ operation_pure_translations(SymmetryOperations const &operations) {
 // The primitive lattice in "translation space": a unit cell whose atoms sit at
 // the pure translations is reduced to its primitive cell; that cell's lattice
 // is the (primitive-to-conventional)^-1 transformation. std::nullopt unless the
-// translations span exactly one primitive point. Port of
-// get_primitive_in_translation_space.
+// translations span exactly one primitive point.
 [[nodiscard]] std::optional<Matrix3d>
 primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
                                std::size_t symmetry_size, double symprec) {
@@ -316,7 +311,7 @@ primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
 
 // The first occurrence of each distinct rotation, keeping its translation,
 // until `primsym_size` are collected. std::nullopt if the number of distinct
-// rotations differs from `primsym_size`. Port of collect_primitive_symmetry.
+// rotations differs from `primsym_size`.
 [[nodiscard]] std::optional<SymmetryOperations>
 collect_primitive_operations(SymmetryOperations const &operations,
                              std::size_t primsym_size) {
@@ -363,7 +358,7 @@ Result<Primitive> find_primitive(Cell const &cell, double symprec,
         continue;
       }
       std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
-      std::iota(mapping.begin(), mapping.end(), 0);
+      std::ranges::iota(mapping, 0);
       return Primitive{std::move(*smallest), std::move(mapping), cell.lattice(),
                        tolerance, angle_tolerance};
     }

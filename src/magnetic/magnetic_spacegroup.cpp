@@ -27,7 +27,7 @@ namespace {
 
 using spacegroup::Spacegroup;
 
-constexpr int kMaxDenominator = 100; // magnetic_spacegroup.c MAX_DENOMINATOR
+constexpr int kMaxDenominator = 100;
 
 [[nodiscard]] MagneticSymmetryOperation identity_operation(bool time_reversal) {
   return {Matrix3i::Identity(), Vector3d::Zero(), time_reversal};
@@ -38,8 +38,7 @@ constexpr int kMaxDenominator = 100; // magnetic_spacegroup.c MAX_DENOMINATOR
 enum class SpaceGroupKind { family, maximal };
 
 // Family / maximal space group of a magnetic symmetry, plus its non-magnetic
-// symmetry operations (in the input setting). Port of
-// get_space_group_with_magnetic_symmetry (+ the family/maximal wrappers).
+// symmetry operations (in the input setting).
 [[nodiscard]] std::optional<std::pair<SymmetryOperations, Spacegroup>>
 space_group_of_magnetic_symmetry(
     MagneticSymmetryOperations const &magnetic_symmetry, SpaceGroupKind kind,
@@ -93,7 +92,7 @@ space_group_of_magnetic_symmetry(
 
 // Coset representative of XSG in MSG (assumes type III or IV).
 // representative[0] is the identity; representative[1] is an anti-translation
-// (type IV) or some primed operation (type III). Port of get_representative.
+// (type IV) or some primed operation (type III).
 [[nodiscard]] std::optional<MagneticSymmetryOperations>
 get_representative(MagneticSymmetryOperations const &magnetic_symmetry) {
   MagneticSymmetryOperations rep{identity_operation(false)};
@@ -130,8 +129,7 @@ get_representative(MagneticSymmetryOperations const &magnetic_symmetry) {
   return std::nullopt;
 }
 
-// The MSG type and the coset representatives of XSG in MSG. Port of
-// get_magnetic_space_group_type.
+// The MSG type and the coset representatives of XSG in MSG.
 //
 // The four Opechowski-Guccione types are distinguished by a single index,
 // [FSG : XSG]: the family space group FSG (the spatial parts, time reversal
@@ -179,8 +177,7 @@ magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
 
 // Transform magnetic operations by (tmat, shift) without de-duplicating:
 //   (W, w) -> (tmat, shift) (W, w) (tmat, shift)^-1
-// i.e. W' = tmat W tmat^-1, w' = wrap(shift - W' shift + tmat w). Port of
-// get_distinct_changed_magnetic_symmetry.
+// i.e. W' = tmat W tmat^-1, w' = wrap(shift - W' shift + tmat w).
 [[nodiscard]] MagneticSymmetryOperations
 distinct_changed_magnetic_symmetry(
     Matrix3d const &tmat, Vector3d const &shift,
@@ -208,8 +205,7 @@ distinct_changed_magnetic_symmetry(
 }
 
 // Pure translations in the transformed setting: (I, w) = (tmat, shift)^-1 (I,
-// w_std)(tmat, shift), i.e. w_std = tmat w. Port of
-// get_changed_pure_translations.
+// w_std)(tmat, shift), i.e. w_std = tmat w.
 [[nodiscard]] std::optional<std::vector<Vector3d>>
 changed_pure_translations(Matrix3d const &tmat,
                           std::vector<Vector3d> const &pure_trans,
@@ -259,7 +255,6 @@ changed_pure_translations(Matrix3d const &tmat,
 
 // The MSG operations in the changed (reference) setting, built from the coset
 // representatives, the conventional centerings, and the factor group of XSG.
-// Port of get_changed_magnetic_symmetry.
 [[nodiscard]] std::optional<MagneticSymmetryOperations>
 changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
                           MagneticSymmetryOperations const &representatives,
@@ -278,8 +273,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
   }
 
   // Factor group of XSG in the conventional lattice: one operation per distinct
-  // rotation.
-  // One operation per distinct rotation of XSG; distinct rotations are bounded
+  // rotation. Distinct rotations are bounded
   // by the point-group order (<= 48). small_vector keeps that count inline but
   // spills to the heap instead of overflowing should the bound ever be exceeded.
   boost::container::small_vector<MagneticSymmetryOperation, 48> factors;
@@ -313,7 +307,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
 }
 
 // Whether two magnetic symmetries are equal as sets (rotation, translation
-// mod 1, time reversal). Port of is_equal.
+// mod 1, time reversal).
 [[nodiscard]] bool same_magnetic_symmetry(MagneticSymmetryOperations const &a,
                                           MagneticSymmetryOperations const &b,
                                           double symprec) {
@@ -331,16 +325,15 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
   });
 }
 
-// Rigid rotation to the idealized standardized lattice. Port of
-// get_rigid_rotation. NB: the upstream code forms the second factor from
-// `tmat^-1` (not `tmat_bravais^-1`), so the conventional-lattice term cancels
-// and the result is the identity up to numerical noise; reproduced verbatim so
-// the (later) std_rotation oracle matches spglib v2.7.0 exactly.
+// Rigid rotation to the idealized standardized lattice. NB: the second factor
+// is formed from `tmat^-1` (not `tmat_bravais^-1`), so the conventional-lattice
+// term cancels and the result is the identity up to numerical noise; reproduced
+// verbatim so the (later) std_rotation oracle matches spglib v2.7.0 exactly.
 [[nodiscard]] Matrix3d rigid_rotation(Matrix3d const &lattice,
                                       Matrix3d const &tmat,
                                       Spacegroup const &ref_sg) {
   Matrix3d const ideal_latt = refine::conventional_lattice(ref_sg);
-  static_cast<void>(ideal_latt); // computed by spglib, unused in the product
+  static_cast<void>(ideal_latt); // unused in the product (see note above)
   return lattice * tmat.inverse() * tmat * lattice.inverse();
 }
 
@@ -352,9 +345,8 @@ struct ReferenceSpaceGroup {
   Vector3d shift;
 };
 
-// Port of get_reference_space_group: identify FSG + XSG, the MSG type, the
-// reference setting (FSG for types I–III, XSG for type IV), and the magnetic
-// symmetry transformed into that setting.
+// Identify FSG + XSG, the MSG type, the reference setting (FSG for types I–III,
+// XSG for type IV), and the magnetic symmetry transformed into that setting.
 [[nodiscard]] std::optional<ReferenceSpaceGroup>
 get_reference_space_group(Matrix3d const &lattice,
                           MagneticSymmetryOperations const &magnetic_symmetry,

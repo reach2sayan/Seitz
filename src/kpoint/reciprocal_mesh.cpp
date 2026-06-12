@@ -17,9 +17,8 @@ namespace spglib::kpoint {
 std::vector<Matrix3i>
 point_group_reciprocal(std::vector<Matrix3i> const &rotations,
                        bool time_reversal) {
-  // The reference lists all transposes first, then (with time reversal) all
-  // inversion partners (-transpose); the de-duplication keeps first occurrence,
-  // so the order matters.
+  // All transposes first, then (with time reversal) all inversion partners
+  // (-transpose); de-duplication keeps first occurrence, so order matters.
   std::vector<Matrix3i> candidates;
   candidates.reserve(rotations.size() * (time_reversal ? 2 : 1));
 
@@ -67,10 +66,10 @@ point_group_reciprocal_with_q(std::vector<Matrix3i> const &rot_reciprocal,
 
 namespace {
 
-// Port of kpoint.c check_mesh_symmetry: true -> the fast "normal" reduction;
-// false -> the "distortion" path (3/6-fold rotations or non-conventional
-// cells). Ported verbatim, INCLUDING the upstream quirk that the a=b and b=c
-// flags test the same column — kept for bit-identical behaviour.
+// True -> the fast "normal" reduction; false -> the "distortion" path (3/6-fold
+// rotations or non-conventional cells). NOTE the deliberate quirk that the a=b
+// and b=c flags test the same column — kept for bit-identical behaviour against
+// the reference.
 [[nodiscard]] bool
 mesh_has_conventional_symmetry(Vector3i const &mesh, Vector3i const &is_shift,
                                std::vector<Matrix3i> const &rot_reciprocal) {
@@ -84,7 +83,7 @@ mesh_has_conventional_symmetry(Vector3i const &mesh, Vector3i const &is_shift,
   Vector3i const e_c(0, 0, 1);
   bool const eq_ab = std::ranges::any_of( // a == b axis present
       rot_reciprocal, [&](Matrix3i const &rot) { return rot.col(0) == e_b; });
-  bool const eq_bc = eq_ab; // b == c (upstream tests the same column as a == b)
+  bool const eq_bc = eq_ab; // b == c (intentionally the same column as a == b)
   bool const eq_ca = std::ranges::any_of( // c == a
       rot_reciprocal, [&](Matrix3i const &rot) { return rot.col(0) == e_c; });
 
@@ -95,8 +94,7 @@ mesh_has_conventional_symmetry(Vector3i const &mesh, Vector3i const &is_shift,
 
 // Smallest grid-point index in the orbit of `address_double` under the
 // reciprocal group (the irreducible representative). The group is closed, so
-// iterating every rotation reaches the whole orbit; the minimum is canonical —
-// identical to spglib's serial and OpenMP IR-mapping branches.
+// iterating every rotation reaches the whole orbit; the minimum is canonical.
 [[nodiscard]] std::size_t
 normal_representative(Vector3i const &address_double, Vector3i const &mesh,
                       std::size_t self,
@@ -114,7 +112,7 @@ normal_representative(Vector3i const &address_double, Vector3i const &mesh,
 
 // As above, but for the distortion path: the rotation is applied in 64-bit
 // (scaled by `divisor`) and a rotated point is only valid when it divides
-// evenly and its parity matches `is_shift`. Port of the distortion inner loop.
+// evenly and its parity matches `is_shift`.
 [[nodiscard]] std::size_t distortion_representative(
     Vector3i const &address_double, Vector3i const &mesh,
     Vector3i const &is_shift, std::size_t self,

@@ -18,8 +18,8 @@ struct e_niggli_failed {};
 struct e_delaunay_failed {};
 struct e_empty_cell {};
 
-// Degenerate input rejected at a public entry point (Phase 9 hardening): a
-// (near-)singular lattice, or a reciprocal mesh with a non-positive component.
+// Degenerate input rejected at a public entry point: a (near-)singular lattice,
+// or a reciprocal mesh with a non-positive component.
 struct e_invalid_lattice {
   double determinant;
 };

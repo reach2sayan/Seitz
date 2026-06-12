@@ -8,18 +8,16 @@
 #include <spglib/symmetry/pointgroup.hpp>
 #include <spglib/symmetry/primitive.hpp>
 
-// Port of the determination + refinement pipeline (determination.c
-// det_determine_all + spglib.c set_dataset), 3D space-group path. The outer
-// loop progressively tightens the tolerance (REDUCE_RATE_OUTER) in case a given
-// tolerance yields an inconsistent cell. Operations are taken from the input
-// cell's symmetry search (set-equal to spglib's exact refined operations); the
-// idealized refined operation values are a later refinement.
+// The determination + refinement pipeline, 3D space-group path. The outer loop
+// progressively tightens the tolerance in case a given tolerance yields an
+// inconsistent cell. Operations are taken from the input cell's symmetry search;
+// the idealized refined operation values are a later refinement.
 namespace spglib {
 
 namespace {
 
-constexpr int kNumAttemptOuter = 10;     // determination.c NUM_ATTEMPT_OUTER
-constexpr double kReduceRateOuter = 0.9; // determination.c REDUCE_RATE_OUTER
+constexpr int kNumAttemptOuter = 10;
+constexpr double kReduceRateOuter = 0.9; // tolerance shrink factor per attempt
 
 } // namespace
 

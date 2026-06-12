@@ -12,7 +12,7 @@ get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
                      AngleTolerance angle_tolerance,
                      std::optional<double> mag_symprec) {
   // The magnetic dataset always searches with time reversal (the full family
-  // space group), matching spglib's get_magnetic_dataset.
+  // space group).
   constexpr bool kWithTimeReversal = true;
   if (auto valid = validate_cell(cell.cell()); !valid) {
     return valid.error();

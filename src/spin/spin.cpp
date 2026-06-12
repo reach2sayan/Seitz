@@ -18,22 +18,21 @@ namespace spglib::spin {
 namespace {
 
 // rot_cart = lattice . rot . lattice^-1: the rotation expressed in Cartesian
-// coordinates (spin.c set_rotations_in_cartesian).
+// coordinates.
 [[nodiscard]] Matrix3d rotation_in_cartesian(Matrix3d const &lattice,
                                              Matrix3i const &rot) {
   return lattice * rot.cast<double>() * lattice.inverse();
 }
 
-// x -> rot . x + trans (spin.c apply_symmetry_to_position).
+// x -> rot . x + trans.
 [[nodiscard]] Vector3d apply_to_position(Matrix3i const &rot,
                                          Vector3d const &trans,
                                          Vector3d const &x) {
   return rot.cast<double>() * x + trans;
 }
 
-// A collinear (scalar) moment transformed by an operation (spin.c
-// apply_symmetry_to_site_scalar): time reversal flips the sign; an axial tensor
-// additionally picks up det(R).
+// A collinear (scalar) moment transformed by an operation: time reversal flips
+// the sign; an axial tensor additionally picks up det(R).
 [[nodiscard]] double apply_to_scalar(double src, Matrix3d const &rot_cart,
                                      bool time_reversal,
                                      bool with_time_reversal, bool is_axial) {
@@ -44,8 +43,7 @@ namespace {
   return dst;
 }
 
-// A non-collinear (vector) moment transformed by an operation (spin.c
-// apply_symmetry_to_site_vector).
+// A non-collinear (vector) moment transformed by an operation.
 [[nodiscard]] Vector3d apply_to_vector(Vector3d const &v,
                                        Matrix3d const &rot_cart,
                                        bool time_reversal,
@@ -61,8 +59,8 @@ namespace {
 }
 
 // Spin-flip sign in {-1, 0, 1} such that `sign * R(spin_j) == spin_k`; 0 when
-// the two moments are not related by the operation (spin.c
-// get_operation_sign_on_scalar). sign = 1 - 2*timerev for the matching timerev.
+// the two moments are not related by the operation. sign = 1 - 2*timerev for
+// the matching timerev.
 [[nodiscard]] int sign_on_scalar(double spin_j, double spin_k,
                                  Matrix3d const &rot_cart,
                                  bool with_time_reversal, bool is_axial,
@@ -102,11 +100,11 @@ cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
   return out;
 }
 
-// The core filter (spin.c get_operations): for each spatial operation, check
-// that it consistently maps every site's moment onto the moment of the site it
-// overlaps, determining the spin-flip sign. Undetermined operations (all
-// touched moments zero) are kept as ordinary, or — with time reversal — as both
-// an ordinary and an anti-operation.
+// The core filter: for each spatial operation, check that it consistently maps
+// every site's moment onto the moment of the site it overlaps, determining the
+// spin-flip sign. Undetermined operations (all touched moments zero) are kept
+// as ordinary, or — with time reversal — as both an ordinary and an
+// anti-operation.
 [[nodiscard]] MagneticSymmetryOperations
 get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
                bool with_time_reversal, bool is_axial, double symprec,
@@ -193,8 +191,8 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
 }
 
 // permutations[p * size + i] = image of atom i under operation p, matching both
-// overlap and transformed moment (spin.c get_symmetry_permutations). nullopt is
-// unreachable in theory (every site must map somewhere).
+// overlap and transformed moment. nullopt is unreachable in theory (every site
+// must map somewhere).
 [[nodiscard]] std::optional<std::vector<int>>
 get_permutations(MagneticSymmetryOperations const &operations,
                  MagneticCell const &mcell, bool with_time_reversal,
@@ -247,8 +245,7 @@ get_permutations(MagneticSymmetryOperations const &operations,
   return perm;
 }
 
-// equivalent_atoms[i] = representative of i's orbit under the permutations
-// (spin.c get_orbits).
+// equivalent_atoms[i] = representative of i's orbit under the permutations.
 [[nodiscard]] std::vector<int>
 get_orbits(std::vector<int> const &permutations, std::size_t num_sym,
            Index num_atoms) {
@@ -376,8 +373,7 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
                                                           pure_trans, symprec);
   if (!prim_lattice) {
     // By definition the number of pure translations must be preserved; failure
-    // to span the primitive lattice means it was not (spin.c `multi !=
-    // pure_trans->size`).
+    // to span the primitive lattice means it was not.
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
 

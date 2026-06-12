@@ -11,8 +11,7 @@ namespace spglib::refine {
 // Exact, database-derived space-group operations of the input cell: the
 // conventional database operations of the Hall setting, shifted by the origin
 // shift, transformed to the primitive setting, then recovered in the input
-// cell (replicated across its pure translations). Port of refinement.c
-// get_refined_symmetry_operations (+ recover_symmetry_in_original_cell).
+// cell (replicated across its pure translations).
 //
 // `sg` must already be adjusted by find_similar_bravais_lattice. Returns
 // std::nullopt when the recovered pure-translation count is inconsistent with

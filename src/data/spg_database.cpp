@@ -11,9 +11,9 @@ namespace spglib::data {
 namespace {
 
 // Decoded form of one packed operation: rotation as 9 row-major elements in
-// {-1,0,1}, translation as 3 base-12 numerators (value n/12). This is spglib's
-// spgdb_decode_symmetry encoding (rotation base-3, translation base-12),
-// unpacked once at compile time so no decoding happens at runtime.
+// {-1,0,1}, translation as 3 base-12 numerators (value n/12). The packed
+// encoding (rotation base-3, translation base-12) is unpacked once at compile
+// time so no decoding happens at runtime.
 struct DecodedOp {
   std::array<std::int8_t, 9> rot;
   std::array<std::int8_t, 3> trans_num;

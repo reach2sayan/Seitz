@@ -26,10 +26,9 @@ int main() {
               "(2, 3, or composite, e.g. 4).\n");
   std::printf("struct TSubgroupRelation {\n  int super;\n  int sub;\n  int "
               "index;\n};\n\n");
-  std::printf(
-      "inline constexpr std::array<TSubgroupRelation, %zu>\n"
-      "    kTSubgroupRelations = {{\n",
-      edges.size());
+  std::printf("inline constexpr std::array<TSubgroupRelation, %zu>\n"
+              "    kTSubgroupRelations = {{\n",
+              edges.size());
   for (auto const &e : edges) {
     std::printf("        {%d, %d, %d},\n", e.super, e.sub, e.index);
   }

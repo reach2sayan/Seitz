@@ -15,7 +15,7 @@ using data::operations_from_database;
 
 namespace {
 
-// ---- idealized conventional lattice setters (refinement.c) -----------------
+// ---- idealized conventional lattice setters --------------------------------
 // Each fills `m` (columns = basis vectors) from the metric's lengths/angles.
 
 [[nodiscard]] double len(Matrix3d const &g, int i) {
@@ -136,7 +136,7 @@ namespace {
   return m;
 }
 
-// get_orthonormal_basis: orthonormal frame from the first two basis vectors
+// Orthonormal frame from the first two basis vectors
 // (e1 = a^, e3 = (a x b)^, e2 = (e3 x a)^); columns are the frame vectors.
 [[nodiscard]] Matrix3d orthonormal_basis(Matrix3d const &lattice) {
   Vector3d const a = lattice.col(0);

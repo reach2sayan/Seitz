@@ -8,8 +8,7 @@
 
 #include <utility>
 
-// Port of spglib.c's standardize_cell / standardize_primitive /
-// get_standardized_cell (3D space-group path). Everything is derived from
+// Cell standardization (3D space-group path). Everything is derived from
 // get_dataset: the idealized cases read the dataset's std_* cell directly; the
 // no_idealize cases transform the *input* cell into the standardized
 // basis/centering (via the dataset transformation matrix), so the input's real
@@ -20,9 +19,9 @@ namespace {
 
 using data::Centering;
 
-// spa_transform_to_primitive: bring `cell` into the primitive setting implied by
-// `trans_mat` (cell -> conventional) and the centering (conventional ->
-// primitive), then fold the atoms into the primitive lattice.
+// Bring `cell` into the primitive setting implied by `trans_mat` (cell ->
+// conventional) and the centering (conventional -> primitive), then fold the
+// atoms into the primitive lattice.
 //   prim_lattice = cell.lattice . trans_mat^-1 . M^-1(centering)
 [[nodiscard]] Result<Cell> transform_to_primitive(Cell const &cell,
                                                   Matrix3d const &trans_mat,
@@ -37,8 +36,7 @@ using data::Centering;
   return std::move(trimmed->first);
 }
 
-// spa_transform_from_primitive: expand a primitive cell into the centered
-// conventional cell.
+// Expand a primitive cell into the centered conventional cell.
 //   conv_lattice  = prim.lattice . M(centering)
 //   x_conventional = M^-1(centering) . x_primitive, replicated over the
 //   non-trivial centering translations.
@@ -69,7 +67,7 @@ using data::Centering;
   }
 
   Cell const expanded(conv_lattice, std::move(pos), std::move(types));
-  // Fold/normalize (the reference runs cel_trim_cell on the expanded cell).
+  // Fold/normalize the expanded cell.
   auto trimmed = symmetry::trim_to_lattice(conv_lattice, expanded, symprec);
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
@@ -91,7 +89,7 @@ Result<Cell> standardize_cell(Cell const &cell, StandardizeOptions options,
     if (!options.to_primitive) {
       return std_cell;
     }
-    // standardize_primitive: the bravais cell -> primitive (identity tmat).
+    // The bravais cell -> primitive (identity tmat).
     return transform_to_primitive(std_cell, Matrix3d::Identity(), centering,
                                   symprec);
   }

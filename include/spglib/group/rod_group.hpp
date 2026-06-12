@@ -76,16 +76,15 @@ private:
 
 // A rod group (1..75) as a standalone, structure-free object: it owns its
 // symmetry operations (decoded from the generated rod tables) and its Wyckoff
-// positions, derived in-house from those operations. The 1D-periodic sibling of
+// positions, derived from those operations. The 1D-periodic sibling of
 // group::SpaceGroup (3D), SpaceGroup::from_layer_* (2D) and group::PointGroup
 // (0D).
 //
 // The Wyckoff positions (general AND special) are derived from the operations by
-// the affine fixed-locus arrangement (rod_group.cpp) — the translation-bearing
-// generalisation of group::PointGroup's linear subspace arrangement, with the
-// periodic axis handled modulo the rod lattice: each operation's fixed locus is
-// the affine solution of (R - I) p = -t + n*e_axis, the loci are closed under
-// intersection, and one Wyckoff position is emitted per orbit of loci.
+// the affine fixed-locus arrangement: with the periodic axis handled modulo the
+// rod lattice, each operation's fixed locus is the affine solution of
+// (R - I) p = -t + n*e_axis, the loci are closed under intersection, and one
+// Wyckoff position is emitted per orbit of loci.
 class RodGroup {
 public:
   // Build by rod-group number (1..75). Requires the generated rod tables

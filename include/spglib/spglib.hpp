@@ -1,8 +1,6 @@
 #pragma once
 
-// Umbrella header for the CppCrystal port of spglib.
-// Phase 0 exposes only the foundations; module headers are added here as the
-// port progresses (cell, symmetry, spacegroup, magnetic, kpoints, ...).
+// Umbrella header: includes the full public API.
 
 #include <spglib/analysis/magnetic_symmetry_analyzer.hpp>
 #include <spglib/analysis/operation_set.hpp>

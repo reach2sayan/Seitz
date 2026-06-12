@@ -10,7 +10,7 @@
 
 namespace spglib {
 
-// Rank of per-site tensors for magnetic structures (spglib SiteTensorType).
+// Rank of per-site tensors for magnetic structures.
 enum class SiteTensor { none = -1, collinear = 0, noncollinear = 1 };
 
 // A crystal cell: lattice with columns equal to the Cartesian basis vectors,

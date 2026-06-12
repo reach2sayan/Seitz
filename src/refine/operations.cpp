@@ -7,15 +7,14 @@
 
 #include <algorithm>
 
-// Port of the refined-operation recovery chain in refinement.c (3D path).
+// Refined-operation recovery chain (3D path).
 namespace spglib::refine {
 
 using data::operations_from_database;
 
 namespace {
 
-// set_translation_with_origin_shift: t' = t + (R - E) w (the database ops in
-// the shifted origin).
+// t' = t + (R - E) w (the database ops in the shifted origin).
 [[nodiscard]] SymmetryOperations
 with_origin_shift(SymmetryOperations const &conv_sym, Vector3d const &shift) {
   SymmetryOperations out;
@@ -32,8 +31,8 @@ with_origin_shift(SymmetryOperations const &conv_sym, Vector3d const &shift) {
   return out;
 }
 
-// get_primitive_db_symmetry: keep the first operation of each distinct rotation
-// and transform it to the primitive setting (R' = T R T^-1, t' = T t).
+// Keep the first operation of each distinct rotation and transform it to the
+// primitive setting (R' = T R T^-1, t' = T t).
 [[nodiscard]] SymmetryOperations
 primitive_db_symmetry(Matrix3d const &t_mat,
                       SymmetryOperations const &conv_sym) {
@@ -54,8 +53,8 @@ primitive_db_symmetry(Matrix3d const &t_mat,
   return out;
 }
 
-// get_surrounding_frame: bounding-box extent of the parallelepiped spanned by
-// the columns of the integer transformation matrix.
+// Bounding-box extent of the parallelepiped spanned by the columns of the
+// integer transformation matrix.
 [[nodiscard]] Vector3i surrounding_frame(Matrix3i const &t_mat) {
   Eigen::Matrix<int, 3, 8> corners;
   corners.col(0).setZero();
@@ -70,8 +69,8 @@ primitive_db_symmetry(Matrix3d const &t_mat,
   return corners.rowwise().maxCoeff() - corners.rowwise().minCoeff();
 }
 
-// get_lattice_translations: every integer point of the surrounding frame mapped
-// by T^-1 and folded into the input cell.
+// Every integer point of the surrounding frame mapped by T^-1 and folded into
+// the input cell.
 [[nodiscard]] std::vector<Vector3d>
 lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
   std::vector<Vector3d> out;
@@ -90,7 +89,7 @@ lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
   return out;
 }
 
-// remove_overlapping_lattice_points.
+// Remove overlapping lattice points.
 [[nodiscard]] std::vector<Vector3d>
 unique_translations(Matrix3d const &lattice,
                     std::vector<Vector3d> const &candidates, double symprec) {
@@ -109,8 +108,8 @@ unique_translations(Matrix3d const &lattice,
   return out;
 }
 
-// get_symmetry_in_original_cell: transform the primitive ops to the input cell
-// (R' = T^-1 R T), keeping only those that map the input lattice exactly.
+// Transform the primitive ops to the input cell (R' = T^-1 R T), keeping only
+// those that map the input lattice exactly.
 [[nodiscard]] SymmetryOperations
 symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
                           Matrix3d const &lattice,
@@ -131,7 +130,7 @@ symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
   return out;
 }
 
-// copy_symmetry_upon_lattice_points (aperiodic_axis = -1: fold all axes).
+// Copy the operations onto every lattice point (fold all axes).
 [[nodiscard]] SymmetryOperations
 upon_lattice_points(std::vector<Vector3d> const &pure_trans,
                     SymmetryOperations const &t_sym) {
@@ -146,7 +145,7 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
   return out;
 }
 
-// recover_symmetry_in_original_cell.
+// Recover the symmetry operations in the original input cell.
 [[nodiscard]] std::optional<SymmetryOperations>
 recover_in_original_cell(SymmetryOperations const &prim_sym,
                          Matrix3i const &t_mat, Matrix3d const &lattice,

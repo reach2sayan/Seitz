@@ -17,7 +17,7 @@ struct Primitive {
   std::vector<int> mapping_table; // input atom index -> primitive atom index
   // The original input cell's lattice (columns = basis vectors). Used by the
   // space-group search to prefer a conventional setting whose basis vectors
-  // resemble the input. (primitive.c Primitive::orig_lattice)
+  // resemble the input.
   Matrix3d orig_lattice{Matrix3d::Identity()};
   // The (possibly tightened) symprec at which the primitive cell was found, and
   // the angle tolerance carried into the symmetry search.
@@ -25,9 +25,8 @@ struct Primitive {
   AngleTolerance angle_tolerance{std::nullopt};
 };
 
-// Find the primitive cell of `cell`. Port of primitive.c prm_get_primitive /
-// the public spg_find_primitive. Errors with e_cell_standardization_failed when
-// no primitive cell can be determined.
+// Find the primitive cell of `cell`. Errors with e_cell_standardization_failed
+// when no primitive cell can be determined.
 [[nodiscard]] Result<Primitive>
 find_primitive(Cell const &cell, double symprec,
                AngleTolerance angle_tolerance = std::nullopt);
@@ -35,9 +34,8 @@ find_primitive(Cell const &cell, double symprec,
 // The primitive lattice (columns = basis vectors) spanned by a set of pure
 // translations of `cell` (which must include the zero translation). std::nullopt
 // when no primitive lattice of the implied multiplicity (= pure_trans.size())
-// exists. The result is Delaunay-reduced. Port of primitive.c
-// prm_get_primitive_lattice_vectors; used by the magnetic-symmetry search to
-// rebuild the primitive cell from the magnetic pure translations.
+// exists. The result is Delaunay-reduced. Used by the magnetic-symmetry search
+// to rebuild the primitive cell from the magnetic pure translations.
 [[nodiscard]] std::optional<Matrix3d>
 primitive_lattice_vectors(Cell const &cell,
                           std::vector<Vector3d> const &pure_trans,
@@ -52,15 +50,15 @@ primitive_lattice_vectors(Cell const &cell,
 // to that setting (R' = T R T^-1, t' = T t), are the primitive operations.
 // std::nullopt if the operation set is inconsistent (e.g. its size is not a
 // multiple of the number of pure translations, or the translations do not span
-// a single primitive point). Port of primitive.c prm_get_primitive_symmetry.
+// a single primitive point).
 [[nodiscard]] std::optional<std::pair<SymmetryOperations, Matrix3d>>
 primitive_symmetry(SymmetryOperations const &operations, double symprec);
 
 // The primitive cell of `cell` given its pure translations explicitly (rather
 // than recomputing them from the symmetry). `pure_trans` must include the zero
 // translation. Used by the magnetic standardization, where the pure
-// translations come from the magnetic symmetry. Port of primitive.c
-// prm_get_primitive_with_pure_trans. Errors with e_cell_standardization_failed.
+// translations come from the magnetic symmetry. Errors with
+// e_cell_standardization_failed.
 [[nodiscard]] Result<Primitive>
 find_primitive_with_pure_translations(Cell const &cell,
                                       std::vector<Vector3d> const &pure_trans,
@@ -70,8 +68,8 @@ find_primitive_with_pure_translations(Cell const &cell,
 // de-duplicating translationally-equivalent atoms and averaging their
 // positions. Returns the trimmed cell together with the input->trimmed atom
 // mapping, or std::nullopt if the atoms do not divide evenly into the lattice.
-// The aperiodic axis (for layer cells) is read from `cell`. Port of cell.c
-// trim_cell; exposed for cell standardization (transform-to-primitive).
+// The aperiodic axis (for layer cells) is read from `cell`. Exposed for cell
+// standardization (transform-to-primitive).
 [[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
 trim_to_lattice(Matrix3d const &trimmed_lattice, Cell const &cell,
                 double symprec);

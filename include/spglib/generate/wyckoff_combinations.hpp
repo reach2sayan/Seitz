@@ -17,13 +17,13 @@ struct WyckoffCombination {
   std::vector<Placement> placements;
 };
 
-// Whether `comp` can be placed on `sg` at all (PyXtal Group.check_compatible).
+// Whether `comp` can be placed on `sg` at all.
 [[nodiscard]] bool check_compatible(group::SpaceGroup const &sg,
                                     Composition const &comp);
 
-// All valid Wyckoff assignments for `comp` on `sg` (PyXtal
-// Group.list_wyckoff_combinations). A position with no degrees of freedom is a
-// single fixed orbit, so it can be used at most once across the whole structure;
+// All valid Wyckoff assignments for `comp` on `sg`. A position with no degrees
+// of freedom is a single fixed orbit, so it can be used at most once across the
+// whole structure;
 // positions with at least one free coordinate may be reused. `max_combinations`
 // caps the result to keep enumeration bounded; when the cap is hit, fewer than
 // the full set are returned (the caller can detect truncation by size ==

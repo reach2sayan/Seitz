@@ -13,8 +13,7 @@
 
 namespace spglib {
 
-// The result of a space-group determination — the modern-C++ value-type
-// analogue of spglib's SpglibDataset (3D space-group path). Carries the
+// The result of a space-group determination (3D space-group path): the
 // space-group identity, the operations of the input cell, the standardized
 // conventional cell, and the per-atom Wyckoff / equivalence data.
 struct Dataset {
@@ -66,10 +65,9 @@ struct Dataset {
   std::optional<int> aperiodic_axis;
 };
 
-// Determine the space group of `cell` and standardize it. Port of spglib.c
-// spg_get_dataset (3D space-group path) wiring find_primitive ->
-// search_spacegroup -> refinement (standardized cell + Wyckoff data).
-// `hall_number == 0` searches all 230 space groups.
+// Determine the space group of `cell` and standardize it (3D space-group path):
+// find_primitive -> search_spacegroup -> refinement (standardized cell + Wyckoff
+// data). `hall_number == 0` searches all 230 space groups.
 //
 // Errors with e_spacegroup_search_failed / e_cell_standardization_failed when
 // determination fails at every attempted tolerance.
@@ -81,10 +79,10 @@ get_dataset(Cell const &cell, double symprec = kDefaultSymprec,
             AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);
 
 // Determine the LAYER group of `cell` — a 2D-periodic crystal with the given
-// `aperiodic_axis` (0/1/2 = a/b/c). Port of spglib's spg_get_layer_dataset. The
-// returned Dataset uses the negative-Hall-number convention (hall_number in
-// -1..-116) and layer-group number (1..80); its aperiodic_axis field is set.
-// Equivalent to setting the aperiodic axis on `cell` and calling get_dataset.
+// `aperiodic_axis` (0/1/2 = a/b/c). The returned Dataset uses the
+// negative-Hall-number convention (hall_number in -1..-116) and layer-group
+// number (1..80); its aperiodic_axis field is set. Equivalent to setting the
+// aperiodic axis on `cell` and calling get_dataset.
 [[nodiscard]] Result<Dataset>
 get_layer_dataset(Cell const &cell, int aperiodic_axis,
                   double symprec = kDefaultSymprec,

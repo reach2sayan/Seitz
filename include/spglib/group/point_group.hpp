@@ -13,13 +13,12 @@ namespace spglib::group {
 
 class PointGroup;
 
-// A single Wyckoff position of a crystallographic point group (PyXtal's 0D
-// Wyckoff_position): a class of points sharing an orbit type under the point
-// group acting about the origin. Unlike the space-group WyckoffPosition there is
-// no translation part and no site-symmetry database — everything is derived
-// in-house from the point group's operations (the arrangement of fixed
-// subspaces: the origin, the rotation axes, the mirror planes, and their
-// intersections).
+// A single Wyckoff position of a crystallographic point group: a class of
+// points sharing an orbit type under the point group acting about the origin.
+// Unlike the space-group WyckoffPosition there is no translation part and no
+// site-symmetry database — everything is derived from the point group's
+// operations (the arrangement of fixed subspaces: the origin, the rotation
+// axes, the mirror planes, and their intersections).
 //
 // The position is parameterised by a `degrees_of_freedom()`-dimensional locus
 // (its fixed subspace): `sample()` turns free parameters into a point on it, and
@@ -72,15 +71,15 @@ private:
   SymmetryOperations site_symmetry_;
 };
 
-// A crystallographic point group (1..32) as a standalone, structure-free object
-// (PyXtal's Group with dim = 0): it owns its symmetry operations (pure
-// rotations / rotoinversions about the origin, expressed as integer matrices in
-// the conventional basis) and its Wyckoff positions as first-class objects.
+// A crystallographic point group (1..32) as a standalone, structure-free
+// object: it owns its symmetry operations (pure rotations / rotoinversions
+// about the origin, expressed as integer matrices in the conventional basis)
+// and its Wyckoff positions as first-class objects.
 //
 // The operations are taken from a representative symmorphic space group of the
 // point group (the distinct rotation parts of its conventional operations); the
-// Wyckoff positions are then derived in-house from those operations. This is the
-// 0D counterpart of SpaceGroup (3D) and SpaceGroup::from_layer_* (2D) for
+// Wyckoff positions are then derived from those operations. This is the 0D
+// counterpart of SpaceGroup (3D) and SpaceGroup::from_layer_* (2D) for
 // crystal/cluster generation.
 class PointGroup {
 public:

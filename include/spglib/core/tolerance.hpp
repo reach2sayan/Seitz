@@ -4,25 +4,22 @@
 
 namespace spglib {
 
-// Default Cartesian distance tolerance for the symmetry search (spglib
-// `symprec`).
+// Default Cartesian distance tolerance for the symmetry search.
 inline constexpr double kDefaultSymprec = 1e-5;
 
-// Threshold used when folding fractional coordinates into the unit cell
-// (spglib's ZERO_PREC in mathfunc.c). Keeps values a hair below 0 near 0
-// instead of wrapping them up to ~1.
+// Threshold used when folding fractional coordinates into the unit cell. Keeps
+// values a hair below 0 near 0 instead of wrapping them up to ~1.
 inline constexpr double kZeroPrec = 1e-10;
 
 // True when |lhs| is longer than |rhs| by more than the near-tie tolerance,
-// given their squared norms. Order is preserved on near-equal lengths, matching
-// the reference spglib's "> ... + ZERO_PREC" length comparisons.
+// given their squared norms. Order is preserved on near-equal lengths.
 [[nodiscard]] constexpr bool sqnorm_longer(double lhs_sqnorm,
                                            double rhs_sqnorm) {
   return lhs_sqnorm > rhs_sqnorm + kZeroPrec;
 }
 
 // An angle tolerance in degrees, or std::nullopt to derive an effective value
-// from symprec (spglib expresses the latter as a negative angle tolerance).
+// from symprec.
 using AngleTolerance = std::optional<double>;
 
 // Bundle of tolerances threaded through the symmetry-finding pipeline.

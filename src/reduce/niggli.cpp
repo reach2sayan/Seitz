@@ -3,17 +3,17 @@
 #include <array>
 #include <cmath>
 
-// Krivy-Gruber Niggli reduction, a faithful port of niggli.c (space-group path,
-// aperiodic_axis = -1). The cell is represented by the six metric parameters
+// Krivy-Gruber Niggli reduction (space-group path). The cell is represented by
+// the six metric parameters
 //   A = a.a, B = b.b, C = c.c, xi = 2 b.c, eta = 2 a.c, zeta = 2 a.b
 // and each step right-multiplies the lattice by an integer matrix `tmat`,
-// transforming the basis columns. The control flow (which steps restart the
-// pass) mirrors the reference exactly.
+// transforming the basis columns. Which steps restart the pass is part of the
+// algorithm (see the restart set below) and must not be changed.
 namespace spglib::reduce {
 
 namespace {
 
-constexpr int kMaxAttempts = 1000; // spglib default (SPGLIB_NUM_ATTEMPTS)
+constexpr int kMaxAttempts = 1000;
 
 struct State {
   Matrix3d lattice;
@@ -163,8 +163,8 @@ Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
     bool (*apply)(State &);
     bool restarts; // firing this step restarts the pass from step 1
   };
-  // Restart set {step2, step5, step6, step7, step8} mirrors niggli.c, where
-  // those steps `continue` the loop while step1/3/4 fall through.
+  // Restart set {step2, step5, step6, step7, step8}: those steps restart the
+  // pass, while step1/3/4 fall through to the next step.
   constexpr std::array<Step, 8> steps{{
       {step1, false},
       {step2, true},

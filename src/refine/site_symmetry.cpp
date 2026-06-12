@@ -9,23 +9,23 @@
 #include <iterator>
 #include <optional>
 
-// Port of site_symmetry.c (3D space-group path). Determines the exact
-// (symmetrized) location of each conventional-cell atom from its site symmetry
-// (Grosse-Kunstleve & Adams 2002), groups equivalent atoms, and looks up the
-// Wyckoff letter + site-symmetry symbol from the database.
+// Site symmetry (3D space-group path). Determines the exact (symmetrized)
+// location of each conventional-cell atom from its site symmetry (Grosse-
+// Kunstleve & Adams 2002), groups equivalent atoms, and looks up the Wyckoff
+// letter + site-symmetry symbol from the database.
 namespace spglib::refine {
 
 namespace {
 
-constexpr int kNumAttempt = 5;        // site_symmetry.c NUM_ATTEMPT
-constexpr double kIncreaseRate = 1.05; // site_symmetry.c INCREASE_RATE
+constexpr int kNumAttempt = 5;
+constexpr double kIncreaseRate = 1.05;
 
 [[nodiscard]] Vector3d apply(SymmetryOperation const &op, Vector3d const &x) {
   return op.rotation.cast<double>() * x + op.translation;
 }
 
-// set_exact_location: average the site-symmetry operations that fix `position`
-// to pin it onto its exact special position.
+// Average the site-symmetry operations that fix `position` to pin it onto its
+// exact special position.
 [[nodiscard]] Vector3d set_exact_location(Vector3d const &position,
                                           SymmetryOperations const &conv_sym,
                                           Matrix3d const &lattice,
@@ -53,8 +53,8 @@ struct Equivalent {
   int representative;
 };
 
-// set_equivalent_atom: if atom `i` is the image of an already-placed
-// independent atom under a conventional operation, return that placement.
+// If atom `i` is the image of an already-placed independent atom under a
+// conventional operation, return that placement.
 [[nodiscard]] std::optional<Equivalent>
 find_equivalent(int i, std::vector<int> const &indep_atoms,
                 std::vector<Vector3d> const &positions, Cell const &conv_prim,
@@ -78,8 +78,8 @@ struct Positions {
   std::vector<int> equivalent_atoms;
 };
 
-// get_exact_positions: place every atom either at the exact special position
-// (independent atoms) or as the image of a representative (equivalent atoms).
+// Place every atom either at the exact special position (independent atoms) or
+// as the image of a representative (equivalent atoms).
 [[nodiscard]] Positions get_exact_positions(Cell const &conv_prim,
                                             SymmetryOperations const &conv_sym,
                                             double symprec) {
@@ -111,9 +111,8 @@ struct WyckoffLabel {
   std::string symbol;
 };
 
-// get_Wyckoff_notation: match `position`'s orbit against the database Wyckoff
-// positions of the Hall setting; the first consistent one gives the letter and
-// site-symmetry symbol.
+// Match `position`'s orbit against the database Wyckoff positions of the Hall
+// setting; the first consistent one gives the letter and site-symmetry symbol.
 [[nodiscard]] std::optional<WyckoffLabel>
 get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
@@ -151,8 +150,8 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
   return std::nullopt;
 }
 
-// set_Wyckoffs_labels: assign a Wyckoff letter + symbol to each independent
-// atom, then propagate to the equivalent atoms. False if any lookup failed.
+// Assign a Wyckoff letter + symbol to each independent atom, then propagate to
+// the equivalent atoms. False if any lookup failed.
 [[nodiscard]] bool
 set_wyckoff_labels(std::vector<int> &wyckoffs,
                    std::vector<std::string> &symbols,

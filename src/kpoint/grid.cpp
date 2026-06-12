@@ -14,7 +14,7 @@ namespace {
   return mesh[0] > 0 && mesh[1] > 0 && mesh[2] > 0;
 }
 
-// Euclidean modulo into [0, m): kgrid.c modulo_i3.
+// Euclidean modulo into [0, m).
 void modulo_i3(Vector3i &v, Vector3i const &m) noexcept {
   for (int i = 0; i < 3; ++i) {
     v[i] %= m[i];
@@ -24,14 +24,13 @@ void modulo_i3(Vector3i &v, Vector3i const &m) noexcept {
   }
 }
 
-// Fold a single-mesh address onto the parallelepiped (default branch, no
-// GRID_BOUNDARY_AS_NEGATIVE): kgrid.c reduce_grid_address.
+// Fold a single-mesh address onto the parallelepiped.
 void inline reduce_grid_address(Vector3i &address, Vector3i const &mesh) noexcept {
   address.array() -=
       mesh.array() * (address.array() > mesh.array() / 2).cast<int>();
 }
 
-// Fold a double-mesh address onto the parallelepiped: reduce_grid_address_double.
+// Fold a double-mesh address onto the parallelepiped.
 void inline reduce_grid_address_double(Vector3i &address,
                                 Vector3i const &mesh) noexcept {
   address.array() -=
