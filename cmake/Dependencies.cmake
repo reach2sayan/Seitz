@@ -1,4 +1,18 @@
-find_package(Eigen3 3.4 REQUIRED NO_MODULE)
+include(FetchContent)
+
+# Eigen 5.0.0 — fetched purely from git rather than the system package. 5.0 is the
+# first release in which fixed-size Matrix/Array are literal types, so they can be
+# built and accessed in constexpr context under C++20+ (we compile as C++23).
+# As a subproject PROJECT_IS_TOP_LEVEL is false, so Eigen's tests/blas/lapack/docs/
+# demos/pkgconfig/cmake-package all default OFF — only the Eigen3::Eigen interface
+# target is created. SYSTEM keeps Eigen's headers out of our -Wconversion warning set.
+FetchContent_Declare(Eigen3
+        GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+        GIT_TAG 5.0.0
+        GIT_SHALLOW TRUE
+        SYSTEM)
+FetchContent_MakeAvailable(Eigen3)
+
 find_package(Boost 1.83 REQUIRED CONFIG)
 
 if (SPGLIB_USE_MKL)
