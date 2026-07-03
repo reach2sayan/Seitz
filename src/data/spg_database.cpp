@@ -1,12 +1,12 @@
-#include <spglib/data/spg_database.hpp>
+#include <cppcrystal/data/spg_database.hpp>
 
-#include <spglib/data/spacegroup_operation_tables.hpp>
+#include <cppcrystal/data/spacegroup_operation_tables.hpp>
 
 #include <array>
 #include <cstdint>
 #include <ranges>
 
-namespace spglib::data {
+namespace cppcrystal::data {
 
 namespace {
 
@@ -104,4 +104,4 @@ SymmetryOperations const &operations_from_database(int hall_number) {
   return ops[static_cast<std::size_t>(in_range ? hall_number : 0)];
 }
 
-} // namespace spglib::data
+} // namespace cppcrystal::data

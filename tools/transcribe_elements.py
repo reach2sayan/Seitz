@@ -40,7 +40,7 @@ def main():
           "Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
-        w("namespace spglib::data {\n\n")
+        w("namespace cppcrystal::data {\n\n")
 
         w("// Number of tabulated elements (atomic numbers 1..%d).\n" % n)
         w("inline constexpr int kNumElements = %d;\n\n" % n)
@@ -59,7 +59,7 @@ def main():
             w("    " + ", ".join("%.2f" % r for r in radii[i:i + 8]) + ",\n")
         w("}};\n\n")
 
-        w("} // namespace spglib::data\n")
+        w("} // namespace cppcrystal::data\n")
 
     print("elements: %d (Z 1..%d)" % (n, n))
 

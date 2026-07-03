@@ -1,9 +1,9 @@
-#include <spglib/core/centering.hpp>
+#include <cppcrystal/core/centering.hpp>
 
 #include <array>
 #include <cstddef>
 
-namespace spglib {
+namespace cppcrystal {
 
 using data::Centering;
 
@@ -67,4 +67,4 @@ std::vector<Vector3d> centering_shifts(Centering centering) {
   }
 }
 
-} // namespace spglib
+} // namespace cppcrystal

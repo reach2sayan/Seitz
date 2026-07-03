@@ -1,8 +1,8 @@
-#include <spglib/kpoint/reciprocal_mesh_builder.hpp>
+#include <cppcrystal/kpoint/reciprocal_mesh_builder.hpp>
 
 #include <utility>
 
-namespace spglib::kpoint {
+namespace cppcrystal::kpoint {
 
 ReciprocalMeshBuilder ReciprocalMeshBuilder::from_cell(
     Cell cell, double symprec, AngleTolerance angle_tolerance) {
@@ -16,4 +16,4 @@ Result<IrReciprocalMesh> ReciprocalMeshBuilder::irreducible(
                             tol_.angle_tolerance);
 }
 
-} // namespace spglib::kpoint
+} // namespace cppcrystal::kpoint

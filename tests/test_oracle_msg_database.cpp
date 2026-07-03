@@ -5,7 +5,7 @@
 
 #include "oracle.hpp"
 
-#include <spglib/data/msg_database.hpp>
+#include <cppcrystal/data/msg_database.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,9 +15,9 @@
 
 namespace {
 
-using spglib::Matrix3i;
-using spglib::MagneticSymmetryOperations;
-using spglib::Vector3d;
+using cppcrystal::Matrix3i;
+using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::Vector3d;
 
 // Reference magnetic operations for (uni_number, hall_number) via spglib's
 // spg_get_magnetic_symmetry_from_database (max 384 operations).
@@ -61,9 +61,9 @@ void require_same_operations(MagneticSymmetryOperations const &got,
 
 TEST_CASE("magnetic_spacegroup_type matches reference for all UNI numbers",
           "[oracle][msg_database]") {
-  for (int uni = 1; uni <= spglib::data::kNumUniNumbers; ++uni) {
+  for (int uni = 1; uni <= cppcrystal::data::kNumUniNumbers; ++uni) {
     INFO("UNI number " << uni);
-    auto const got = spglib::data::magnetic_spacegroup_type(uni);
+    auto const got = cppcrystal::data::magnetic_spacegroup_type(uni);
     SpglibMagneticSpacegroupType const ref =
         spg_get_magnetic_spacegroup_type(uni);
 
@@ -78,9 +78,9 @@ TEST_CASE("magnetic_spacegroup_type matches reference for all UNI numbers",
 
 TEST_CASE("magnetic operations match reference (default Hall setting)",
           "[oracle][msg_database]") {
-  for (int uni = 1; uni <= spglib::data::kNumUniNumbers; ++uni) {
+  for (int uni = 1; uni <= cppcrystal::data::kNumUniNumbers; ++uni) {
     INFO("UNI number " << uni);
-    auto const got = spglib::data::magnetic_operations_from_database(uni, 0);
+    auto const got = cppcrystal::data::magnetic_operations_from_database(uni, 0);
     auto const ref = reference_magnetic_operations(uni, 0);
     REQUIRE(!got.empty());
     require_same_operations(got, ref);
@@ -89,13 +89,13 @@ TEST_CASE("magnetic operations match reference (default Hall setting)",
 
 TEST_CASE("magnetic operations match reference across all Hall settings",
           "[oracle][msg_database]") {
-  for (int hall = 1; hall <= spglib::data::kNumHallNumbers; ++hall) {
-    auto const range = spglib::data::uni_candidates(hall);
+  for (int hall = 1; hall <= cppcrystal::data::kNumHallNumbers; ++hall) {
+    auto const range = cppcrystal::data::uni_candidates(hall);
     REQUIRE(range.has_value());
     for (int uni = (*range).first; uni <= (*range).second; ++uni) {
       INFO("UNI number " << uni << ", Hall number " << hall);
       auto const got =
-          spglib::data::magnetic_operations_from_database(uni, hall);
+          cppcrystal::data::magnetic_operations_from_database(uni, hall);
       auto const ref = reference_magnetic_operations(uni, hall);
       require_same_operations(got, ref);
     }

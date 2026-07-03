@@ -1,11 +1,11 @@
-#include <spglib/magnetic_dataset.hpp>
+#include <cppcrystal/magnetic_dataset.hpp>
 
-#include <spglib/core/validation.hpp>
-#include <spglib/magnetic/magnetic_spacegroup.hpp>
-#include <spglib/spin/spin.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/core/validation.hpp>
+#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
+#include <cppcrystal/spin/spin.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
-namespace spglib {
+namespace cppcrystal {
 
 Result<MagneticDataset>
 get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
@@ -64,4 +64,4 @@ get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
   return dataset;
 }
 
-} // namespace spglib
+} // namespace cppcrystal

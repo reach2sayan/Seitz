@@ -1,10 +1,10 @@
 #include "oracle.hpp"
 
-#include <spglib/core/overlap.hpp>
+#include <cppcrystal/core/overlap.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 Cell bcc(double a) {

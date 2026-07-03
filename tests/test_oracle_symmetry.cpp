@@ -1,10 +1,10 @@
 #include "oracle.hpp"
 
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 // Returns true iff the two operation collections are equal as sets (rotations

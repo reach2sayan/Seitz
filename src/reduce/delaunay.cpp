@@ -1,7 +1,7 @@
-#include <spglib/reduce/delaunay.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
 
-#include <spglib/core/tolerance.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <array>
 #include <cmath>
@@ -9,7 +9,7 @@
 #include <ranges>
 #include <utility>
 
-namespace spglib::reduce {
+namespace cppcrystal::reduce {
 
 namespace {
 
@@ -228,4 +228,4 @@ Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, double symprec) {
   return *reduced;
 }
 
-} // namespace spglib::reduce
+} // namespace cppcrystal::reduce

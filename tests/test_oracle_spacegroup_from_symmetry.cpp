@@ -6,7 +6,7 @@
 
 #include "oracle.hpp"
 
-#include <spglib/spacegroup/spacegroup.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -16,11 +16,11 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::Matrix3d;
-using spglib::Positions;
-using spglib::SymmetryOperations;
-using spglib::oracle::reference_symmetry;
+using cppcrystal::Cell;
+using cppcrystal::Matrix3d;
+using cppcrystal::Positions;
+using cppcrystal::SymmetryOperations;
+using cppcrystal::oracle::reference_symmetry;
 
 Cell make_cell(Matrix3d const &lattice,
                std::vector<std::array<double, 3>> const &pos,
@@ -73,14 +73,14 @@ void check_conventional(Cell const &cell, double symprec) {
   REQUIRE(!ops.empty());
 
   auto const got =
-      spglib::spacegroup::spacegroup_type_from_symmetry(ops, cell.lattice(), symprec);
+      cppcrystal::spacegroup::spacegroup_type_from_symmetry(ops, cell.lattice(), symprec);
   REQUIRE(got);
 
   std::vector<int> rot;
   std::vector<double> trans;
   to_c_operations(rot, trans, ops);
   double lat[3][3];
-  spglib::oracle::to_c_lattice(lat, cell.lattice());
+  cppcrystal::oracle::to_c_lattice(lat, cell.lattice());
   SpglibSpacegroupType const ref = spg_get_spacegroup_type_from_symmetry(
       reinterpret_cast<int(*)[3][3]>(rot.data()),
       reinterpret_cast<double(*)[3]>(trans.data()),
@@ -150,8 +150,8 @@ TEST_CASE("spacegroup_type_from_symmetry matches reference (primitive)",
       static_cast<int>(ops.size()), s);
 
   auto const got =
-      spglib::spacegroup::spacegroup_type_from_symmetry<
-          spglib::spacegroup::LatticeSetting::primitive>(
+      cppcrystal::spacegroup::spacegroup_type_from_symmetry<
+          cppcrystal::spacegroup::LatticeSetting::primitive>(
           ops, Matrix3d::Identity(), s);
 
   REQUIRE((ref_hall == 0) == (!got.has_value()));

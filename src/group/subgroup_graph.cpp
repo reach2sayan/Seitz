@@ -1,11 +1,11 @@
-#include <spglib/group/subgroup_graph.hpp>
+#include <cppcrystal/group/subgroup_graph.hpp>
 
-#include <spglib/core/symmetry_operation.hpp>
-#include <spglib/core/tolerance.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/data/subgroup_relations.hpp>
-#include <spglib/generate/random_lattice.hpp>
-#include <spglib/spacegroup/spacegroup.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/data/subgroup_relations.hpp>
+#include <cppcrystal/generate/random_lattice.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/breadth_first_search.hpp>
@@ -25,7 +25,7 @@
 #include <tuple>
 #include <vector>
 
-namespace spglib::group {
+namespace cppcrystal::group {
 
 namespace {
 
@@ -360,4 +360,4 @@ bool SubgroupGraph::is_subgroup(int sub, int super) const {
   return boost::edge(s, t, impl_->reachability).second;
 }
 
-} // namespace spglib::group
+} // namespace cppcrystal::group

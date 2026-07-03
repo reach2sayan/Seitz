@@ -1,9 +1,9 @@
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 using Catch::Approx;
 
 namespace {

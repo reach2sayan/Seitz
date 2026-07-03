@@ -1,10 +1,10 @@
-#include <spglib/spacegroup/hall_symbol.hpp>
+#include <cppcrystal/spacegroup/hall_symbol.hpp>
 
-#include <spglib/core/centering.hpp>
-#include <spglib/core/overlap.hpp>
-#include <spglib/data/hall_classification.hpp>
-#include <spglib/data/hall_generators_view.hpp>
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/core/centering.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/data/hall_classification.hpp>
+#include <cppcrystal/data/hall_generators_view.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <boost/container/static_vector.hpp>
 
@@ -18,7 +18,7 @@
 // operations. The Grosse-Kunstleve (1999) origin-shift formula shift = VSpU . dw
 // is precomputed per setting (the VSpU tables); dw is the per-generator
 // translation difference vs the database.
-namespace spglib::spacegroup {
+namespace cppcrystal::spacegroup {
 
 using data::Centering;
 
@@ -324,4 +324,4 @@ std::optional<Vector3d> match_hall_symbol(Matrix3d const &bravais_lattice,
   return Vector3d(centering_matrix_inv(centering) * shift);
 }
 
-} // namespace spglib::spacegroup
+} // namespace cppcrystal::spacegroup

@@ -2,7 +2,7 @@
 
 // Bridging helpers between CppCrystal's Eigen value types and the reference
 // spglib C API (target Spglib::symspg). Compiled only into the oracle test
-// targets, gated by SPGLIB_BUILD_ORACLE_TESTS.
+// targets, gated by CPPCRYSTAL_BUILD_ORACLE_TESTS.
 //
 // FOOTGUN: spglib's C `double lattice[3][3]` is row-major with the basis
 // vectors stored as COLUMNS (a = {L[0][0], L[1][0], L[2][0]}). Our Matrix3d
@@ -11,8 +11,8 @@
 // `Eigen::Map<Matrix3d>(&L[0][0])` (column-major map of row-major data silently
 // transposes).
 
-#include <spglib/core/cell.hpp>
-#include <spglib/core/symmetry_operation.hpp>
+#include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
 
 extern "C" {
 #include <spglib.h>
@@ -29,7 +29,7 @@ extern "C" {
 #include <string>
 #include <vector>
 
-namespace spglib::oracle {
+namespace cppcrystal::oracle {
 
 inline void to_c_lattice(double out[3][3], Matrix3d const &m) {
   for (int i = 0; i < 3; ++i)
@@ -471,4 +471,4 @@ inline std::vector<std::size_t> reference_BZ_grid_points_by_rotations(
   return out;
 }
 
-} // namespace spglib::oracle
+} // namespace cppcrystal::oracle

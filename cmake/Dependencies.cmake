@@ -15,19 +15,19 @@ FetchContent_MakeAvailable(Eigen3)
 
 find_package(Boost 1.83 REQUIRED CONFIG)
 
-if (SPGLIB_USE_MKL)
+if (CPPCRYSTAL_USE_MKL)
     set(MKL_INTERFACE lp64)
     set(MKL_THREADING sequential)
     find_package(MKL CONFIG REQUIRED)
 endif ()
 
-if (SPGLIB_BUILD_TESTS)
+if (CPPCRYSTAL_BUILD_TESTS)
     find_package(Catch2 3 REQUIRED)
 endif ()
 
 # Reference spglib v2.7.0 — the validation oracle. Built only for oracle tests and
 # never linked into the cppcrystal library itself. Exposes target Spglib::symspg.
-if (SPGLIB_BUILD_ORACLE_TESTS)
+if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
     include(FetchContent)
     set(SPGLIB_WITH_TESTS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Fortran OFF CACHE BOOL "" FORCE)

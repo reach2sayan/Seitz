@@ -1,9 +1,9 @@
-#include <spglib/core/error.hpp>
+#include <cppcrystal/core/error.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 using Catch::Approx;
 
 namespace {

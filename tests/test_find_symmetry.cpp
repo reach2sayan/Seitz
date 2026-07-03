@@ -1,8 +1,8 @@
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 Cell primitive_cubic(double a) {

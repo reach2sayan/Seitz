@@ -1,10 +1,10 @@
-#include <spglib/standardize.hpp>
+#include <cppcrystal/standardize.hpp>
 
-#include <spglib/core/centering.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/dataset.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/core/centering.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <utility>
 
@@ -13,7 +13,7 @@
 // no_idealize cases transform the *input* cell into the standardized
 // basis/centering (via the dataset transformation matrix), so the input's real
 // geometry is preserved.
-namespace spglib {
+namespace cppcrystal {
 
 namespace {
 
@@ -104,4 +104,4 @@ Result<Cell> standardize_cell(Cell const &cell, StandardizeOptions options,
   return transform_from_primitive(primitive, centering, symprec);
 }
 
-} // namespace spglib
+} // namespace cppcrystal

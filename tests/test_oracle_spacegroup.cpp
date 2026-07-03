@@ -1,12 +1,12 @@
 #include "oracle.hpp"
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/dataset.hpp>
-#include <spglib/refine/refinement.hpp>
-#include <spglib/refine/standardize.hpp>
-#include <spglib/spacegroup/spacegroup.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/refine/refinement.hpp>
+#include <cppcrystal/refine/standardize.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 

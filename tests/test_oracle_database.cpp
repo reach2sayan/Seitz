@@ -1,10 +1,10 @@
 #include "oracle.hpp"
 
-#include <spglib/data/spg_database.hpp>
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 TEST_CASE("db ops match spg_get_symmetry_from_database for all 530 Hall numbers",
           "[oracle][database]") {

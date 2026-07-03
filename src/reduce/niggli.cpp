@@ -1,4 +1,4 @@
-#include <spglib/reduce/niggli.hpp>
+#include <cppcrystal/reduce/niggli.hpp>
 
 #include <array>
 #include <cmath>
@@ -9,7 +9,7 @@
 // and each step right-multiplies the lattice by an integer matrix `tmat`,
 // transforming the basis columns. Which steps restart the pass is part of the
 // algorithm (see the restart set below) and must not be changed.
-namespace spglib::reduce {
+namespace cppcrystal::reduce {
 
 namespace {
 
@@ -203,4 +203,4 @@ Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
   return p.lattice;
 }
 
-} // namespace spglib::reduce
+} // namespace cppcrystal::reduce

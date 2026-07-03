@@ -1,14 +1,14 @@
-#include <spglib/refine/operations.hpp>
+#include <cppcrystal/refine/operations.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
 
 // Refined-operation recovery chain (3D path).
-namespace spglib::refine {
+namespace cppcrystal::refine {
 
 using data::operations_from_database;
 
@@ -186,4 +186,4 @@ refined_operations(spacegroup::Spacegroup const &sg, Cell const &primitive,
                                   multiplicity, symprec);
 }
 
-} // namespace spglib::refine
+} // namespace cppcrystal::refine

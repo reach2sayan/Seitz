@@ -5,7 +5,7 @@
 
 #include "corpus.hpp"
 
-#include <spglib/dataset.hpp>
+#include <cppcrystal/dataset.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,7 +14,7 @@
 
 namespace {
 
-using namespace spglib;
+using namespace cppcrystal;
 
 // Perturb every atom by a random Cartesian displacement bounded well below
 // symprec (so symmetry-related atoms still coincide within symprec).
@@ -60,14 +60,14 @@ TEST_CASE("get_dataset is stable under sub-symprec jitter",
           "[oracle][robustness]") {
   double const symprec = 1e-5;
   std::mt19937 rng(0xC0FFEE);
-  auto const corpus = spglib::oracle::load_corpus();
+  auto const corpus = cppcrystal::oracle::load_corpus();
   REQUIRE(corpus.size() >= 200);
 
   for (std::size_t i = 0; i < corpus.size(); i += 13) {
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const jittered = jitter(entry.cell, rng, 0.15 * symprec);
-    auto const got = spglib::get_dataset(jittered, symprec);
+    auto const got = cppcrystal::get_dataset(jittered, symprec);
     REQUIRE(got);
     CHECK(got->spacegroup_number == entry.space_group_number);
   }
@@ -76,14 +76,14 @@ TEST_CASE("get_dataset is stable under sub-symprec jitter",
 TEST_CASE("get_dataset returns the same space group for a 2x2x2 supercell",
           "[oracle][robustness]") {
   double const symprec = 1e-5;
-  auto const corpus = spglib::oracle::load_corpus();
+  auto const corpus = cppcrystal::oracle::load_corpus();
   REQUIRE(corpus.size() >= 200);
 
   for (std::size_t i = 0; i < corpus.size(); i += 17) {
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const sc = supercell(entry.cell, 2);
-    auto const got = spglib::get_dataset(sc, symprec);
+    auto const got = cppcrystal::get_dataset(sc, symprec);
     REQUIRE(got);
     CHECK(got->spacegroup_number == entry.space_group_number);
   }

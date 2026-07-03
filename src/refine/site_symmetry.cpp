@@ -1,9 +1,9 @@
-#include <spglib/refine/site_symmetry.hpp>
+#include <cppcrystal/refine/site_symmetry.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/data/sitesym_database.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/data/sitesym_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -13,7 +13,7 @@
 // location of each conventional-cell atom from its site symmetry (Grosse-
 // Kunstleve & Adams 2002), groups equivalent atoms, and looks up the Wyckoff
 // letter + site-symmetry symbol from the database.
-namespace spglib::refine {
+namespace cppcrystal::refine {
 
 namespace {
 
@@ -217,4 +217,4 @@ exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
   return std::nullopt;
 }
 
-} // namespace spglib::refine
+} // namespace cppcrystal::refine

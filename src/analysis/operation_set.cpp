@@ -1,6 +1,6 @@
-#include <spglib/analysis/operation_set.hpp>
+#include <cppcrystal/analysis/operation_set.hpp>
 
-namespace spglib::analysis {
+namespace cppcrystal::analysis {
 
 std::vector<Matrix3i> OperationSet::rotations() const {
   return symmetry::rotations_of(ops_);
@@ -40,4 +40,4 @@ MagneticOperationSet::identify_spacegroup_type(Matrix3d const &lattice,
   return magnetic::identify_magnetic_spacegroup_type(lattice, ops_, symprec);
 }
 
-} // namespace spglib::analysis
+} // namespace cppcrystal::analysis

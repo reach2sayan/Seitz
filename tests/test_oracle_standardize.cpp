@@ -1,11 +1,11 @@
 // Oracle test for cell standardization (spglib spg_standardize_cell):
-// spglib::standardize_cell must reproduce the reference across all four
+// cppcrystal::standardize_cell must reproduce the reference across all four
 // to_primitive x no_idealize combinations — atom count, cell shape (metric
 // tensor, rotation-invariant), composition, and the atom set.
 
 #include "oracle.hpp"
 
-#include <spglib/standardize.hpp>
+#include <cppcrystal/standardize.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -19,12 +19,12 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::Matrix3d;
-using spglib::Positions;
-using spglib::Result;
-using spglib::Types;
-using spglib::Vector3d;
+using cppcrystal::Cell;
+using cppcrystal::Matrix3d;
+using cppcrystal::Positions;
+using cppcrystal::Result;
+using cppcrystal::Types;
+using cppcrystal::Vector3d;
 
 Cell make_cell(Matrix3d const &lattice,
                std::vector<std::array<double, 3>> const &pos,
@@ -57,7 +57,7 @@ bool overlap(Vector3d const &a, Vector3d const &b, double tol) {
 }
 
 template <class T> T must(Result<T> r) {
-  namespace leaf = spglib::leaf;
+  namespace leaf = cppcrystal::leaf;
   return leaf::try_handle_all(
       [&]() -> Result<T> { return std::move(r); },
       [](leaf::error_info const &) -> T {
@@ -69,9 +69,9 @@ template <class T> T must(Result<T> r) {
 void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
                double symprec) {
   INFO("to_primitive=" << to_primitive << " no_idealize=" << no_idealize);
-  auto const got = must(spglib::standardize_cell(
+  auto const got = must(cppcrystal::standardize_cell(
       cell, {to_primitive, no_idealize}, symprec));
-  Cell const ref = spglib::oracle::reference_standardize_cell(
+  Cell const ref = cppcrystal::oracle::reference_standardize_cell(
       cell, to_primitive, no_idealize, symprec);
   REQUIRE(ref.size() > 0); // reference succeeded
 
@@ -196,12 +196,12 @@ TEST_CASE("standardize: find_primitive / refine_cell convenience wrappers",
            a.types() == b.types();
   };
 
-  Cell const prim = must(spglib::find_primitive(nacl));
+  Cell const prim = must(cppcrystal::find_primitive(nacl));
   Cell const prim_ref =
-      must(spglib::standardize_cell(nacl, {.to_primitive = true}));
+      must(cppcrystal::standardize_cell(nacl, {.to_primitive = true}));
   CHECK(same_cell(prim, prim_ref));
 
-  Cell const refined = must(spglib::refine_cell(nacl));
-  Cell const refined_ref = must(spglib::standardize_cell(nacl, {}));
+  Cell const refined = must(cppcrystal::refine_cell(nacl));
+  Cell const refined_ref = must(cppcrystal::standardize_cell(nacl, {}));
   CHECK(same_cell(refined, refined_ref));
 }

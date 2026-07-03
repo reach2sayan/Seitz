@@ -1,16 +1,16 @@
-#include <spglib/spacegroup/spacegroup.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
 
-#include <spglib/core/centering.hpp>
-#include <spglib/core/point_group.hpp>
-#include <spglib/core/tolerance.hpp>
-#include <spglib/data/hall_classification.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
-#include <spglib/reduce/delaunay.hpp>
-#include <spglib/reduce/niggli.hpp>
-#include <spglib/spacegroup/hall_symbol.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
-#include <spglib/symmetry/pointgroup.hpp>
+#include <cppcrystal/core/centering.hpp>
+#include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/data/hall_classification.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/reduce/niggli.hpp>
+#include <cppcrystal/spacegroup/hall_symbol.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
 
 #include <algorithm>
 #include <array>
@@ -25,7 +25,7 @@
 // up the triclinic/monoclinic basis, determine the centering, build the
 // conventional symmetry, then loop candidate Hall numbers permuting axis/setting
 // choices and matching against the Hall database.
-namespace spglib::spacegroup {
+namespace cppcrystal::spacegroup {
 
 using data::Centering;
 using symmetry::Primitive;
@@ -1109,4 +1109,4 @@ template Result<Spacegroup>
 spacegroup_type_from_symmetry<LatticeSetting::primitive>(
     SymmetryOperations const &, Matrix3d const &, double);
 
-} // namespace spglib::spacegroup
+} // namespace cppcrystal::spacegroup

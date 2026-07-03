@@ -208,7 +208,7 @@ def main():
         w("// constexpr catalog in the public spg_database.hpp without leaking the\n")
         w("// operation encoding to clients.\n\n")
         w("#include <array>\n\n")
-        w("namespace spglib::data {\n\n")
+        w("namespace cppcrystal::data {\n\n")
         w("struct SpacegroupTypeRaw {\n")
         w("  int number;\n")
         w("  char const *schoenflies;\n")
@@ -234,7 +234,7 @@ def main():
             lits = ", ".join(cpp_string(s) for s in strs)
             w("    {%d, %s, %d, %d},\n" % (number, lits, centering, pg))
         w("}};\n\n")
-        w("} // namespace spglib::data\n")
+        w("} // namespace cppcrystal::data\n")
 
     # --- operations header (private): the encoded packing, decoded in the .cpp ---
     with open(ops_out, "w") as fh:
@@ -246,7 +246,7 @@ def main():
         w("// rotation base-3, translation base-12. Decoded in\n")
         w("// src/data/spg_database.cpp; must NOT be included by a public header.\n\n")
         w("#include <array>\n\n")
-        w("namespace spglib::data {\n\n")
+        w("namespace cppcrystal::data {\n\n")
 
         w("inline constexpr std::array<int, %d> kSymmetryOperations = {{\n" % len(ops))
         for i in range(0, len(ops), 12):
@@ -264,7 +264,7 @@ def main():
         for (a, b) in lg_idx:
             w("    {{%d, %d}},\n" % (a, b))
         w("}};\n\n")
-        w("} // namespace spglib::data\n")
+        w("} // namespace cppcrystal::data\n")
 
     print("spacegroup_types: %d, symmetry_operations: %d, index: %d, "
           "layer_group_types: %d, layer_index: %d" %

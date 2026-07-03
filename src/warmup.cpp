@@ -1,12 +1,12 @@
-#include <spglib/warmup.hpp>
+#include <cppcrystal/warmup.hpp>
 
-#include <spglib/data/spg_database.hpp>
-#include <spglib/group/subgroup_graph.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/group/subgroup_graph.hpp>
 
 #include <future>
 #include <vector>
 
-namespace spglib {
+namespace cppcrystal {
 
 namespace {
 
@@ -39,4 +39,4 @@ std::future<void> warmup_async(WarmupOptions opts) {
   return std::async(std::launch::async, [opts] { prime(opts); });
 }
 
-} // namespace spglib
+} // namespace cppcrystal

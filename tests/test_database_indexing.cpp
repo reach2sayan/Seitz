@@ -3,15 +3,15 @@
 // original direct constexpr-array indexing for every Hall number. This is
 // independent of the reference oracle, so it runs in the standalone suite.
 
-#include <spglib/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
-#include <spglib/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
-#include <spglib/data/spg_database.hpp>                // accessors (new indexing)
+#include <cppcrystal/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
+#include <cppcrystal/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
+#include <cppcrystal/data/spg_database.hpp>                // accessors (new indexing)
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string_view>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 // Reference unpack of one packed operation (spgdb_decode_symmetry: rotation

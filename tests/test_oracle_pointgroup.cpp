@@ -1,11 +1,11 @@
 #include "oracle.hpp"
 
-#include <spglib/symmetry/find_symmetry.hpp>
-#include <spglib/symmetry/pointgroup.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 Cell primitive_cubic(double a) {
@@ -57,4 +57,19 @@ TEST_CASE("get_pointgroup matches spg_get_pointgroup", "[oracle][pointgroup]") {
     CHECK(std::string(ours->pointgroup.symbol) == ref.symbol);
     CHECK(ours->transformation == ref.transformation);
   }
+}
+
+TEST_CASE("crystal_class is aligned to the point-group numbering",
+          "[pointgroup]") {
+  // The documented invariant that consumers (e.g. switch on CrystalClass) rely
+  // on: static_cast<CrystalClass>(number) round-trips through the table.
+  for (int n = 1; n <= 32; ++n) {
+    auto const pg = symmetry::pointgroup_by_number(n);
+    INFO("number = " << n << ", schoenflies = " << pg.schoenflies);
+    CHECK(pg.crystal_class == static_cast<CrystalClass>(n));
+    CHECK(pg.crystal_class != CrystalClass::none);
+  }
+  // Out-of-range numbers carry no class.
+  CHECK(symmetry::pointgroup_by_number(0).crystal_class == CrystalClass::none);
+  CHECK(symmetry::pointgroup_by_number(33).crystal_class == CrystalClass::none);
 }

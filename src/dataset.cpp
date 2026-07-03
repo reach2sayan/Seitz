@@ -1,18 +1,18 @@
-#include <spglib/dataset.hpp>
+#include <cppcrystal/dataset.hpp>
 
-#include <spglib/core/validation.hpp>
-#include <spglib/refine/operations.hpp>
-#include <spglib/refine/refinement.hpp>
-#include <spglib/refine/standardize.hpp>
-#include <spglib/spacegroup/spacegroup.hpp>
-#include <spglib/symmetry/pointgroup.hpp>
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/core/validation.hpp>
+#include <cppcrystal/refine/operations.hpp>
+#include <cppcrystal/refine/refinement.hpp>
+#include <cppcrystal/refine/standardize.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
 // The determination + refinement pipeline, 3D space-group path. The outer loop
 // progressively tightens the tolerance in case a given tolerance yields an
 // inconsistent cell. Operations are taken from the input cell's symmetry search;
 // the idealized refined operation values are a later refinement.
-namespace spglib {
+namespace cppcrystal {
 
 namespace {
 
@@ -105,4 +105,4 @@ Result<Dataset> get_layer_dataset(Cell const &cell, int aperiodic_axis,
   return get_dataset(layer_cell, symprec, angle_tolerance, /*hall_number=*/0);
 }
 
-} // namespace spglib
+} // namespace cppcrystal

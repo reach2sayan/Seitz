@@ -5,11 +5,11 @@
 
 #include "oracle.hpp"
 
-#include <spglib/core/magnetic_cell.hpp>
-#include <spglib/spin/spin.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/spin/spin.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -19,16 +19,16 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::CollinearTensors;
-using spglib::MagneticCell;
-using spglib::MagneticSymmetryOperations;
-using spglib::Matrix3d;
-using spglib::Matrix3i;
-using spglib::noncollinear_tensors;
-using spglib::Positions;
-using spglib::SiteTensors;
-using spglib::Vector3d;
+using cppcrystal::Cell;
+using cppcrystal::CollinearTensors;
+using cppcrystal::MagneticCell;
+using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::Matrix3d;
+using cppcrystal::Matrix3i;
+using cppcrystal::noncollinear_tensors;
+using cppcrystal::Positions;
+using cppcrystal::SiteTensors;
+using cppcrystal::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
                std::vector<int> const &types) {
@@ -54,7 +54,7 @@ struct Reference {
 Reference reference_magnetic(Cell const &cell, std::vector<double> const &tensors,
                              int tensor_rank, bool with_time_reversal,
                              bool is_axial, double symprec) {
-  spglib::oracle::CCell c(cell);
+  cppcrystal::oracle::CCell c(cell);
   int const n = c.num_atom();
   int const max_size = 384;
   std::vector<int> rot(static_cast<std::size_t>(9 * max_size));
@@ -84,12 +84,12 @@ Reference reference_magnetic(Cell const &cell, std::vector<double> const &tensor
     ref.operations.push_back({r, t, time_reversal});
   }
   ref.equivalent_atoms = equiv;
-  spglib::oracle::from_c_lattice(ref.primitive_lattice, prim);
+  cppcrystal::oracle::from_c_lattice(ref.primitive_lattice, prim);
   return ref;
 }
 
 bool contains_operation(MagneticSymmetryOperations const &ops,
-                        spglib::MagneticSymmetryOperation const &target,
+                        cppcrystal::MagneticSymmetryOperation const &target,
                         double symprec) {
   for (auto const &op : ops) {
     if (op.rotation != target.rotation ||
@@ -109,7 +109,7 @@ bool contains_operation(MagneticSymmetryOperations const &ops,
 // unimodular matrix (a change of primitive basis).
 bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
   Matrix3d const rel = a.inverse() * b;
-  Matrix3i const rounded = spglib::math::round_to_int(rel);
+  Matrix3i const rounded = cppcrystal::math::round_to_int(rel);
   if ((rel - rounded.cast<double>()).cwiseAbs().maxCoeff() > 1e-6) {
     return false;
   }
@@ -119,10 +119,10 @@ bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
 void check(MagneticCell const &mcell, std::vector<double> const &tensors,
            int tensor_rank, bool with_time_reversal, bool is_axial,
            double symprec) {
-  auto const sym_nonspin = spglib::symmetry::find_symmetry(mcell.cell(), symprec);
+  auto const sym_nonspin = cppcrystal::symmetry::find_symmetry(mcell.cell(), symprec);
   REQUIRE(sym_nonspin);
 
-  auto const got = spglib::spin::operations_with_site_tensors(
+  auto const got = cppcrystal::spin::operations_with_site_tensors(
       sym_nonspin.value(), mcell, with_time_reversal, is_axial, symprec);
   REQUIRE(got);
 

@@ -1,13 +1,13 @@
-#include <spglib/generate/random_lattice.hpp>
+#include <cppcrystal/generate/random_lattice.hpp>
 
-#include <spglib/data/element_data.hpp>
+#include <cppcrystal/data/element_data.hpp>
 
 #include <cmath>
 #include <numbers>
 #include <numeric>
 #include <random>
 
-namespace spglib::generate {
+namespace cppcrystal::generate {
 
 namespace {
 
@@ -148,4 +148,4 @@ Matrix3d random_layer_lattice(std::span<SymmetryOperation const> operations,
   return lattice;
 }
 
-} // namespace spglib::generate
+} // namespace cppcrystal::generate

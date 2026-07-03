@@ -1,5 +1,5 @@
 // Oracle test for the layer-group dataset (spglib.c get_layer_dataset):
-// spglib::get_layer_dataset must reproduce the reference spg_get_layer_dataset —
+// cppcrystal::get_layer_dataset must reproduce the reference spg_get_layer_dataset —
 // the layer-group identity (negative hall number, layer-group number 1..80,
 // symbol, point group), the symmetry operations, the per-atom Wyckoff /
 // site-symmetry / equivalence data, and the standardized layer cell.
@@ -10,7 +10,7 @@
 
 #include "oracle.hpp"
 
-#include <spglib/dataset.hpp>
+#include <cppcrystal/dataset.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -25,12 +25,12 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::Matrix3d;
-using spglib::Positions;
-using spglib::Result;
-using spglib::Types;
-using spglib::Vector3d;
+using cppcrystal::Cell;
+using cppcrystal::Matrix3d;
+using cppcrystal::Positions;
+using cppcrystal::Result;
+using cppcrystal::Types;
+using cppcrystal::Vector3d;
 
 Cell make_layer_cell(Matrix3d const &lattice,
                      std::vector<std::array<double, 3>> const &pos,
@@ -94,7 +94,7 @@ bool same_metric(Matrix3d const &a, Matrix3d const &b) {
 }
 
 template <class T> T must(Result<T> r) {
-  namespace leaf = spglib::leaf;
+  namespace leaf = cppcrystal::leaf;
   return leaf::try_handle_all(
       [&]() -> Result<T> { return std::move(r); },
       [](leaf::error_info const &) -> T {
@@ -104,9 +104,9 @@ template <class T> T must(Result<T> r) {
 }
 
 void check(Cell const &cell, int aperiodic_axis, double symprec) {
-  auto const got = must(spglib::get_layer_dataset(cell, aperiodic_axis, symprec));
+  auto const got = must(cppcrystal::get_layer_dataset(cell, aperiodic_axis, symprec));
   auto const ref =
-      spglib::oracle::reference_layer_dataset(cell, aperiodic_axis, symprec);
+      cppcrystal::oracle::reference_layer_dataset(cell, aperiodic_axis, symprec);
   REQUIRE(ref.number != 0); // reference succeeded
 
   // Layer-group identity.

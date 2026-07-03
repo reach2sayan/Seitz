@@ -1,9 +1,9 @@
-#include <spglib/generate/wyckoff_combinations.hpp>
+#include <cppcrystal/generate/wyckoff_combinations.hpp>
 
 #include <span>
 #include <vector>
 
-namespace spglib::generate {
+namespace cppcrystal::generate {
 
 namespace {
 
@@ -108,4 +108,4 @@ bool check_compatible(group::SpaceGroup const &sg, Composition const &comp) {
   return !list_wyckoff_combinations(sg, comp, 1).empty();
 }
 
-} // namespace spglib::generate
+} // namespace cppcrystal::generate

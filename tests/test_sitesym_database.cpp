@@ -1,10 +1,10 @@
-#include <spglib/data/sitesym_database.hpp>
-#include <spglib/data/sitesym_tables.hpp>
+#include <cppcrystal/data/sitesym_database.hpp>
+#include <cppcrystal/data/sitesym_tables.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
-using namespace spglib::data;
+using namespace cppcrystal;
+using namespace cppcrystal::data;
 
 TEST_CASE("wyckoff_coordinate decodes the documented entries", "[sitesym]") {
   // Index 1 (P1 general position): identity rotation, zero translation.

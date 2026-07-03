@@ -86,7 +86,7 @@ def main():
         w("// v2.7.0 sitesym_database.c. Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
-        w("namespace spglib::data {\n\n")
+        w("namespace cppcrystal::data {\n\n")
 
         w("// Wyckoff-position ranges per Hall number: kPositionWyckoff[h] is the\n")
         w("// global index of the first Wyckoff position of Hall number h; the\n")
@@ -132,7 +132,7 @@ def main():
             w("    " + ", ".join('"%s"' % s for s in symbols[i:i + 6]) + ",\n")
         w("}};\n\n")
 
-        w("} // namespace spglib::data\n")
+        w("} // namespace cppcrystal::data\n")
 
     print("position_wyckoff: %d, coordinates_first: %d, multiplicities: %d, "
           "symbols: %d" % (len(position_wyckoff), len(coordinates_first),

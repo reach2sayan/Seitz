@@ -2,14 +2,14 @@
 // right tag) rather than UB. No reference spglib needed — this exercises the
 // port's own validation/guards.
 
-#include <spglib/core/cell.hpp>
-#include <spglib/core/error.hpp>
-#include <spglib/core/magnetic_cell.hpp>
-#include <spglib/dataset.hpp>
-#include <spglib/kpoint/grid.hpp>
-#include <spglib/kpoint/reciprocal_mesh.hpp>
-#include <spglib/magnetic_dataset.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/kpoint/grid.hpp>
+#include <cppcrystal/kpoint/reciprocal_mesh.hpp>
+#include <cppcrystal/magnetic_dataset.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -17,7 +17,7 @@
 
 namespace {
 
-using namespace spglib;
+using namespace cppcrystal;
 
 enum class Err { none, empty, invalid_lattice, invalid_mesh, other };
 

@@ -12,7 +12,7 @@
       "binaryDir": "${sourceDir}/cmake-build-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "SPGLIB_BUILD_TESTS": "ON"
+        "CPPCRYSTAL_BUILD_TESTS": "ON"
       }
     },
     {
@@ -21,8 +21,8 @@
       "binaryDir": "${sourceDir}/cmake-build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "SPGLIB_BUILD_TESTS": "ON",
-        "SPGLIB_BUILD_ORACLE_TESTS": "ON"
+        "CPPCRYSTAL_BUILD_TESTS": "ON",
+        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"
       }
     },
     {
@@ -30,7 +30,7 @@
       "displayName": "Release + MKL",
       "inherits": "release",
       "cacheVariables": {
-        "SPGLIB_USE_MKL": "ON"
+        "CPPCRYSTAL_USE_MKL": "ON"
       }
     },
     {
@@ -38,7 +38,7 @@
       "displayName": "Debug + reference-spglib oracle",
       "inherits": "default",
       "cacheVariables": {
-        "SPGLIB_BUILD_ORACLE_TESTS": "ON"
+        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"
       }
     },
     {
@@ -46,7 +46,7 @@
       "displayName": "Debug + oracle + Address/UB sanitizers",
       "inherits": "oracle",
       "cacheVariables": {
-        "SPGLIB_ENABLE_SANITIZERS": "ON"
+        "CPPCRYSTAL_ENABLE_SANITIZERS": "ON"
       }
     }
   ],

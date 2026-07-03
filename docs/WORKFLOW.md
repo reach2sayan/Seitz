@@ -139,5 +139,5 @@ flowchart LR
 Metadata (numbers, symbols, centering, multiplicities) is decoded once at
 compile time and indexed directly by the group's key. Operation matrices, which
 cannot be `constexpr` because they are `Eigen` types, are decoded on first use
-and cached. `spglib::warmup()` primes these caches up front so they are race-free
+and cached. `cppcrystal::warmup()` primes these caches up front so they are race-free
 for concurrent reads.

@@ -1,7 +1,7 @@
-#include <spglib/group/space_group.hpp>
+#include <cppcrystal/group/space_group.hpp>
 
-#include <spglib/data/sitesym_database.hpp>
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/data/sitesym_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <Eigen/Dense>
 
@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace spglib::group {
+namespace cppcrystal::group {
 
 namespace {
 constexpr double kGroupTol = 1e-5;
@@ -144,4 +144,4 @@ Result<WyckoffPosition const *> SpaceGroup::wyckoff(char letter) const {
                 letter + "' in this space group"});
 }
 
-} // namespace spglib::group
+} // namespace cppcrystal::group

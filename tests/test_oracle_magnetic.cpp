@@ -6,10 +6,10 @@
 
 #include "oracle.hpp"
 
-#include <spglib/core/magnetic_cell.hpp>
-#include <spglib/magnetic/magnetic_spacegroup.hpp>
-#include <spglib/spin/spin.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
+#include <cppcrystal/spin/spin.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -18,15 +18,15 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::CollinearTensors;
-using spglib::MagneticCell;
-using spglib::MagneticSymmetryOperations;
-using spglib::Matrix3d;
-using spglib::noncollinear_tensors;
-using spglib::Positions;
-using spglib::SiteTensors;
-using spglib::Vector3d;
+using cppcrystal::Cell;
+using cppcrystal::CollinearTensors;
+using cppcrystal::MagneticCell;
+using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::Matrix3d;
+using cppcrystal::noncollinear_tensors;
+using cppcrystal::Positions;
+using cppcrystal::SiteTensors;
+using cppcrystal::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
                std::vector<int> const &types) {
@@ -43,9 +43,9 @@ MagneticSymmetryOperations magnetic_symmetry(MagneticCell const &mcell,
                                              bool with_time_reversal,
                                              bool is_axial, double symprec) {
   auto const sym_nonspin =
-      spglib::symmetry::find_symmetry(mcell.cell(), symprec);
+      cppcrystal::symmetry::find_symmetry(mcell.cell(), symprec);
   REQUIRE(sym_nonspin);
-  auto const search = spglib::spin::operations_with_site_tensors(
+  auto const search = cppcrystal::spin::operations_with_site_tensors(
       sym_nonspin.value(), mcell, with_time_reversal, is_axial, symprec);
   REQUIRE(search);
   return search->operations;
@@ -69,7 +69,7 @@ reference_uni(MagneticSymmetryOperations const &ops, Matrix3d const &lattice,
     timerev[s] = ops[s].time_reversal ? 1 : 0;
   }
   double lat[3][3];
-  spglib::oracle::to_c_lattice(lat, lattice);
+  cppcrystal::oracle::to_c_lattice(lat, lattice);
   SpglibMagneticSpacegroupType const ref =
       spg_get_magnetic_spacegroup_type_from_symmetry(
           reinterpret_cast<int(*)[3][3]>(rot.data()),
@@ -81,7 +81,7 @@ reference_uni(MagneticSymmetryOperations const &ops, Matrix3d const &lattice,
 void check(MagneticCell const &mcell, bool with_time_reversal, bool is_axial,
            double symprec) {
   auto const ops = magnetic_symmetry(mcell, with_time_reversal, is_axial, symprec);
-  auto const got = spglib::magnetic::identify_magnetic_spacegroup_type(
+  auto const got = cppcrystal::magnetic::identify_magnetic_spacegroup_type(
       mcell.cell().lattice(), ops, symprec);
   REQUIRE(got);
 

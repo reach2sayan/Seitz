@@ -1,15 +1,15 @@
-#include <spglib/refine/refinement.hpp>
+#include <cppcrystal/refine/refinement.hpp>
 
-#include <spglib/core/point_group.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
-#include <spglib/symmetry/pointgroup.hpp>
+#include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
 
 #include <cmath>
 #include <ranges>
 
-namespace spglib::refine {
+namespace cppcrystal::refine {
 
 using data::operations_from_database;
 
@@ -238,4 +238,4 @@ Matrix3d measure_rigid_rotation(Matrix3d const &bravais_lattice,
   return std * brv.inverse();
 }
 
-} // namespace spglib::refine
+} // namespace cppcrystal::refine

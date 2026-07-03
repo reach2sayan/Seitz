@@ -1,0 +1,44 @@
+#pragma once
+
+// Umbrella header: includes the full public API.
+
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
+#include <cppcrystal/analysis/operation_set.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/centering.hpp>
+#include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/core/magnetic_symmetry_operation.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/core/types.hpp>
+#include <cppcrystal/core/version.hpp>
+#include <cppcrystal/data/msg_database.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/generate/crystal_builder.hpp>
+#include <cppcrystal/generate/random_lattice.hpp>
+#include <cppcrystal/generate/wyckoff_combinations.hpp>
+#include <cppcrystal/group/space_group.hpp>
+#include <cppcrystal/group/wyckoff_position.hpp>
+#include <cppcrystal/standardize.hpp>
+#include <cppcrystal/kpoint/brillouin_zone.hpp>
+#include <cppcrystal/kpoint/grid.hpp>
+#include <cppcrystal/kpoint/reciprocal_mesh.hpp>
+#include <cppcrystal/kpoint/reciprocal_mesh_builder.hpp>
+#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
+#include <cppcrystal/magnetic_dataset.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/reduce/niggli.hpp>
+#include <cppcrystal/spacegroup/hall_symbol.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include <cppcrystal/warmup.hpp>
+#include <cppcrystal/spin/spin.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>

@@ -1,10 +1,10 @@
-#include <spglib/refine/standardize.hpp>
+#include <cppcrystal/refine/standardize.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/refine/refinement.hpp>
-#include <spglib/refine/site_symmetry.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/refine/refinement.hpp>
+#include <cppcrystal/refine/site_symmetry.hpp>
 
 #include <algorithm>
 #include <optional>
@@ -13,7 +13,7 @@
 //   conventional primitive cell -> exact Wyckoff positions -> expansion across
 //   the centering translations into the bravais cell -> per-input-atom Wyckoff
 //   / equivalence data (including the supercell broken-symmetry case).
-namespace spglib::refine {
+namespace cppcrystal::refine {
 
 using data::operations_from_database;
 
@@ -231,4 +231,4 @@ get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
   return out;
 }
 
-} // namespace spglib::refine
+} // namespace cppcrystal::refine

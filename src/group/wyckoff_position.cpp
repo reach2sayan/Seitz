@@ -1,11 +1,11 @@
-#include <spglib/group/wyckoff_position.hpp>
+#include <cppcrystal/group/wyckoff_position.hpp>
 
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <algorithm>
 #include <vector>
 
-namespace spglib::group {
+namespace cppcrystal::group {
 
 namespace {
 // Tolerance for comparing exact (rational) database coordinates mod 1.
@@ -45,4 +45,4 @@ Positions WyckoffPosition::get_all_positions(Vector3d const &xyz) const {
   return out;
 }
 
-} // namespace spglib::group
+} // namespace cppcrystal::group

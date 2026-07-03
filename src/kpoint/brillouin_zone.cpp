@@ -1,6 +1,6 @@
-#include <spglib/kpoint/brillouin_zone.hpp>
+#include <cppcrystal/kpoint/brillouin_zone.hpp>
 
-#include <spglib/kpoint/grid.hpp>
+#include <cppcrystal/kpoint/grid.hpp>
 
 #include <algorithm>
 #include <array>
@@ -10,7 +10,7 @@
 #include <ranges>
 #include <vector>
 
-namespace spglib::kpoint {
+namespace cppcrystal::kpoint {
 
 namespace {
 
@@ -139,4 +139,4 @@ std::vector<std::optional<std::size_t>> BZ_grid_points_by_rotations(
   return out;
 }
 
-} // namespace spglib::kpoint
+} // namespace cppcrystal::kpoint

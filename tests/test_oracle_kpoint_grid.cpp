@@ -4,13 +4,13 @@
 
 #include "oracle.hpp"
 
-#include <spglib/kpoint/grid.hpp>
+#include <cppcrystal/kpoint/grid.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
 
-using spglib::Vector3i;
+using cppcrystal::Vector3i;
 
 void check_mesh(Vector3i const &mesh) {
   for (int x = -mesh[0]; x <= 2 * mesh[0]; ++x) {
@@ -18,8 +18,8 @@ void check_mesh(Vector3i const &mesh) {
       for (int z = -mesh[2]; z <= 2 * mesh[2]; ++z) {
         Vector3i const address(x, y, z);
         INFO("mesh " << mesh.transpose() << " address " << address.transpose());
-        REQUIRE(spglib::kpoint::grid_point_from_address(address, mesh) ==
-                spglib::oracle::reference_grid_point_from_address(address, mesh));
+        REQUIRE(cppcrystal::kpoint::grid_point_from_address(address, mesh) ==
+                cppcrystal::oracle::reference_grid_point_from_address(address, mesh));
       }
     }
   }
@@ -36,12 +36,12 @@ TEST_CASE("grid_point_from_address matches reference", "[oracle][kpoint]") {
 TEST_CASE("all_grid_addresses indices are self-consistent", "[oracle][kpoint]") {
   for (Vector3i const &mesh :
        {Vector3i(4, 4, 4), Vector3i(3, 3, 3), Vector3i(2, 3, 4)}) {
-    auto const grid = spglib::kpoint::all_grid_addresses(mesh);
+    auto const grid = cppcrystal::kpoint::all_grid_addresses(mesh);
     REQUIRE(grid.size() ==
             static_cast<std::size_t>(mesh[0] * mesh[1] * mesh[2]));
     for (std::size_t gp = 0; gp < grid.size(); ++gp) {
       INFO("mesh " << mesh.transpose() << " grid point " << gp);
-      REQUIRE(spglib::kpoint::grid_point_from_address(grid[gp], mesh) == gp);
+      REQUIRE(cppcrystal::kpoint::grid_point_from_address(grid[gp], mesh) == gp);
     }
   }
 }

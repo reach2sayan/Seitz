@@ -3,17 +3,17 @@
 // generation. The group tests assert the orbit-stabilizer invariant across all
 // 230 space groups; the generation test round-trips a generated cell back
 // through the analyzer.
-#include <spglib/analysis/symmetry_analyzer.hpp>
-#include <spglib/core/overlap.hpp>
-#include <spglib/data/rod_database.hpp>
-#include <spglib/dataset.hpp>
-#include <spglib/generate/crystal_builder.hpp>
-#include <spglib/generate/distance_check.hpp>
-#include <spglib/generate/rod_crystal.hpp>
-#include <spglib/group/point_group.hpp>
-#include <spglib/group/rod_group.hpp>
-#include <spglib/group/space_group.hpp>
-#include <spglib/group/subgroup_graph.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/data/rod_database.hpp>
+#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/generate/crystal_builder.hpp>
+#include <cppcrystal/generate/distance_check.hpp>
+#include <cppcrystal/generate/rod_crystal.hpp>
+#include <cppcrystal/group/point_group.hpp>
+#include <cppcrystal/group/rod_group.hpp>
+#include <cppcrystal/group/space_group.hpp>
+#include <cppcrystal/group/subgroup_graph.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -23,7 +23,7 @@
 #include <stdexcept>
 #include <utility>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 // Unwrap a move-only Result<T>, failing the test on an error result.

@@ -42,7 +42,7 @@ PERIODIC_AXIS = 2  # c; PyXtal rod-group convention
 # Default output, resolved relative to this file (tools/ -> repo root).
 DEFAULT_OUT = os.path.normpath(
     os.path.join(os.path.dirname(__file__), os.pardir,
-                 "include", "spglib", "data", "rod_group_tables.hpp"))
+                 "include", "cppcrystal", "data", "rod_group_tables.hpp"))
 
 
 def require_pyxtal():
@@ -137,7 +137,7 @@ def emit(symbols, ops_per_group, out_path):
           "(Group(n, dim=1)).\n// Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
-        w("namespace spglib::data {\n\n")
+        w("namespace cppcrystal::data {\n\n")
 
         w("// Number of rod (1D-periodic subperiodic) groups.\n")
         w("inline constexpr int kNumRodGroups = %d;\n\n" % NUM_ROD_GROUPS)
@@ -184,7 +184,7 @@ def emit(symbols, ops_per_group, out_path):
             w("    " + ", ".join("%d" % o for o in offsets[i:i + 12]) + ",\n")
         w("}};\n\n")
 
-        w("} // namespace spglib::data\n")
+        w("} // namespace cppcrystal::data\n")
 
     return len(flat)
 

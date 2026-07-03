@@ -1,10 +1,10 @@
-#include <spglib/data/element_data.hpp>
+#include <cppcrystal/data/element_data.hpp>
 
 #include <boost/bimap.hpp>
 
 #include <string>
 
-namespace spglib::data {
+namespace cppcrystal::data {
 
 namespace {
 
@@ -37,4 +37,4 @@ std::optional<int> atomic_number(std::string_view symbol) {
   return it->second;
 }
 
-} // namespace spglib::data
+} // namespace cppcrystal::data

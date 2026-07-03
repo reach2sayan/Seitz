@@ -1,13 +1,13 @@
-#include <spglib/generate/distance_check.hpp>
+#include <cppcrystal/generate/distance_check.hpp>
 
-#include <spglib/data/element_data.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/data/element_data.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
 #include <limits>
 #include <vector>
 
-namespace spglib::generate {
+namespace cppcrystal::generate {
 
 namespace {
 
@@ -101,4 +101,4 @@ bool cluster_distances_valid(Positions const &coordinates, Types const &types,
   return true;
 }
 
-} // namespace spglib::generate
+} // namespace cppcrystal::generate

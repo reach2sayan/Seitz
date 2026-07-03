@@ -1,13 +1,13 @@
 #include "oracle.hpp"
 
-#include <spglib/reduce/delaunay.hpp>
-#include <spglib/reduce/niggli.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/reduce/niggli.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 // A spread of lattices: cubic, a primitive-rhombohedral-ish cell, a sheared

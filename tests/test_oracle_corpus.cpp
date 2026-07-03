@@ -7,7 +7,7 @@
 #include "corpus.hpp"
 #include "oracle.hpp"
 
-#include <spglib/dataset.hpp>
+#include <cppcrystal/dataset.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -16,7 +16,7 @@
 TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
           "[oracle][corpus]") {
   double const symprec = 1e-5;
-  auto const corpus = spglib::oracle::load_corpus();
+  auto const corpus = cppcrystal::oracle::load_corpus();
   INFO("corpus size " << corpus.size());
   REQUIRE(corpus.size() >= 200); // ~230 cells; guards against a bad data path
 
@@ -25,9 +25,9 @@ TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
     INFO("cell " << entry.name << " (expected SG "
                  << entry.space_group_number << ")");
 
-    auto const got = spglib::get_dataset(entry.cell, symprec);
+    auto const got = cppcrystal::get_dataset(entry.cell, symprec);
     REQUIRE(got);
-    auto const ref = spglib::oracle::reference_dataset(entry.cell, symprec);
+    auto const ref = cppcrystal::oracle::reference_dataset(entry.cell, symprec);
     REQUIRE(ref.number != 0);
 
     CHECK(got->spacegroup_number == ref.number);

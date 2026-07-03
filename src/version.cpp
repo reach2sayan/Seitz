@@ -1,7 +1,7 @@
-#include <spglib/core/version.hpp>
+#include <cppcrystal/core/version.hpp>
 
-namespace spglib {
+namespace cppcrystal {
 
 char const *version_string() noexcept { return "0.1.0"; }
 
-} // namespace spglib
+} // namespace cppcrystal

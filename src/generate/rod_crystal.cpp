@@ -1,8 +1,8 @@
-#include <spglib/generate/rod_crystal.hpp>
+#include <cppcrystal/generate/rod_crystal.hpp>
 
-#include <spglib/data/element_data.hpp>
-#include <spglib/generate/random_lattice.hpp>
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/data/element_data.hpp>
+#include <cppcrystal/generate/random_lattice.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <algorithm>
 #include <array>
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace spglib::generate {
+namespace cppcrystal::generate {
 
 namespace {
 
@@ -277,4 +277,4 @@ random_rod_crystal(group::RodGroup const &rg, Composition const &comp,
       "the attempt budget for any compatible Wyckoff assignment"});
 }
 
-} // namespace spglib::generate
+} // namespace cppcrystal::generate

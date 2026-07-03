@@ -1,7 +1,7 @@
-#include <spglib/group/rod_group.hpp>
+#include <cppcrystal/group/rod_group.hpp>
 
-#include <spglib/data/rod_database.hpp>
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/data/rod_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -14,7 +14,7 @@
 #include <span>
 #include <vector>
 
-namespace spglib::group {
+namespace cppcrystal::group {
 
 namespace {
 
@@ -362,4 +362,4 @@ Result<RodGroup> RodGroup::from_number(int number) {
   return rg;
 }
 
-} // namespace spglib::group
+} // namespace cppcrystal::group

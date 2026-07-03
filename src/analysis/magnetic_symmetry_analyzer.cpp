@@ -1,10 +1,10 @@
-#include <spglib/analysis/magnetic_symmetry_analyzer.hpp>
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <utility>
 
-namespace spglib::analysis {
+namespace cppcrystal::analysis {
 
 MagneticSymmetryAnalyzer MagneticSymmetryAnalyzer::from_cell(
     MagneticCell cell, bool is_axial, double symprec,
@@ -84,4 +84,4 @@ Result<void> MagneticSymmetryAnalyzer::warm() const {
   return {};
 }
 
-} // namespace spglib::analysis
+} // namespace cppcrystal::analysis

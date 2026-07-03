@@ -1,8 +1,8 @@
-#include <spglib/generate/crystal_builder.hpp>
+#include <cppcrystal/generate/crystal_builder.hpp>
 
-#include <spglib/generate/random_lattice.hpp>
+#include <cppcrystal/generate/random_lattice.hpp>
 
-#include <spglib/math/fractional.hpp>
+#include <cppcrystal/math/fractional.hpp>
 
 #include <algorithm>
 #include <array>
@@ -11,7 +11,7 @@
 #include <span>
 #include <vector>
 
-namespace spglib::generate {
+namespace cppcrystal::generate {
 
 namespace {
 
@@ -362,4 +362,4 @@ Result<GeneratedCluster> random_cluster(group::PointGroup const &pg,
       "attempt budget for any compatible Wyckoff assignment"});
 }
 
-} // namespace spglib::generate
+} // namespace cppcrystal::generate

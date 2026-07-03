@@ -1,10 +1,10 @@
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
-#include <spglib/reduce/delaunay.hpp>
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <algorithm>
 #include <array>
@@ -24,7 +24,7 @@
 //   3. Otherwise pick three pure-translation/unit vectors that span the
 //      primitive volume, Delaunay-reduce, then fold and de-duplicate the atoms
 //      into the smaller cell.
-namespace spglib::symmetry {
+namespace cppcrystal::symmetry {
 
 namespace {
 
@@ -442,4 +442,4 @@ find_primitive_with_pure_translations(Cell const &cell,
                    cell.lattice(), symprec, std::nullopt};
 }
 
-} // namespace spglib::symmetry
+} // namespace cppcrystal::symmetry

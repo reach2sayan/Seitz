@@ -1,6 +1,6 @@
-#include <spglib/data/sitesym_database.hpp>
+#include <cppcrystal/data/sitesym_database.hpp>
 
-#include <spglib/data/sitesym_tables.hpp>
+#include <cppcrystal/data/sitesym_tables.hpp>
 
 #include <array>
 #include <cstddef>
@@ -8,7 +8,7 @@
 #include <ranges>
 #include <string_view>
 
-namespace spglib::data {
+namespace cppcrystal::data {
 
 namespace {
 
@@ -131,4 +131,4 @@ std::vector<WyckoffEntry> wyckoff_entries(int hall_number) {
   return entries;
 }
 
-} // namespace spglib::data
+} // namespace cppcrystal::data

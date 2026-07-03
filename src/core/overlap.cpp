@@ -1,11 +1,11 @@
-#include <spglib/core/overlap.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
 #include <numeric>
 #include <ranges>
 
-namespace spglib {
+namespace cppcrystal {
 
 namespace {
 
@@ -142,4 +142,4 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   return true;
 }
 
-} // namespace spglib
+} // namespace cppcrystal

@@ -1,10 +1,10 @@
-#include <spglib/symmetry/find_symmetry.hpp>
+#include <cppcrystal/symmetry/find_symmetry.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/core/validation.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
-#include <spglib/reduce/delaunay.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/validation.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -19,7 +19,7 @@
 //   2. Transform those rotations into the input cell's basis.
 //   3. For each rotation, find the translations that map the cell onto itself
 //      via the OverlapChecker.
-namespace spglib::symmetry {
+namespace cppcrystal::symmetry {
 
 namespace {
 
@@ -288,4 +288,4 @@ std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
                                    *min_index, symprec, cell.aperiodic_axis());
 }
 
-} // namespace spglib::symmetry
+} // namespace cppcrystal::symmetry

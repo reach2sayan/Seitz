@@ -1,8 +1,8 @@
-#include <spglib/kpoint/grid.hpp>
+#include <cppcrystal/kpoint/grid.hpp>
 
 #include <cstddef>
 
-namespace spglib::kpoint {
+namespace cppcrystal::kpoint {
 
 namespace {
 
@@ -98,4 +98,4 @@ std::size_t grid_point_from_address(Vector3i const &grid_address,
   return grid_point_double_mesh(address_double, mesh);
 }
 
-} // namespace spglib::kpoint
+} // namespace cppcrystal::kpoint

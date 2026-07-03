@@ -1,9 +1,9 @@
-#include <spglib/spin/spin.hpp>
+#include <cppcrystal/spin/spin.hpp>
 
-#include <spglib/core/overlap.hpp>
-#include <spglib/math/fractional.hpp> // math::nint
-#include <spglib/symmetry/find_symmetry.hpp> // is_overlap_same_type
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/math/fractional.hpp> // math::nint
+#include <cppcrystal/symmetry/find_symmetry.hpp> // is_overlap_same_type
+#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +13,7 @@
 #include <ranges>
 #include <vector>
 
-namespace spglib::spin {
+namespace cppcrystal::spin {
 
 namespace {
 
@@ -382,4 +382,4 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
                                 std::move(*permutations), *prim_lattice};
 }
 
-} // namespace spglib::spin
+} // namespace cppcrystal::spin

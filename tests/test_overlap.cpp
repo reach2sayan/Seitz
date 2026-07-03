@@ -1,8 +1,8 @@
-#include <spglib/core/overlap.hpp>
+#include <cppcrystal/core/overlap.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 // Body-centered cubic: atoms at (0,0,0) and (1/2,1/2,1/2).

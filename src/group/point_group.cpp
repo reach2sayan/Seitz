@@ -1,7 +1,7 @@
-#include <spglib/group/point_group.hpp>
+#include <cppcrystal/group/point_group.hpp>
 
-#include <spglib/data/spg_database.hpp>
-#include <spglib/symmetry/pointgroup.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -13,7 +13,7 @@
 #include <span>
 #include <vector>
 
-namespace spglib::group {
+namespace cppcrystal::group {
 
 namespace {
 
@@ -285,4 +285,4 @@ Result<PointGroup> PointGroup::from_number(int number) {
   return pg;
 }
 
-} // namespace spglib::group
+} // namespace cppcrystal::group

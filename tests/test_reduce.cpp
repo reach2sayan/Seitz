@@ -1,10 +1,10 @@
-#include <spglib/reduce/delaunay.hpp>
-#include <spglib/reduce/niggli.hpp>
+#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/reduce/niggli.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 using Catch::Approx;
 
 namespace {

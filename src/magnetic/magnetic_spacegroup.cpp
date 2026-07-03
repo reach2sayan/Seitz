@@ -1,13 +1,13 @@
-#include <spglib/magnetic/magnetic_spacegroup.hpp>
+#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
 
-#include <spglib/core/symmetry_operation.hpp>
-#include <spglib/data/msg_database.hpp>
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
-#include <spglib/refine/refinement.hpp>
-#include <spglib/spacegroup/spacegroup.hpp>
-#include <spglib/spin/spin.hpp>
-#include <spglib/symmetry/primitive.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/data/msg_database.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/refine/refinement.hpp>
+#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include <cppcrystal/spin/spin.hpp>
+#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <boost/container/small_vector.hpp>
 
@@ -21,7 +21,7 @@
 #include <utility>
 #include <vector>
 
-namespace spglib::magnetic {
+namespace cppcrystal::magnetic {
 
 namespace {
 
@@ -536,4 +536,4 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
   return MagneticCell(Cell(lattice, positions, types), std::move(tensors));
 }
 
-} // namespace spglib::magnetic
+} // namespace cppcrystal::magnetic

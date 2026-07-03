@@ -1,8 +1,8 @@
-#include <spglib/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 
 #include <utility>
 
-namespace spglib::analysis {
+namespace cppcrystal::analysis {
 
 SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, double symprec,
                                              AngleTolerance angle_tolerance,
@@ -136,4 +136,4 @@ Result<void> SymmetryAnalyzer::warm() const {
   return {};
 }
 
-} // namespace spglib::analysis
+} // namespace cppcrystal::analysis

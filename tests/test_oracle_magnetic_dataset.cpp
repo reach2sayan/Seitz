@@ -1,15 +1,15 @@
 // Oracle test for the full magnetic dataset (spglib.c get_magnetic_dataset):
-// spglib::get_magnetic_dataset must reproduce spg_get_magnetic_dataset — the
+// cppcrystal::get_magnetic_dataset must reproduce spg_get_magnetic_dataset — the
 // magnetic space-group identity, the standardized cell (lattice + positions +
 // site tensors), equivalent atoms, and the transformation to the standardized
 // setting.
 
 #include "oracle.hpp"
 
-#include <spglib/core/magnetic_cell.hpp>
-#include <spglib/magnetic_dataset.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/magnetic_dataset.hpp>
 
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -19,17 +19,17 @@
 
 namespace {
 
-using spglib::Cell;
-using spglib::CollinearTensors;
-using spglib::MagneticCell;
-using spglib::Matrix3d;
-using spglib::Matrix3i;
-using spglib::NoncollinearTensors;
-using spglib::noncollinear_tensors;
-using spglib::Positions;
-using spglib::SiteTensor;
-using spglib::SiteTensors;
-using spglib::Vector3d;
+using cppcrystal::Cell;
+using cppcrystal::CollinearTensors;
+using cppcrystal::MagneticCell;
+using cppcrystal::Matrix3d;
+using cppcrystal::Matrix3i;
+using cppcrystal::NoncollinearTensors;
+using cppcrystal::noncollinear_tensors;
+using cppcrystal::Positions;
+using cppcrystal::SiteTensor;
+using cppcrystal::SiteTensors;
+using cppcrystal::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
                std::vector<int> const &types) {
@@ -64,17 +64,17 @@ bool fractional_overlap(Vector3d const &a, Vector3d const &b, double symprec) {
 
 bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
   Matrix3d const rel = a.inverse() * b;
-  Matrix3i const rounded = spglib::math::round_to_int(rel);
+  Matrix3i const rounded = cppcrystal::math::round_to_int(rel);
   return (rel - rounded.cast<double>()).cwiseAbs().maxCoeff() < 1e-6 &&
          std::abs(rounded.determinant()) == 1;
 }
 
 void check(MagneticCell const &mcell, bool is_axial, double symprec) {
-  auto const got = spglib::get_magnetic_dataset(mcell, is_axial, symprec);
+  auto const got = cppcrystal::get_magnetic_dataset(mcell, is_axial, symprec);
   REQUIRE(got);
 
   // Reference dataset.
-  spglib::oracle::CCell c(mcell.cell());
+  cppcrystal::oracle::CCell c(mcell.cell());
   std::vector<double> const tensors = flat_tensors(mcell);
   int const rank = mcell.rank() == SiteTensor::collinear ? 0 : 1;
   SpglibMagneticDataset *ref = spg_get_magnetic_dataset(
@@ -90,18 +90,18 @@ void check(MagneticCell const &mcell, bool is_axial, double symprec) {
 
   // Transformation to the standardized setting.
   Matrix3d ref_tmat;
-  spglib::oracle::from_c_lattice(ref_tmat, ref->transformation_matrix);
+  cppcrystal::oracle::from_c_lattice(ref_tmat, ref->transformation_matrix);
   CHECK((got->transformation_matrix - ref_tmat).cwiseAbs().maxCoeff() < 1e-5);
   Vector3d const ref_shift(ref->origin_shift[0], ref->origin_shift[1],
                            ref->origin_shift[2]);
   CHECK((got->origin_shift - ref_shift).cwiseAbs().maxCoeff() < 1e-5);
   Matrix3d ref_std_rot;
-  spglib::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
+  cppcrystal::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
   CHECK((got->std_rotation_matrix - ref_std_rot).cwiseAbs().maxCoeff() < 1e-5);
 
   // Standardized lattice.
   Matrix3d ref_std_lat;
-  spglib::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
+  cppcrystal::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
   CHECK((got->std_lattice - ref_std_lat).cwiseAbs().maxCoeff() < 1e-5);
 
   // Equivalent atoms (per input atom).
@@ -163,7 +163,7 @@ void check(MagneticCell const &mcell, bool is_axial, double symprec) {
   }
 
   Matrix3d ref_prim;
-  spglib::oracle::from_c_lattice(ref_prim, ref->primitive_lattice);
+  cppcrystal::oracle::from_c_lattice(ref_prim, ref->primitive_lattice);
   CHECK(same_lattice(got->primitive_lattice, ref_prim));
 
   spg_free_magnetic_dataset(ref);

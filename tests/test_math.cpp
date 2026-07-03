@@ -1,10 +1,10 @@
-#include <spglib/math/fractional.hpp>
-#include <spglib/math/integer_matrix.hpp>
+#include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 using Catch::Approx;
 
 TEST_CASE("nint rounds half away from zero", "[math]") {

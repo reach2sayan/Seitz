@@ -1,7 +1,7 @@
 // Non-oracle tests for standardize_cell: round-trip checks against the
 // determination pipeline, without the reference spglib.
-#include <spglib/analysis/symmetry_analyzer.hpp>
-#include <spglib/standardize.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/standardize.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <utility>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 template <class T> T must(Result<T> r) {

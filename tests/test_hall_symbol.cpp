@@ -4,12 +4,12 @@
 // operations (the canonical setting) back through match_hall_symbol must
 // recognise that Hall number, with a zero origin shift.
 
-#include <spglib/data/spg_database.hpp>
-#include <spglib/spacegroup/hall_symbol.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/spacegroup/hall_symbol.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 TEST_CASE(
     "each Hall setting matches its own database operations with zero shift",

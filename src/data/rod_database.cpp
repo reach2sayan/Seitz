@@ -1,8 +1,8 @@
-#include <spglib/data/rod_database.hpp>
+#include <cppcrystal/data/rod_database.hpp>
 
-#include <spglib/data/rod_group_tables.hpp>
+#include <cppcrystal/data/rod_group_tables.hpp>
 
-namespace spglib::data {
+namespace cppcrystal::data {
 
 SymmetryOperations rod_operations_from_database(int rod_number) {
   if (!rod_number_in_range(rod_number)) {
@@ -28,4 +28,4 @@ SymmetryOperations rod_operations_from_database(int rod_number) {
   return ops;
 }
 
-} // namespace spglib::data
+} // namespace cppcrystal::data

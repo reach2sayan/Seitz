@@ -39,7 +39,7 @@ compiled into the binary as `constexpr` catalogs and decoded on demand.
 A single umbrella header pulls in the whole API:
 
 ```cpp
-#include <spglib/spglib.hpp>
+#include <cppcrystal/cppcrystal.hpp>
 ```
 
 ---
@@ -49,20 +49,20 @@ A single umbrella header pulls in the whole API:
 ### Determine a space group
 
 ```cpp
-#include <spglib/spglib.hpp>
+#include <cppcrystal/cppcrystal.hpp>
 
-spglib::Cell rutile{lattice, positions, types}; // lattice columns = basis vectors
-auto result = spglib::get_dataset(rutile);
+cppcrystal::Cell rutile{lattice, positions, types}; // lattice columns = basis vectors
+auto result = cppcrystal::get_dataset(rutile);
 
-spglib::leaf::try_handle_all(
-    [&]() -> spglib::Result<void> {
-      BOOST_LEAF_AUTO(ds, spglib::get_dataset(rutile));
+cppcrystal::leaf::try_handle_all(
+    [&]() -> cppcrystal::Result<void> {
+      BOOST_LEAF_AUTO(ds, cppcrystal::get_dataset(rutile));
       std::printf("space group %d (%s)\n",
                   ds.spacegroup_number,
                   std::string(ds.international_symbol).c_str());
       return {};
     },
-    [](spglib::e_spacegroup_search_failed) {
+    [](cppcrystal::e_spacegroup_search_failed) {
       std::puts("no space group found at this tolerance");
     });
 ```
@@ -81,7 +81,7 @@ the pipeline, so the dataset is computed once and every projection
 served from that cache:
 
 ```cpp
-auto sa = spglib::analysis::SymmetryAnalyzer::from_cell(rutile);
+auto sa = cppcrystal::analysis::SymmetryAnalyzer::from_cell(rutile);
 auto number = sa.spacegroup_number();   // runs determination
 auto prim   = sa.primitive_cell();      // reuses it
 auto std    = sa.standardized_cell();   // reuses it
@@ -93,9 +93,9 @@ tolerance, build a new one.
 ### Generate a random crystal
 
 ```cpp
-auto sg   = spglib::group::SpaceGroup::from_number(225).value();   // Fm-3m
-auto comp = spglib::Composition{{ {/*Z=*/11, 4}, {/*Z=*/17, 4} }}; // NaCl
-auto xtal = spglib::generate::random_crystal(sg, comp);
+auto sg   = cppcrystal::group::SpaceGroup::from_number(225).value();   // Fm-3m
+auto comp = cppcrystal::Composition{{ {/*Z=*/11, 4}, {/*Z=*/17, 4} }}; // NaCl
+auto xtal = cppcrystal::generate::random_crystal(sg, comp);
 ```
 
 `random_crystal` enumerates the valid ways to seat the composition on the group's
@@ -107,7 +107,7 @@ minimum-distance criterion is met. The same shape generates 2D layers
 ### Irreducible k-points
 
 ```cpp
-auto mesh = spglib::kpoint::ir_reciprocal_mesh(
+auto mesh = cppcrystal::kpoint::ir_reciprocal_mesh(
     cell, /*mesh=*/{8, 8, 8}, /*is_shift=*/{0, 0, 0},
     /*time_reversal=*/true);
 // mesh.num_ir  -> count of irreducible points
@@ -144,14 +144,14 @@ decoded lazily at runtime and cached. Generated tables are split into a public
 metadata header and a private operation header so the encoded packing never
 reaches a public interface.
 
-**Thread-safety.** The shared global tables are primed by `spglib::warmup()` and
+**Thread-safety.** The shared global tables are primed by `cppcrystal::warmup()` and
 are race-free for concurrent reads afterward. Per-instance analyzer caches are
 not; call `.warm()` on one thread before sharing an analyzer read-only.
 
 ### Source layout
 
 ```
-include/spglib/         public headers
+include/cppcrystal/         public headers
   core/                 Cell, symmetry operations, errors, tolerance, periodicity
   analysis/             SymmetryAnalyzer, MagneticSymmetryAnalyzer (memoizing facades)
   group/                SpaceGroup, PointGroup, RodGroup, Wyckoff, SubgroupGraph
@@ -191,12 +191,12 @@ ctest --test-dir cmake-build-debug  # run the unit tests
 
 | Option | Default | Effect |
 |---|---|---|
-| `SPGLIB_BUILD_TESTS` | ON | unit test suite |
-| `SPGLIB_BUILD_DEMO` | ON | `cppcrystal_demo` executable |
-| `SPGLIB_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 |
-| `SPGLIB_USE_MKL` | OFF | Intel MKL as Eigen's BLAS/LAPACK backend |
-| `SPGLIB_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
-| `SPGLIB_BUILD_TOOLS` | OFF | offline data generators |
+| `CPPCRYSTAL_BUILD_TESTS` | ON | unit test suite |
+| `CPPCRYSTAL_BUILD_DEMO` | ON | `cppcrystal_demo` executable |
+| `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 |
+| `CPPCRYSTAL_USE_MKL` | OFF | Intel MKL as Eigen's BLAS/LAPACK backend |
+| `CPPCRYSTAL_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
+| `CPPCRYSTAL_BUILD_TOOLS` | OFF | offline data generators |
 
 The `oracle` preset builds reference spglib via `FetchContent` and links it only
 into the oracle tests — never into the library — to cross-check every result

@@ -1,8 +1,8 @@
-#include <spglib/kpoint/reciprocal_mesh.hpp>
+#include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 
-#include <spglib/dataset.hpp> // get_dataset
-#include <spglib/kpoint/grid.hpp>
-#include <spglib/math/fractional.hpp> // math::nint
+#include <cppcrystal/dataset.hpp> // get_dataset
+#include <cppcrystal/kpoint/grid.hpp>
+#include <cppcrystal/math/fractional.hpp> // math::nint
 
 #include <algorithm>
 #include <array>
@@ -12,7 +12,7 @@
 #include <ranges>
 #include <vector>
 
-namespace spglib::kpoint {
+namespace cppcrystal::kpoint {
 
 std::vector<Matrix3i>
 point_group_reciprocal(std::vector<Matrix3i> const &rotations,
@@ -231,4 +231,4 @@ grid_points_by_rotations(Vector3i const &address_orig,
   return out;
 }
 
-} // namespace spglib::kpoint
+} // namespace cppcrystal::kpoint

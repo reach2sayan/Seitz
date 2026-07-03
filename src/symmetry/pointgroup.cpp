@@ -1,4 +1,4 @@
-#include <spglib/symmetry/pointgroup.hpp>
+#include <cppcrystal/symmetry/pointgroup.hpp>
 
 #include <algorithm>
 #include <array>
@@ -14,7 +14,7 @@
 //   * kRotAxes: 73 candidate rotation axes used to pick conventional axes.
 // Identification matches the input's rotation-type histogram against the table;
 // the transformation matrix selects conventional axes per Laue class.
-namespace spglib::symmetry {
+namespace cppcrystal::symmetry {
 
 namespace {
 
@@ -217,57 +217,11 @@ Matrix3i const kIdentity = Matrix3i::Identity();
 
 // The ten crystallographic rotation types, ordered as the point-group
 // class-count table indexes them: {-6,-4,-3,-2,-1,1,2,3,4,6}.
-enum class RotationType {
-  rotoinversion_6, // -6
-  rotoinversion_4, // -4
-  rotoinversion_3, // -3
-  mirror,          // -2
-  inversion,       // -1
-  identity,        //  1
-  rotation_2,      //  2
-  rotation_3,      //  3
-  rotation_4,      //  4
-  rotation_6,      //  6
-};
 constexpr std::size_t kRotationTypeCount = 10;
 
-// Classify a rotation by its determinant and trace; std::nullopt if it is not a
-// crystallographic rotation (a defensive case that valid point groups avoid).
-[[nodiscard]] std::optional<RotationType>
-rotation_type(Matrix3i const &rot) noexcept {
-  int const det = rot.determinant();
-  int const tr = rot.trace();
-  if (det == -1) {
-    switch (tr) {
-    case -2:
-      return RotationType::rotoinversion_6;
-    case -1:
-      return RotationType::rotoinversion_4;
-    case 0:
-      return RotationType::rotoinversion_3;
-    case 1:
-      return RotationType::mirror;
-    case -3:
-      return RotationType::inversion;
-    default:
-      return std::nullopt;
-    }
-  }
-  switch (tr) {
-  case 3:
-    return RotationType::identity;
-  case -1:
-    return RotationType::rotation_2;
-  case 0:
-    return RotationType::rotation_3;
-  case 1:
-    return RotationType::rotation_4;
-  case 2:
-    return RotationType::rotation_6;
-  default:
-    return std::nullopt;
-  }
-}
+// rotation_type() is now public (declared in the header) and defined below,
+// after this anonymous namespace; class_table() calls it through that
+// declaration.
 
 // De-duplicate rotations by value.
 [[nodiscard]] PointSymmetry
@@ -313,7 +267,7 @@ unique_rotations(std::span<Matrix3i const> rotations) {
 
 // Index into kRotAxes that is the rotation axis (eigenvector) of a proper
 // rotation; std::nullopt for the identity / when none matches.
-[[nodiscard]] std::optional<int> rotation_axis(Matrix3i const &proper_rot) {
+[[nodiscard]] std::optional<int> axis_index(Matrix3i const &proper_rot) {
   if (proper_rot != kIdentity) {
     for (int i = 0; i < kNumRotAxes; ++i) {
       Vector3i const v = proper_rot * rot_axis(i);
@@ -375,7 +329,7 @@ bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
   for (Matrix3i const &r : ps) {
     prop_rot = proper_rotation(r);
     if (prop_rot.trace() == -1) { // two-fold
-      two_fold = rotation_axis(prop_rot);
+      two_fold = axis_index(prop_rot);
       break;
     }
   }
@@ -418,7 +372,7 @@ struct Principal {
     Matrix3i const prop_rot = proper_rotation(r);
     if ((rot_order == 4 && prop_rot.trace() == 1) ||
         (rot_order == 3 && prop_rot.trace() == 0)) {
-      return rotation_axis(prop_rot).transform(
+      return axis_index(prop_rot).transform(
           [&](int axis) { return Principal{prop_rot, axis}; });
     }
   }
@@ -522,7 +476,7 @@ void sort_axes(AxisTriple &axes) {
   for (Matrix3i const &r : ps) {
     prop_rot = proper_rotation(r);
     if (prop_rot.trace() == -1) {
-      two_fold = rotation_axis(prop_rot);
+      two_fold = axis_index(prop_rot);
       break;
     }
   }
@@ -598,7 +552,7 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
     Matrix3i const prop_rot = proper_rotation(r);
     if ((prop_rot.trace() == -1 && rot_order == 2) ||
         (prop_rot.trace() == 1 && rot_order == 4)) {
-      auto const axis = rotation_axis(prop_rot);
+      auto const axis = axis_index(prop_rot);
       if (!axis) {
         continue;
       }
@@ -664,16 +618,87 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
 
 } // namespace
 
+std::optional<RotationType> rotation_type(Matrix3i const &rot) noexcept {
+  int const det = rot.determinant();
+  int const tr = rot.trace();
+  if (det == -1) {
+    switch (tr) {
+    case -2:
+      return RotationType::rotoinversion_6;
+    case -1:
+      return RotationType::rotoinversion_4;
+    case 0:
+      return RotationType::rotoinversion_3;
+    case 1:
+      return RotationType::mirror;
+    case -3:
+      return RotationType::inversion;
+    default:
+      return std::nullopt;
+    }
+  }
+  switch (tr) {
+  case 3:
+    return RotationType::identity;
+  case -1:
+    return RotationType::rotation_2;
+  case 0:
+    return RotationType::rotation_3;
+  case 1:
+    return RotationType::rotation_4;
+  case 2:
+    return RotationType::rotation_6;
+  default:
+    return std::nullopt;
+  }
+}
+
+int rotation_order(Matrix3i const &rot) noexcept {
+  auto const t = rotation_type(rot);
+  if (!t) {
+    return 0;
+  }
+  switch (*t) {
+  case RotationType::identity:
+    return 1;
+  case RotationType::rotation_2:
+    return 2;
+  case RotationType::rotation_3:
+    return 3;
+  case RotationType::rotation_4:
+    return 4;
+  case RotationType::rotation_6:
+    return 6;
+  case RotationType::inversion:
+    return -1;
+  case RotationType::mirror:
+    return -2;
+  case RotationType::rotoinversion_3:
+    return -3;
+  case RotationType::rotoinversion_4:
+    return -4;
+  case RotationType::rotoinversion_6:
+    return -6;
+  }
+  return 0;
+}
+
+std::optional<Vector3i> rotation_axis(Matrix3i const &rot) {
+  auto const idx = axis_index(proper_rotation(rot));
+  return idx ? std::optional<Vector3i>{rot_axis(*idx)} : std::nullopt;
+}
+
 PointGroup pointgroup_by_number(int number) noexcept {
   if (number < 1 || number > 32) {
     return {};
   }
   PgEntry const &e = kPointgroupData[static_cast<std::size_t>(number)];
-  return {number, e.symbol, e.schoenflies, e.holohedry, e.laue};
+  // CrystalClass enumerators are aligned to the point-group numbering (1..32).
+  return {number, e.symbol, e.schoenflies, e.holohedry, e.laue,
+          static_cast<CrystalClass>(number)};
 }
 
-inline int
-identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
+int identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
   return pointgroup_number(unique_rotations(rotations));
 }
 
@@ -709,4 +734,4 @@ std::vector<Matrix3i> rotations_of(SymmetryOperations const &ops) {
   return r;
 }
 
-} // namespace spglib::symmetry
+} // namespace cppcrystal::symmetry

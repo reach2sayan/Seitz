@@ -25,7 +25,7 @@ catch_discover_tests(cppcrystal_tests)
 
 # Oracle tests link the reference spglib (Spglib::symspg) and diff our results
 # against it. Gated so the normal build needs no reference checkout.
-if (SPGLIB_BUILD_ORACLE_TESTS)
+if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
     add_executable(cppcrystal_oracle_tests
             test_oracle_overlap.cpp
             test_oracle_reduce.cpp

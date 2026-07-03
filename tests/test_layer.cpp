@@ -2,9 +2,9 @@
 // structures with hand-checked layer-group numbers, symbols and Wyckoff data.
 // The oracle comparison against spg_get_layer_dataset lives in the gated
 // oracle suite; these cases pin the behavior in the default build.
-#include <spglib/analysis/symmetry_analyzer.hpp>
-#include <spglib/data/spg_database.hpp>
-#include <spglib/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/dataset.hpp>
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -14,7 +14,7 @@
 #include <stdexcept>
 #include <utility>
 
-using namespace spglib;
+using namespace cppcrystal;
 
 namespace {
 template <class T> T must(Result<T> r) {

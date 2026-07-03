@@ -1,6 +1,6 @@
-#include <spglib/data/msg_database.hpp>
+#include <cppcrystal/data/msg_database.hpp>
 
-#include <spglib/data/magnetic_spacegroup_operation_tables.hpp>
+#include <cppcrystal/data/magnetic_spacegroup_operation_tables.hpp>
 
 #include <array>
 #include <cstddef>
@@ -8,7 +8,7 @@
 #include <optional>
 #include <ranges>
 
-namespace spglib::data {
+namespace cppcrystal::data {
 
 namespace {
 
@@ -168,4 +168,4 @@ SymmetryOperations magnetic_std_transformations(int uni_number,
   return transforms;
 }
 
-} // namespace spglib::data
+} // namespace cppcrystal::data
