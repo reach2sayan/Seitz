@@ -52,7 +52,7 @@ make_operation(DecodedOp const &d) noexcept {
       Eigen::Map<Eigen::Matrix<std::int8_t, 3, 1> const>(d.trans_num.data())
           .cast<double>() /
       12.0;
-  return {rot, trans};
+  return {.rotation = rot, .translation = trans};
 }
 
 // Materialise per-setting operation lists from a {count, offset} index table

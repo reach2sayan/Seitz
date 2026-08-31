@@ -9,7 +9,7 @@
 namespace cppcrystal::data::detail {
 
 // 1-based table lookup; index 0 is the out-of-range fallback entry.
-template <class Table>
+template <typename Table>
 [[nodiscard]] constexpr auto const &at_or_sentinel(Table const &table,
                                                    int key) noexcept {
   bool const in_range = key >= 1 && key < static_cast<int>(table.size());
@@ -18,7 +18,7 @@ template <class Table>
 
 // Dispatch a Hall number to the 3D table (positive, 1..N3) or the layer table
 // (negative, keyed by -hall). The two tables must share their element type.
-template <class Main, class Layer>
+template <typename Main, typename Layer>
 [[nodiscard]] constexpr auto const &
 hall_indexed(Main const &main, Layer const &layer, int hall_number) noexcept {
   return hall_number < 0 ? at_or_sentinel(layer, -hall_number)
