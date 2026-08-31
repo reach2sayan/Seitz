@@ -6,12 +6,22 @@
 // references that may or may not be satisfied by another TU's instantiation.
 #include <Eigen/Dense>
 
+#include <concepts>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 namespace cppcrystal {
 
 using Index = Eigen::Index;
+
+// Anything Eigen treats as a matrix expression: a concrete matrix, a block, a
+// map, or an unevaluated expression node. Eigen's CRTP base is the test.
+// Constrains the element-wise helpers that accept any of them.
+template <class T>
+concept MatrixExpr =
+    std::derived_from<std::remove_cvref_t<T>,
+                      Eigen::MatrixBase<std::remove_cvref_t<T>>>;
 
 using Vector3d = Eigen::Vector3d;
 using Vector3i = Eigen::Vector3i;

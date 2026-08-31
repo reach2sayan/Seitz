@@ -14,6 +14,7 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -41,6 +42,12 @@ template <WyckoffLike W> struct Placement {
 
 // One complete Wyckoff assignment of a composition.
 template <WyckoffLike W> using Assignment = std::vector<Placement<W>>;
+
+// The candidate type a `realize` callback yields: it returns
+// std::optional<R>, and this is that R.
+template <class Realize, WyckoffLike W>
+using Realized = std::invoke_result_t<Realize &, Assignment<W> const &, int,
+                                      std::mt19937_64 &>::value_type;
 
 // Options shared by every random-structure generator.
 struct GenerateOptions {
@@ -180,8 +187,7 @@ template <WyckoffLike W, class Realize>
 search_assignments(std::span<W const> positions, Composition const &comp,
                    GenerateOptions const &options, std::string_view who,
                    std::string_view group_kind, Realize &&realize)
-    -> Result<typename std::invoke_result_t<
-        Realize &, Assignment<W> const &, int, std::mt19937_64 &>::value_type> {
+    -> Result<Realized<Realize, W>> {
   auto assignments = enumerate_assignments(positions, comp);
   if (assignments.empty()) {
     return leaf::new_error(e_message{std::format(

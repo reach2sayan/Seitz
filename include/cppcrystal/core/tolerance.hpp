@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Eigen/Core>
+#include <cppcrystal/core/types.hpp>
 
 #include <optional>
 
@@ -22,9 +22,8 @@ inline constexpr double kZeroPrec = 1e-10;
 
 // Entry-wise tolerance comparison: every |a - b| entry strictly below tol.
 // The single definition of "equal within tolerance" for vectors and matrices.
-template <typename A, typename B>
-[[nodiscard]] bool approx_equal(Eigen::MatrixBase<A> const &a,
-                                Eigen::MatrixBase<B> const &b,
+[[nodiscard]] bool approx_equal(MatrixExpr auto const &a,
+                                MatrixExpr auto const &b,
                                 double tol) noexcept {
   return ((a - b).cwiseAbs().maxCoeff() < tol);
 }

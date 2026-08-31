@@ -79,24 +79,27 @@ partition_orbit(std::span<SymmetryOperation const> ops, Vector3d const &p0,
   return out;
 }
 
-// A dimension policy for the locus arrangement. `Locus` is the geometry's
-// stabiliser-locus representation; `derive` computes the orbit data of one
-// representative locus (the geometry holds the group's operations).
+// The geometry's stabiliser-locus representation.
+template <class G> using LocusOf = G::Locus;
+
+// A dimension policy for the locus arrangement. `derive` computes the orbit
+// data of one representative locus (the geometry holds the group's
+// operations).
 template <class G>
 concept LocusGeometry =
-    requires(G const g, typename G::Locus const l, SymmetryOperation const &op) {
-      { g.whole_space() } -> std::same_as<typename G::Locus>;
+    requires(G const g, LocusOf<G> const l, SymmetryOperation const &op) {
+      { g.whole_space() } -> std::same_as<LocusOf<G>>;
       { g.fixed_loci(op) } -> std::ranges::input_range;
       { g.intersections(l, l) } -> std::ranges::input_range;
       { g.same_locus(l, l) } -> std::convertible_to<bool>;
-      { g.image(op, l) } -> std::same_as<typename G::Locus>;
+      { g.image(op, l) } -> std::same_as<LocusOf<G>>;
       { g.derive(l) } -> std::same_as<DerivedLocus>;
     };
 
 template <LocusGeometry G>
 [[nodiscard]] std::vector<LocusWyckoff>
 derive_wyckoff_positions(std::span<SymmetryOperation const> ops, G const &geom) {
-  using Locus = typename G::Locus;
+  using Locus = LocusOf<G>;
 
   // 1. The arrangement: whole space (general position), every operation's
   //    fixed loci, and the closure under pairwise intersection (re-scanning

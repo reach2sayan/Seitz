@@ -19,18 +19,14 @@ namespace cppcrystal::math {
   return a < 0.0 ? static_cast<int>(a - 0.5) : static_cast<int>(a + 0.5);
 }
 
-template <typename Derived>
-[[nodiscard]] inline auto
-round_to_int(Eigen::MatrixBase<Derived> const &a) noexcept {
+[[nodiscard]] inline auto round_to_int(MatrixExpr auto const &a) noexcept {
   return a.unaryExpr([](double x) { return nint(x); }).eval();
 }
 
 // Displacement from each coordinate to its nearest integer, x - nint(x). For a
 // fractional position this is the offset to the nearest lattice point, the
 // quantity that is invariant under integer lattice translations.
-template <typename Derived>
-[[nodiscard]] inline auto
-nearest_offset(Eigen::MatrixBase<Derived> const &a) noexcept {
+[[nodiscard]] inline auto nearest_offset(MatrixExpr auto const &a) noexcept {
   return a.unaryExpr([](double x) { return x - nint(x); });
 }
 
