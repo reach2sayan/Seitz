@@ -1,16 +1,19 @@
 #include <cppcrystal/symmetry/find_symmetry.hpp>
 
 #include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/validation.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 #include <cppcrystal/reduce/delaunay.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <map>
 #include <optional>
 #include <ranges>
+#include <utility>
 
 // The symmetry-operation search:
 //   1. Delaunay-reduce the lattice and enumerate the lattice point group by
@@ -65,15 +68,14 @@ constexpr int kRelativeAxes[26][3] = {
     return false;
   }
 
-  constexpr int elem_sets[3][2] = {{0, 1}, {0, 2}, {1, 2}};
-  for (auto const &set : elem_sets) {
-    int const j = set[0];
-    int const k = set[1];
+  auto const angle = [](Matrix3d const &m, int a, int b) {
+    return std::acos(m(a, b) / std::sqrt(m(a, a)) / std::sqrt(m(b, b))) /
+           std::numbers::pi * 180.0;
+  };
+  constexpr std::array<std::pair<int, int>, 3> elem_sets{
+      {{0, 1}, {0, 2}, {1, 2}}};
+  for (auto const &[j, k] : elem_sets) {
     if (angle_tolerance) {
-      auto angle = [](Matrix3d const &m, int a, int b) {
-        return std::acos(m(a, b) / std::sqrt(m(a, a)) / std::sqrt(m(b, b))) /
-               std::numbers::pi * 180.0;
-      };
       if (std::fabs(angle(orig, j, k) - angle(rotated, j, k)) >
           *angle_tolerance) {
         return false;
@@ -107,26 +109,23 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
   // the 48 of a 3D point group); overflowing the cap asks for a tighter angle.
   std::size_t const cap = aperiodic_axis ? 24 : 48;
   PointSymmetry found;
-  for (auto const &ai : kRelativeAxes) {
-    for (auto const &aj : kRelativeAxes) {
-      for (auto const &ak : kRelativeAxes) {
-        Matrix3i axes;
-        axes << axis(ai), axis(aj), axis(ak);
-        if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
-          continue;
-        }
-        if (int const det = axes.determinant(); det != 1 && det != -1) {
-          continue;
-        }
-        Matrix3d const lattice = min_lattice * axes.cast<double>();
-        Matrix3d const metric = math::metric_tensor(lattice);
-        if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
-          if (found.size() >= cap) {
-            return std::nullopt;
-          }
-          found.push_back(axes);
-        }
+  for (auto const &[ai, aj, ak] : std::views::cartesian_product(
+           kRelativeAxes, kRelativeAxes, kRelativeAxes)) {
+    Matrix3i axes;
+    axes << axis(ai), axis(aj), axis(ak);
+    if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
+      continue;
+    }
+    if (int const det = axes.determinant(); det != 1 && det != -1) {
+      continue;
+    }
+    Matrix3d const lattice = min_lattice * axes.cast<double>();
+    Matrix3d const metric = math::metric_tensor(lattice);
+    if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
+      if (found.size() >= cap) {
+        return std::nullopt;
       }
+      found.push_back(axes);
     }
   }
   return found;
@@ -195,13 +194,7 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
     if (checker.check_total_overlap(trans, rot, symprec)) {
       // Layer translations live in the periodic plane; the aperiodic component
       // is kept raw rather than folded into [0, 1).
-      Vector3d wrapped;
-      for (int j = 0; j < 3; ++j) {
-        wrapped[j] = (aperiodic_axis && j == *aperiodic_axis)
-                         ? trans[j]
-                         : math::wrap_to_unit_cell(trans[j]);
-      }
-      result.push_back(wrapped);
+      result.push_back(wrap_periodic(trans, aperiodic_axis));
     }
   }
   return result;

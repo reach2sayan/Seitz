@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cppcrystal/core/types.hpp>
+#include <cppcrystal/math/fractional.hpp>
+
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -53,6 +56,19 @@ single_aperiodic_axis(CellPeriodicity const &p) noexcept {
   }
 
   return found;
+}
+
+// Fold a fractional coordinate into the cell [0, 1), but leave the aperiodic
+// axis (if any) at its raw value — layer/rod cells are not periodic along it.
+[[nodiscard]] inline Vector3d
+wrap_periodic(Vector3d const &v, std::optional<int> aperiodic_axis) noexcept {
+  Vector3d out;
+  for (int j = 0; j < 3; ++j) {
+    out[j] = (aperiodic_axis && j == *aperiodic_axis)
+                 ? v[j]
+                 : math::wrap_to_unit_cell(v[j]);
+  }
+  return out;
 }
 
 } // namespace cppcrystal

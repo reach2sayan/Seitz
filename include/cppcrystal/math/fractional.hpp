@@ -30,4 +30,11 @@ namespace cppcrystal::math {
   return nearest_offset(b - a);
 }
 
+// Whether two fractional points coincide modulo lattice translations, within
+// `tol` per component.
+[[nodiscard]] inline bool same_point(Vector3d const &a, Vector3d const &b,
+                                     double tol) noexcept {
+  return frac_displacement(a, b).cwiseAbs().maxCoeff() < tol;
+}
+
 } // namespace cppcrystal::math

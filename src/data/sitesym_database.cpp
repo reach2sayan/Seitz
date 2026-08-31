@@ -1,5 +1,6 @@
 #include <cppcrystal/data/sitesym_database.hpp>
 
+#include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/sitesym_tables.hpp>
 
 #include <array>
@@ -61,30 +62,23 @@ static_assert(kWyckoffDecoded[1].rot ==
 static_assert(kWyckoffDecoded[1].trans_num ==
               std::array<std::int8_t, 3>{0, 0, 0});
 
-// Per-Hall Wyckoff ranges, precomputed once at compile time from
-// kPositionWyckoff (the hall_number domain is fixed at 1..530). Index 0 is the
-// out-of-range sentinel ({0, 0}); valid Hall numbers index directly.
-// kPositionWyckoff has kNumHalls + 2 entries (0..531), so this table holds
-// kNumHalls + 1.
-constexpr auto kWyckoffRanges = [] {
-  std::array<WyckoffRange, kPositionWyckoff.size() - 1> t{};
+// Wyckoff ranges precomputed once at compile time from a cumulative-offset
+// table (entry h holds [Table[h], Table[h+1])). The source tables have one
+// extra trailing entry, so the range table holds Table.size() - 1 rows; index
+// 0 is the out-of-range fallback ({0, 0}), valid keys index directly.
+template <auto const &Table> [[nodiscard]] consteval auto build_ranges() {
+  std::array<WyckoffRange, Table.size() - 1> t{};
   for (std::size_t const h : std::views::iota(std::size_t{1}, t.size())) {
-    int const start = kPositionWyckoff[h];
-    t[h] = WyckoffRange{start, kPositionWyckoff[h + 1] - start};
+    int const start = Table[h];
+    t[h] = WyckoffRange{start, Table[h + 1] - start};
   }
   return t;
-}();
+}
 
-// Layer-group Wyckoff ranges, indexed by -(negative layer hall number). Built
-// the same way from kPositionLayerWyckoff; index 0 is the sentinel.
-constexpr auto kLayerWyckoffRanges = [] {
-  std::array<WyckoffRange, kPositionLayerWyckoff.size() - 1> t{};
-  for (std::size_t const h : std::views::iota(std::size_t{1}, t.size())) {
-    int const start = kPositionLayerWyckoff[h];
-    t[h] = WyckoffRange{start, kPositionLayerWyckoff[h + 1] - start};
-  }
-  return t;
-}();
+// Per-Hall ranges (keys 1..530) and layer-group ranges (keyed by the negation
+// of the negative layer hall number).
+constexpr auto kWyckoffRanges = build_ranges<kPositionWyckoff>();
+constexpr auto kLayerWyckoffRanges = build_ranges<kPositionLayerWyckoff>();
 } // namespace
 
 WyckoffCoordinate wyckoff_coordinate(int index) {
@@ -101,16 +95,7 @@ WyckoffCoordinate wyckoff_coordinate(int index) {
 }
 
 WyckoffRange wyckoff_indices(int hall_number) {
-  if (hall_number < 0) {
-    int const neg = -hall_number;
-    bool const in_range =
-        static_cast<std::size_t>(neg) < kLayerWyckoffRanges.size();
-    return kLayerWyckoffRanges[static_cast<std::size_t>(in_range ? neg : 0)];
-  }
-  bool const in_range =
-      hall_number >= 1 &&
-      static_cast<std::size_t>(hall_number) < kWyckoffRanges.size();
-  return kWyckoffRanges[static_cast<std::size_t>(in_range ? hall_number : 0)];
+  return detail::hall_indexed(kWyckoffRanges, kLayerWyckoffRanges, hall_number);
 }
 
 std::string_view site_symmetry_symbol(int index) {

@@ -1,7 +1,7 @@
 #include <cppcrystal/spin/spin.hpp>
 
 #include <cppcrystal/core/overlap.hpp>
-#include <cppcrystal/math/fractional.hpp> // math::nint
+#include <cppcrystal/math/fractional.hpp> // math::nearest_offset
 #include <cppcrystal/symmetry/find_symmetry.hpp> // is_overlap_same_type
 #include <cppcrystal/symmetry/primitive.hpp>
 
@@ -11,6 +11,7 @@
 #include <iterator>
 #include <optional>
 #include <ranges>
+#include <variant>
 #include <vector>
 
 namespace cppcrystal::spin {
@@ -24,65 +25,91 @@ namespace {
   return lattice * rot.cast<double>() * lattice.inverse();
 }
 
-// x -> rot . x + trans.
-[[nodiscard]] Vector3d apply_to_position(Matrix3i const &rot,
-                                         Vector3d const &trans,
-                                         Vector3d const &x) {
-  return rot.cast<double>() * x + trans;
-}
+// How one kind of magnetic moment (collinear scalar / non-collinear 3-vector)
+// reads, transforms, compares, and packs back into SiteTensors. Everything
+// moment-kind-specific lives here; the search algorithms are generic over M.
+template <class M> struct MomentOps;
 
-// A collinear (scalar) moment transformed by an operation: time reversal flips
-// the sign; an axial tensor additionally picks up det(R).
-[[nodiscard]] double apply_to_scalar(double src, Matrix3d const &rot_cart,
-                                     bool time_reversal,
-                                     bool with_time_reversal, bool is_axial) {
-  double dst = (with_time_reversal && time_reversal) ? -src : src;
-  if (is_axial) {
-    dst *= rot_cart.determinant();
+template <> struct MomentOps<double> {
+  [[nodiscard]] static double moment(MagneticCell const &mcell, Index i) {
+    return mcell.scalar(i);
   }
-  return dst;
-}
-
-// A non-collinear (vector) moment transformed by an operation.
-[[nodiscard]] Vector3d apply_to_vector(Vector3d const &v,
-                                       Matrix3d const &rot_cart,
-                                       bool time_reversal,
-                                       bool with_time_reversal, bool is_axial) {
-  Vector3d dst = rot_cart * v;
-  if (with_time_reversal && time_reversal) {
-    dst = -dst;
-  }
-  if (is_axial) {
-    dst *= rot_cart.determinant();
-  }
-  return dst;
-}
-
-// Spin-flip sign in {-1, 0, 1} such that `sign * R(spin_j) == spin_k`; 0 when
-// the two moments are not related by the operation. sign = 1 - 2*timerev for
-// the matching timerev.
-[[nodiscard]] int sign_on_scalar(double spin_j, double spin_k,
-                                 Matrix3d const &rot_cart,
-                                 bool with_time_reversal, bool is_axial,
-                                 double mag_symprec) {
-  for (int timerev = 0; timerev <= 1; ++timerev) {
-    double const transformed = apply_to_scalar(
-        spin_j, rot_cart, timerev != 0, with_time_reversal, is_axial);
-    if (std::abs(spin_k - transformed) < mag_symprec) {
-      return 1 - 2 * timerev;
+  // Time reversal flips the sign; an axial tensor additionally picks up
+  // det(R).
+  [[nodiscard]] static double transform(double src, Matrix3d const &rot_cart,
+                                        bool time_reversal,
+                                        bool with_time_reversal,
+                                        bool is_axial) {
+    double dst = (with_time_reversal && time_reversal) ? -src : src;
+    if (is_axial) {
+      dst *= rot_cart.determinant();
     }
+    return dst;
   }
-  return 0;
+  [[nodiscard]] static bool close(double a, double b, double tol) {
+    return std::abs(a - b) < tol;
+  }
+  [[nodiscard]] static double zero() { return 0.0; }
+  [[nodiscard]] static SiteTensors pack(std::vector<double> moments) {
+    return CollinearTensors{std::move(moments)};
+  }
+};
+
+template <> struct MomentOps<Vector3d> {
+  [[nodiscard]] static Vector3d moment(MagneticCell const &mcell, Index i) {
+    return mcell.vector(i);
+  }
+  [[nodiscard]] static Vector3d transform(Vector3d const &v,
+                                          Matrix3d const &rot_cart,
+                                          bool time_reversal,
+                                          bool with_time_reversal,
+                                          bool is_axial) {
+    Vector3d dst = rot_cart * v;
+    if (with_time_reversal && time_reversal) {
+      dst = -dst;
+    }
+    if (is_axial) {
+      dst *= rot_cart.determinant();
+    }
+    return dst;
+  }
+  [[nodiscard]] static bool close(Vector3d const &a, Vector3d const &b,
+                                  double tol) {
+    return (a - b).cwiseAbs().maxCoeff() < tol;
+  }
+  [[nodiscard]] static Vector3d zero() { return Vector3d::Zero(); }
+  [[nodiscard]] static SiteTensors pack(std::vector<Vector3d> const &moments) {
+    return NoncollinearTensors{to_positions(moments)};
+  }
+};
+
+// Run `f.operator()<M>()` for the moment kind matching the cell's active
+// tensor alternative — the single collinear/non-collinear dispatch point.
+template <class F>
+[[nodiscard]] decltype(auto) visit_moment_kind(MagneticCell const &mcell,
+                                               F &&f) {
+  return std::visit(
+      [&]<class T>(T const &) {
+        if constexpr (std::same_as<T, CollinearTensors>) {
+          return f.template operator()<double>();
+        } else {
+          return f.template operator()<Vector3d>();
+        }
+      },
+      mcell.tensors());
 }
 
-[[nodiscard]] int sign_on_vector(Vector3d const &v_j, Vector3d const &v_k,
-                                 Matrix3d const &rot_cart,
-                                 bool with_time_reversal, bool is_axial,
-                                 double mag_symprec) {
+// Spin-flip sign in {-1, 0, 1} such that `sign * R(moment_j) == moment_k`; 0
+// when the two moments are not related by the operation. sign = 1 - 2*timerev
+// for the matching timerev.
+template <class M>
+[[nodiscard]] int spin_sign(M const &m_j, M const &m_k,
+                            Matrix3d const &rot_cart, bool with_time_reversal,
+                            bool is_axial, double mag_symprec) {
   for (int timerev = 0; timerev <= 1; ++timerev) {
-    Vector3d const transformed = apply_to_vector(
-        v_j, rot_cart, timerev != 0, with_time_reversal, is_axial);
-    if ((v_k - transformed).cwiseAbs().maxCoeff() < mag_symprec) {
+    M const transformed = MomentOps<M>::transform(
+        m_j, rot_cart, timerev != 0, with_time_reversal, is_axial);
+    if (MomentOps<M>::close(m_k, transformed, mag_symprec)) {
       return 1 - 2 * timerev;
     }
   }
@@ -105,61 +132,49 @@ cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
 // spin-flip sign. Undetermined operations (all touched moments zero) are kept
 // as ordinary, or — with time reversal — as both an ordinary and an
 // anti-operation.
+template <class M>
 [[nodiscard]] MagneticSymmetryOperations
 get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
                bool with_time_reversal, bool is_axial, double symprec,
                double mag_symprec) {
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  bool const collinear = mcell.rank() == SiteTensor::collinear;
   auto const rot_cart = cartesian_rotations(cell.lattice(), sym_nonspin);
 
   MagneticSymmetryOperations out;
   out.reserve(2 * sym_nonspin.size()); // upper bound: 1–2 ops emitted per spatial op
-  for (std::size_t i = 0; i < sym_nonspin.size(); ++i) {
-    auto const &op = sym_nonspin[i];
+  for (auto const &[rc, op] : std::views::zip(rot_cart, sym_nonspin)) {
     bool found = true;
     bool determined = false;
     int sign = 0;
 
     for (Index j = 0; j < n; ++j) {
-      Vector3d const pos =
-          apply_to_position(op.rotation, op.translation, cell.position(j));
-      Index k = 0;
-      for (; k < n; ++k) {
-        if (is_overlap_same_type(cell.position(k), pos, cell.type(k),
-                                 cell.type(j), cell.lattice(), symprec)) {
-          break;
-        }
-      }
-      if (k == n) {
+      Vector3d const pos = op.apply(cell.position(j));
+      auto const image = std::views::iota(Index{0}, n);
+      auto const k_it = std::ranges::find_if(image, [&](Index k) {
+        return is_overlap_same_type(cell.position(k), pos, cell.type(k),
+                                    cell.type(j), cell.lattice(), symprec);
+      });
+      if (k_it == image.end()) {
         // Rare: failure to overlap (e.g. too loose symprec); skip the op.
         found = false;
         break;
       }
+      Index const k = *k_it;
 
       // Sites whose relevant moments are all (near) zero say nothing about the
       // magnetic symmetry. m and -m coincide within mag_symprec when
       // |m| < 0.5*mag_symprec, so test the moments against 0.5*mag_symprec.
       double const half = 0.5 * mag_symprec;
-      if (collinear) {
-        if (std::abs(mcell.scalar(j)) < half &&
-            std::abs(mcell.scalar(k)) < half) {
-          continue;
-        }
-      } else {
-        if (mcell.vector(j).cwiseAbs().maxCoeff() < half &&
-            mcell.vector(k).cwiseAbs().maxCoeff() < half) {
-          continue;
-        }
+      M const m_j = MomentOps<M>::moment(mcell, j);
+      M const m_k = MomentOps<M>::moment(mcell, k);
+      if (MomentOps<M>::close(m_j, MomentOps<M>::zero(), half) &&
+          MomentOps<M>::close(m_k, MomentOps<M>::zero(), half)) {
+        continue;
       }
 
       int const s =
-          collinear
-              ? sign_on_scalar(mcell.scalar(j), mcell.scalar(k), rot_cart[i],
-                               with_time_reversal, is_axial, mag_symprec)
-              : sign_on_vector(mcell.vector(j), mcell.vector(k), rot_cart[i],
-                               with_time_reversal, is_axial, mag_symprec);
+          spin_sign(m_j, m_k, rc, with_time_reversal, is_axial, mag_symprec);
 
       if (!determined) {
         sign = s;
@@ -190,56 +205,39 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
   return out;
 }
 
-// permutations[p * size + i] = image of atom i under operation p, matching both
-// overlap and transformed moment. nullopt is unreachable in theory (every site
-// must map somewhere).
+// Flat permutation buffer: row p, entry i = image of atom i under operation p,
+// matching both overlap and transformed moment. nullopt is unreachable in
+// theory (every site must map somewhere).
+template <class M>
 [[nodiscard]] std::optional<std::vector<int>>
 get_permutations(MagneticSymmetryOperations const &operations,
                  MagneticCell const &mcell, bool with_time_reversal,
                  bool is_axial, double symprec, double mag_symprec) {
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  bool const collinear = mcell.rank() == SiteTensor::collinear;
   auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
 
-  std::vector<int> perm(operations.size() * static_cast<std::size_t>(n), -1);
-  for (auto const [pi, pair] :
-       std::views::zip(operations, rot_cart) | std::views::enumerate) {
-    auto const &[op, rc] = pair;
-    auto const p = static_cast<std::size_t>(pi);
+  std::vector<int> perm;
+  perm.reserve(operations.size() * static_cast<std::size_t>(n));
+  for (auto const &[op, rc] : std::views::zip(operations, rot_cart)) {
     for (Index i = 0; i < n; ++i) {
-      Vector3d const pos =
-          apply_to_position(op.rotation, op.translation, cell.position(i));
-      double scalar = 0.0;
-      Vector3d vector = Vector3d::Zero();
-      if (collinear) {
-        scalar = apply_to_scalar(mcell.scalar(i), rc, op.time_reversal,
-                                 with_time_reversal, is_axial);
-      } else {
-        vector = apply_to_vector(mcell.vector(i), rc, op.time_reversal,
-                                 with_time_reversal, is_axial);
-      }
+      Vector3d const pos = op.spatial().apply(cell.position(i));
+      M const moment =
+          MomentOps<M>::transform(MomentOps<M>::moment(mcell, i), rc,
+                                  op.time_reversal, with_time_reversal,
+                                  is_axial);
 
-      for (Index j = 0; j < n; ++j) {
-        if (!is_overlap_same_type(pos, cell.position(j), cell.type(i),
-                                  cell.type(j), cell.lattice(), symprec)) {
-          continue;
-        }
-        if (collinear && std::abs(mcell.scalar(j) - scalar) >= mag_symprec) {
-          continue;
-        }
-        if (!collinear &&
-            (mcell.vector(j) - vector).cwiseAbs().maxCoeff() >= mag_symprec) {
-          continue;
-        }
-        perm[p * static_cast<std::size_t>(n) + static_cast<std::size_t>(i)] =
-            static_cast<int>(j);
-        break;
-      }
-      if (perm[p * static_cast<std::size_t>(n) + static_cast<std::size_t>(i)] ==
-          -1) {
+      auto const image = std::views::iota(Index{0}, n);
+      auto const j_it = std::ranges::find_if(image, [&](Index j) {
+        return is_overlap_same_type(pos, cell.position(j), cell.type(i),
+                                    cell.type(j), cell.lattice(), symprec) &&
+               MomentOps<M>::close(MomentOps<M>::moment(mcell, j), moment,
+                                   mag_symprec);
+      });
+      if (j_it == image.end()) {
         return std::nullopt;
       }
+      perm.push_back(static_cast<int>(*j_it));
     }
   }
   return perm;
@@ -249,20 +247,73 @@ get_permutations(MagneticSymmetryOperations const &operations,
 [[nodiscard]] std::vector<int>
 get_orbits(std::vector<int> const &permutations, std::size_t num_sym,
            Index num_atoms) {
-  std::vector<int> equivalent(static_cast<std::size_t>(num_atoms), -1);
-  for (Index i = 0; i < num_atoms; ++i) {
-    auto const ui = static_cast<std::size_t>(i);
-    if (equivalent[ui] != -1) {
+  auto const n = static_cast<std::size_t>(num_atoms);
+  std::vector<std::optional<int>> equivalent(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    if (equivalent[i]) {
       continue;
     }
-    equivalent[ui] = static_cast<int>(i);
+    equivalent[i] = static_cast<int>(i);
     for (std::size_t s = 0; s < num_sym; ++s) {
-      auto const image = static_cast<std::size_t>(
-          permutations[s * static_cast<std::size_t>(num_atoms) + ui]);
+      auto const image = static_cast<std::size_t>(permutations[s * n + i]);
       equivalent[image] = static_cast<int>(i);
     }
   }
-  return equivalent;
+  std::vector<int> out;
+  out.reserve(n);
+  std::ranges::transform(equivalent, std::back_inserter(out),
+                         [](std::optional<int> const &e) { return *e; });
+  return out;
+}
+
+template <class M>
+[[nodiscard]] MagneticCell
+idealized_cell_impl(MagneticSymmetrySearch const &search,
+                    MagneticCell const &mcell, bool with_time_reversal,
+                    bool is_axial) {
+  Cell const &cell = mcell.cell();
+  Index const n = cell.size();
+  auto const &operations = search.operations;
+  auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
+
+  // inv_perm[p][i] = the atom that operation p maps onto atom i.
+  std::vector<std::vector<int>> inv_perm;
+  inv_perm.reserve(operations.size());
+  for (auto const row : search.permutation_rows()) {
+    std::vector<int> inv(static_cast<std::size_t>(n));
+    for (auto const [j, image] : row | std::views::enumerate) {
+      inv[static_cast<std::size_t>(image)] = static_cast<int>(j);
+    }
+    inv_perm.push_back(std::move(inv));
+  }
+
+  Positions positions(n, 3);
+  std::vector<M> moments(static_cast<std::size_t>(n));
+
+  auto const denom = static_cast<double>(operations.size());
+  for (Index i = 0; i < n; ++i) {
+    Vector3d pos_res = Vector3d::Zero();
+    M moment_res = MomentOps<M>::zero();
+    for (auto const &[op, rc, inv_row] :
+         std::views::zip(operations, rot_cart, inv_perm)) {
+      Index const j = inv_row[static_cast<std::size_t>(i)];
+      Vector3d const pos_tmp = op.spatial().apply(cell.position(j));
+      // Subtract the input position so the accumulated residual stays small;
+      // the per-component nint removes the lattice translation.
+      Vector3d const diff = pos_tmp - cell.position(i);
+      pos_res += math::nearest_offset(diff);
+      moment_res += MomentOps<M>::transform(MomentOps<M>::moment(mcell, j), rc,
+                                            op.time_reversal,
+                                            with_time_reversal, is_axial) -
+                    MomentOps<M>::moment(mcell, i);
+    }
+    positions.row(i) = (cell.position(i) + pos_res / denom).transpose();
+    moments[static_cast<std::size_t>(i)] =
+        MomentOps<M>::moment(mcell, i) + moment_res / denom;
+  }
+
+  return MagneticCell(Cell(cell.lattice(), positions, cell.types()),
+                      MomentOps<M>::pack(std::move(moments)));
 }
 
 } // namespace
@@ -278,74 +329,12 @@ collect_pure_translations(MagneticSymmetryOperations const &operations) {
   return out;
 }
 
-MagneticCell idealized_cell(std::vector<int> const &permutations,
-                            MagneticCell const &mcell,
-                            MagneticSymmetryOperations const &operations,
-                            bool with_time_reversal, bool is_axial) {
-  Cell const &cell = mcell.cell();
-  Index const n = cell.size();
-  std::size_t const num_ops = operations.size();
-  bool const collinear = mcell.rank() == SiteTensor::collinear;
-  auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
-
-  // inv_perm[p][i] = the atom that operation p maps onto atom i.
-  std::vector<std::vector<int>> inv_perm(
-      num_ops, std::vector<int>(static_cast<std::size_t>(n)));
-  for (std::size_t p = 0; p < num_ops; ++p) {
-    for (Index j = 0; j < n; ++j) {
-      int const image = permutations[p * static_cast<std::size_t>(n) +
-                                     static_cast<std::size_t>(j)];
-      inv_perm[p][static_cast<std::size_t>(image)] = static_cast<int>(j);
-    }
-  }
-
-  Positions positions(n, 3);
-  CollinearTensors scalars;
-  NoncollinearTensors vectors;
-  if (collinear) {
-    scalars.resize(static_cast<std::size_t>(n));
-  } else {
-    vectors.resize(n, 3);
-  }
-
-  auto const denom = static_cast<double>(num_ops);
-  for (Index i = 0; i < n; ++i) {
-    Vector3d pos_res = Vector3d::Zero();
-    double scalar_res = 0.0;
-    Vector3d vector_res = Vector3d::Zero();
-    for (auto const &[op, rc, inv_row] :
-         std::views::zip(operations, rot_cart, inv_perm)) {
-      Index const j = inv_row[static_cast<std::size_t>(i)];
-      Vector3d const pos_tmp =
-          apply_to_position(op.rotation, op.translation, cell.position(j));
-      // Subtract the input position so the accumulated residual stays small;
-      // the per-component nint removes the lattice translation.
-      Vector3d const diff = pos_tmp - cell.position(i);
-      pos_res += math::nearest_offset(diff);
-      if (collinear) {
-        double const t = apply_to_scalar(mcell.scalar(j), rc, op.time_reversal,
-                                         with_time_reversal, is_axial);
-        scalar_res += t - mcell.scalar(i);
-      } else {
-        Vector3d const t = apply_to_vector(mcell.vector(j), rc, op.time_reversal,
-                                           with_time_reversal, is_axial);
-        vector_res += t - mcell.vector(i);
-      }
-    }
-    positions.row(i) = (cell.position(i) + pos_res / denom).transpose();
-    auto const ui = static_cast<std::size_t>(i);
-    if (collinear) {
-      scalars[ui] = mcell.scalar(i) + scalar_res / denom;
-    } else {
-      vectors.row(i) = (mcell.vector(i) + vector_res / denom).transpose();
-    }
-  }
-
-  SiteTensors tensors = collinear
-                            ? SiteTensors{std::move(scalars)}
-                            : SiteTensors{std::move(vectors)};
-  return MagneticCell(Cell(cell.lattice(), positions, cell.types()),
-                      std::move(tensors));
+MagneticCell idealized_cell(MagneticSymmetrySearch const &search,
+                            MagneticCell const &mcell, bool with_time_reversal,
+                            bool is_axial) {
+  return visit_moment_kind(mcell, [&]<class M>() {
+    return idealized_cell_impl<M>(search, mcell, with_time_reversal, is_axial);
+  });
 }
 
 Result<MagneticSymmetrySearch>
@@ -357,11 +346,16 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
   (void)angle_tolerance; // primitive_lattice_vectors uses the Delaunay path
   double const mag_tol = mag_symprec.value_or(symprec);
 
-  MagneticSymmetryOperations operations = get_operations(
-      sym_nonspin, mcell, with_time_reversal, is_axial, symprec, mag_tol);
+  MagneticSymmetryOperations operations =
+      visit_moment_kind(mcell, [&]<class M>() {
+        return get_operations<M>(sym_nonspin, mcell, with_time_reversal,
+                                 is_axial, symprec, mag_tol);
+      });
 
-  auto permutations = get_permutations(operations, mcell, with_time_reversal,
-                                       is_axial, symprec, mag_tol);
+  auto permutations = visit_moment_kind(mcell, [&]<class M>() {
+    return get_permutations<M>(operations, mcell, with_time_reversal, is_axial,
+                               symprec, mag_tol);
+  });
   if (!permutations) {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }

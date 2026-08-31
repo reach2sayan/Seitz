@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/centering.hpp>
 #include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/data/hall_classification.hpp>
 #include <cppcrystal/data/hall_generators_view.hpp>
 #include <cppcrystal/math/fractional.hpp>
@@ -10,7 +11,9 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <ranges>
+#include <span>
 
 // Given the symmetry operations of the conventional (bravais) cell and a
 // candidate Hall number, determine whether the operations match that Hall
@@ -90,16 +93,12 @@ unpack_generators(data::GeneratorSet const &g) {
 }
 
 // Fold a fractional 3-vector into the cell. For a layer setting (hall_number <
-// 0) the conventional c axis (index 2) is the aperiodic axis and is not
-// periodic, so its component is left raw rather than folded into [0, 1) — this
-// is what lets a layer offset along its aperiodic axis be re-centered onto the
-// database convention (the third component is `hall_number > 0 ? folded : raw`).
+// 0) the conventional c axis (index 2) is aperiodic and stays raw — this is
+// what lets a layer offset along its aperiodic axis be re-centered onto the
+// database convention.
 [[nodiscard]] Vector3d wrap_shift(Vector3d const &v, int hall_number) {
-  Vector3d out = math::wrap_to_unit_cell(v);
-  if (hall_number < 0) {
-    out[2] = v[2];
-  }
-  return out;
+  return wrap_periodic(v, hall_number < 0 ? std::optional<int>(2)
+                                          : std::nullopt);
 }
 
 // shift = VSpU . dw, with dw assembled per generator.
@@ -139,9 +138,10 @@ unpack_generators(data::GeneratorSet const &g) {
   std::optional<int> const aperiodic_axis =
       hall_number < 0 ? std::optional<int>(2) : std::nullopt;
   boost::container::static_vector<std::uint8_t, 192> found(db_ops.size(), 0);
+  auto const enumerated = db_ops | std::views::enumerate;
   for (const auto &op : symmetry) {
     const auto it = std::ranges::find_if(
-        db_ops | std::views::enumerate, [&](const auto &entry) {
+        enumerated, [&](const auto &entry) {
           const auto [idx, db_op] = entry;
 
           if (found[static_cast<std::size_t>(idx)] ||
@@ -160,7 +160,7 @@ unpack_generators(data::GeneratorSet const &g) {
                             aperiodic_axis);
         });
 
-    if (it == std::ranges::end(db_ops | std::views::enumerate)) {
+    if (it == enumerated.end()) {
       return false;
     }
 
@@ -194,118 +194,94 @@ unpack_generators(data::GeneratorSet const &g) {
   return found;
 }
 
-// ---- per-crystal-system candidate loops ----
-template <std::size_t N>
-[[nodiscard]] bool
-try_entries(Vector3d &shift, int hall_number, Matrix3d const &prim,
-            SymmetryOperations const &sym, Centering c,
-            std::array<data::GeneratorSet, N> const &gens,
-            std::array<data::VSpUSet, N> const &vspu, double symprec) {
+// ---- per-crystal-system candidate loop -------------------------------------
+[[nodiscard]] bool try_entries(Vector3d &shift, int hall_number,
+                               Matrix3d const &prim,
+                               SymmetryOperations const &sym, Centering c,
+                               std::span<data::GeneratorSet const> gens,
+                               std::span<data::VSpUSet const> vspu,
+                               double symprec) {
   return std::ranges::any_of(std::views::zip(gens, vspu), [&](const auto &x) {
     const auto &[gen, vsp] = x;
     return is_hall_symbol(shift, hall_number, prim, sym, c, gen, vsp, symprec);
   });
 }
 
+// One row of the (Holohedry, Centering) -> (generators, VSpU) dispatch table.
+// `match` == nullopt accepts any input centering (systems whose matching always
+// runs in the primitive setting); `pass` overrides the centering handed to
+// try_entries (nullopt keeps the input centering).
+struct DispatchEntry {
+  Holohedry system;
+  std::optional<Centering> match;
+  std::span<data::GeneratorSet const> gens;
+  std::span<data::VSpUSet const> vspu;
+  std::optional<Centering> pass;
+};
+
+// The Grosse-Kunstleve candidate tables per crystal family — data, not
+// control flow; auditable row-by-row against the old per-system switch.
+inline constexpr auto kDispatch = [] {
+  using namespace data;
+  using enum Centering;
+  constexpr std::optional<Centering> any = std::nullopt;
+  constexpr std::optional<Centering> keep = std::nullopt;
+  return std::array<DispatchEntry, 19>{{
+      {Holohedry::cubic, primitive, cubic_generators, cubic_VSpU, keep},
+      {Holohedry::cubic, body, cubic_generators, cubic_I_VSpU, keep},
+      {Holohedry::cubic, face, cubic_generators, cubic_F_VSpU, keep},
+      {Holohedry::hexagonal, any, hexa_generators, hexa_VSpU, primitive},
+      {Holohedry::trigonal, any, trigo_generators, trigo_VSpU, primitive},
+      {Holohedry::tetragonal, primitive, tetra_generators, tetra_VSpU, keep},
+      {Holohedry::tetragonal, body, tetra_generators, tetra_I_VSpU, keep},
+      {Holohedry::orthorhombic, primitive, ortho_generators, ortho_VSpU, keep},
+      {Holohedry::orthorhombic, body, ortho_generators, ortho_I_VSpU, keep},
+      {Holohedry::orthorhombic, face, ortho_generators, ortho_F_VSpU, keep},
+      {Holohedry::orthorhombic, a_face, ortho_generators, ortho_A_VSpU, keep},
+      {Holohedry::orthorhombic, b_face, ortho_generators, ortho_B_VSpU, keep},
+      {Holohedry::orthorhombic, c_face, ortho_generators, ortho_C_VSpU, keep},
+      {Holohedry::monoclinic, primitive, monocli_generators, monocli_VSpU, keep},
+      {Holohedry::monoclinic, a_face, monocli_generators, monocli_A_VSpU, keep},
+      {Holohedry::monoclinic, b_face, monocli_generators, monocli_B_VSpU, keep},
+      {Holohedry::monoclinic, c_face, monocli_generators, monocli_C_VSpU, keep},
+      {Holohedry::monoclinic, body, monocli_generators, monocli_I_VSpU, keep},
+      {Holohedry::triclinic, any, tricli_generators, tricli_VSpU, primitive},
+  }};
+}();
+
 [[nodiscard]] bool dispatch(Vector3d &shift, int hall_number,
                             Matrix3d const &prim, SymmetryOperations const &sym,
                             Centering c, double symprec) {
   using namespace data;
   // Crystal system and the rhombohedral subsets are pure functions of the Hall
-  // number, precomputed once in data::kHallClass. The VSpU/generator choice
-  // below still depends on the runtime Centering c, so it stays here. Layer
-  // groups (negative hall numbers) carry no 3D hall-range bucket, so their
-  // crystal system is derived from the point-group number; they are never
-  // rhombohedral and reuse the same per-system generator families.
+  // number, precomputed once in data::kHallClass. Layer groups (negative hall
+  // numbers) carry no 3D hall-range bucket, so their crystal system is derived
+  // from the point-group number; they are never rhombohedral and reuse the
+  // same per-system generator families.
   HallClass const hc =
       hall_number < 0
           ? HallClass{holohedry_from_pointgroup(
                           spacegroup_type(hall_number).pointgroup_number),
                       false, false}
           : hall_class(hall_number);
-  switch (hc.system) {
-  case Holohedry::cubic:
-    if (c == Centering::primitive)
-      return try_entries(shift, hall_number, prim, sym, c, cubic_generators,
-                         cubic_VSpU, symprec);
-    if (c == Centering::body)
-      return try_entries(shift, hall_number, prim, sym, c, cubic_generators,
-                         cubic_I_VSpU, symprec);
-    if (c == Centering::face)
-      return try_entries(shift, hall_number, prim, sym, c, cubic_generators,
-                         cubic_F_VSpU, symprec);
-    return false;
-  case Holohedry::hexagonal:
-    return try_entries(shift, hall_number, prim, sym, Centering::primitive,
-                       hexa_generators, hexa_VSpU, symprec);
-  case Holohedry::trigonal:
-    if (hc.rhombohedral) {
-      if (hc.rhombo_hex_setting)
-        return try_entries(shift, hall_number, prim, sym, Centering::r_center,
-                           rhombo_h_generators, rhombo_h_VSpU, symprec);
-      return try_entries(shift, hall_number, prim, sym, Centering::primitive,
-                         rhombo_p_generators, rhombo_p_VSpU, symprec);
-    }
-    return try_entries(shift, hall_number, prim, sym, Centering::primitive,
-                       trigo_generators, trigo_VSpU, symprec);
-  case Holohedry::tetragonal:
-    if (c == Centering::primitive)
-      return try_entries(shift, hall_number, prim, sym, c, tetra_generators,
-                         tetra_VSpU, symprec);
-    if (c == Centering::body)
-      return try_entries(shift, hall_number, prim, sym, c, tetra_generators,
-                         tetra_I_VSpU, symprec);
-    return false;
-  case Holohedry::orthorhombic:
-    switch (c) {
-    case Centering::primitive:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_VSpU, symprec);
-    case Centering::body:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_I_VSpU, symprec);
-    case Centering::face:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_F_VSpU, symprec);
-    case Centering::a_face:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_A_VSpU, symprec);
-    case Centering::b_face:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_B_VSpU, symprec);
-    case Centering::c_face:
-      return try_entries(shift, hall_number, prim, sym, c, ortho_generators,
-                         ortho_C_VSpU, symprec);
-    default:
-      return false;
-    }
-  case Holohedry::monoclinic:
-    switch (c) {
-    case Centering::primitive:
-      return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
-                         monocli_VSpU, symprec);
-    case Centering::a_face:
-      return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
-                         monocli_A_VSpU, symprec);
-    case Centering::b_face:
-      return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
-                         monocli_B_VSpU, symprec);
-    case Centering::c_face:
-      return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
-                         monocli_C_VSpU, symprec);
-    case Centering::body:
-      return try_entries(shift, hall_number, prim, sym, c, monocli_generators,
-                         monocli_I_VSpU, symprec);
-    default:
-      return false;
-    }
-  case Holohedry::triclinic:
-    return try_entries(shift, hall_number, prim, sym, Centering::primitive,
-                       tricli_generators, tricli_VSpU, symprec);
-  case Holohedry::none:
-  default:
-    return false;
+
+  // The one choice not keyed on (system, centering): rhombohedral settings
+  // split on the hexagonal-vs-primitive axes choice of the Hall symbol.
+  if (hc.system == Holohedry::trigonal && hc.rhombohedral) {
+    return hc.rhombo_hex_setting
+               ? try_entries(shift, hall_number, prim, sym, Centering::r_center,
+                             rhombo_h_generators, rhombo_h_VSpU, symprec)
+               : try_entries(shift, hall_number, prim, sym,
+                             Centering::primitive, rhombo_p_generators,
+                             rhombo_p_VSpU, symprec);
   }
+
+  auto const entry = std::ranges::find_if(kDispatch, [&](DispatchEntry const &e) {
+    return e.system == hc.system && (!e.match || *e.match == c);
+  });
+  return entry != kDispatch.end() &&
+         try_entries(shift, hall_number, prim, sym, entry->pass.value_or(c),
+                     entry->gens, entry->vspu, symprec);
 }
 
 } // namespace

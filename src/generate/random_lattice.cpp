@@ -2,9 +2,9 @@
 
 #include <cppcrystal/data/element_data.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
-#include <numeric>
 #include <random>
 
 namespace cppcrystal::generate {
@@ -93,9 +93,8 @@ double estimated_cell_volume(std::map<int, int> const &composition,
   // realistic cell volume (e.g. rock-salt NaCl lands near its true ~179 A^3).
   constexpr double kPackingFraction = 0.55;
 
-  double const sphere_sum = std::accumulate(
-      composition.begin(), composition.end(), 0.0,
-      [&](double sum, auto const &entry) {
+  double const sphere_sum = std::ranges::fold_left(
+      composition, 0.0, [&](double sum, auto const &entry) {
         auto const &[type, count] = entry;
         double const v = data::atomic_volume(type).value_or(fallback_volume);
         return sum + static_cast<double>(count) * v;

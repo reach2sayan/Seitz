@@ -1,11 +1,13 @@
 #include <cppcrystal/refine/operations.hpp>
 
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/overlap.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
+#include <ranges>
 
 // Refined-operation recovery chain (3D path).
 namespace cppcrystal::refine {
@@ -38,35 +40,19 @@ primitive_db_symmetry(Matrix3d const &t_mat,
                       SymmetryOperations const &conv_sym) {
   Matrix3d const inv_mat = t_mat.inverse();
   SymmetryOperations out;
-  std::vector<Matrix3i> seen_rotations; // first occurrence
-  for (auto const &op : conv_sym) {
-    if (std::ranges::any_of(seen_rotations, [&](Matrix3i const &r) {
-          return r == op.rotation;
-        })) {
-      continue;
-    }
-    seen_rotations.push_back(op.rotation);
-    Matrix3d const rot_d = t_mat * op.rotation.cast<double>() * inv_mat;
-    out.push_back(
-        {math::round_to_int(rot_d), Vector3d(t_mat * op.translation)});
+  for (auto const &op :
+       unique_by_rotation(conv_sym, &SymmetryOperation::rotation)) {
+    out.push_back(conjugated_by(op, t_mat, inv_mat));
   }
   return out;
 }
 
 // Bounding-box extent of the parallelepiped spanned by the columns of the
-// integer transformation matrix.
+// integer transformation matrix. Each corner is an independent 0/1 choice per
+// column, so the per-row max (min) over the corners is the sum of the
+// positive (negative) entries of that row.
 [[nodiscard]] Vector3i surrounding_frame(Matrix3i const &t_mat) {
-  Eigen::Matrix<int, 3, 8> corners;
-  corners.col(0).setZero();
-  corners.col(1) = t_mat.col(0);
-  corners.col(2) = t_mat.col(1);
-  corners.col(3) = t_mat.col(2);
-  corners.col(4) = t_mat.col(1) + t_mat.col(2);
-  corners.col(5) = t_mat.col(2) + t_mat.col(0);
-  corners.col(6) = t_mat.col(0) + t_mat.col(1);
-  corners.col(7) = t_mat.col(0) + t_mat.col(1) + t_mat.col(2);
-
-  return corners.rowwise().maxCoeff() - corners.rowwise().minCoeff();
+  return t_mat.cwiseMax(0).rowwise().sum() - t_mat.cwiseMin(0).rowwise().sum();
 }
 
 // Every integer point of the surrounding frame mapped by T^-1 and folded into
@@ -78,12 +64,10 @@ lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
               static_cast<std::size_t>(frame[1]) *
               static_cast<std::size_t>(frame[2]));
 
-  for (int i = 0; i < frame[0]; ++i) {
-    for (int j = 0; j < frame[1]; ++j) {
-      for (int k = 0; k < frame[2]; ++k) {
-        out.emplace_back(math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
-      }
-    }
+  for (auto const [i, j, k] : std::views::cartesian_product(
+           std::views::iota(0, frame[0]), std::views::iota(0, frame[1]),
+           std::views::iota(0, frame[2]))) {
+    out.emplace_back(math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
   }
 
   return out;
@@ -96,13 +80,9 @@ unique_translations(Matrix3d const &lattice,
   std::vector<Vector3d> out;
   out.reserve(candidates.size());
   for (const auto &t : candidates) {
-    const bool duplicate = std::ranges::any_of(out, [&](const Vector3d &u) {
-      return is_overlap(t, u, lattice, symprec);
+    push_unique(out, t, [&](Vector3d const &kept, Vector3d const &cand) {
+      return is_overlap(cand, kept, lattice, symprec);
     });
-
-    if (!duplicate) {
-      out.emplace_back(t);
-    }
   }
 
   return out;

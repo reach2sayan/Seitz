@@ -10,13 +10,16 @@
 
 namespace cppcrystal::refine {
 
-// Per-atom exact-position / Wyckoff data for the conventional primitive cell.
-struct ExactPositions {
-  std::vector<Vector3d> positions;  // exact (symmetrized) fractional positions
-  std::vector<int> wyckoffs;        // Wyckoff letter index (0 = a, 1 = b, ...)
-  std::vector<int> equivalent_atoms;       // representative atom index per atom
-  std::vector<std::string> site_symmetry_symbols;
+// Exact-position / Wyckoff data of one conventional-primitive atom.
+struct ExactPosition {
+  Vector3d position;        // exact (symmetrized) fractional position
+  int wyckoff = 0;          // Wyckoff letter index (0 = a, 1 = b, ...)
+  int equivalent_atom = 0;  // representative atom index
+  std::string site_symmetry_symbol;
 };
+
+// Per-atom exact-position / Wyckoff data for the conventional primitive cell.
+using ExactPositions = std::vector<ExactPosition>;
 
 // Exact positions + Wyckoff assignment for the atoms of `conv_prim` (positions
 // expressed wrt the idealized conventional lattice). `conv_sym` are the

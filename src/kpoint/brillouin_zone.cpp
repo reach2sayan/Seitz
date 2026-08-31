@@ -14,41 +14,25 @@ namespace cppcrystal::kpoint {
 
 namespace {
 
-// The 125 reciprocal-lattice offsets searched per grid point (the ±2 cube,
-// ordered 0,1,2,-2,-1 on each axis). Kept Eigen-free (literal type) and mapped
-// to Vector3i at use.
-inline constexpr std::array<std::array<int, 3>, 125> kBzSearchSpace = {{
-    {0, 0, 0},   {0, 0, 1},   {0, 0, 2},   {0, 0, -2},   {0, 0, -1},
-    {0, 1, 0},   {0, 1, 1},   {0, 1, 2},   {0, 1, -2},   {0, 1, -1},
-    {0, 2, 0},   {0, 2, 1},   {0, 2, 2},   {0, 2, -2},   {0, 2, -1},
-    {0, -2, 0},  {0, -2, 1},  {0, -2, 2},  {0, -2, -2},  {0, -2, -1},
-    {0, -1, 0},  {0, -1, 1},  {0, -1, 2},  {0, -1, -2},  {0, -1, -1},
-    {1, 0, 0},   {1, 0, 1},   {1, 0, 2},   {1, 0, -2},   {1, 0, -1},
-    {1, 1, 0},   {1, 1, 1},   {1, 1, 2},   {1, 1, -2},   {1, 1, -1},
-    {1, 2, 0},   {1, 2, 1},   {1, 2, 2},   {1, 2, -2},   {1, 2, -1},
-    {1, -2, 0},  {1, -2, 1},  {1, -2, 2},  {1, -2, -2},  {1, -2, -1},
-    {1, -1, 0},  {1, -1, 1},  {1, -1, 2},  {1, -1, -2},  {1, -1, -1},
-    {2, 0, 0},   {2, 0, 1},   {2, 0, 2},   {2, 0, -2},   {2, 0, -1},
-    {2, 1, 0},   {2, 1, 1},   {2, 1, 2},   {2, 1, -2},   {2, 1, -1},
-    {2, 2, 0},   {2, 2, 1},   {2, 2, 2},   {2, 2, -2},   {2, 2, -1},
-    {2, -2, 0},  {2, -2, 1},  {2, -2, 2},  {2, -2, -2},  {2, -2, -1},
-    {2, -1, 0},  {2, -1, 1},  {2, -1, 2},  {2, -1, -2},  {2, -1, -1},
-    {-2, 0, 0},  {-2, 0, 1},  {-2, 0, 2},  {-2, 0, -2},  {-2, 0, -1},
-    {-2, 1, 0},  {-2, 1, 1},  {-2, 1, 2},  {-2, 1, -2},  {-2, 1, -1},
-    {-2, 2, 0},  {-2, 2, 1},  {-2, 2, 2},  {-2, 2, -2},  {-2, 2, -1},
-    {-2, -2, 0}, {-2, -2, 1}, {-2, -2, 2}, {-2, -2, -2}, {-2, -2, -1},
-    {-2, -1, 0}, {-2, -1, 1}, {-2, -1, 2}, {-2, -1, -2}, {-2, -1, -1},
-    {-1, 0, 0},  {-1, 0, 1},  {-1, 0, 2},  {-1, 0, -2},  {-1, 0, -1},
-    {-1, 1, 0},  {-1, 1, 1},  {-1, 1, 2},  {-1, 1, -2},  {-1, 1, -1},
-    {-1, 2, 0},  {-1, 2, 1},  {-1, 2, 2},  {-1, 2, -2},  {-1, 2, -1},
-    {-1, -2, 0}, {-1, -2, 1}, {-1, -2, 2}, {-1, -2, -2}, {-1, -2, -1},
-    {-1, -1, 0}, {-1, -1, 1}, {-1, -1, 2}, {-1, -1, -2}, {-1, -1, -1},
-}};
-
-[[nodiscard]] Vector3i search_offset(std::size_t j) {
-  auto const &o = kBzSearchSpace[j];
-  return Vector3i(o[0], o[1], o[2]);
+// The 125 reciprocal-lattice offsets searched per grid point: the ±2 cube in
+// odometer order over the digits 0,1,2,-2,-1 per axis (x outermost, z varying
+// fastest). Built at compile time; Eigen 5 fixed-size vectors are constexpr
+// for construction, access and assignment.
+[[nodiscard]] consteval std::array<Vector3i, 125> bz_search_space() {
+  constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
+  std::array<Vector3i, 125> table{};
+  std::size_t n = 0;
+  for (int const x : digits) {
+    for (int const y : digits) {
+      for (int const z : digits) {
+        table[n++] = Vector3i(x, y, z);
+      }
+    }
+  }
+  return table;
 }
+
+inline constexpr std::array<Vector3i, 125> kBzSearchSpace = bz_search_space();
 
 // Adaptive tolerance for merging BZ-boundary points: 0.01 * max over axes of
 // |reciprocal vector|^2 / mesh^2.
@@ -84,7 +68,7 @@ BzGrid relocate_BZ_grid_address(std::vector<Vector3i> const &grid_address,
     // Squared distance to the origin of each candidate image.
     std::array<double, kBzSearchSpace.size()> distance{};
     for (std::size_t j = 0; j < kBzSearchSpace.size(); ++j) {
-      Vector3i const offset = search_offset(j);
+      Vector3i const &offset = kBzSearchSpace[j];
       const auto mesh_d = mesh.cast<double>().array();
 
       Vector3d q = (grid_address[i].cast<double>().array() +
@@ -96,15 +80,14 @@ BzGrid relocate_BZ_grid_address(std::vector<Vector3i> const &grid_address,
 
     auto const min_it = std::ranges::min_element(distance);
     double const min_distance = *min_it;
-    auto const min_index =
-        static_cast<std::size_t>(std::ranges::distance(distance.begin(), min_it));
+    auto const min_index = static_cast<std::size_t>(min_it - distance.begin());
 
     for (std::size_t j = 0; j < kBzSearchSpace.size(); ++j) {
       if (distance[j] >= min_distance + tolerance) {
         continue;
       }
-      const Eigen::Map<const Vector3i> shift(kBzSearchSpace[j].data());
-      const Vector3i bz_address = grid_address[i] + shift.cwiseProduct(mesh);
+      const Vector3i bz_address =
+          grid_address[i] + kBzSearchSpace[j].cwiseProduct(mesh);
       std::size_t gp = 0;
       if (j == min_index) {
         gp = i;

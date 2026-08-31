@@ -1,6 +1,8 @@
 #include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
 
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/msg_database.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
@@ -8,8 +10,6 @@
 #include <cppcrystal/spacegroup/spacegroup.hpp>
 #include <cppcrystal/spin/spin.hpp>
 #include <cppcrystal/symmetry/primitive.hpp>
-
-#include <boost/container/small_vector.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -49,7 +49,7 @@ space_group_of_magnetic_symmetry(
   bool const is_type2 =
       std::ranges::any_of(magnetic_symmetry, [&](auto const &op) {
         return op.rotation == Matrix3i::Identity() && op.time_reversal &&
-               op.translation.cwiseAbs().maxCoeff() < symprec;
+               approx_equal(op.translation, Vector3d::Zero(), symprec);
       });
 
   // Keep an operation in the spatial subgroup unless it must be dropped: primed
@@ -196,14 +196,6 @@ distinct_changed_magnetic_symmetry(
   return changed;
 }
 
-[[nodiscard]] bool contains_vector(Vector3d const &v,
-                                   std::vector<Vector3d> const &trans,
-                                   double symprec) {
-  return std::ranges::any_of(trans, [&](Vector3d const &t) {
-    return (v - t).cwiseAbs().maxCoeff() < symprec;
-  });
-}
-
 // Pure translations in the transformed setting: (I, w) = (tmat, shift)^-1 (I,
 // w_std)(tmat, shift), i.e. w_std = tmat w.
 [[nodiscard]] std::optional<std::vector<Vector3d>>
@@ -221,29 +213,33 @@ changed_pure_translations(Matrix3d const &tmat,
         [&](auto const &t) { return math::wrap_to_unit_cell(Vector3d(tmat * t)); });
   } else {
     // det(tmat) need not be integer; find the least common denominator of the
-    // matrix entries, then enumerate added lattice points.
-    int denominator = 1;
-    for (; denominator <= kMaxDenominator; ++denominator) {
-      bool const ok = std::ranges::all_of(
-          std::views::cartesian_product(std::views::iota(0, 3),
-                                        std::views::iota(0, 3)),
-          [&](auto const st) {
-            auto const [s, t] = st;
-            double const scaled = tmat(s, t) * denominator;
-            return std::abs(scaled - math::nint(scaled)) <= symprec;
-          });
-      if (ok) {
-        break;
-      }
+    // matrix entries, then enumerate added lattice points. When no denominator
+    // up to kMaxDenominator clears the entries, fail like any other unusable
+    // transformation instead of silently enumerating an enormous lattice-point
+    // set (the old loop fell through with denominator = kMaxDenominator + 1).
+    auto const denominators = std::views::iota(1, kMaxDenominator + 1);
+    auto const denom_it =
+        std::ranges::find_if(denominators, [&](int denominator) {
+          return std::ranges::all_of(
+              std::views::cartesian_product(std::views::iota(0, 3),
+                                            std::views::iota(0, 3)),
+              [&](auto const st) {
+                auto const [s, t] = st;
+                double const scaled = tmat(s, t) * denominator;
+                return std::abs(scaled - math::nint(scaled)) <= symprec;
+              });
+        });
+    if (denom_it == denominators.end()) {
+      return std::nullopt;
     }
-    auto const lattice_pts = std::views::iota(0, denominator + 1);
+    auto const lattice_pts = std::views::iota(0, *denom_it + 1);
     for (auto const &[n0, n1, n2, t] : std::views::cartesian_product(
              lattice_pts, lattice_pts, lattice_pts, pure_trans)) {
       Vector3d const shifted = t + Vector3d(n0, n1, n2);
       Vector3d const transformed = math::wrap_to_unit_cell(Vector3d(tmat * shifted));
-      if (!contains_vector(transformed, out, symprec)) {
-        out.push_back(transformed);
-      }
+      push_unique(out, transformed, [&](Vector3d const &a, Vector3d const &b) {
+        return approx_equal(a, b, symprec);
+      });
     }
   }
 
@@ -273,17 +269,12 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
   }
 
   // Factor group of XSG in the conventional lattice: one operation per distinct
-  // rotation. Distinct rotations are bounded
-  // by the point-group order (<= 48). small_vector keeps that count inline but
-  // spills to the heap instead of overflowing should the bound ever be exceeded.
-  boost::container::small_vector<MagneticSymmetryOperation, 48> factors;
-  for (auto const &op : sym_xsg) {
-    bool const seen = std::ranges::any_of(
-        factors, [&](auto const &f) { return f.rotation == op.rotation; });
-    if (!seen) {
-      factors.push_back({op.rotation, op.translation, false});
-    }
-  }
+  // rotation, first occurrence winning.
+  auto const factors = unique_by_rotation(
+      sym_xsg | std::views::transform([](auto const &op) {
+        return MagneticSymmetryOperation{op.rotation, op.translation, false};
+      }),
+      &MagneticSymmetryOperation::rotation);
   MagneticSymmetryOperations const changed_factors =
       distinct_changed_magnetic_symmetry(tmat, shift, factors);
 
@@ -316,11 +307,12 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
   }
   return std::ranges::all_of(a, [&](MagneticSymmetryOperation const &oa) {
     return std::ranges::any_of(b, [&](MagneticSymmetryOperation const &ob) {
+      // NB: strictly below symprec, unlike same_operation's <=; kept as is.
       return oa.rotation == ob.rotation &&
              oa.time_reversal == ob.time_reversal &&
-             math::nearest_offset(Vector3d(oa.translation - ob.translation))
-                     .cwiseAbs()
-                     .maxCoeff() < symprec;
+             approx_equal(math::nearest_offset(
+                              Vector3d(oa.translation - ob.translation)),
+                          Vector3d::Zero(), symprec);
     });
   });
 }
@@ -407,47 +399,51 @@ Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
 
-  std::optional<int> matched_uni;
-  Matrix3d tmat_cor = Matrix3d::Identity();
-  Vector3d shift_cor = Vector3d::Zero();
+  // The first UNI candidate whose tabulated operations match the changed
+  // symmetry, with the correction transformation x_uni = (tmat, shift)
+  // x_changed that made them match.
+  struct Correction {
+    int uni;
+    Matrix3d tmat;
+    Vector3d shift;
+  };
+  auto const find_correction = [&]() -> std::optional<Correction> {
+    for (int uni = (*range).first; uni <= (*range).second; ++uni) {
+      if (data::magnetic_spacegroup_type(uni).type != type) {
+        continue;
+      }
+      auto const msg_uni =
+          data::magnetic_operations_from_database(uni, hall_number);
+      if (msg_uni.size() != reference->changed_symmetry.size()) {
+        continue;
+      }
 
-  for (int uni = (*range).first; uni <= (*range).second && !matched_uni; ++uni) {
-    if (data::magnetic_spacegroup_type(uni).type != type) {
-      continue;
-    }
-    auto const msg_uni =
-        data::magnetic_operations_from_database(uni, hall_number);
-    if (msg_uni.size() != reference->changed_symmetry.size()) {
-      continue;
-    }
-
-    // Correction transformation x_uni = (tmat_cor, shift_cor) x_changed.
-    auto const transformations =
-        data::magnetic_std_transformations(uni, hall_number);
-    for (auto const &transform : transformations) {
-      Matrix3d const cor = transform.rotation.cast<double>();
-      Vector3d const cor_shift = transform.translation;
-      auto const symmetry_cor = distinct_changed_magnetic_symmetry(
-          cor, cor_shift, reference->changed_symmetry);
-      if (same_magnetic_symmetry(msg_uni, symmetry_cor, symprec)) {
-        matched_uni = uni;
-        tmat_cor = cor;
-        shift_cor = cor_shift;
-        break;
+      auto const transformations =
+          data::magnetic_std_transformations(uni, hall_number);
+      for (auto const &transform : transformations) {
+        Matrix3d const cor = transform.rotation.cast<double>();
+        Vector3d const cor_shift = transform.translation;
+        auto const symmetry_cor = distinct_changed_magnetic_symmetry(
+            cor, cor_shift, reference->changed_symmetry);
+        if (same_magnetic_symmetry(msg_uni, symmetry_cor, symprec)) {
+          return Correction{uni, cor, cor_shift};
+        }
       }
     }
-  }
+    return std::nullopt;
+  };
+  std::optional<Correction> const correction = find_correction();
 
-  if (!matched_uni) {
+  if (!correction) {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
 
-  auto const msgtype = data::magnetic_spacegroup_type(*matched_uni);
+  auto const msgtype = data::magnetic_spacegroup_type(correction->uni);
 
   // Compose the correction onto the reference transformation:
   //   (tmat, shift) -> (tmat_cor, shift_cor) (tmat, shift).
-  Matrix3d const tmat = tmat_cor * reference->tmat;
-  Vector3d const shift = tmat_cor * reference->shift + shift_cor;
+  Matrix3d const tmat = correction->tmat * reference->tmat;
+  Vector3d const shift = correction->tmat * reference->shift + correction->shift;
 
   Spacegroup ref_sg = reference->ref_sg;
   ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
@@ -479,13 +475,15 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
   Matrix3d const tmat_prm =
       transformation_matrix * cell.lattice().inverse() * prim_cell.lattice();
 
-  // The cell -> primitive map is many-to-one; pick one preimage per primitive
-  // atom (site tensors are invariant under pure translations).
-  std::vector<int> remapping(static_cast<std::size_t>(prim_cell.size()), -1);
+  // The cell -> primitive map is many-to-one; pick the first preimage per
+  // primitive atom (site tensors are invariant under pure translations).
+  std::vector<std::optional<int>> remapping(
+      static_cast<std::size_t>(prim_cell.size()));
   for (Index i = 0; i < cell.size(); ++i) {
     int const prim_atom = prim.mapping_table[static_cast<std::size_t>(i)];
-    if (remapping[static_cast<std::size_t>(prim_atom)] == -1) {
-      remapping[static_cast<std::size_t>(prim_atom)] = static_cast<int>(i);
+    auto &preimage = remapping[static_cast<std::size_t>(prim_atom)];
+    if (!preimage) {
+      preimage = static_cast<int>(i);
     }
   }
 
@@ -514,7 +512,7 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
   for (Index i = 0; i < static_cast<Index>(np); ++i) {
     Vector3d const pos_std =
         tmat_prm * prim_cell.position(i) + origin_shift; // x_std
-    int const orig = remapping[static_cast<std::size_t>(i)];
+    int const orig = *remapping[static_cast<std::size_t>(i)];
     for (std::size_t p = 0; p < nc; ++p) {
       Index const ip = i * static_cast<Index>(nc) + static_cast<Index>(p);
       auto const uip = static_cast<std::size_t>(ip);

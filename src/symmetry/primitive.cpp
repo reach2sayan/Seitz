@@ -1,6 +1,8 @@
 #include <cppcrystal/symmetry/primitive.hpp>
 
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 #include <cppcrystal/reduce/delaunay.hpp>
@@ -11,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <iterator>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -36,19 +39,6 @@ constexpr double kTrimIncreaseRate = 2.0;
 
 [[nodiscard]] Vector3d row(Positions const &p, int i) {
   return p.row(i).transpose();
-}
-
-// Fold a fractional coordinate into the cell, but leave the aperiodic axis (if
-// any) at its raw value — layer cells are not periodic along it.
-[[nodiscard]] Vector3d wrap_periodic(Vector3d const &v,
-                                     std::optional<int> aperiodic_axis) {
-  Vector3d out;
-  for (int j = 0; j < 3; ++j) {
-    out[j] = (aperiodic_axis && j == *aperiodic_axis)
-                 ? v[j]
-                 : math::wrap_to_unit_cell(v[j]);
-  }
-  return out;
 }
 
 // The Delaunay reduction appropriate to the cell: 2D (periodic plane only) for
@@ -213,23 +203,20 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
       }
     }
 
-    bool retry = false;
-    for (int i = 0; i < n && !retry; ++i) {
-      if (overlap[static_cast<std::size_t>(i)] != i) {
-        continue;
-      }
-      auto const count = std::ranges::count_if(
-          std::views::iota(0, n),
-          [&](int j) { return overlap[static_cast<std::size_t>(j)] == i; });
-      if (count < ratio) {
-        tol *= kTrimIncreaseRate;
-        retry = true;
-      } else if (count > ratio) {
-        tol *= kTrimReduceRate;
-        retry = true;
-      }
+    // Class sizes in one pass: every overlap entry names its representative,
+    // so the histogram keys are exactly the representatives, in index order.
+    std::map<int, int> class_size;
+    for (int const rep : overlap) {
+      ++class_size[rep];
     }
-    ok = !retry;
+    auto const bad = std::ranges::find_if(
+        class_size, [&](auto const &entry) { return entry.second != ratio; });
+    ok = bad == class_size.end();
+    if (!ok) {
+      // The smallest-index wrong-sized class decides the adjustment: too few
+      // atoms widens the tolerance, too many tightens it.
+      tol *= bad->second < ratio ? kTrimIncreaseRate : kTrimReduceRate;
+    }
   }
   if (!ok)
     return std::nullopt;
@@ -249,20 +236,19 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
   }
   int const tn = index_atom;
 
-  // Average the positions of overlapping atoms (with periodic-boundary care).
+  // Average the positions of overlapping atoms (with periodic-boundary care):
+  // a component more than half a cell from its representative is shifted one
+  // cell toward it before summing.
   Positions tpos = Positions::Zero(tn, 3);
   for (int i = 0; i < n; ++i) {
     int const j = mapping[static_cast<std::size_t>(i)];
     int const k = overlap[static_cast<std::size_t>(i)];
-    for (int l = 0; l < 3; ++l) {
-      double const pi = pos(i, l);
-      double const pk = pos(k, l);
+    tpos.row(j) += pos.row(i).binaryExpr(pos.row(k), [](double pi, double pk) {
       if (std::abs(pk - pi) > 0.5) {
-        tpos(j, l) += pi < pk ? pi + 1.0 : pi - 1.0;
-      } else {
-        tpos(j, l) += pi;
+        return pi < pk ? pi + 1.0 : pi - 1.0;
       }
-    }
+      return pi;
+    });
   }
   int const multi = n / tn;
   for (int i = 0; i < tn; ++i) {
@@ -297,11 +283,7 @@ primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
   if (np == 0 || symmetry_size % np != 0) {
     return std::nullopt;
   }
-  Positions pos(static_cast<Index>(np), 3);
-  for (auto const [i, t] : pure_trans | std::views::enumerate) {
-    pos.row(static_cast<Index>(i)) = t.transpose();
-  }
-  Cell const cell(Matrix3d::Identity(), pos, Types(np, 1));
+  Cell const cell(Matrix3d::Identity(), to_positions(pure_trans), Types(np, 1));
   auto const prim = find_primitive(cell, symprec);
   if (!prim || prim->cell.size() != 1) {
     return std::nullopt;
@@ -309,24 +291,12 @@ primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
   return prim->cell.lattice();
 }
 
-// The first occurrence of each distinct rotation, keeping its translation,
-// until `primsym_size` are collected. std::nullopt if the number of distinct
-// rotations differs from `primsym_size`.
+// The first occurrence of each distinct rotation, keeping its translation.
+// std::nullopt if the number of distinct rotations differs from `primsym_size`.
 [[nodiscard]] std::optional<SymmetryOperations>
 collect_primitive_operations(SymmetryOperations const &operations,
                              std::size_t primsym_size) {
-  SymmetryOperations out;
-  for (auto const &op : operations) {
-    if (std::ranges::any_of(out, [&](SymmetryOperation const &o) {
-          return o.rotation == op.rotation;
-        })) {
-      continue;
-    }
-    if (out.size() == primsym_size) {
-      return std::nullopt; // more distinct rotations than expected
-    }
-    out.push_back(op);
-  }
+  auto out = unique_by_rotation(operations, &SymmetryOperation::rotation);
   if (out.size() != primsym_size) {
     return std::nullopt;
   }
@@ -407,9 +377,7 @@ primitive_symmetry(SymmetryOperations const &operations, double symprec) {
 
   // (T, 0) (R, t) (T, 0)^-1 = (T R T^-1, T t).
   for (auto &op : *prim) {
-    Matrix3d const rot_d = t_mat * op.rotation.cast<double>() * (*t_mat_inv);
-    op.rotation = math::round_to_int(rot_d);
-    op.translation = t_mat * op.translation;
+    op = conjugated_by(op, t_mat, *t_mat_inv);
   }
   return std::make_pair(std::move(*prim), t_mat);
 }

@@ -17,23 +17,31 @@
 
 namespace cppcrystal::analysis {
 
+// CRTP base of the operation-set wrappers: the shared construction and
+// container face over an owned operations vector. Static polymorphism only —
+// `Derived` is a concrete type, there is no runtime hierarchy.
+template <class Derived, class Ops> class OperationSetBase {
+public:
+  [[nodiscard]] static Derived from_operations(Ops ops) {
+    return Derived{std::move(ops)};
+  }
+
+  [[nodiscard]] Ops const &operations() const noexcept { return ops_; }
+  [[nodiscard]] std::size_t size() const noexcept { return ops_.size(); }
+
+protected:
+  explicit OperationSetBase(Ops ops) : ops_(std::move(ops)) {}
+  Ops ops_;
+};
+
 // An immutable wrapper that gives a bare SymmetryOperations vector an object
 // identity: the free functions that take SymmetryOperations as their de-facto
 // `this` (rotations_of, primitive_symmetry, spacegroup_type_from_symmetry,
 // search_spacegroup_with_symmetry) become methods here. Nothing is memoized
 // (projections are cheap, an OperationSet is usually transient). Lives in
 // analysis/, never core/, to avoid a core -> spacegroup -> core cycle.
-class OperationSet {
+class OperationSet : public OperationSetBase<OperationSet, SymmetryOperations> {
 public:
-  [[nodiscard]] static OperationSet from_operations(SymmetryOperations ops) {
-    return OperationSet{std::move(ops)};
-  }
-
-  [[nodiscard]] SymmetryOperations const &operations() const noexcept {
-    return ops_;
-  }
-  [[nodiscard]] std::size_t size() const noexcept { return ops_.size(); }
-
   // The rotation parts of the operations, de-duplicated by value internally
   // (symmetry::rotations_of).
   [[nodiscard]] std::vector<Matrix3i> rotations() const;
@@ -60,25 +68,17 @@ public:
   search_spacegroup(Matrix3d const &prim_lattice, double symprec) const;
 
 private:
-  explicit OperationSet(SymmetryOperations ops) : ops_(std::move(ops)) {}
-  SymmetryOperations ops_;
+  friend OperationSetBase;
+  using OperationSetBase::OperationSetBase;
 };
 
 // The magnetic counterpart of OperationSet: an immutable wrapper over a
 // MagneticSymmetryOperations vector, exposing the free functions that take it as
 // their `this`.
-class MagneticOperationSet {
+class MagneticOperationSet
+    : public OperationSetBase<MagneticOperationSet,
+                              MagneticSymmetryOperations> {
 public:
-  [[nodiscard]] static MagneticOperationSet
-  from_operations(MagneticSymmetryOperations ops) {
-    return MagneticOperationSet{std::move(ops)};
-  }
-
-  [[nodiscard]] MagneticSymmetryOperations const &operations() const noexcept {
-    return ops_;
-  }
-  [[nodiscard]] std::size_t size() const noexcept { return ops_.size(); }
-
   // The pure (non-time-reversal) translations, including the zero translation
   // (spin::collect_pure_translations).
   [[nodiscard]] std::vector<Vector3d> pure_translations() const;
@@ -89,9 +89,8 @@ public:
   identify_spacegroup_type(Matrix3d const &lattice, double symprec) const;
 
 private:
-  explicit MagneticOperationSet(MagneticSymmetryOperations ops)
-      : ops_(std::move(ops)) {}
-  MagneticSymmetryOperations ops_;
+  friend OperationSetBase;
+  using OperationSetBase::OperationSetBase;
 };
 
 } // namespace cppcrystal::analysis

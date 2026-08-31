@@ -1,6 +1,7 @@
 #include <cppcrystal/spacegroup/spacegroup.hpp>
 
 #include <cppcrystal/core/centering.hpp>
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/hall_classification.hpp>
@@ -52,9 +53,38 @@ make_matrices(double const (&data)[Rows][3][3]) {
 
 // ---- change-of-basis tables ------------------------------------------------
 
+// One axis/setting choice: the change-of-basis matrix, the centering that
+// replaces C-centering under it, and the resulting unique axis. Stored as one
+// row per choice so the three properties can never drift apart.
+struct AxisChoice {
+  Matrix3d basis;
+  Centering centering;
+  int unique_axis;
+};
+
+template <std::size_t N>
+[[nodiscard]] std::array<AxisChoice, N>
+make_axis_choices(double const (&bases)[N][3][3],
+                  std::array<Centering, N> const &centerings,
+                  std::array<int, N> const &unique_axes) {
+  std::array<AxisChoice, N> out;
+  auto const matrices = make_matrices<N>(bases);
+  for (auto &&[choice, b, c, u] :
+       std::views::zip(out, matrices, centerings, unique_axes)) {
+    choice = {b, c, u};
+  }
+  return out;
+}
+
+// The two axes other than the unique one.
+[[nodiscard]] auto non_unique_axes(int unique_axis) {
+  return std::views::iota(0, 3) |
+         std::views::filter([unique_axis](int j) { return j != unique_axis; });
+}
+
 // The 36 monoclinic change-of-basis choices (3D bulk; layer entries 36..47 are
 // out of scope).
-[[nodiscard]] std::array<Matrix3d, 36> const &change_of_basis_monocli() {
+[[nodiscard]] std::array<AxisChoice, 36> const &monocli_axis_choices() {
   static double constexpr d[36][3][3] = {
       {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
       {{0, 0, 1}, {0, -1, 0}, {1, 0, 0}},
@@ -93,46 +123,31 @@ make_matrices(double const (&data)[Rows][3][3]) {
       {{1, 0, 0}, {0, 0, -1}, {1, 1, 0}},
       {{0, 0, -1}, {-1, 0, 0}, {0, 1, -1}},
   };
-  static auto table = make_matrices<36>(d);
-  return table;
-}
-
-[[nodiscard]] std::array<Centering, 36> const &change_of_centering_monocli() {
   using enum Centering;
-  static constexpr std::array<Centering, 36> const t = {
+  static constexpr std::array<Centering, 36> centerings = {
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
       a_face, b_face, b_face, body,   body,   body,   body,   body,   body,
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
       a_face, b_face, b_face, body,   body,   body,   body,   body,   body};
-  return t;
-}
-
-[[nodiscard]] constexpr std::array<int, 36> const &change_of_unique_axis_monocli() {
-  static constexpr std::array<int, 36> const t = {1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
-                                        1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
-                                        1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0};
-  return t;
-}
-
-[[nodiscard]] std::array<Matrix3d, 6> const &change_of_basis_ortho() {
-  static double const d[6][3][3] = {
-      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},  {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
-      {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},  {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
-      {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}}, {{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}}};
-  static auto const table = make_matrices<6>(d);
+  static constexpr std::array<int, 36> unique_axes = {
+      1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
+      1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0};
+  static auto const table = make_axis_choices<36>(d, centerings, unique_axes);
   return table;
 }
 
-[[nodiscard]] std::array<Centering, 6> const &change_of_centering_ortho() {
+// The 6 orthorhombic axis permutations {abc, cab, bca, ba-c, a-cb, -cba}.
+[[nodiscard]] std::array<AxisChoice, 6> const &ortho_axis_choices() {
+  static double constexpr d[6][3][3] = {
+      {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},  {{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
+      {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},  {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
+      {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}}, {{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}}};
   using enum Centering;
-  static std::array<Centering, 6> const t = {c_face, b_face, a_face,
-                                             c_face, b_face, a_face};
-  return t;
-}
-
-[[nodiscard]] std::array<int, 6> const &change_of_unique_axis_ortho() {
-  static std::array<int, 6> const t = {2, 1, 0, 2, 1, 0};
-  return t;
+  static constexpr std::array<Centering, 6> centerings = {
+      c_face, b_face, a_face, c_face, b_face, a_face};
+  static constexpr std::array<int, 6> unique_axes = {2, 1, 0, 2, 1, 0};
+  static auto const table = make_axis_choices<6>(d, centerings, unique_axes);
+  return table;
 }
 
 // Number of orthorhombic axis choices, indexed by (space-group number - 16),
@@ -434,12 +449,10 @@ get_conventional_symmetry(Matrix3d const &tmat, Centering centering,
 
   SymmetryOperations base;
   base.reserve(primitive_sym.size());
-  std::ranges::transform(
-      primitive_sym, std::back_inserter(base),
-      [&](SymmetryOperation const &op) -> SymmetryOperation {
-        Matrix3d const rot_d = inv_tmat * op.rotation.cast<double>() * tmat;
-        return {math::round_to_int(rot_d), inv_tmat * op.translation};
-      });
+  std::ranges::transform(primitive_sym, std::back_inserter(base),
+                         [&](SymmetryOperation const &op) {
+                           return conjugated_by(op, inv_tmat, tmat);
+                         });
 
   SymmetryOperations out = base;
   for (Vector3d const &shift : centering_shifts(centering)) {
@@ -516,6 +529,29 @@ try_hall(Matrix3d const &conv_lattice, int hall_number, Centering centering,
   return MatchResult{*shift, conv_lattice};
 }
 
+// The two-pass preference loop shared by the per-system matchers: when the
+// input lattice is usable, first try every choice constrained to it (so a
+// basis matching the input wins), then retry unconstrained.
+// `attempt(choice, orig_lattice_or_null)` produces the candidate result.
+template <std::ranges::input_range R, class Try>
+[[nodiscard]] std::optional<MatchResult>
+first_match(R &&choices, Matrix3d const *orig_lattice, double symprec,
+            Try &&attempt) {
+  if (orig_lattice && orig_lattice->determinant() > symprec) {
+    for (auto const &choice : choices) {
+      if (auto r = attempt(choice, orig_lattice)) {
+        return r;
+      }
+    }
+  }
+  for (auto const &choice : choices) {
+    if (auto r = attempt(choice, nullptr)) {
+      return r;
+    }
+  }
+  return std::nullopt;
+}
+
 // Shared loop for TETRA / HEXA / TRIGO / rhombohedral: try each rotation choice
 // (with the input-similarity preference first), defer to the Hall matcher.
 [[nodiscard]] std::optional<MatchResult> match_db_change_of_basis_loop(
@@ -527,31 +563,20 @@ try_hall(Matrix3d const &conv_lattice, int hall_number, Centering centering,
                                                ? Centering::r_center
                                                : Centering::primitive;
 
-  auto attempt = [&](Matrix3d const &cob) -> std::optional<MatchResult> {
-    SymmetryOperations const changed_symmetry =
-        get_conventional_symmetry(cob, centering_for_symmetry, conv_symmetry);
-    Matrix3d const changed_lattice = conv_lattice * cob;
-    return try_hall(changed_lattice, hall_number, centering, changed_symmetry,
-                    symprec);
-  };
-
-  if (orig_lattice && orig_lattice->determinant() > symprec) {
-    for (Matrix3d const &cob : change_of_basis) {
-      Matrix3d const changed_lattice = conv_lattice * cob;
-      if (!is_equivalent_lattice(0, changed_lattice, *orig_lattice, symprec)) {
-        continue;
-      }
-      if (auto r = attempt(cob)) {
-        return r;
-      }
-    }
-  }
-  for (Matrix3d const &cob : change_of_basis) {
-    if (auto r = attempt(cob)) {
-      return r;
-    }
-  }
-  return std::nullopt;
+  return first_match(
+      change_of_basis, orig_lattice, symprec,
+      [&](Matrix3d const &cob,
+          Matrix3d const *orig) -> std::optional<MatchResult> {
+        Matrix3d const changed_lattice = conv_lattice * cob;
+        if (orig &&
+            !is_equivalent_lattice(0, changed_lattice, *orig, symprec)) {
+          return std::nullopt;
+        }
+        SymmetryOperations const changed_symmetry = get_conventional_symmetry(
+            cob, centering_for_symmetry, conv_symmetry);
+        return try_hall(changed_lattice, hall_number, centering,
+                        changed_symmetry, symprec);
+      });
 }
 
 [[nodiscard]] std::optional<MatchResult>
@@ -615,40 +640,24 @@ match_db_others(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
 match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                int hall_number, Centering centering,
                SymmetryOperations const &conv_symmetry, double symprec) {
-  if (orig_lattice && orig_lattice->determinant() > symprec) {
-    for (Matrix3d const &change : change_of_basis_ortho()) {
-      if (auto r = match_db_cubic_in_loop(conv_lattice, orig_lattice, change,
-                                          hall_number, centering, conv_symmetry,
-                                          symprec)) {
-        return r;
-      }
-    }
-  }
-  for (Matrix3d const &change : change_of_basis_ortho()) {
-    if (auto r =
-            match_db_cubic_in_loop(conv_lattice, nullptr, change, hall_number,
-                                   centering, conv_symmetry, symprec)) {
-      return r;
-    }
-  }
-  return std::nullopt;
+  return first_match(ortho_axis_choices(), orig_lattice, symprec,
+                     [&](AxisChoice const &choice, Matrix3d const *orig) {
+                       return match_db_cubic_in_loop(
+                           conv_lattice, orig, choice.basis, hall_number,
+                           centering, conv_symmetry, symprec);
+                     });
 }
 
 // Norm-ordering preference among the free axes. Returns false if the choice
 // violates the required |a|<=|b|<=|c| order.
-[[nodiscard]] bool ortho_axis_norms_ok(Matrix3d const &lattice,
-                                       int axis_choice_index,
+[[nodiscard]] bool ortho_axis_norms_ok(Matrix3d const &lattice, int unique_axis,
                                        int num_free_axes) {
   auto sqnorm = [&](int j) { return lattice.col(j).squaredNorm(); };
   if (num_free_axes == 2) {
-    std::array<double, 2> norms;
-    int l = 0;
-    for (int j = 0; j < 3; ++j)
-      if (j != change_of_unique_axis_ortho()[static_cast<std::size_t>(
-                   axis_choice_index)]) {
-        norms[static_cast<std::size_t>(l++)] = sqnorm(j);
-      }
-    return !sqnorm_longer(norms[0], norms[1]);
+    auto norms = non_unique_axes(unique_axis) | std::views::transform(sqnorm);
+    auto it = norms.begin();
+    double const first = *it;
+    return !sqnorm_longer(first, *++it);
   }
   if (num_free_axes == 3) {
     return !(sqnorm_longer(sqnorm(0), sqnorm(1)) ||
@@ -663,14 +672,12 @@ match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
 
 [[nodiscard]] std::optional<MatchResult> match_db_ortho_in_loop(
     Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
-    int axis_choice_index, int hall_number, Centering centering,
+    AxisChoice const &choice, int hall_number, Centering centering,
     SymmetryOperations const &symmetry, int num_free_axes, double symprec) {
-  auto const idx = static_cast<std::size_t>(axis_choice_index);
-  Centering const changed_centering = (centering == Centering::c_face)
-                                          ? change_of_centering_ortho()[idx]
-                                          : centering;
+  Centering const changed_centering =
+      (centering == Centering::c_face) ? choice.centering : centering;
 
-  Matrix3d change_of_basis = change_of_basis_ortho()[idx];
+  Matrix3d change_of_basis = choice.basis;
   Matrix3d changed_lattice = conv_lattice * change_of_basis;
 
   if (orig_lattice) {
@@ -683,7 +690,8 @@ match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
     change_of_basis = change_of_basis * *tmat;
   }
 
-  if (!ortho_axis_norms_ok(changed_lattice, axis_choice_index, num_free_axes)) {
+  if (!ortho_axis_norms_ok(changed_lattice, choice.unique_axis,
+                           num_free_axes)) {
     return std::nullopt;
   }
 
@@ -699,26 +707,20 @@ match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                SymmetryOperations const &symmetry, int num_free_axes,
                double symprec) {
   // 3D tries all six axis permutations {abc, bca, cab, ba-c, a-cb, -cba}; a
-  // layer group (hall < 0) tries only abc and ba-c (step 3), the two that keep
-  // the aperiodic axis at c.
+  // layer group (hall < 0) tries only abc and ba-c (stride 3), the two that
+  // keep the aperiodic axis at c.
   int const step = hall_number < 0 ? 3 : 1;
-  if (orig_lattice && orig_lattice->determinant() > symprec) {
-    for (int i = 0; i < 6; i += step) {
-      if (auto r = match_db_ortho_in_loop(conv_lattice, orig_lattice, i,
-                                          hall_number, centering, symmetry,
-                                          num_free_axes, symprec)) {
-        return r;
-      }
-    }
-  }
-  for (int i = 0; i < 6; i += step) {
-    if (auto r = match_db_ortho_in_loop(conv_lattice, nullptr, i, hall_number,
-                                        centering, symmetry, num_free_axes,
-                                        symprec)) {
-      return r;
-    }
-  }
-  return std::nullopt;
+  auto const choices = std::views::iota(0, 6) | std::views::stride(step) |
+                       std::views::transform([](int i) -> AxisChoice const & {
+                         return ortho_axis_choices()[
+                             static_cast<std::size_t>(i)];
+                       });
+  return first_match(choices, orig_lattice, symprec,
+                     [&](AxisChoice const &choice, Matrix3d const *orig) {
+                       return match_db_ortho_in_loop(
+                           conv_lattice, orig, choice, hall_number, centering,
+                           symmetry, num_free_axes, symprec);
+                     });
 }
 
 // One change-of-basis attempt for monoclinic. Status: 0 not found, 1 found, 2
@@ -731,31 +733,26 @@ struct MonocliCandidate {
 };
 
 [[nodiscard]] MonocliCandidate
-match_db_monocli_in_loop(Matrix3d conv_lattice, int change_of_basis_index,
+match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
                          Matrix3d const *orig_lattice, bool check_norms,
                          int hall_number, Centering centering,
                          SymmetryOperations const &conv_symmetry,
                          double symprec) {
-  auto const idx = static_cast<std::size_t>(change_of_basis_index);
-  Centering const changed_centering = (centering == Centering::c_face)
-                                          ? change_of_centering_monocli()[idx]
-                                          : centering;
+  Centering const changed_centering =
+      (centering == Centering::c_face) ? choice.centering : centering;
 
-  Matrix3d change_of_basis = change_of_basis_monocli()[idx];
+  Matrix3d change_of_basis = choice.basis;
   conv_lattice = conv_lattice * change_of_basis;
-  int const unique_axis = change_of_unique_axis_monocli()[idx];
+  int const unique_axis = choice.unique_axis;
 
   // The two non-unique axes and their squared norms.
   std::array<Vector3d, 2> vec;
   std::array<double, 2> norms_squared;
-  int l = 0;
-  for (int j = 0; j < 3; ++j)
-    if (j != unique_axis) {
-      vec[static_cast<std::size_t>(l)] = conv_lattice.col(j);
-      norms_squared[static_cast<std::size_t>(l)] =
-          conv_lattice.col(j).squaredNorm();
-      ++l;
-    }
+  for (int l = 0; int const j : non_unique_axes(unique_axis)) {
+    vec[static_cast<std::size_t>(l)] = conv_lattice.col(j);
+    norms_squared[static_cast<std::size_t>(l)] = vec[static_cast<std::size_t>(l)].squaredNorm();
+    ++l;
+  }
 
   // Discard if the principal angle is acute.
   if (vec[0].dot(vec[1]) > kZeroPrec) {
@@ -803,11 +800,12 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                            group_number == 11;
 
   std::array<MonocliCandidate, 36> found;
-  std::ranges::transform(std::views::iota(0, 36), found.begin(), [&](int i) {
-    return match_db_monocli_in_loop(conv_lattice, i, orig_lattice, check_norms,
-                                    hall_number, centering, conv_symmetry,
-                                    symprec);
-  });
+  std::ranges::transform(monocli_axis_choices(), found.begin(),
+                         [&](AxisChoice const &choice) {
+                           return match_db_monocli_in_loop(
+                               conv_lattice, choice, orig_lattice, check_norms,
+                               hall_number, centering, conv_symmetry, symprec);
+                         });
 
   auto is_found = [](MonocliCandidate const &c) { return c.status != 0; };
   if (std::ranges::none_of(found, is_found)) {
@@ -823,20 +821,16 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   double const shortest = std::ranges::min(
       found | std::views::filter(is_found) | std::views::transform(norm_sum));
 
-  // Among the shortest, prefer a basis that matches the input (status == 2).
-  MonocliCandidate const *chosen = nullptr;
-  for (auto const &c : found) {
-    if (!is_found(c) || std::abs(norm_sum(c) - shortest) >= symprec) {
-      continue;
-    }
-    if (c.status == 2) {
-      chosen = &c;
-      break;
-    }
-    if (chosen == nullptr) {
-      chosen = &c;
-    }
-  }
+  // Among the near-shortest matches, prefer a basis that matches the input
+  // (status == 2); max_element keeps the first of equal status, matching the
+  // historical first-candidate preference.
+  auto near_shortest =
+      found | std::views::filter(is_found) |
+      std::views::filter([&](MonocliCandidate const &c) {
+        return std::abs(norm_sum(c) - shortest) < symprec;
+      });
+  auto const chosen =
+      std::ranges::max_element(near_shortest, {}, &MonocliCandidate::status);
   return MatchResult{chosen->origin_shift, chosen->conv_lattice};
 }
 
@@ -932,10 +926,12 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
     // monoclinic reduction keeps it and reduces the periodic plane.
     std::optional<int> aperiodic_conv;
     if (auto const ap = primitive.cell.aperiodic_axis()) {
-      for (int i = 0; i < 3; ++i) {
-        if (tmat_int(*ap, i) != 0) {
-          aperiodic_conv = i;
-        }
+      // The last nonzero column wins, matching the historical scan direction.
+      auto const cols = std::views::iota(0, 3) | std::views::reverse;
+      auto const it = std::ranges::find_if(
+          cols, [&](int i) { return tmat_int(*ap, i) != 0; });
+      if (it != cols.end()) {
+        aperiodic_conv = *it;
       }
     }
     auto const updated =
@@ -1002,15 +998,8 @@ iterative_search_hall_number(std::span<int const> candidates,
 // Sanity check: in a primitive cell every operation must carry a distinct
 // rotation.
 [[nodiscard]] bool point_symmetry_intact(SymmetryOperations const &symmetry) {
-  std::vector<Matrix3i> seen;
-  for (auto const &op : symmetry) {
-    if (std::ranges::any_of(
-            seen, [&](Matrix3i const &r) { return r == op.rotation; })) {
-      return false;
-    }
-    seen.push_back(op.rotation);
-  }
-  return true;
+  return unique_by_rotation(symmetry, &SymmetryOperation::rotation).size() ==
+         symmetry.size();
 }
 
 [[nodiscard]] Result<Spacegroup> search_spacegroup_with_symmetry(
@@ -1092,11 +1081,10 @@ spacegroup_type_from_symmetry(SymmetryOperations const &operations,
   Matrix3d const inv2 = t_mat2.inverse();
   SymmetryOperations red_sym;
   red_sym.reserve(prim_sym.size());
-  for (auto const &op : prim_sym) {
-    Matrix3d const rot_d = t_mat2 * op.rotation.cast<double>() * inv2;
-    red_sym.push_back(
-        {math::round_to_int(rot_d), Vector3d(t_mat2 * op.translation)});
-  }
+  std::ranges::transform(prim_sym, std::back_inserter(red_sym),
+                         [&](SymmetryOperation const &op) {
+                           return conjugated_by(op, t_mat2, inv2);
+                         });
 
   return search_spacegroup_with_symmetry(red_sym, red_lat, symprec);
 }

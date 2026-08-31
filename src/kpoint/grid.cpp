@@ -1,6 +1,7 @@
 #include <cppcrystal/kpoint/grid.hpp>
 
 #include <cstddef>
+#include <ranges>
 
 namespace cppcrystal::kpoint {
 
@@ -78,15 +79,15 @@ std::vector<Vector3i> all_grid_addresses(Vector3i const &mesh) {
   }
   const auto n = static_cast<std::size_t>(mesh.prod());
   std::vector<Vector3i> grid_address(n);
-  for (int i = 0; i < mesh[0]; ++i) {
-    for (int j = 0; j < mesh[1]; ++j) {
-      for (int k = 0; k < mesh[2]; ++k) {
-        Vector3i const address(i, j, k);
-        Vector3i reduced = address;
-        reduce_grid_address(reduced, mesh);
-        grid_address[grid_point_single_mesh(address, mesh)] = reduced;
-      }
-    }
+  // cartesian_product varies the last range fastest, matching the original
+  // loop nest (k innermost).
+  for (auto const [i, j, k] : std::views::cartesian_product(
+           std::views::iota(0, mesh[0]), std::views::iota(0, mesh[1]),
+           std::views::iota(0, mesh[2]))) {
+    Vector3i const address(i, j, k);
+    Vector3i reduced = address;
+    reduce_grid_address(reduced, mesh);
+    grid_address[grid_point_single_mesh(address, mesh)] = reduced;
   }
   return grid_address;
 }

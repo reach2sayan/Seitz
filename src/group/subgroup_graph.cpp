@@ -38,11 +38,7 @@ using RotationSet = std::set<Key>;
 
 [[nodiscard]] Key key_of(Matrix3i const &r) noexcept {
   Key k{};
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      k[static_cast<std::size_t>(3 * i + j)] = r(i, j);
-    }
-  }
+  Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor>>(k.data()) = r;
   return k;
 }
 

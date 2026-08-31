@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
+#include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/spacegroup_metadata_tables.hpp>
 
 #include <algorithm>
@@ -64,8 +65,7 @@ struct SpacegroupCatalog {
 
   // The setting for a Hall number (1..530); the sentinel (number 0) otherwise.
   [[nodiscard]] constexpr SpacegroupType const &at(int hall) const noexcept {
-    bool const in_range = hall >= 1 && hall <= kNumHallNumbers;
-    return by_hall[static_cast<std::size_t>(in_range ? hall : 0)];
+    return detail::at_or_sentinel(by_hall, hall);
   }
 
   // Every Hall setting of a given international number, as a span of Hall
@@ -146,9 +146,7 @@ struct LayerCatalog {
 
   // The setting for a layer hall number (-1..-116); the sentinel otherwise.
   [[nodiscard]] constexpr SpacegroupType const &at(int hall) const noexcept {
-    int const neg = -hall;
-    bool const in_range = neg >= 1 && neg <= kNumLayerHallNumbers;
-    return by_neg_hall[static_cast<std::size_t>(in_range ? neg : 0)];
+    return detail::at_or_sentinel(by_neg_hall, -hall);
   }
 };
 
@@ -176,21 +174,30 @@ inline constexpr LayerCatalog kLayerCatalog = [] {
 // constant expressions.
 [[nodiscard]] constexpr SpacegroupType
 spacegroup_type(int hall_number) noexcept {
-  return hall_number < 0 ? kLayerCatalog.at(hall_number)
-                         : kCatalog.at(hall_number);
+  return detail::hall_indexed(kCatalog.by_hall, kLayerCatalog.by_neg_hall,
+                              hall_number);
 }
 
-// The first (default) layer Hall setting (-1..-116) for a layer-group number
-// (1..80); 0 if out of range. constexpr — the number -> hall map is resolved at
-// compile time rather than scanned at run time.
-[[nodiscard]] constexpr int layer_default_hall(int layer_number) noexcept {
-  for (int neg = 1; neg <= kNumLayerHallNumbers; ++neg) {
-    if (kLayerCatalog.by_neg_hall[static_cast<std::size_t>(neg)].number ==
-        layer_number) {
-      return -neg;
+// number -> first (default) layer Hall setting, built once at compile time.
+// Walking the settings from the last down leaves each number's smallest
+// (first/canonical) setting in place; entry 0 stays 0 for out-of-range.
+inline constexpr auto kLayerDefaultHall = [] {
+  std::array<int, kNumLayerGroups + 1> t{};
+  for (int neg = kNumLayerHallNumbers; neg >= 1; --neg) {
+    int const number = kLayerCatalog.by_neg_hall[static_cast<std::size_t>(neg)].number;
+    if (number >= 1 && number <= kNumLayerGroups) {
+      t[static_cast<std::size_t>(number)] = -neg;
     }
   }
-  return 0;
+  return t;
+}();
+
+// The first (default) layer Hall setting (-1..-116) for a layer-group number
+// (1..80); 0 if out of range.
+[[nodiscard]] constexpr int layer_default_hall(int layer_number) noexcept {
+  return layer_number_in_range(layer_number)
+             ? kLayerDefaultHall[static_cast<std::size_t>(layer_number)]
+             : 0;
 }
 
 // Compile-time integrity guards on the layer catalog: the settings must cover

@@ -1,12 +1,13 @@
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 
-#include <cppcrystal/dataset.hpp> // get_dataset
+#include <cppcrystal/core/matrix_order.hpp> // unique_by_rotation
+#include <cppcrystal/core/tolerance.hpp>    // approx_equal
+#include <cppcrystal/dataset.hpp>           // get_dataset
 #include <cppcrystal/kpoint/grid.hpp>
 #include <cppcrystal/math/fractional.hpp> // math::nint
 
 #include <algorithm>
 #include <array>
-#include <boost/container/flat_set.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
@@ -29,17 +30,7 @@ point_group_reciprocal(std::vector<Matrix3i> const &rotations,
                            [](const Matrix3i &r) { return -r.transpose(); });
   }
 
-  boost::container::flat_set<Matrix3i,
-                             decltype([](const Matrix3i &a, const Matrix3i &b) {
-                               return std::lexicographical_compare(
-                                   a.data(), a.data() + 9, b.data(),
-                                   b.data() + 9);
-                             })>
-      seen;
-  std::vector<Matrix3i> unique;
-  std::ranges::copy_if(candidates, std::back_inserter(unique),
-                       [&](Matrix3i const &m) { return seen.insert(m).second; });
-  return unique;
+  return unique_by_rotation(candidates);
 }
 
 std::vector<Matrix3i>
@@ -51,9 +42,9 @@ point_group_reciprocal_with_q(std::vector<Matrix3i> const &rot_reciprocal,
     return std::ranges::all_of(qpoints, [&](const Vector3d &q) {
       const Vector3d q_rot = rot.cast<double>() * q;
       return std::ranges::any_of(qpoints, [&](const Vector3d &other) {
-        Vector3d diff = q_rot - other;
-        diff -= math::round_to_int(diff).cast<double>();
-        return diff.cwiseAbs().maxCoeff() < symprec;
+        Vector3d const diff = q_rot - other;
+        return approx_equal(diff, math::round_to_int(diff).cast<double>(),
+                            symprec);
       });
     });
   };

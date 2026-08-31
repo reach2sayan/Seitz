@@ -7,7 +7,10 @@
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
 
+#include <cstddef>
 #include <optional>
+#include <ranges>
+#include <utility>
 #include <vector>
 
 // Magnetic symmetry from per-site tensors (3D path). Given the non-magnetic
@@ -17,14 +20,33 @@
 namespace cppcrystal::spin {
 
 // The result of the magnetic symmetry search, in the *input* cell's basis.
-struct MagneticSymmetrySearch {
+class MagneticSymmetrySearch {
+public:
   MagneticSymmetryOperations operations;
   // equivalent_atoms[i] = representative atom of i's magnetic orbit.
   std::vector<int> equivalent_atoms;
-  // permutations[p * size + i] = image of atom i under operation p.
-  std::vector<int> permutations;
   // Primitive lattice implied by the magnetic pure translations.
   Matrix3d primitive_lattice{Matrix3d::Identity()};
+
+  MagneticSymmetrySearch(MagneticSymmetryOperations ops,
+                         std::vector<int> equivalent,
+                         std::vector<int> permutations, Matrix3d prim_lattice)
+      : operations(std::move(ops)), equivalent_atoms(std::move(equivalent)),
+        primitive_lattice(std::move(prim_lattice)),
+        permutations_(std::move(permutations)) {}
+
+  // permutation_rows()[p][i] = image of atom i under operation p. A range of
+  // per-operation rows over the (private) flat buffer — iterate it, never
+  // compute flat indices.
+  [[nodiscard]] auto permutation_rows() const {
+    return permutations_ |
+           std::views::chunk(
+               static_cast<std::ptrdiff_t>(equivalent_atoms.size()));
+  }
+
+private:
+  // One row of equivalent_atoms.size() images per operation.
+  std::vector<int> permutations_;
 };
 
 // Magnetic symmetry operations of `mcell` consistent with its site tensors.
@@ -57,11 +79,9 @@ collect_pure_translations(MagneticSymmetryOperations const &operations);
 
 // The idealized magnetic cell: each atom's position and site tensor is replaced
 // by the average, over all magnetic operations, of the operation applied to the
-// atom that maps onto it. `permutations[p * size + i]` is the image of atom i
-// under operation p (as returned by operations_with_site_tensors).
+// atom that maps onto it (per `search`'s operations and permutations).
 [[nodiscard]] MagneticCell
-idealized_cell(std::vector<int> const &permutations, MagneticCell const &mcell,
-               MagneticSymmetryOperations const &operations,
+idealized_cell(MagneticSymmetrySearch const &search, MagneticCell const &mcell,
                bool with_time_reversal, bool is_axial);
 
 } // namespace cppcrystal::spin

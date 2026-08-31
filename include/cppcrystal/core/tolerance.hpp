@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Eigen/Core>
+
 #include <optional>
 
 namespace cppcrystal {
@@ -16,6 +18,15 @@ inline constexpr double kZeroPrec = 1e-10;
 [[nodiscard]] constexpr bool sqnorm_longer(double lhs_sqnorm,
                                            double rhs_sqnorm) {
   return lhs_sqnorm > rhs_sqnorm + kZeroPrec;
+}
+
+// Entry-wise tolerance comparison: every |a - b| entry strictly below tol.
+// The single definition of "equal within tolerance" for vectors and matrices.
+template <typename A, typename B>
+[[nodiscard]] bool approx_equal(Eigen::MatrixBase<A> const &a,
+                                Eigen::MatrixBase<B> const &b,
+                                double tol) noexcept {
+  return ((a - b).cwiseAbs().maxCoeff() < tol);
 }
 
 // An angle tolerance in degrees, or std::nullopt to derive an effective value

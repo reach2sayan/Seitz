@@ -1,5 +1,7 @@
 #include <cppcrystal/symmetry/pointgroup.hpp>
 
+#include <cppcrystal/core/matrix_order.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -223,12 +225,13 @@ constexpr std::size_t kRotationTypeCount = 10;
 // after this anonymous namespace; class_table() calls it through that
 // declaration.
 
-// De-duplicate rotations by value.
+// De-duplicate rotations by value; distinct rotations beyond the capacity of
+// PointSymmetry are dropped, as before.
 [[nodiscard]] PointSymmetry
 unique_rotations(std::span<Matrix3i const> rotations) {
   PointSymmetry out;
-  for (const Matrix3i &r : rotations) {
-    if (std::ranges::find(out, r) == out.end() && out.size() < out.capacity()) {
+  for (const Matrix3i &r : unique_by_rotation(rotations)) {
+    if (out.size() < out.capacity()) {
       out.push_back(r);
     }
   }
@@ -253,12 +256,10 @@ unique_rotations(std::span<Matrix3i const> rotations) {
   if (!class_table(table, ps)) {
     return 0;
   }
-  for (const auto [i, pg_data] : kPointgroupData | std::views::enumerate) {
-    if (pg_data.table == table) {
-      return static_cast<int>(i);
-    }
-  }
-  return 0;
+  auto const it = std::ranges::find(kPointgroupData, table, &PgEntry::table);
+  return it == kPointgroupData.end()
+             ? 0
+             : static_cast<int>(it - kPointgroupData.begin());
 }
 
 [[nodiscard]] inline Matrix3i proper_rotation(Matrix3i const &rot) {
@@ -323,45 +324,23 @@ using AxisTriple = std::array<SignedAxis, 3>;
   return tmat;
 }
 
-bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
-  Matrix3i prop_rot = kIdentity;
-  std::optional<int> two_fold;
-  for (Matrix3i const &r : ps) {
-    prop_rot = proper_rotation(r);
-    if (prop_rot.trace() == -1) { // two-fold
-      two_fold = axis_index(prop_rot);
-      break;
-    }
-  }
-  if (!two_fold) {
-    return false;
-  }
-  axes[1] = {*two_fold, 1};
+// Squared length of candidate axis kRotAxes[idx].
+[[nodiscard]] int axis_sqnorm(int idx) { return rot_axis(idx).squaredNorm(); }
 
-  auto const ortho = orthogonal_axes(prop_rot, 2);
-  if (ortho.empty()) {
-    return false;
+// The shortest axis (index into kRotAxes) of `range`; min_element keeps the
+// first occurrence on ties (the index-order tie-break). nullopt when empty.
+template <std::ranges::forward_range R>
+[[nodiscard]] std::optional<int> shortest_axis(R &&range) {
+  auto const it = std::ranges::min_element(range, {}, axis_sqnorm);
+  if (it == std::ranges::end(range)) {
+    return std::nullopt;
   }
-
-  // a and b: the two shortest orthogonal axes (distinct); min_element keeps the
-  // first occurrence on ties (the index-order tie-break).
-  auto const sqnorm = [](int idx) { return rot_axis(idx).squaredNorm(); };
-
-  axes[0] = {*std::ranges::min_element(ortho, {}, sqnorm), 1};
-
-  auto rest =
-      ortho | std::views::filter([&](int idx) { return idx != axes[0].index; });
-  auto const second = std::ranges::min_element(rest, {}, sqnorm);
-  if (second == rest.end()) {
-    return false;
-  }
-  axes[2] = {*second, 1};
-  return true;
+  return *it;
 }
 
-// The principal (c) axis of a one-axis Laue class: the proper rotation of
-// rot_order paired with its rotation-axis index. nullopt if no such operation
-// (or no axis for it) exists.
+// The distinguished axis of a Laue class: the first proper rotation of
+// rot_order (2, 3 or 4, identified by its trace) paired with its rotation-axis
+// index. nullopt if no such operation (or no axis for it) exists.
 struct Principal {
   Matrix3i prop_rot;
   int axis;
@@ -371,12 +350,38 @@ struct Principal {
   for (Matrix3i const &r : ps) {
     Matrix3i const prop_rot = proper_rotation(r);
     if ((rot_order == 4 && prop_rot.trace() == 1) ||
-        (rot_order == 3 && prop_rot.trace() == 0)) {
+        (rot_order == 3 && prop_rot.trace() == 0) ||
+        (rot_order == 2 && prop_rot.trace() == -1)) {
       return axis_index(prop_rot).transform(
           [&](int axis) { return Principal{prop_rot, axis}; });
     }
   }
   return std::nullopt;
+}
+
+bool laue2m(AxisTriple &axes, PointSymmetry const &ps) {
+  auto const two_fold = principal_axis(ps, 2);
+  if (!two_fold) {
+    return false;
+  }
+  axes[1] = {two_fold->axis, 1};
+
+  auto const ortho = orthogonal_axes(two_fold->prop_rot, 2);
+  if (ortho.empty()) {
+    return false;
+  }
+
+  // a and b: the two shortest orthogonal axes (distinct).
+  axes[0] = {*shortest_axis(ortho), 1};
+
+  auto const second = shortest_axis(ortho | std::views::filter([&](int idx) {
+                                      return idx != axes[0].index;
+                                    }));
+  if (!second) {
+    return false;
+  }
+  axes[2] = {*second, 1};
+  return true;
 }
 
 // The two in-plane axes (a, b) for a one-axis Laue class: the first orthogonal
@@ -419,15 +424,7 @@ in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
 }
 
 void sort_axes(AxisTriple &axes) {
-  if (axes[1].index > axes[2].index) {
-    std::swap(axes[1], axes[2]);
-  }
-  if (axes[0].index > axes[1].index) {
-    std::swap(axes[0], axes[1]);
-  }
-  if (axes[1].index > axes[2].index) {
-    std::swap(axes[1], axes[2]);
-  }
+  std::ranges::sort(axes, {}, &SignedAxis::index);
   if (transformation_from_axes(axes).determinant() < 0) {
     std::swap(axes[1], axes[2]);
   }
@@ -443,22 +440,21 @@ void sort_axes(AxisTriple &axes) {
 // Move the aperiodic axis to c, then orient for a positive determinant. False
 // for an invalid (e.g. inclined) configuration.
 [[nodiscard]] bool layer_sort_axes(AxisTriple &axes, int aperiodic_axis) {
-  int lattice_rank = 0;
-  int arank = 0;
-  int axis_pos = -1;
-  for (int i = 0; i < 3; ++i) {
-    int const c = aperiodic_component(axes[static_cast<std::size_t>(i)].index,
-                                      aperiodic_axis);
-    if (c == 0) {
-      ++lattice_rank;
-    } else if (c == 1 || c == -1) {
-      axis_pos = i;
-      ++arank;
-    }
-  }
-  if (lattice_rank != 2 || arank != 1) {
+  auto const component = [&](int i) {
+    return aperiodic_component(axes[static_cast<std::size_t>(i)].index,
+                               aperiodic_axis);
+  };
+  auto const in_plane = [&](int i) { return component(i) == 0; };
+  auto const along_aperiodic = [&](int i) {
+    int const c = component(i);
+    return c == 1 || c == -1;
+  };
+  auto const positions = std::views::iota(0, 3);
+  if (std::ranges::count_if(positions, in_plane) != 2 ||
+      std::ranges::count_if(positions, along_aperiodic) != 1) {
     return false;
   }
+  int const axis_pos = *std::ranges::find_if(positions, along_aperiodic);
   std::swap(axes[static_cast<std::size_t>(axis_pos)], axes[2]);
   if (transformation_from_axes(axes).determinant() < 0) {
     std::swap(axes[0], axes[1]);
@@ -471,44 +467,28 @@ void sort_axes(AxisTriple &axes) {
 // monoclinic layers); the remaining two axes are chosen accordingly.
 [[nodiscard]] bool layer_laue2m(AxisTriple &axes, PointSymmetry const &ps,
                                 int aperiodic_axis) {
-  Matrix3i prop_rot = kIdentity;
-  std::optional<int> two_fold;
-  for (Matrix3i const &r : ps) {
-    prop_rot = proper_rotation(r);
-    if (prop_rot.trace() == -1) {
-      two_fold = axis_index(prop_rot);
-      break;
-    }
-  }
+  auto const two_fold = principal_axis(ps, 2);
   if (!two_fold) {
     return false;
   }
-  axes[0] = {*two_fold, 1};
+  axes[0] = {two_fold->axis, 1};
 
-  auto const ortho = orthogonal_axes(prop_rot, 2);
+  auto const ortho = orthogonal_axes(two_fold->prop_rot, 2);
   if (ortho.empty()) {
     return false;
   }
-  auto const sqnorm = [](int idx) { return rot_axis(idx).squaredNorm(); };
-  auto shortest = [&](auto &&range) -> std::optional<int> {
-    auto const it = std::ranges::min_element(range, {}, sqnorm);
-    if (it == std::ranges::end(range)) {
-      return std::nullopt;
-    }
-    return *it;
-  };
 
-  int const a0 = aperiodic_component(*two_fold, aperiodic_axis);
+  int const a0 = aperiodic_component(two_fold->axis, aperiodic_axis);
   if (a0 == 1 || a0 == -1) {
     // Monoclinic/oblique: the two-fold is along the aperiodic axis; a and b are
     // the two shortest orthogonal axes.
-    auto const first = shortest(ortho);
+    auto const first = shortest_axis(ortho);
     if (!first) {
       return false;
     }
-    auto const second = shortest(ortho | std::views::filter([&](int idx) {
-                               return idx != axes[1].index;
-                             }));
+    auto const second =
+        shortest_axis(ortho | std::views::filter(
+                                  [&](int idx) { return idx != axes[1].index; }));
     if (!second) {
       return false;
     }
@@ -518,18 +498,18 @@ void sort_axes(AxisTriple &axes) {
     // Monoclinic/rectangular: the second axis lies in the periodic plane, the
     // third along the aperiodic axis.
     auto const in_plane =
-        shortest(ortho | std::views::filter([&](int idx) {
-                   return aperiodic_component(idx, aperiodic_axis) == 0;
-                 }));
+        shortest_axis(ortho | std::views::filter([&](int idx) {
+                        return aperiodic_component(idx, aperiodic_axis) == 0;
+                      }));
     if (!in_plane) {
       return false;
     }
 
     auto const out_plane =
-        shortest(ortho | std::views::filter([&](int idx) {
-                   int const c = aperiodic_component(idx, aperiodic_axis);
-                   return c == 1 || c == -1;
-                 }));
+        shortest_axis(ortho | std::views::filter([&](int idx) {
+                        int const c = aperiodic_component(idx, aperiodic_axis);
+                        return c == 1 || c == -1;
+                      }));
     if (!out_plane) {
       return false;
     }
@@ -578,6 +558,14 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
 [[nodiscard]] bool get_axes(AxisTriple &axes, Laue laue,
                             PointSymmetry const &ps,
                             std::optional<int> aperiodic_axis) {
+  auto const assign_axes = [&](int rot_order) {
+    return laue_one_axis(ps, rot_order)
+        .transform([&](AxisTriple const &a) {
+          axes = a;
+          return true;
+        })
+        .value_or(false);
+  };
   switch (laue) {
   case Laue::laue_1:
     axes = {SignedAxis{0, 1}, SignedAxis{1, 1}, SignedAxis{2, 1}};
@@ -591,22 +579,12 @@ bool lauennn(AxisTriple &axes, PointSymmetry const &ps, int rot_order,
   case Laue::laue_4mmm:
     // The 4-fold axis is the aperiodic axis for a layer; laue_one_axis already
     // places it at c, so no aperiodic-specific handling is needed.
-    return laue_one_axis(ps, 4)
-        .transform([&](AxisTriple const &a) {
-          axes = a;
-          return true;
-        })
-        .value_or(false);
+    return assign_axes(4);
   case Laue::laue_3:
   case Laue::laue_3m:
   case Laue::laue_6m:
   case Laue::laue_6mmm:
-    return laue_one_axis(ps, 3)
-        .transform([&](AxisTriple const &a) {
-          axes = a;
-          return true;
-        })
-        .value_or(false);
+    return assign_axes(3);
   case Laue::laue_m3:
     return lauennn(axes, ps, 2, aperiodic_axis);
   case Laue::laue_m3m:
@@ -654,33 +632,13 @@ std::optional<RotationType> rotation_type(Matrix3i const &rot) noexcept {
 }
 
 int rotation_order(Matrix3i const &rot) noexcept {
-  auto const t = rotation_type(rot);
-  if (!t) {
-    return 0;
-  }
-  switch (*t) {
-  case RotationType::identity:
-    return 1;
-  case RotationType::rotation_2:
-    return 2;
-  case RotationType::rotation_3:
-    return 3;
-  case RotationType::rotation_4:
-    return 4;
-  case RotationType::rotation_6:
-    return 6;
-  case RotationType::inversion:
-    return -1;
-  case RotationType::mirror:
-    return -2;
-  case RotationType::rotoinversion_3:
-    return -3;
-  case RotationType::rotoinversion_4:
-    return -4;
-  case RotationType::rotoinversion_6:
-    return -6;
-  }
-  return 0;
+  // Signed orders in RotationType declaration order.
+  constexpr std::array<int, 10> kOrders{-6, -4, -3, -2, -1, 1, 2, 3, 4, 6};
+  return rotation_type(rot)
+      .transform([&](RotationType t) {
+        return kOrders[static_cast<std::size_t>(std::to_underlying(t))];
+      })
+      .value_or(0);
 }
 
 std::optional<Vector3i> rotation_axis(Matrix3i const &rot) {

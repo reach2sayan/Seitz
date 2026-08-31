@@ -13,7 +13,16 @@ FetchContent_Declare(Eigen3
         SYSTEM)
 FetchContent_MakeAvailable(Eigen3)
 
-find_package(Boost 1.83 REQUIRED CONFIG)
+# Boost 1.88.0 — always fetched (no system/install flow), from the CMake-ready
+# release archive. 1.87 is the floor: it is the first release shipping
+# boost::parser (the house parsing library — never Spirit). Only the libraries
+# we actually link are configured.
+set(BOOST_INCLUDE_LIBRARIES container graph bimap leaf parser preprocessor)
+FetchContent_Declare(Boost
+        URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
+        SYSTEM)
+FetchContent_MakeAvailable(Boost)
 
 if (CPPCRYSTAL_USE_MKL)
     set(MKL_INTERFACE lp64)

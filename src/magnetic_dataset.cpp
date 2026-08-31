@@ -32,8 +32,7 @@ get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
 
   // 3. Idealize positions and site tensors.
   MagneticCell const exact =
-      spin::idealized_cell(search.permutations, cell, search.operations,
-                           kWithTimeReversal, is_axial);
+      spin::idealized_cell(search, cell, kWithTimeReversal, is_axial);
 
   // 4. Transform the idealized cell into the standardized setting.
   BOOST_LEAF_AUTO(std_cell,

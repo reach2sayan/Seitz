@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp>
 #include <cppcrystal/data/spg_database.hpp> // kNumHallNumbers
 
@@ -38,8 +39,7 @@ struct MagneticSpacegroupCatalog {
 
   [[nodiscard]] constexpr MagneticSpacegroupType const &
   at(int uni) const noexcept {
-    bool const in_range = uni >= 1 && uni <= kNumUniNumbers;
-    return by_uni[static_cast<std::size_t>(in_range ? uni : 0)];
+    return detail::at_or_sentinel(by_uni, uni);
   }
 };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/analysis/detail/lazy.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
@@ -13,25 +14,22 @@
 
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace cppcrystal::analysis {
 
 // A persistent, stateful view over a Cell + tolerances that lazily computes and
 // memoizes the symmetry analysis: owns the inputs once and caches each pipeline
-// stage so repeated queries do not recompute. Immutable after construction (no
-// setters); to analyze at a different tolerance, build a new analyzer. The
-// caches are `mutable` so the const getters stay logically const.
+// stage (detail::Lazy) so repeated queries do not recompute. Immutable after
+// construction (no setters); to analyze at a different tolerance, build a new
+// analyzer.
 //
 // Thread-safety: the per-instance caches are NOT race-free — concurrent
-// first-calls race on the `mutable` optionals. To share one instance read-only
-// across threads, call warm() once on a single thread first; afterwards every
-// getter is served from a populated cache and does no writing. (The shared
-// global tables are primed separately by cppcrystal::warmup().)
-//
-// boost::leaf::result is move-only, so the caches store the success *value*
-// (std::optional<T>) rather than the Result; on error nothing is cached and the
-// next call re-runs.
+// first-calls race. To share one instance read-only across threads, call
+// warm() once on a single thread first; afterwards every getter is served from
+// a populated cache and does no writing. (The shared global tables are primed
+// separately by cppcrystal::warmup().)
 class SymmetryAnalyzer {
 public:
   // Named factory (no overloaded constructors). `hall_number == 0` searches all
@@ -42,8 +40,8 @@ public:
 
   // Analyze `cell` as a layer group with the given aperiodic axis (0/1/2). The
   // axis is stamped onto the owned cell, so dataset()/operations()/etc. all
-  // return layer results. (from_cell auto-routes too if the cell already carries
-  // an aperiodic axis; this is the explicit convenience form.)
+  // return layer results. (from_cell auto-routes too if the cell already
+  // carries an aperiodic axis; this is the explicit convenience form.)
   [[nodiscard]] static SymmetryAnalyzer
   from_layer_cell(Cell cell, int aperiodic_axis,
                   double symprec = kDefaultSymprec,
@@ -57,25 +55,42 @@ public:
 
   // The full space-group dataset of the input cell (memoized). Every getter
   // below is a projection of this and shares the one computation.
-  [[nodiscard]] Result<Dataset> dataset() const;
+  [[nodiscard]] Result<Dataset> dataset() const {
+    BOOST_LEAF_AUTO(ds, cached_dataset());
+    return *ds;
+  }
 
   // Projections of the dataset.
-  [[nodiscard]] Result<SymmetryOperations> operations() const;
+  [[nodiscard]] Result<SymmetryOperations> operations() const {
+    return project<&Dataset::operations>();
+  }
+  [[nodiscard]] Result<int> spacegroup_number() const {
+    return project<&Dataset::spacegroup_number>();
+  }
+  [[nodiscard]] Result<int> hall_number() const {
+    return project<&Dataset::hall_number>();
+  }
+  [[nodiscard]] Result<std::vector<int>> wyckoffs() const {
+    return project<&Dataset::wyckoffs>();
+  }
+  [[nodiscard]] Result<std::vector<std::string>>
+  site_symmetry_symbols() const {
+    return project<&Dataset::site_symmetry_symbols>();
+  }
+  [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const {
+    BOOST_LEAF_AUTO(hall, hall_number());
+    return data::spacegroup_type(hall);
+  }
 
-  // All space-group operations of the input cell exactly as given, including the
-  // centering translations of a non-primitive cell (symmetry::find_symmetry).
-  // Distinct from operations(), which are the dataset's operations in the input
-  // basis. Cached independently.
+  // All space-group operations of the input cell exactly as given, including
+  // the centering translations of a non-primitive cell
+  // (symmetry::find_symmetry). Distinct from operations(), which are the
+  // dataset's operations in the input basis. Cached independently.
   [[nodiscard]] Result<SymmetryOperations> cell_operations() const;
 
   // The lattice point group: the rotations (in the cell basis) that map the
   // Delaunay-reduced lattice metric onto itself (symmetry::lattice_symmetry).
   [[nodiscard]] Result<PointSymmetry> lattice_symmetry() const;
-  [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const;
-  [[nodiscard]] Result<int> spacegroup_number() const;
-  [[nodiscard]] Result<int> hall_number() const;
-  [[nodiscard]] Result<std::vector<int>> wyckoffs() const;
-  [[nodiscard]] Result<std::vector<std::string>> site_symmetry_symbols() const;
 
   // The standardized conventional cell, assembled from the dataset's std_*
   // fields (idealized lattice, fractional positions, atom types).
@@ -87,9 +102,9 @@ public:
   // dataset; this overload is keyed by `options` and is not memoized.
   [[nodiscard]] Result<Cell> standardized_cell(StandardizeOptions options) const;
 
-  // Pipeline intermediates, cached independently of the full dataset so a caller
-  // that only wants the primitive cell or the matched Hall setting does not pay
-  // for standardization.
+  // Pipeline intermediates, cached independently of the full dataset so a
+  // caller that only wants the primitive cell or the matched Hall setting does
+  // not pay for standardization.
   [[nodiscard]] Result<symmetry::Primitive> primitive() const;
   [[nodiscard]] Result<Cell> primitive_cell() const;
   [[nodiscard]] Result<spacegroup::Spacegroup> spacegroup() const;
@@ -105,22 +120,28 @@ private:
   SymmetryAnalyzer(Cell cell, Tolerance tol, int hall_number)
       : cell_(std::move(cell)), tol_(tol), hall_number_(hall_number) {}
 
-  // Ensure-and-return helpers: populate the cache on first use and hand back a
-  // pointer into it (or propagate the error). Returning a pointer lets the
-  // projections copy out only the field they need rather than the whole value.
   [[nodiscard]] Result<Dataset const *> cached_dataset() const;
   [[nodiscard]] Result<symmetry::Primitive const *> cached_primitive() const;
-  [[nodiscard]] Result<spacegroup::Spacegroup const *> cached_spacegroup() const;
+  [[nodiscard]] Result<spacegroup::Spacegroup const *>
+  cached_spacegroup() const;
+
+  // Copy one field out of the memoized dataset.
+  template <auto Member> [[nodiscard]] auto project() const
+      -> Result<std::remove_cvref_t<
+          decltype(std::declval<Dataset const &>().*Member)>> {
+    BOOST_LEAF_AUTO(ds, cached_dataset());
+    return ds->*Member;
+  }
 
   Cell cell_;
   Tolerance tol_;
   int hall_number_ = 0;
 
-  mutable std::optional<Dataset> dataset_;
-  mutable std::optional<symmetry::Primitive> primitive_;
-  mutable std::optional<spacegroup::Spacegroup> spacegroup_;
-  mutable std::optional<SymmetryOperations> cell_operations_;
-  mutable std::optional<PointSymmetry> lattice_symmetry_;
+  detail::Lazy<Dataset> dataset_;
+  detail::Lazy<symmetry::Primitive> primitive_;
+  detail::Lazy<spacegroup::Spacegroup> spacegroup_;
+  detail::Lazy<SymmetryOperations> cell_operations_;
+  detail::Lazy<PointSymmetry> lattice_symmetry_;
 };
 
 } // namespace cppcrystal::analysis

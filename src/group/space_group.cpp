@@ -1,6 +1,8 @@
 #include <cppcrystal/group/space_group.hpp>
 
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
+#include <cppcrystal/group/detail/locus_arrangement.hpp>
 #include <cppcrystal/math/fractional.hpp>
 
 #include <Eigen/Dense>
@@ -15,11 +17,6 @@
 namespace cppcrystal::group {
 
 namespace {
-constexpr double kGroupTol = 1e-5;
-
-[[nodiscard]] bool same_point(Vector3d const &a, Vector3d const &b) {
-  return math::frac_displacement(a, b).cwiseAbs().maxCoeff() < kGroupTol;
-}
 
 // Number of free coordinates of a Wyckoff position = rank of its representative
 // coordinate operator (the projector onto the canonical coordinate).
@@ -38,34 +35,26 @@ WyckoffPosition SpaceGroup::build_position(data::WyckoffEntry const &entry,
 
   // A generic seed, projected onto the position, lands at a generic point whose
   // stabilizer is exactly the site-symmetry group (for a 0-DOF position the
-  // projector ignores the seed and pins the fixed point).
+  // projector ignores the seed and pins the fixed point). Exact (rational)
+  // database coordinates are compared at the default symprec.
   Vector3d const seed{0.1357, 0.2468, 0.3791};
   Vector3d const p0 = math::wrap_to_unit_cell(
       wc.rotation.cast<double>() * seed + wc.translation);
 
-  SymmetryOperations orbit_ops; // coset representatives, one per orbit point
-  SymmetryOperations site_symmetry; // stabilizer of p0
-  std::vector<Vector3d> distinct_images;
-  for (auto const &op : conv_ops) {
-    Vector3d const image = math::wrap_to_unit_cell(op.apply(p0));
-    if (same_point(image, p0)) {
-      site_symmetry.push_back(op);
-    }
-    bool const seen =
-        std::ranges::any_of(distinct_images, [&](Vector3d const &q) {
-          return same_point(q, image);
-        });
-    if (!seen) {
-      distinct_images.push_back(image);
-      orbit_ops.push_back(op);
-    }
-  }
+  auto partition = detail::partition_orbit(
+      conv_ops, p0, [](Vector3d const &p) { return math::wrap_to_unit_cell(p); },
+      [](Vector3d const &a, Vector3d const &b) {
+        return math::same_point(a, b, kDefaultSymprec);
+      });
 
-  return WyckoffPosition{
-      wc.multiplicity,      entry.letter,
-      rank_of(wc.rotation), data::site_symmetry_symbol(entry.global_index),
-      wc.rotation,          wc.translation,
-      std::move(orbit_ops), std::move(site_symmetry)};
+  return WyckoffPosition{wc.multiplicity,
+                         entry.letter,
+                         rank_of(wc.rotation),
+                         data::site_symmetry_symbol(entry.global_index),
+                         wc.rotation,
+                         wc.translation,
+                         std::move(partition.orbit_ops),
+                         std::move(partition.site_symmetry)};
 }
 
 Result<SpaceGroup> SpaceGroup::from_hall_number(int hall_number) {

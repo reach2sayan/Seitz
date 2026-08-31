@@ -4,10 +4,20 @@
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 
+#include <concepts>
 #include <optional>
 #include <vector>
 
 namespace cppcrystal {
+
+// Anything shaped like a space-group operation: an integer rotation plus a
+// fractional translation (SymmetryOperation, MagneticSymmetryOperation).
+// Constrains the generic algorithms that only touch the spatial part.
+template <class Op>
+concept SpaceGroupOperationLike = requires(Op op) {
+  { op.rotation } -> std::convertible_to<Matrix3i>;
+  { op.translation } -> std::convertible_to<Vector3d>;
+};
 
 // A space-group symmetry operation acting on fractional coordinates:
 //   x -> rotation . x + translation.
@@ -41,6 +51,18 @@ struct SymmetryOperation {
 };
 
 using SymmetryOperations = std::vector<SymmetryOperation>;
+
+// Change of basis of an operation: (T, 0)(R, t)(T, 0)^-1 = (T R T^-1, T t),
+// with the conjugated rotation rounded back to the integer basis. Any extra
+// fields of `Op` (e.g. a time-reversal flag) ride along unchanged.
+template <SpaceGroupOperationLike Op>
+[[nodiscard]] Op conjugated_by(Op op, Matrix3d const &t,
+                               Matrix3d const &t_inv) noexcept {
+  op.rotation =
+      math::round_to_int(t * op.rotation.template cast<double>() * t_inv);
+  op.translation = t * op.translation;
+  return op;
+}
 [[nodiscard]] inline bool same_operation(SymmetryOperation const &a,
                                          SymmetryOperation const &b,
                                          double symprec) noexcept {

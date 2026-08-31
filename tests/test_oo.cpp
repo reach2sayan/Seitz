@@ -182,7 +182,7 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
 
     auto gen = must(generate::random_layer_crystal(
         lg, comp,
-        {.volume_factor = 4.0, .seed = 13u, .general_position_only = true}));
+        {.scale = 4.0, .seed = 13u, .general_position_only = true}));
     REQUIRE(gen.cell.aperiodic_axis() == 2);
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
@@ -207,7 +207,7 @@ TEST_CASE("layer crystal round-trips through get_layer_dataset", "[layergen]") {
 
     auto gen = must(generate::random_layer_crystal(
         lg, comp,
-        {.volume_factor = 4.0, .seed = 13u, .general_position_only = true}));
+        {.scale = 4.0, .seed = 13u, .general_position_only = true}));
     auto ds = must(get_layer_dataset(gen.cell, 2, 1e-4));
     REQUIRE(ds.spacegroup_number == number); // exact layer-group recovery
   }
@@ -406,7 +406,7 @@ TEST_CASE("generated clusters carry their full point-group symmetry",
 
     auto gen = must(generate::random_cluster(
         pg, comp,
-        {.size_factor = 3.0, .seed = 17u, .general_position_only = true}));
+        {.scale = 3.0, .seed = 17u, .general_position_only = true}));
     REQUIRE(gen.types.size() == static_cast<std::size_t>(2 * m));
     REQUIRE(generate::cluster_distances_valid(gen.coordinates, gen.types));
     REQUIRE(cluster_is_invariant(gen, pg));
@@ -505,10 +505,10 @@ TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
 
     auto gen = must(generate::random_rod_crystal(
         rg, comp,
-        {.size_factor = 2.0, .seed = 31u, .general_position_only = true}));
-    REQUIRE(gen.periodicity == CellPeriodicity{AxisKind::aperiodic,
-                                               AxisKind::aperiodic,
-                                               AxisKind::periodic});
+        {.scale = 2.0, .seed = 31u, .general_position_only = true}));
+    REQUIRE(gen.cell.periodicity() == CellPeriodicity{AxisKind::aperiodic,
+                                                      AxisKind::aperiodic,
+                                                      AxisKind::periodic});
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(rod_is_invariant(gen, rg));
   }
@@ -530,7 +530,7 @@ TEST_CASE("rod special positions are derived and generate invariant structures",
 
     generate::Composition const comp{{6, special.multiplicity()}};
     auto gen = must(generate::random_rod_crystal(
-        rg, comp, {.size_factor = 2.0, .seed = 5u}));
+        rg, comp, {.scale = 2.0, .seed = 5u}));
     REQUIRE(rod_is_invariant(gen, rg));
   }
 }

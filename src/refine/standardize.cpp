@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <ranges>
 
 // Wyckoff-position assembly (3D path):
 //   conventional primitive cell -> exact Wyckoff positions -> expansion across
@@ -27,9 +28,8 @@ namespace {
 
 // Number of pure (identity-rotation) translations among the conventional ops.
 [[nodiscard]] int num_pure_translations(SymmetryOperations const &conv_sym) {
-  return static_cast<int>(std::ranges::count_if(conv_sym, [](auto const &op) {
-    return op.rotation == Matrix3i::Identity();
-  }));
+  return static_cast<int>(std::ranges::count_if(
+      conv_sym, &SymmetryOperation::is_identity_rotation));
 }
 
 // Primitive atoms expressed wrt the (idealized) conventional lattice, shifted
@@ -56,10 +56,7 @@ namespace {
 // to build the full bravais cell.
 struct Bravais {
   Cell cell;
-  std::vector<int> wyckoffs;
-  std::vector<std::string> site_symmetry_symbols;
-  std::vector<int> equivalent_atoms;
-  std::vector<int> std_mapping_to_primitive;
+  std::vector<int> std_mapping_to_primitive; // per bravais atom
 };
 
 [[nodiscard]] Bravais expand_in_bravais(Cell const &conv_prim,
@@ -67,79 +64,72 @@ struct Bravais {
                                         SymmetryOperations const &conv_sym,
                                         ExactPositions const &exact,
                                         std::optional<int> aperiodic_axis) {
-  auto const n = static_cast<std::size_t>(conv_prim.size());
-  int const multi = num_pure_translations(conv_sym);
-  auto const total = static_cast<Index>(n * static_cast<std::size_t>(multi));
+  auto const total =
+      exact.size() * static_cast<std::size_t>(num_pure_translations(conv_sym));
 
-  Positions pos(total, 3);
-  Types types(static_cast<std::size_t>(total));
-  Bravais b;
-  b.wyckoffs.resize(static_cast<std::size_t>(total));
-  b.site_symmetry_symbols.resize(static_cast<std::size_t>(total));
-  b.equivalent_atoms.resize(static_cast<std::size_t>(total));
-  b.std_mapping_to_primitive.resize(static_cast<std::size_t>(total));
-
-  Index idx = 0;
-  for (auto const &op : conv_sym) {
-    if (op.rotation != Matrix3i::Identity()) {
-      continue;
-    }
-    for (std::size_t j = 0; j < n; ++j) {
-      Vector3d const p =
-          math::wrap_to_unit_cell(Vector3d(exact.positions[j] + op.translation));
-      auto const u = static_cast<std::size_t>(idx);
-      pos.row(idx) = p.transpose();
-      types[u] = conv_prim.type(static_cast<Index>(j));
-      b.wyckoffs[u] = exact.wyckoffs[j];
-      b.site_symmetry_symbols[u] = exact.site_symmetry_symbols[j];
-      b.equivalent_atoms[u] = exact.equivalent_atoms[j];
-      b.std_mapping_to_primitive[u] = static_cast<int>(j);
-      ++idx;
+  std::vector<Vector3d> pos;
+  Types types;
+  std::vector<int> mapping;
+  pos.reserve(total);
+  types.reserve(total);
+  mapping.reserve(total);
+  for (auto const &op : conv_sym | std::views::filter(
+                            &SymmetryOperation::is_identity_rotation)) {
+    for (auto const &[j, atom] : exact | std::views::enumerate) {
+      pos.emplace_back(
+          math::wrap_to_unit_cell(Vector3d(atom.position + op.translation)));
+      types.push_back(conv_prim.type(j));
+      mapping.push_back(static_cast<int>(j));
     }
   }
-  b.cell = Cell(std_lattice, std::move(pos), std::move(types), aperiodic_axis);
-  return b;
+  return {
+      Cell(std_lattice, to_positions(pos), std::move(types), aperiodic_axis),
+      std::move(mapping)};
 }
 
-// Lowest-indexed atom that an operation maps `i` onto.
+// First atom (per operation, lowest index first) that an operation maps `i`
+// onto among the atoms before it; `i` itself when none is found.
 [[nodiscard]] int search_equivalent_atom(int i, Cell const &cell,
                                          SymmetryOperations const &operations,
                                          double symprec) {
   std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
+  auto const earlier = std::views::iota(0, i);
   for (auto const &op : operations) {
-    Vector3d const pos = op.rotation.cast<double>() * cell.position(i) +
-                         op.translation;
-    for (int j = 0; j < i; ++j) {
-      if (is_overlap_same_type(cell.position(j), pos, cell.type(j),
-                               cell.type(i), cell.lattice(), symprec,
-                               aperiodic_axis)) {
-        return j;
-      }
+    Vector3d const pos = op.apply(cell.position(i));
+    auto const it = std::ranges::find_if(earlier, [&](int j) {
+      return is_overlap_same_type(cell.position(j), pos, cell.type(j),
+                                  cell.type(i), cell.lattice(), symprec,
+                                  aperiodic_axis);
+    });
+    if (it != earlier.end()) {
+      return *it;
     }
   }
   return i;
 }
 
 // Equivalence by the actual found operations (used when the input cell breaks
-// the ideal multiplicity).
+// the ideal multiplicity). Each atom links through the first atom sharing its
+// primitive atom; the class heads chain through the first symmetry image found
+// (a first-match chain, deliberately not a full connected-components closure).
 [[nodiscard]] std::vector<int>
 equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
   int const n = static_cast<int>(cell.size());
-  std::vector<int> equiv(static_cast<std::size_t>(n));
+  std::vector<int> equiv;
+  equiv.reserve(static_cast<std::size_t>(n));
   for (int i = 0; i < n; ++i) {
-    auto const ui = static_cast<std::size_t>(i);
-    equiv[ui] = i;
-    for (int j = 0; j < n; ++j) {
-      if (mapping_table[ui] == mapping_table[static_cast<std::size_t>(j)]) {
-        equiv[ui] =
-            (i == j)
-                ? equiv[static_cast<std::size_t>(
-                      search_equivalent_atom(i, cell, operations, symprec))]
-                : equiv[static_cast<std::size_t>(j)];
-        break;
-      }
+    // First atom sharing i's primitive atom; i itself when i is the first.
+    auto const first = static_cast<int>(std::distance(
+        mapping_table.begin(),
+        std::ranges::find(mapping_table,
+                          mapping_table[static_cast<std::size_t>(i)])));
+    if (first != i) {
+      equiv.push_back(equiv[static_cast<std::size_t>(first)]);
+      continue;
     }
+    int const found = search_equivalent_atom(i, cell, operations, symprec);
+    equiv.push_back(found == i ? i : equiv[static_cast<std::size_t>(found)]);
   }
   return equiv;
 }
@@ -147,28 +137,23 @@ equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
 // Representative input-cell atom per atom, derived from the primitive-cell
 // equivalence classes.
 [[nodiscard]] std::vector<int>
-crystallographic_orbits(Cell const &primitive, Cell const &cell,
-                        std::vector<int> const &equiv_prim,
+crystallographic_orbits(ExactPositions const &exact,
                         std::vector<int> const &mapping_table) {
-  int const np = static_cast<int>(primitive.size());
-  int const nc = static_cast<int>(cell.size());
-
   // For each primitive atom, the first input-cell atom in its orbit.
-  std::vector<int> rep(static_cast<std::size_t>(np));
-  for (int i = 0; i < np; ++i) {
-    for (int j = 0; j < nc; ++j) {
-      if (mapping_table[static_cast<std::size_t>(j)] ==
-          equiv_prim[static_cast<std::size_t>(i)]) {
-        rep[static_cast<std::size_t>(i)] = j;
-        break;
-      }
-    }
+  std::vector<int> rep;
+  rep.reserve(exact.size());
+  for (auto const &atom : exact) {
+    auto const it = std::ranges::find(mapping_table, atom.equivalent_atom);
+    rep.push_back(it != mapping_table.end()
+                      ? static_cast<int>(
+                            std::distance(mapping_table.begin(), it))
+                      : 0);
   }
 
-  std::vector<int> orbits(static_cast<std::size_t>(nc));
-  for (int i = 0; i < nc; ++i) {
-    orbits[static_cast<std::size_t>(i)] =
-        rep[static_cast<std::size_t>(mapping_table[static_cast<std::size_t>(i)])];
+  std::vector<int> orbits;
+  orbits.reserve(mapping_table.size());
+  for (int const prim : mapping_table) {
+    orbits.push_back(rep[static_cast<std::size_t>(prim)]);
   }
   return orbits;
 }
@@ -195,26 +180,23 @@ get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
     return std::nullopt;
   }
 
-  Bravais const bravais =
+  Bravais bravais =
       expand_in_bravais(conv_prim, std_lattice, conv_sym, *exact, conv_ap);
 
   // Per input-cell atom Wyckoff letter + site-symmetry symbol (the first
   // bravais block is in primitive-atom order).
-  auto const nc = static_cast<std::size_t>(cell.size());
   Standardized out;
-  out.bravais = bravais.cell;
-  out.std_mapping_to_primitive = bravais.std_mapping_to_primitive;
-  out.wyckoffs.resize(nc);
-  out.site_symmetry_symbols.resize(nc);
-  for (std::size_t i = 0; i < nc; ++i) {
-    int const prim = mapping_table[i];
-    out.wyckoffs[i] = exact->wyckoffs[static_cast<std::size_t>(prim)];
-    out.site_symmetry_symbols[i] =
-        exact->site_symmetry_symbols[static_cast<std::size_t>(prim)];
+  out.bravais = std::move(bravais.cell);
+  out.std_mapping_to_primitive = std::move(bravais.std_mapping_to_primitive);
+  out.wyckoffs.reserve(mapping_table.size());
+  out.site_symmetry_symbols.reserve(mapping_table.size());
+  for (int const prim : mapping_table) {
+    auto const &atom = (*exact)[static_cast<std::size_t>(prim)];
+    out.wyckoffs.push_back(atom.wyckoff);
+    out.site_symmetry_symbols.push_back(atom.site_symmetry_symbol);
   }
 
-  out.crystallographic_orbits = crystallographic_orbits(
-      primitive, cell, exact->equivalent_atoms, mapping_table);
+  out.crystallographic_orbits = crystallographic_orbits(*exact, mapping_table);
 
   // Equivalent atoms: the crystallographic orbits unless the input cell breaks
   // the ideal site multiplicity (supercell), in which case use the found ops.
