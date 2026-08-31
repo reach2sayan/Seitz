@@ -11,7 +11,7 @@ namespace cppcrystal::data {
 using GeneratorSet = std::array<std::array<int, 9>, 3>;
 using VSpUSet = std::array<std::array<double, 9>, 3>;
 
-inline constexpr std::array<VSpUSet, 2> tricli_VSpU = {{
+inline constinit std::array<VSpUSet, 2> tricli_VSpU = {{
     {{{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -20,7 +20,7 @@ inline constexpr std::array<VSpUSet, 2> tricli_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 2> tricli_generators = {{
+inline constinit std::array<GeneratorSet, 2> tricli_generators = {{
     {{{1, 0, 0, 0, 1, 0, 0, 0, 1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -29,7 +29,7 @@ inline constexpr std::array<GeneratorSet, 2> tricli_generators = {{
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 9> monocli_VSpU = {{
+inline constinit std::array<VSpUSet, 9> monocli_VSpU = {{
     {{{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -59,7 +59,7 @@ inline constexpr std::array<VSpUSet, 9> monocli_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 9> monocli_A_VSpU = {{
+inline constinit std::array<VSpUSet, 9> monocli_A_VSpU = {{
     {{{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -89,7 +89,7 @@ inline constexpr std::array<VSpUSet, 9> monocli_A_VSpU = {{
       {0.0, 1.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 9> monocli_B_VSpU = {{
+inline constinit std::array<VSpUSet, 9> monocli_B_VSpU = {{
     {{{-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -119,7 +119,7 @@ inline constexpr std::array<VSpUSet, 9> monocli_B_VSpU = {{
       {1.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 9> monocli_C_VSpU = {{
+inline constinit std::array<VSpUSet, 9> monocli_C_VSpU = {{
     {{{-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -149,7 +149,7 @@ inline constexpr std::array<VSpUSet, 9> monocli_C_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 9> monocli_I_VSpU = {{
+inline constinit std::array<VSpUSet, 9> monocli_I_VSpU = {{
     {{{-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.5, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -179,7 +179,7 @@ inline constexpr std::array<VSpUSet, 9> monocli_I_VSpU = {{
       {0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 9> monocli_generators = {{
+inline constinit std::array<GeneratorSet, 9> monocli_generators = {{
     {{{1, 0, 0, 0, -1, 0, 0, 0, -1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -209,7 +209,7 @@ inline constexpr std::array<GeneratorSet, 9> monocli_generators = {{
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_VSpU = {{
     {{{-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
@@ -227,7 +227,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_F_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_F_VSpU = {{
     {{{0.0, 0.5, 0.0, -0.25, -0.25, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, -0.25, -0.25, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, -0.25, 0.75, 0.0, 0.0, 0.0, 0.0}}},
@@ -245,7 +245,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_F_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.5, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_I_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_I_VSpU = {{
     {{{0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.5, -0.5, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -263,7 +263,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_I_VSpU = {{
       {0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_A_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_A_VSpU = {{
     {{{-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0},
       {0.0, 1.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0}}},
@@ -281,7 +281,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_A_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_B_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_B_VSpU = {{
     {{{-0.5, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.5, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -299,7 +299,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_B_VSpU = {{
       {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.5, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 5> ortho_C_VSpU = {{
+inline constinit std::array<VSpUSet, 5> ortho_C_VSpU = {{
     {{{-0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
@@ -317,7 +317,7 @@ inline constexpr std::array<VSpUSet, 5> ortho_C_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 5> ortho_generators = {{
+inline constinit std::array<GeneratorSet, 5> ortho_generators = {{
     {{{-1, 0, 0, 0, -1, 0, 0, 0, 1},
       {1, 0, 0, 0, -1, 0, 0, 0, -1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -335,7 +335,7 @@ inline constexpr std::array<GeneratorSet, 5> ortho_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 8> tetra_VSpU = {{
+inline constinit std::array<VSpUSet, 8> tetra_VSpU = {{
     {{{-0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -362,7 +362,7 @@ inline constexpr std::array<VSpUSet, 8> tetra_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 8> tetra_I_VSpU = {{
+inline constinit std::array<VSpUSet, 8> tetra_I_VSpU = {{
     {{{-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -389,7 +389,7 @@ inline constexpr std::array<VSpUSet, 8> tetra_I_VSpU = {{
       {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 8> tetra_generators = {{
+inline constinit std::array<GeneratorSet, 8> tetra_generators = {{
     {{{0, -1, 0, 1, 0, 0, 0, 0, 1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -416,7 +416,7 @@ inline constexpr std::array<GeneratorSet, 8> tetra_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 13> trigo_VSpU = {{
+inline constinit std::array<VSpUSet, 13> trigo_VSpU = {{
     {{{-0.6666666666666666, 0.3333333333333333, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
        0.0},
       {-0.3333333333333333, -0.3333333333333333, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -464,7 +464,7 @@ inline constexpr std::array<VSpUSet, 13> trigo_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 13> trigo_generators = {{
+inline constinit std::array<GeneratorSet, 13> trigo_generators = {{
     {{{0, -1, 0, 1, -1, 0, 0, 0, 1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -506,7 +506,7 @@ inline constexpr std::array<GeneratorSet, 13> trigo_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 8> rhombo_h_VSpU = {{
+inline constinit std::array<VSpUSet, 8> rhombo_h_VSpU = {{
     {{{-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -533,7 +533,7 @@ inline constexpr std::array<VSpUSet, 8> rhombo_h_VSpU = {{
       {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.5, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 8> rhombo_h_generators = {{
+inline constinit std::array<GeneratorSet, 8> rhombo_h_generators = {{
     {{{0, -1, 0, 1, -1, 0, 0, 0, 1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -560,7 +560,7 @@ inline constexpr std::array<GeneratorSet, 8> rhombo_h_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 8> rhombo_p_VSpU = {{
+inline constinit std::array<VSpUSet, 8> rhombo_p_VSpU = {{
     {{{-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -587,7 +587,7 @@ inline constexpr std::array<VSpUSet, 8> rhombo_p_VSpU = {{
       {0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.5, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 8> rhombo_p_generators = {{
+inline constinit std::array<GeneratorSet, 8> rhombo_p_generators = {{
     {{{0, 0, 1, 1, 0, 0, 0, 1, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -614,7 +614,7 @@ inline constexpr std::array<GeneratorSet, 8> rhombo_p_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 8> hexa_VSpU = {{
+inline constinit std::array<VSpUSet, 8> hexa_VSpU = {{
     {{{-1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -645,7 +645,7 @@ inline constexpr std::array<VSpUSet, 8> hexa_VSpU = {{
       {0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 8> hexa_generators = {{
+inline constinit std::array<GeneratorSet, 8> hexa_generators = {{
     {{{1, -1, 0, 1, 0, 0, 0, 0, 1},
       {0, 0, 0, 0, 0, 0, 0, 0, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},
@@ -672,7 +672,7 @@ inline constexpr std::array<GeneratorSet, 8> hexa_generators = {{
       {-1, 0, 0, 0, -1, 0, 0, 0, -1}}},
 }};
 
-inline constexpr std::array<VSpUSet, 10> cubic_VSpU = {{
+inline constinit std::array<VSpUSet, 10> cubic_VSpU = {{
     {{{-0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {-0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -705,7 +705,7 @@ inline constexpr std::array<VSpUSet, 10> cubic_VSpU = {{
       {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.5, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 10> cubic_F_VSpU = {{
+inline constinit std::array<VSpUSet, 10> cubic_F_VSpU = {{
     {{{0.0, 0.0, -0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -1.0, 0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, 0.0, -0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -738,7 +738,7 @@ inline constexpr std::array<VSpUSet, 10> cubic_F_VSpU = {{
       {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, -0.5, 0.0, 0.0}}},
 }};
 
-inline constexpr std::array<VSpUSet, 10> cubic_I_VSpU = {{
+inline constinit std::array<VSpUSet, 10> cubic_I_VSpU = {{
     {{{0.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {1.0, -1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0},
       {0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}},
@@ -771,7 +771,7 @@ inline constexpr std::array<VSpUSet, 10> cubic_I_VSpU = {{
       {-1.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 1.0}}},
 }};
 
-inline constexpr std::array<GeneratorSet, 10> cubic_generators = {{
+inline constinit std::array<GeneratorSet, 10> cubic_generators = {{
     {{{0, -1, 0, 1, 0, 0, 0, 0, 1},
       {0, 0, 1, 1, 0, 0, 0, 1, 0},
       {0, 0, 0, 0, 0, 0, 0, 0, 0}}},

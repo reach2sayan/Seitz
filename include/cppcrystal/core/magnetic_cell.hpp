@@ -26,7 +26,7 @@ using SiteTensors = std::variant<CollinearTensors, NoncollinearTensors>;
 [[nodiscard]] inline NoncollinearTensors
 noncollinear_tensors(std::initializer_list<Vector3d> moments) {
   NoncollinearTensors out(static_cast<Index>(moments.size()), 3);
-  for (Index i = 0; const Vector3d& m : moments) {
+  for (Index i = 0; const Vector3d &m : moments) {
     out.row(i++) = m.transpose();
   }
   return out;

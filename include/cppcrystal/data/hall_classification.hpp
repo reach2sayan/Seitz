@@ -123,6 +123,7 @@ constexpr bool flags_imply_trigonal = [] {
 }();
 } // namespace detail
 
+// clang-format off
 static_assert(detail::count_rhombohedral == 14);
 static_assert(detail::count_rhombo_hex == 7);
 static_assert(detail::flags_imply_trigonal);
@@ -130,9 +131,7 @@ static_assert(hall_class(0).system == Holohedry::none);   // sentinel
 static_assert(hall_class(531).system == Holohedry::none); // out of range
 static_assert(hall_class(1).system == Holohedry::triclinic);
 static_assert(hall_class(530).system == Holohedry::cubic);
-static_assert(hall_class(433).rhombohedral &&
-              hall_class(433).rhombo_hex_setting);
-static_assert(hall_class(434).rhombohedral &&
-              !hall_class(434).rhombo_hex_setting);
-
+static_assert(hall_class(433).rhombohedral && hall_class(433).rhombo_hex_setting);
+static_assert(hall_class(434).rhombohedral && !hall_class(434).rhombo_hex_setting);
+// clang-format on
 } // namespace cppcrystal::data

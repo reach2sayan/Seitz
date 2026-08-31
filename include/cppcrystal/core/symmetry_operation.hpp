@@ -69,7 +69,8 @@ template <SpaceGroupOperationLike Op>
   if (a.rotation != b.rotation) {
     return false;
   }
-  Vector3d const d = math::nearest_offset(Vector3d(a.translation - b.translation));
+  Vector3d const d =
+      math::nearest_offset(Vector3d(a.translation - b.translation));
   return d.cwiseAbs().maxCoeff() <= symprec;
 }
 

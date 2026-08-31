@@ -19,8 +19,8 @@ class Cell {
 public:
   Cell() = default;
   // The legacy constructor: a 3D cell (default) or a single aperiodic axis (a
-  // layer group's c). Retained so existing call sites are unchanged; it sets the
-  // per-axis periodicity accordingly.
+  // layer group's c). Retained so existing call sites are unchanged; it sets
+  // the per-axis periodicity accordingly.
   Cell(Matrix3d lattice, Positions positions, Types types,
        std::optional<int> aperiodic_axis = std::nullopt)
       : lattice_(std::move(lattice)), positions_(std::move(positions)),

@@ -46,8 +46,7 @@ template <std::ranges::input_range R, class Proj = std::identity>
 // ranges::unique for an unsorted container — first occurrence wins.
 template <class T, class Equiv>
 bool push_unique(std::vector<T> &out, T value, Equiv &&equiv) {
-  if (std::ranges::any_of(
-          out, [&](T const &e) { return equiv(e, value); })) {
+  if (std::ranges::any_of(out, [&](T const &e) { return equiv(e, value); })) {
     return false;
   }
   out.push_back(std::move(value));

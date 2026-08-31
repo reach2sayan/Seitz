@@ -13,17 +13,16 @@ namespace cppcrystal {
 // (layer groups), that axis is NOT periodic: only the two periodic components
 // are folded to the minimal image; the aperiodic component keeps its raw
 // difference.
-[[nodiscard]] bool is_overlap(Vector3d const &a, Vector3d const &b,
-                              Matrix3d const &lattice, double symprec,
-                              std::optional<int> aperiodic_axis =
-                                  std::nullopt) noexcept;
+[[nodiscard]] bool
+is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
+           double symprec,
+           std::optional<int> aperiodic_axis = std::nullopt) noexcept;
 
-[[nodiscard]] inline bool
-is_overlap_same_type(Vector3d const &a, Vector3d const &b, int type_a,
-                     int type_b, Matrix3d const &lattice, double symprec,
-                     std::optional<int> aperiodic_axis = std::nullopt) noexcept {
-  return type_a == type_b &&
-         is_overlap(a, b, lattice, symprec, aperiodic_axis);
+[[nodiscard]] inline bool is_overlap_same_type(
+    Vector3d const &a, Vector3d const &b, int type_a, int type_b,
+    Matrix3d const &lattice, double symprec,
+    std::optional<int> aperiodic_axis = std::nullopt) noexcept {
+  return type_a == type_b && is_overlap(a, b, lattice, symprec, aperiodic_axis);
 }
 
 // Precomputes a distance-sorted copy of a cell so that many candidate symmetry

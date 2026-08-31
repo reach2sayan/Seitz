@@ -15,16 +15,14 @@ namespace cppcrystal::data {
 
 // Single-bond covalent radius (angstrom) of atomic number `z`; std::nullopt for
 // an untabulated element (no magic sentinel).
-[[nodiscard]] constexpr std::optional<double>
-covalent_radius(int z) noexcept {
+[[nodiscard]] constexpr std::optional<double> covalent_radius(int z) noexcept {
   if (!is_known_element(z)) {
     return std::nullopt;
   }
   return kCovalentRadii[static_cast<std::size_t>(z - 1)];
 }
 
-[[nodiscard]] constexpr std::optional<double>
-atomic_volume(int z) noexcept {
+[[nodiscard]] constexpr std::optional<double> atomic_volume(int z) noexcept {
   auto const r = covalent_radius(z);
   if (!r) {
     return std::nullopt;
@@ -32,7 +30,8 @@ atomic_volume(int z) noexcept {
   return 4.0 / 3.0 * std::numbers::pi * (*r) * (*r) * (*r);
 }
 
-// Chemical symbol of atomic number `z`; std::nullopt for an untabulated element.
+// Chemical symbol of atomic number `z`; std::nullopt for an untabulated
+// element.
 [[nodiscard]] constexpr std::optional<std::string_view>
 element_symbol(int z) noexcept {
   if (!is_known_element(z)) {

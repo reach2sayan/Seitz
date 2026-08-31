@@ -15,23 +15,23 @@
 // raw data tables are generated into two headers:
 // magnetic_spacegroup_metadata_tables.hpp (catalog metadata + the small
 // Hall<->UNI mapping tables, included here to back the constexpr catalog) and
-// magnetic_spacegroup_operation_tables.hpp (the encoded operations + alternative
-// transformations — a compile-time-only compaction, included only by the .cpp).
-// As with spg_database, metadata is decoded once at compile time into a
-// constexpr catalog, while the symmetry operations (which carry Eigen, not a
-// literal type) are decoded on demand.
+// magnetic_spacegroup_operation_tables.hpp (the encoded operations +
+// alternative transformations — a compile-time-only compaction, included only
+// by the .cpp). As with spg_database, metadata is decoded once at compile time
+// into a constexpr catalog, while the symmetry operations (which carry Eigen,
+// not a literal type) are decoded on demand.
 namespace cppcrystal::data {
 
 inline constexpr int kNumUniNumbers = 1651;
 
 // Magnetic space-group type metadata.
 struct MagneticSpacegroupType {
-  int uni_number = 0;    // 1..1651 (the catalog's unique key)
-  int litvin_number = 0; // Litvin's sequential number
+  int uni_number = 0;          // 1..1651 (the catalog's unique key)
+  int litvin_number = 0;       // Litvin's sequential number
   std::string_view bns_number; // Belov-Neronova-Smirnova symbol
   std::string_view og_number;  // Opechowski-Guccione symbol
-  int number = 0; // family-space-group international number 1..230
-  int type = 0;   // construction type 1..4 (type-I..IV)
+  int number = 0;              // family-space-group international number 1..230
+  int type = 0;                // construction type 1..4 (type-I..IV)
 };
 
 struct MagneticSpacegroupCatalog {
@@ -47,9 +47,9 @@ inline constexpr MagneticSpacegroupCatalog kMagneticCatalog = [] {
   MagneticSpacegroupCatalog c{};
   for (std::size_t u = 0; u < kMagneticSpacegroupTypes.size(); ++u) {
     auto const &r = kMagneticSpacegroupTypes[u];
-    c.by_uni[u] = MagneticSpacegroupType{r.uni_number, r.litvin_number,
-                                         r.bns_number,  r.og_number,
-                                         r.number,      r.type};
+    c.by_uni[u] =
+        MagneticSpacegroupType{r.uni_number, r.litvin_number, r.bns_number,
+                               r.og_number,  r.number,        r.type};
   }
   return c;
 }();

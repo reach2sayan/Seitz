@@ -56,7 +56,7 @@ def main():
 
         for (name, ctype, data) in tables:
             elem = "GeneratorSet" if ctype == "int" else "VSpUSet"
-            w("inline constexpr std::array<%s, %d> %s = {{\n" % (elem, len(data), name))
+            w("inline constinit std::array<%s, %d> %s = {{\n" % (elem, len(data), name))
             for entry in data:
                 rows = []
                 for row in entry:

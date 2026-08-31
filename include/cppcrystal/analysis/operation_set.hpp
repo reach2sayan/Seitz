@@ -25,7 +25,6 @@ public:
   [[nodiscard]] static Derived from_operations(Ops ops) {
     return Derived{std::move(ops)};
   }
-
   [[nodiscard]] Ops const &operations() const noexcept { return ops_; }
   [[nodiscard]] std::size_t size() const noexcept { return ops_.size(); }
 
@@ -38,8 +37,7 @@ protected:
 // identity: the free functions that take SymmetryOperations as their de-facto
 // `this` (rotations_of, primitive_symmetry, spacegroup_type_from_symmetry,
 // search_spacegroup_with_symmetry) become methods here. Nothing is memoized
-// (projections are cheap, an OperationSet is usually transient). Lives in
-// analysis/, never core/, to avoid a core -> spacegroup -> core cycle.
+// (projections are cheap, an OperationSet is usually transient).
 class OperationSet : public OperationSetBase<OperationSet, SymmetryOperations> {
 public:
   // The rotation parts of the operations, de-duplicated by value internally
@@ -55,8 +53,7 @@ public:
   // The space group implied by these operations and a `lattice`
   // (spacegroup::spacegroup_type_from_symmetry). `setting` selects whether
   // `lattice` is the conventional cell (recover the primitive via the implied
-  // t_mat) or already primitive — dispatching to the two instantiations of the
-  // underlying template at runtime.
+  // t_mat) or already primitive.
   [[nodiscard]] Result<spacegroup::Spacegroup>
   spacegroup_type(Matrix3d const &lattice, double symprec,
                   spacegroup::LatticeSetting setting =
