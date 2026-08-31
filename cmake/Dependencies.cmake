@@ -30,8 +30,21 @@ if (CPPCRYSTAL_USE_MKL)
     find_package(MKL CONFIG REQUIRED)
 endif ()
 
+# Catch2 v3 — fetched like Eigen and Boost so a checkout needs no system install.
+# A system Catch2 3.x is used when one is already present. The extras/ directory
+# holds the Catch.cmake module providing catch_discover_tests(); find_package adds
+# it to CMAKE_MODULE_PATH automatically, FetchContent does not.
 if (CPPCRYSTAL_BUILD_TESTS)
-    find_package(Catch2 3 REQUIRED)
+    find_package(Catch2 3 QUIET)
+    if (NOT Catch2_FOUND)
+        FetchContent_Declare(Catch2
+                GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+                GIT_TAG v3.8.1
+                GIT_SHALLOW TRUE
+                SYSTEM)
+        FetchContent_MakeAvailable(Catch2)
+        list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+    endif ()
 endif ()
 
 # Reference spglib v2.7.0 — the validation oracle. Built only for oracle tests and

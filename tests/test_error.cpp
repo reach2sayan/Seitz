@@ -25,7 +25,11 @@ TEST_CASE("Result propagates an error tag through BOOST_LEAF_CHECK",
   double seen = -1.0;
   int code = leaf::try_handle_all(
       [&]() -> Result<int> {
-        int v = BOOST_LEAF_CHECK(may_fail(false));
+        // BOOST_LEAF_AUTO, not `v = BOOST_LEAF_CHECK(...)`: LEAF only expands
+        // BOOST_LEAF_CHECK to a value-yielding expression where GNU statement
+        // expressions exist. Under MSVC it is a statement, so the value form
+        // does not compile. BOOST_LEAF_AUTO is the portable spelling.
+        BOOST_LEAF_AUTO(v, may_fail(false));
         return v;
       },
       [&](e_atoms_too_close const &e) {

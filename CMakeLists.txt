@@ -93,12 +93,24 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif ()
 
 # The magnetic database decodes all 76683 operations + the alternative
-# transformations into constexpr tables at compile time; that exceeds Clang's
-# default -fconstexpr-steps budget (GCC's default is far higher and needs no
-# flag). Raise it for this one translation unit only.
+# transformations into constexpr tables at compile time, which blows past every
+# compiler's default constant-evaluation budget. Each toolchain spells the knob
+# differently; raise all three for this one translation unit.
+#   Clang  -fconstexpr-steps      (default 1048576)
+#   GCC    -fconstexpr-ops-limit  (default 33554432)
+#   MSVC   /constexpr:steps       (default 1048576), plus the loop-nesting depth
+set(CPPCRYSTAL_CONSTEXPR_BUDGET 100000000)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-steps=${CPPCRYSTAL_CONSTEXPR_BUDGET}")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-ops-limit=${CPPCRYSTAL_CONSTEXPR_BUDGET}")
+elseif (MSVC)
+    set(CPPCRYSTAL_CONSTEXPR_FLAGS
+            "/constexpr:steps${CPPCRYSTAL_CONSTEXPR_BUDGET}" "/constexpr:depth2048")
+endif ()
+if (CPPCRYSTAL_CONSTEXPR_FLAGS)
     set_source_files_properties(src/data/msg_database.cpp
-            PROPERTIES COMPILE_OPTIONS "-fconstexpr-steps=64000000")
+            PROPERTIES COMPILE_OPTIONS "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
 endif ()
 
 if (CPPCRYSTAL_USE_MKL)

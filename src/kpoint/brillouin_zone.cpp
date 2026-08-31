@@ -16,23 +16,31 @@ namespace {
 
 // The 125 reciprocal-lattice offsets searched per grid point: the ±2 cube in
 // odometer order over the digits 0,1,2,-2,-1 per axis (x outermost, z varying
-// fastest). Built at compile time; Eigen 5 fixed-size vectors are constexpr
-// for construction, access and assignment.
-[[nodiscard]] consteval std::array<Vector3i, 125> bz_search_space() {
+// fastest). Held as plain int triples rather than Vector3i: Eigen's (x, y, z)
+// constructor is not constexpr, and its CRTP coefficient accessors are not
+// constant-evaluable under MSVC, so an Eigen table cannot be built portably at
+// compile time. `bz_offset` materialises a Vector3i at the use site.
+[[nodiscard]] consteval std::array<std::array<int, 3>, 125> bz_search_space() {
   constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
-  std::array<Vector3i, 125> table{};
+  std::array<std::array<int, 3>, 125> table{};
   std::size_t n = 0;
   for (int const x : digits) {
     for (int const y : digits) {
       for (int const z : digits) {
-        table[n++] = Vector3i(x, y, z);
+        table[n++] = {x, y, z};
       }
     }
   }
   return table;
 }
 
-inline constexpr std::array<Vector3i, 125> kBzSearchSpace = bz_search_space();
+inline constexpr std::array<std::array<int, 3>, 125> kBzSearchSpace =
+    bz_search_space();
+
+[[nodiscard]] inline Vector3i bz_offset(std::size_t j) noexcept {
+  auto const &o = kBzSearchSpace[j];
+  return {o[0], o[1], o[2]};
+}
 
 // Adaptive tolerance for merging BZ-boundary points: 0.01 * max over axes of
 // |reciprocal vector|^2 / mesh^2.
@@ -68,7 +76,7 @@ BzGrid relocate_BZ_grid_address(std::vector<Vector3i> const &grid_address,
     // Squared distance to the origin of each candidate image.
     std::array<double, kBzSearchSpace.size()> distance{};
     for (std::size_t j = 0; j < kBzSearchSpace.size(); ++j) {
-      Vector3i const &offset = kBzSearchSpace[j];
+      Vector3i const offset = bz_offset(j);
       const auto mesh_d = mesh.cast<double>().array();
 
       Vector3d q = (grid_address[i].cast<double>().array() +
@@ -87,7 +95,7 @@ BzGrid relocate_BZ_grid_address(std::vector<Vector3i> const &grid_address,
         continue;
       }
       const Vector3i bz_address =
-          grid_address[i] + kBzSearchSpace[j].cwiseProduct(mesh);
+          grid_address[i] + bz_offset(j).cwiseProduct(mesh);
       std::size_t gp = 0;
       if (j == min_index) {
         gp = i;
