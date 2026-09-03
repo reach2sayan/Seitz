@@ -62,12 +62,18 @@ public:
     return tol_;
   }
 
-  // The full determination of the input cell (memoized). Every projection
-  // below shares this one computation.
-  [[nodiscard]] Result<DatasetType> dataset() const {
+  // The full determination of the input cell (memoized). A reference into the
+  // memo: every projection below is a view onto this one computation, and a
+  // caller that wants ownership copies for itself.
+  //
+  // Ref-qualified, so a reference into a temporary analyzer is a compile error
+  // rather than a dangling read. An analyzer exists to be held anyway --
+  // `from_cell(cell).dataset()` throws the memo away with the temporary.
+  [[nodiscard]] Result<DatasetType const &> dataset() const & {
     BOOST_LEAF_AUTO(ds, cached_dataset());
     return *ds;
   }
+  Result<DatasetType const &> dataset() const && = delete;
 
   // Force every lazy cache. Returns the first error encountered, or success
   // once all caches are populated; afterwards this const instance may be
@@ -89,10 +95,11 @@ protected:
     return dataset_.get([&] { return derived().determine(); });
   }
 
-  // Copy one field out of the memoized dataset.
+  // One field of the memoized dataset, by reference. Same lifetime contract as
+  // dataset(): the derived accessors that use this are ref-qualified too.
   template <auto Member>
-  [[nodiscard]] auto project() const -> Result<std::remove_cvref_t<
-      decltype(std::declval<DatasetType const &>().*Member)>> {
+  [[nodiscard]] auto project() const
+      -> Result<decltype(std::declval<DatasetType const &>().*Member) const &> {
     BOOST_LEAF_AUTO(ds, cached_dataset());
     return ds->*Member;
   }

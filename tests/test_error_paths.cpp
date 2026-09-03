@@ -6,8 +6,6 @@
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/kpoint/grid.hpp>
-#include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 #include "symmetry/search.hpp"
 
@@ -21,7 +19,7 @@ namespace {
 
 using namespace cppcrystal;
 
-enum class Err { none, empty, invalid_lattice, invalid_mesh, other };
+enum class Err { none, empty, invalid_lattice, other };
 
 // Run `f` (returning a Result) inside a LEAF handling scope and report which
 // error tag, if any, it produced.
@@ -37,7 +35,6 @@ template <class F> Err classify(F f) {
       },
       [&](e_empty_cell const &) { err = Err::empty; },
       [&](e_invalid_lattice const &) { err = Err::invalid_lattice; },
-      [&](e_invalid_mesh const &) { err = Err::invalid_mesh; },
       [&]() { err = Err::other; });
   return err;
 }
@@ -92,24 +89,7 @@ TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
         Err::invalid_lattice);
 }
 
-TEST_CASE("non-positive mesh is rejected with e_invalid_mesh", "[error]") {
-  CHECK(classify([] {
-          return kpoint::ir_reciprocal_mesh(valid_cell(), Vector3i(4, 0, 4),
-                                            Vector3i::Zero(), TimeReversal::on);
-        }) == Err::invalid_mesh);
-  CHECK(classify([] {
-          return kpoint::ir_reciprocal_mesh(valid_cell(), Vector3i(4, -2, 4),
-                                            Vector3i::Zero(), TimeReversal::on);
-        }) == Err::invalid_mesh);
-}
 
-TEST_CASE("k-point value functions degrade instead of UB on a bad mesh",
-          "[error]") {
-  // Zero / negative mesh must not divide-by-zero or over-allocate.
-  CHECK(kpoint::all_grid_addresses(Vector3i(4, 0, 4)).empty());
-  CHECK(kpoint::all_grid_addresses(Vector3i(-1, 4, 4)).empty());
-  CHECK(kpoint::grid_point_from_address(Vector3i(1, 1, 1),
-                                        Vector3i(0, 0, 0)) == 0U);
-  // A valid mesh still works (sanity).
-  CHECK(kpoint::all_grid_addresses(Vector3i(2, 2, 2)).size() == 8U);
-}
+// A bad mesh is now unrepresentable rather than something every grid function
+// has to guard: Mesh::of rejects it once, at the only entry point. Covered by
+// the static_asserts in kpoint/mesh.hpp and by test_kpoint.cpp.

@@ -211,7 +211,8 @@ TEST_CASE("standardize: the to_primitive / idealized option pairs",
       cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<cppcrystal::analysis::CellSetting::primitive, cppcrystal::analysis::Idealize::yes>());
   CHECK(same_cell(prim, prim_ref));
 
-  Cell const refined = must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell());
-  Cell const refined_ref = must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell());
+  auto const analyzer = cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl);
+  Cell const refined = must(analyzer.standardized_cell());
+  Cell const refined_ref = must(analyzer.standardized_cell());
   CHECK(same_cell(refined, refined_ref));
 }

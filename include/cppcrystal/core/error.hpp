@@ -18,12 +18,13 @@ struct e_niggli_failed {};
 struct e_delaunay_failed {};
 struct e_empty_cell {};
 
-// Degenerate input rejected at a public entry point: a (near-)singular lattice,
-// or a reciprocal mesh with a non-positive component.
+// Degenerate input rejected at a public entry point: a (near-)singular lattice
+// whose inverse would propagate NaN/inf through the whole pipeline. (A
+// non-positive sampling mesh is unrepresentable rather than an error:
+// kpoint::Mesh::of rejects it.)
 struct e_invalid_lattice {
   double determinant;
 };
-struct e_invalid_mesh {};
 
 struct e_atoms_too_close {
   double distance;

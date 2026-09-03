@@ -32,21 +32,26 @@ public:
     return MagneticSymmetryAnalyzer{std::move(cell), tol};
   }
 
-  [[nodiscard]] Result<UniNumber> uni() const {
+  [[nodiscard]] Result<UniNumber const &> uni() const & {
     return project<&MagneticDataset::uni>();
   }
-  [[nodiscard]] Result<HallNumber> hall() const {
+  Result<UniNumber const &> uni() const && = delete;
+  [[nodiscard]] Result<HallNumber const &> hall() const & {
     return project<&MagneticDataset::hall>();
   }
-  [[nodiscard]] Result<MagneticOperations> operations() const {
+  Result<HallNumber const &> hall() const && = delete;
+  [[nodiscard]] Result<MagneticOperations const &> operations() const & {
     return project<&MagneticDataset::operations>();
   }
-  [[nodiscard]] Result<std::vector<int>> equivalent_atoms() const {
+  Result<MagneticOperations const &> operations() const && = delete;
+  [[nodiscard]] Result<std::vector<int> const &> equivalent_atoms() const & {
     return project<&MagneticDataset::equivalent_atoms>();
   }
-  [[nodiscard]] Result<MagneticCell> standardized_cell() const {
+  Result<std::vector<int> const &> equivalent_atoms() const && = delete;
+  [[nodiscard]] Result<MagneticCell const &> standardized_cell() const & {
     return project<&MagneticDataset::standardized>();
   }
+  Result<MagneticCell const &> standardized_cell() const && = delete;
   [[nodiscard]] Result<data::MagneticSpacegroupType> spacegroup_type() const {
     BOOST_LEAF_AUTO(number, uni());
     return data::magnetic_spacegroup_type(number);

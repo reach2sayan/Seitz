@@ -9,6 +9,7 @@
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/spg_database.hpp>
+#include <cppcrystal/kpoint/mesh.hpp>
 
 #include <optional>
 #include <span>
@@ -40,15 +41,18 @@ public:
   }
 
   // Projections of the dataset.
-  [[nodiscard]] Result<HallNumber> hall() const {
+  [[nodiscard]] Result<HallNumber const &> hall() const & {
     return project<&Dataset::hall>();
   }
-  [[nodiscard]] Result<Operations> operations() const {
+  Result<HallNumber const &> hall() const && = delete;
+  [[nodiscard]] Result<Operations const &> operations() const & {
     return project<&Dataset::operations>();
   }
-  [[nodiscard]] Result<std::vector<Site>> sites() const {
+  Result<Operations const &> operations() const && = delete;
+  [[nodiscard]] Result<std::vector<Site> const &> sites() const & {
     return project<&Dataset::sites>();
   }
+  Result<std::vector<Site> const &> sites() const && = delete;
   [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const {
     BOOST_LEAF_AUTO(setting, hall());
     return data::spacegroup_type(setting);
@@ -56,9 +60,10 @@ public:
 
   // The standardized conventional, idealized cell — the one the dataset
   // already holds.
-  [[nodiscard]] Result<Cell> standardized_cell() const {
+  [[nodiscard]] Result<Cell const &> standardized_cell() const & {
     return project<&Dataset::standardized>();
   }
+  Result<Cell const &> standardized_cell() const && = delete;
 
   // The standardized cell in another setting: primitive vs conventional,
   // idealized vs the input's own geometry. Not memoized — keyed by its
@@ -79,6 +84,13 @@ public:
   // The primitive cell, cached independently of the full dataset so a caller
   // that only wants it does not pay for standardization.
   [[nodiscard]] Result<Cell> primitive_cell() const;
+
+  // The irreducible reciprocal mesh of this crystal: the determination's
+  // rotations, made reciprocal (adding the inversion partner with time
+  // reversal), reducing `mesh`. The Builder that replaces
+  // ReciprocalMeshBuilder — the analyzer already owns the cell and tolerance.
+  [[nodiscard]] Result<kpoint::ReciprocalMesh>
+  reciprocal_mesh(kpoint::Mesh mesh, TimeReversal time_reversal) const;
 
 private:
   friend Analyzer;

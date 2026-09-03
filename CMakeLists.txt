@@ -63,10 +63,7 @@ target_sources(cppcrystal PRIVATE
         src/data/msg_database.cpp
         src/spin/spin.cpp
         src/magnetic/magnetic_spacegroup.cpp
-        src/kpoint/grid.cpp
-        src/kpoint/reciprocal_mesh.cpp
-        src/kpoint/reciprocal_mesh_builder.cpp
-        src/kpoint/brillouin_zone.cpp
+        src/kpoint/mesh.cpp
         src/spacegroup/hall_symbol.cpp
         src/spacegroup/spacegroup.cpp
         src/refine/refinement.cpp

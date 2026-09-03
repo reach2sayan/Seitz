@@ -27,9 +27,6 @@
 #include <cppcrystal/generate/wyckoff_combinations.hpp>
 #include <cppcrystal/group/space_group.hpp>
 #include <cppcrystal/group/wyckoff.hpp>
-#include <cppcrystal/kpoint/brillouin_zone.hpp>
-#include <cppcrystal/kpoint/grid.hpp>
-#include <cppcrystal/kpoint/reciprocal_mesh.hpp>
-#include <cppcrystal/kpoint/reciprocal_mesh_builder.hpp>
+#include <cppcrystal/kpoint/mesh.hpp>
 #include <cppcrystal/spacegroup_match.hpp>
 #include <cppcrystal/warmup.hpp>

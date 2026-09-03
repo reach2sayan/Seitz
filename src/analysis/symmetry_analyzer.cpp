@@ -180,6 +180,14 @@ Result<Cell> SymmetryAnalyzer::primitive_cell() const {
   return *cell;
 }
 
+Result<kpoint::ReciprocalMesh>
+SymmetryAnalyzer::reciprocal_mesh(kpoint::Mesh mesh,
+                                  TimeReversal time_reversal) const {
+  BOOST_LEAF_AUTO(ds, cached_dataset());
+  return kpoint::ReciprocalMesh::from_rotations(mesh, ds->operations.rotations(),
+                                                time_reversal);
+}
+
 Result<void> SymmetryAnalyzer::warm_derived() const {
   BOOST_LEAF_CHECK(primitive_cell());
   BOOST_LEAF_CHECK(cell_operations());
