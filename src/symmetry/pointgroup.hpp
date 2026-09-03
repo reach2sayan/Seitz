@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -23,13 +25,20 @@ struct PointgroupTransform {
   Matrix3i transformation{Matrix3i::Zero()};
 };
 
+// The family is a compile-time parameter: only the layer path rejects the
+// cubic point groups and sorts the axes so the aperiodic one becomes c.
+// `layer_axis` is still data — a layer cell's aperiodic axis is whichever of
+// the three the input basis put it on — and is ignored for GroupFamily::space.
+template <GroupFamily F>
 [[nodiscard]] Result<PointgroupTransform>
-get_pointgroup(std::span<Matrix3i const> rotations,
-               std::optional<int> aperiodic_axis = std::nullopt);
+identify_point_group(std::span<Matrix3i const> rotations,
+                     std::optional<int> layer_axis = std::nullopt);
 
-// Convenience: the rotation parts of a set of symmetry operations, one per
-// operation in order (de-duplication happens in get_pointgroup). For the object-oriented form, prefer
-// cppcrystal::analysis::OperationSet::rotations().
-[[nodiscard]] std::vector<Matrix3i> rotations_of(SymmetryOperations const &ops);
+extern template Result<PointgroupTransform>
+identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
+                                         std::optional<int>);
+extern template Result<PointgroupTransform>
+identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
+                                         std::optional<int>);
 
 } // namespace cppcrystal::symmetry

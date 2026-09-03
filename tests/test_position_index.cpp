@@ -4,7 +4,7 @@
 // first hit of a linear scan. Everything built on the index inherits its
 // semantics from this.
 
-#include <cppcrystal/core/position_index.hpp>
+#include "core/position_index.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

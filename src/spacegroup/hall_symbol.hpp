@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/data/spg_database.hpp>
@@ -15,7 +16,7 @@ namespace cppcrystal::spacegroup {
 
 [[nodiscard]] std::optional<Vector3d>
 match_hall_symbol(Matrix3d const &bravais_lattice, int hall_number,
-                  data::Centering centering, SymmetryOperations const &symmetry,
+                  data::Centering centering, Operations const &symmetry,
                   double symprec);
 
 } // namespace cppcrystal::spacegroup

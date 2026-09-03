@@ -7,7 +7,7 @@
 #include "oracle.hpp"
 
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
+#include "symmetry/pointgroup.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -94,8 +94,8 @@ TEST_CASE("ir reciprocal mesh matches reference (distortion path)",
 TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const cell = make_cell(cubic(4.0), {{0, 0, 0}}, {0});
-  auto const rotations = cppcrystal::symmetry::rotations_of(
-      cppcrystal::oracle::reference_symmetry(cell, s));
+  auto const rotations =
+      cppcrystal::oracle::reference_symmetry(cell, s).rotations();
   Vector3i const mesh(4, 4, 4);
   Vector3i const shift(0, 0, 0);
 
@@ -126,8 +126,8 @@ TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
 TEST_CASE("grid points by rotations match reference", "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const cell = make_cell(cubic(4.0), {{0, 0, 0}}, {0});
-  auto const rotations = cppcrystal::symmetry::rotations_of(
-      cppcrystal::oracle::reference_symmetry(cell, s));
+  auto const rotations =
+      cppcrystal::oracle::reference_symmetry(cell, s).rotations();
   auto const rot_reciprocal =
       cppcrystal::kpoint::point_group_reciprocal(rotations,
                                              cppcrystal::TimeReversal::off);

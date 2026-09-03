@@ -2,7 +2,7 @@
 
 #include <cppcrystal/generate/random_lattice.hpp>
 
-#include <cppcrystal/math/fractional.hpp>
+#include "math/fractional.hpp"
 
 #include <array>
 #include <optional>

@@ -1,13 +1,15 @@
-#include <cppcrystal/spacegroup/hall_symbol.hpp>
+#include "spacegroup/hall_symbol.hpp"
 
-#include <cppcrystal/core/centering.hpp>
-#include <cppcrystal/core/matrix_order.hpp>
-#include <cppcrystal/core/position_index.hpp>
+#include "core/centering.hpp"
+#include "core/matrix_order.hpp"
+#include "core/position_index.hpp"
+#include "data/operation_index.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/hall_classification.hpp>
-#include <cppcrystal/data/hall_generators_view.hpp>
+#include "data/hall_generators_view.hpp"
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
@@ -53,9 +55,9 @@ namespace {
 struct Setting {
   int hall_number;
   Matrix3d const &primitive_lattice;
-  SymmetryOperations const &symmetry;
+  Operations const &symmetry;
   RotationMultimap<int> const &symmetry_by_rotation;
-  SymmetryOperations const &db_ops;
+  Operations const &db_ops;
   RotationMultimap<int> const &db_by_rotation;
   double symprec;
 
@@ -296,9 +298,9 @@ constexpr auto kFamilies = [] {
 
 std::optional<Vector3d> match_hall_symbol(Matrix3d const &bravais_lattice,
                                           int hall_number, Centering centering,
-                                          SymmetryOperations const &symmetry,
+                                          Operations const &symmetry,
                                           double symprec) {
-  SymmetryOperations const &db_ops = data::operations_from_database(hall_number);
+  Operations const &db_ops = data::operations_from_database(hall_number);
   if (db_ops.size() != symmetry.size()) {
     return std::nullopt;
   }

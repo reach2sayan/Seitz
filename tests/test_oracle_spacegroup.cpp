@@ -1,12 +1,13 @@
+#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
 
-#include <cppcrystal/core/overlap.hpp>
+#include "core/overlap.hpp"
 #include <cppcrystal/dataset.hpp>
-#include <cppcrystal/refine/refinement.hpp>
-#include <cppcrystal/refine/standardize.hpp>
-#include <cppcrystal/spacegroup/spacegroup.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
+#include "refine/refinement.hpp"
+#include "refine/standardize.hpp"
+#include "spacegroup/spacegroup.hpp"
+#include "symmetry/search.hpp"
+#include "symmetry/primitive.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -261,15 +262,19 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim = symmetry::find_primitive(cell, {symprec});
+    auto const prim =
+        symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim, 0);
+    auto const sg = matcher.search(prim->tolerance);
     REQUIRE(sg);
 
-    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
-    Matrix3d const std_lat = refine::conventional_lattice(sg2);
+    auto const sg2 =
+        refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
+    Lattice const std_lattice = refine::conventional_lattice(sg2);
+    Matrix3d const std_lat = std_lattice.matrix();
     Matrix3d const std_rot =
-        Lattice{sg2.bravais_lattice}.rigid_rotation_to(Lattice{std_lat});
+        Lattice{sg2.bravais_lattice}.rigid_rotation_to(std_lattice);
     Matrix3d const trans = sg2.bravais_lattice.inverse() * cell.lattice().matrix();
 
     CHECK((std_lat - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
@@ -349,16 +354,20 @@ TEST_CASE("standardized cell + Wyckoffs + equivalent atoms match the oracle",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim = symmetry::find_primitive(cell, {symprec});
+    auto const prim =
+        symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim, 0);
+    auto const sg = matcher.search(prim->tolerance);
     REQUIRE(sg);
-    auto const ops = symmetry::find_symmetry(cell, prim->tolerance);
+    auto const ops = symmetry::SymmetrySearch<GroupFamily::space>{
+        cell, prim->tolerance}.operations();
     REQUIRE(ops);
 
-    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
-    auto const std = refine::get_wyckoff_positions(
-        sg2, prim->cell, cell, *ops, prim->mapping_table, prim->tolerance.symprec);
+    refine::Refinement<GroupFamily::space> const refinement(
+        refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec),
+        prim->cell, cell, prim->tolerance);
+    auto const std = refinement.standardize(*ops, prim->mapping_table);
     REQUIRE(std);
 
     // Standardized cell: same atom count, same atoms (set, mod lattice).
@@ -393,7 +402,7 @@ TEST_CASE("get_dataset operations equal the input cell symmetry set",
 
     // Set-equal to the reference operations (rotations exact, translations mod
     // lattice). spglib orders them differently than we discover them.
-    auto same_set = [](SymmetryOperations const &a, SymmetryOperations const &b) {
+    auto same_set = [](auto const &a, auto const &b) {
       if (a.size() != b.size())
         return false;
       for (auto const &oa : a) {

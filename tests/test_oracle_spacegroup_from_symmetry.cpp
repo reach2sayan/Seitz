@@ -4,9 +4,10 @@
 // reproduce spg_get_spacegroup_type_from_symmetry. The same operation set is fed
 // to both sides, so this tests the pipeline, not the symmetry search.
 
+#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
 
-#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include "spacegroup/spacegroup.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,7 +21,7 @@ using cppcrystal::Cell;
 using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
-using cppcrystal::SymmetryOperations;
+using cppcrystal::Operations;
 using cppcrystal::oracle::reference_symmetry;
 
 Cell make_cell(Matrix3d const &lattice,
@@ -53,7 +54,7 @@ Matrix3d tetragonal(double a, double c) {
 }
 
 void to_c_operations(std::vector<int> &rot, std::vector<double> &trans,
-                     SymmetryOperations const &ops) {
+                     Operations const &ops) {
   rot.resize(9 * ops.size());
   trans.resize(3 * ops.size());
   for (std::size_t s = 0; s < ops.size(); ++s) {

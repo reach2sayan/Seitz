@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
@@ -36,7 +37,7 @@ struct Dataset {
 
   // Space-group operations of the *input* cell (rotation in the cell basis,
   // fractional translation).
-  SymmetryOperations operations;
+  Operations operations;
 
   // Per input-cell atom: Wyckoff letter index (0 = a), site-symmetry symbol,
   // symmetrically-equivalent representative atom, and crystallographic orbit

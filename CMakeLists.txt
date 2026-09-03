@@ -35,7 +35,6 @@ target_sources(cppcrystal PRIVATE
         src/dataset.cpp
         src/analysis/symmetry_analyzer.cpp
         src/analysis/magnetic_symmetry_analyzer.cpp
-        src/analysis/operation_set.cpp
         src/group/space_group.cpp
         src/group/wyckoff_position.cpp
         src/group/point_group.cpp
@@ -50,6 +49,7 @@ target_sources(cppcrystal PRIVATE
         src/group/rod_group.cpp
         src/generate/rod_crystal.cpp
         src/core/lattice.cpp
+        src/core/symmetry_operation.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp
         src/core/centering.cpp
@@ -59,6 +59,7 @@ target_sources(cppcrystal PRIVATE
         src/symmetry/pointgroup.cpp
         src/symmetry/primitive.cpp
         src/data/spg_database.cpp
+        src/data/operation_index.cpp
         src/data/sitesym_database.cpp
         src/data/msg_database.cpp
         src/spin/spin.cpp
@@ -78,6 +79,10 @@ target_sources(cppcrystal PRIVATE
 target_include_directories(cppcrystal PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
+# The determination pipeline's headers live beside their .cpp files under src/
+# and are never installed: `#include <cppcrystal/...>` is the public API,
+# `#include "module/x.hpp"` is internal.
+target_include_directories(cppcrystal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(cppcrystal PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container

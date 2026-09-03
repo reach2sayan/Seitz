@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/rod_group_tables.hpp>
 
@@ -50,6 +51,6 @@ static_assert(rod_symbol(76).empty()); // out of range (above)
 static_assert(rod_symbol(1) == "p1");
 static_assert(rod_symbol(75) == "p6/mmc");
 
-[[nodiscard]] SymmetryOperations rod_operations_from_database(int rod_number);
+[[nodiscard]] Operations rod_operations_from_database(int rod_number);
 
 } // namespace cppcrystal::data

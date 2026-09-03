@@ -4,8 +4,8 @@
 // 230 space groups; the generation test round-trips a generated cell back
 // through the analyzer.
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/core/overlap.hpp>
-#include <cppcrystal/data/rod_database.hpp>
+#include "core/overlap.hpp"
+#include "data/rod_database.hpp"
 #include <cppcrystal/dataset.hpp>
 #include <cppcrystal/generate/crystal_builder.hpp>
 #include <cppcrystal/generate/distance_check.hpp>

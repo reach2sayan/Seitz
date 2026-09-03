@@ -6,10 +6,11 @@
 
 #include "oracle.hpp"
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
-#include <cppcrystal/spin/spin.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "magnetic/identify.hpp"
+#include "spin/search.hpp"
+#include "symmetry/search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -22,7 +23,7 @@ using cppcrystal::Cell;
 using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
 using cppcrystal::MagneticCell;
-using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::MagneticOperations;
 using cppcrystal::Matrix3d;
 using cppcrystal::noncollinear_tensors;
 using cppcrystal::Positions;
@@ -40,27 +41,29 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
 }
 
 // The magnetic symmetry of `mcell`, via the ported spin module.
-MagneticSymmetryOperations magnetic_symmetry(MagneticCell const &input,
+MagneticOperations magnetic_symmetry(MagneticCell const &input,
                                              bool with_time_reversal,
                                              bool is_axial, double symprec) {
   MagneticCell const mcell(input.cell(), input.tensors(),
                            is_axial ? cppcrystal::TensorKind::axial
                                     : cppcrystal::TensorKind::polar);
-  auto const sym_nonspin =
-      cppcrystal::symmetry::find_symmetry(mcell.cell(), {symprec});
+  cppcrystal::symmetry::SymmetrySearch<cppcrystal::GroupFamily::space> const
+      spatial(mcell.cell(), {symprec});
+  auto const sym_nonspin = spatial.operations();
   REQUIRE(sym_nonspin);
-  auto const search = cppcrystal::spin::operations_with_site_tensors(
-      sym_nonspin.value(), mcell,
-      with_time_reversal ? cppcrystal::TimeReversal::on
-                         : cppcrystal::TimeReversal::off,
-      {{symprec}});
+  cppcrystal::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
+                                                {{symprec}});
+  auto const search =
+      with_time_reversal
+          ? spin_search.operations<cppcrystal::TimeReversal::on>()
+          : spin_search.operations<cppcrystal::TimeReversal::off>();
   REQUIRE(search);
   return search->operations;
 }
 
 // Reference UNI number + MSG type via the magnetic symmetry directly.
 std::pair<int, int>
-reference_uni(MagneticSymmetryOperations const &ops, Matrix3d const &lattice,
+reference_uni(MagneticOperations const &ops, Matrix3d const &lattice,
               double symprec) {
   std::vector<int> rot(9 * ops.size());
   std::vector<double> trans(3 * ops.size());
@@ -69,9 +72,9 @@ reference_uni(MagneticSymmetryOperations const &ops, Matrix3d const &lattice,
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
         rot[9 * s + 3 * static_cast<std::size_t>(i) +
-            static_cast<std::size_t>(j)] = ops[s].rotation(i, j);
+            static_cast<std::size_t>(j)] = ops[s].spatial.rotation(i, j);
       }
-      trans[3 * s + static_cast<std::size_t>(i)] = ops[s].translation[i];
+      trans[3 * s + static_cast<std::size_t>(i)] = ops[s].spatial.translation[i];
     }
     timerev[s] = ops[s].time_reversal ? 1 : 0;
   }
@@ -88,8 +91,9 @@ reference_uni(MagneticSymmetryOperations const &ops, Matrix3d const &lattice,
 void check(MagneticCell const &mcell, bool with_time_reversal, bool is_axial,
            double symprec) {
   auto const ops = magnetic_symmetry(mcell, with_time_reversal, is_axial, symprec);
-  auto const got = cppcrystal::magnetic::identify_magnetic_spacegroup_type(
-      mcell.cell().lattice().matrix(), ops, symprec);
+  cppcrystal::magnetic::MagneticIdentification const identification(
+      mcell.cell().lattice(), ops, {symprec});
+  auto const got = identification.identify();
   REQUIRE(got);
 
   auto const [ref_uni, ref_type] =

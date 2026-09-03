@@ -1,12 +1,10 @@
 #pragma once
 
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/core/fractional.hpp>
 
 #include <concepts>
 #include <optional>
-#include <vector>
 
 namespace cppcrystal {
 
@@ -40,21 +38,14 @@ struct SymmetryOperation {
             rotation.cast<double>() * rhs.translation + translation};
   }
 
-  // Inverse operation; std::nullopt when the rotation is not unimodular.
-  [[nodiscard]] std::optional<SymmetryOperation> inverse() const noexcept {
-    auto const rinv = math::integer_inverse(rotation);
-    if (!rinv) {
-      return std::nullopt;
-    }
-    return SymmetryOperation{*rinv, -(rinv->cast<double>() * translation)};
-  }
+  // Inverse operation; std::nullopt when the rotation is not unimodular. Out
+  // of line: the exact integer inverse it needs is private to src/math.
+  [[nodiscard]] std::optional<SymmetryOperation> inverse() const noexcept;
 
   [[nodiscard]] bool is_identity_rotation() const noexcept {
     return rotation == Matrix3i::Identity();
   }
 };
-
-using SymmetryOperations = std::vector<SymmetryOperation>;
 
 // Change of basis of an operation: (T, 0)(R, t)(T, 0)^-1 = (T R T^-1, T t),
 // with the conjugated rotation rounded back to the integer basis. Any extra

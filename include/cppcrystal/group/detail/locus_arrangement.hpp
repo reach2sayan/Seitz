@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/group/locus_wyckoff.hpp>
@@ -24,8 +25,8 @@ struct DerivedLocus {
   int dof = 0;
   Vector3d origin{Vector3d::Zero()};
   Matrix3d locus_basis{Matrix3d::Zero()};
-  SymmetryOperations orbit_ops;
-  SymmetryOperations site_symmetry;
+  Operations orbit_ops;
+  Operations site_symmetry;
 };
 
 struct WyckoffFactory {
@@ -54,29 +55,31 @@ struct WyckoffFactory {
 // `fold` normalises an image into the fundamental domain (wrap_to_unit_cell,
 // a single-axis fold, or identity); `same_point` is the geometry's equality.
 struct OrbitPartition {
-  SymmetryOperations orbit_ops;     // coset representatives, one per point
-  SymmetryOperations site_symmetry; // stabilizer of p0
-  std::vector<Vector3d> points;     // the distinct (folded) orbit points
+  Operations orbit_ops;         // coset representatives, one per point
+  Operations site_symmetry;     // stabilizer of p0
+  std::vector<Vector3d> points; // the distinct (folded) orbit points
 };
 
 template <class Fold, class SamePoint>
 [[nodiscard]] OrbitPartition
 partition_orbit(std::span<SymmetryOperation const> ops, Vector3d const &p0,
                 Fold &&fold, SamePoint &&same_point) {
-  OrbitPartition out;
+  std::vector<SymmetryOperation> orbit_ops;
+  std::vector<SymmetryOperation> site_symmetry;
+  std::vector<Vector3d> points;
   for (auto const &op : ops) {
     Vector3d const image = fold(op.apply(p0));
     if (same_point(image, p0)) {
-      out.site_symmetry.push_back(op);
+      site_symmetry.push_back(op);
     }
-    if (std::ranges::none_of(out.points, [&](Vector3d const &q) {
-          return same_point(q, image);
-        })) {
-      out.points.push_back(image);
-      out.orbit_ops.push_back(op);
+    if (std::ranges::none_of(
+            points, [&](Vector3d const &q) { return same_point(q, image); })) {
+      points.push_back(image);
+      orbit_ops.push_back(op);
     }
   }
-  return out;
+  return {Operations{std::move(orbit_ops)}, Operations{std::move(site_symmetry)},
+          std::move(points)};
 }
 
 // The geometry's stabiliser-locus representation.

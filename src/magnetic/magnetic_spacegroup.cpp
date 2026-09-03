@@ -1,15 +1,16 @@
-#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
+#include "magnetic/identify.hpp"
 
-#include <cppcrystal/core/matrix_order.hpp>
+#include "core/matrix_order.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/msg_database.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/refine/refinement.hpp>
-#include <cppcrystal/spacegroup/spacegroup.hpp>
-#include <cppcrystal/spin/spin.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
+#include "refine/refinement.hpp"
+#include "spacegroup/spacegroup.hpp"
+#include "spin/search.hpp"
+#include "symmetry/primitive.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -29,8 +30,12 @@ using spacegroup::Spacegroup;
 
 constexpr int kMaxDenominator = 100;
 
+// Internal construction buffer: operations are appended incrementally, then
+// wrapped in a MagneticOperations at the boundary.
+using MagOps = std::vector<MagneticSymmetryOperation>;
+
 [[nodiscard]] MagneticSymmetryOperation identity_operation(bool time_reversal) {
-  return {Matrix3i::Identity(), Vector3d::Zero(), time_reversal};
+  return {{Matrix3i::Identity(), Vector3d::Zero()}, time_reversal};
 }
 
 // Whether a magnetic space group is built as the family (ignore time reversal)
@@ -39,17 +44,17 @@ enum class SpaceGroupKind { family, maximal };
 
 // Family / maximal space group of a magnetic symmetry, plus its non-magnetic
 // symmetry operations (in the input setting).
-[[nodiscard]] std::optional<std::pair<SymmetryOperations, Spacegroup>>
+[[nodiscard]] std::optional<std::pair<Operations, Spacegroup>>
 space_group_of_magnetic_symmetry(
-    MagneticSymmetryOperations const &magnetic_symmetry, SpaceGroupKind kind,
+    MagneticOperations const &magnetic_symmetry, SpaceGroupKind kind,
     double symprec) {
   bool const ignore_time_reversal = kind == SpaceGroupKind::family;
 
   // Type-II magnetic space groups contain the pure time-reversal (I, 0)1'.
   bool const is_type2 =
       std::ranges::any_of(magnetic_symmetry, [&](auto const &op) {
-        return op.rotation == Matrix3i::Identity() && op.time_reversal &&
-               approx_equal(op.translation, Vector3d::Zero(), symprec);
+        return op.spatial.is_identity_rotation() && op.time_reversal &&
+               approx_equal(op.spatial.translation, Vector3d::Zero(), symprec);
       });
 
   // Keep an operation in the spatial subgroup unless it must be dropped: primed
@@ -61,20 +66,17 @@ space_group_of_magnetic_symmetry(
     return !drop;
   };
 
-  SymmetryOperations sym;
-  std::ranges::copy(magnetic_symmetry |
-                        std::views::filter(keep_in_subgroup) |
-                        std::views::transform([](const auto &op) {
-                          return SymmetryOperation{op.rotation, op.translation};
-                        }),
-                    std::back_inserter(sym));
+  Operations const sym{
+      std::from_range,
+      magnetic_symmetry | std::views::filter(keep_in_subgroup) |
+          std::views::transform([](auto const &op) { return op.spatial; })};
 
   // (a, b, c) = (a_prim, b_prim, c_prim) . t_mat.
-  auto const prim = symmetry::primitive_symmetry(sym, symprec);
+  auto const prim = sym.to_primitive({symprec, std::nullopt});
   if (!prim) {
     return std::nullopt;
   }
-  SymmetryOperations const &prim_sym = prim->first;
+  Operations const &prim_sym = prim->first;
   Matrix3d const &t_mat = prim->second;
 
   auto sg = spacegroup::search_spacegroup_with_symmetry(
@@ -93,23 +95,22 @@ space_group_of_magnetic_symmetry(
 // Coset representative of XSG in MSG (assumes type III or IV).
 // representative[0] is the identity; representative[1] is an anti-translation
 // (type IV) or some primed operation (type III).
-[[nodiscard]] std::optional<MagneticSymmetryOperations>
-get_representative(MagneticSymmetryOperations const &magnetic_symmetry) {
-  MagneticSymmetryOperations rep{identity_operation(false)};
+[[nodiscard]] std::optional<MagOps>
+get_representative(MagneticOperations const &magnetic_symmetry) {
+  MagOps rep{identity_operation(false)};
 
   auto const anti_translation =
       std::ranges::find_if(magnetic_symmetry, [](auto const &op) {
-        return op.rotation == Matrix3i::Identity() && op.time_reversal;
+        return op.spatial.is_identity_rotation() && op.time_reversal;
       });
   if (anti_translation != magnetic_symmetry.end()) {
-    rep.push_back({anti_translation->rotation, anti_translation->translation,
-                   true}); // type IV
+    rep.push_back({anti_translation->spatial, true}); // type IV
     return rep;
   }
   auto const primed = std::ranges::find_if(
       magnetic_symmetry, [](auto const &op) { return op.time_reversal; });
   if (primed != magnetic_symmetry.end()) {
-    rep.push_back({primed->rotation, primed->translation, true}); // type III
+    rep.push_back({primed->spatial, true}); // type III
     return rep;
   }
   return std::nullopt;
@@ -140,8 +141,8 @@ get_representative(MagneticSymmetryOperations const &magnetic_symmetry) {
 //   * index 2 - XSG is a halving subgroup; the missing spatial operations recur
 //     only when primed, as a pure anti-translation (type IV) or a primed point
 //     operation (type III), read off the coset representative.
-[[nodiscard]] std::optional<std::pair<MagneticType, MagneticSymmetryOperations>>
-magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
+[[nodiscard]] std::optional<std::pair<MagneticType, MagOps>>
+magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
                           std::size_t num_sym_fsg, std::size_t num_sym_xsg) {
   std::size_t const num_sym_msg = magnetic_symmetry.size();
   auto const spatial_index = subgroup_index(num_sym_fsg, num_sym_xsg);
@@ -151,15 +152,13 @@ magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
 
   if (*spatial_index == 1) {
     if (num_sym_msg == num_sym_fsg) {
-      return std::make_pair(
-          MagneticType::type_i,
-          MagneticSymmetryOperations{identity_operation(false)});
+      return std::make_pair(MagneticType::type_i,
+                            MagOps{identity_operation(false)});
     }
     if (num_sym_msg == 2 * num_sym_fsg) {
       return std::make_pair(
           MagneticType::type_ii,
-          MagneticSymmetryOperations{identity_operation(false),
-                                     identity_operation(true)});
+          MagOps{identity_operation(false), identity_operation(true)});
     }
     return std::nullopt;
   }
@@ -169,7 +168,7 @@ magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
   if (!rep) {
     return std::nullopt;
   }
-  MagneticType const type = (*rep)[1].rotation == Matrix3i::Identity()
+  MagneticType const type = (*rep)[1].spatial.is_identity_rotation()
                                 ? MagneticType::type_iv
                                 : MagneticType::type_iii;
   return std::make_pair(type, std::move(*rep));
@@ -178,20 +177,20 @@ magnetic_space_group_type(MagneticSymmetryOperations const &magnetic_symmetry,
 // Transform magnetic operations by (tmat, shift) without de-duplicating:
 //   (W, w) -> (tmat, shift) (W, w) (tmat, shift)^-1
 // i.e. W' = tmat W tmat^-1, w' = wrap(shift - W' shift + tmat w).
-[[nodiscard]] MagneticSymmetryOperations
-distinct_changed_magnetic_symmetry(
+[[nodiscard]] MagOps distinct_changed_magnetic_symmetry(
     Matrix3d const &tmat, Vector3d const &shift,
     std::span<MagneticSymmetryOperation const> sym_msg) {
   Matrix3d const tmat_inv = tmat.inverse();
-  MagneticSymmetryOperations changed;
+  MagOps changed;
   changed.reserve(sym_msg.size());
   std::ranges::transform(
       sym_msg, std::back_inserter(changed), [&](auto const &op) {
         Matrix3i const rot = math::round_to_int(
-            tmat * op.rotation.template cast<double>() * tmat_inv);
-        Vector3d const trans = math::wrap_to_unit_cell(Vector3d(
-            shift - rot.cast<double>() * shift + tmat * op.translation));
-        return MagneticSymmetryOperation{rot, trans, op.time_reversal};
+            tmat * op.spatial.rotation.template cast<double>() * tmat_inv);
+        Vector3d const trans = math::wrap_to_unit_cell(
+            Vector3d(shift - rot.cast<double>() * shift +
+                     tmat * op.spatial.translation));
+        return MagneticSymmetryOperation{{rot, trans}, op.time_reversal};
       });
   return changed;
 }
@@ -251,17 +250,16 @@ changed_pure_translations(Matrix3d const &tmat,
 
 // The MSG operations in the changed (reference) setting, built from the coset
 // representatives, the conventional centerings, and the factor group of XSG.
-[[nodiscard]] std::optional<MagneticSymmetryOperations>
-changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
-                          MagneticSymmetryOperations const &representatives,
-                          SymmetryOperations const &sym_xsg,
-                          MagneticSymmetryOperations const &magnetic_symmetry,
-                          double symprec) {
-  MagneticSymmetryOperations const changed_representatives =
+[[nodiscard]] std::optional<MagOps> changed_magnetic_symmetry(
+    Matrix3d const &tmat, Vector3d const &shift,
+    std::span<MagneticSymmetryOperation const> representatives,
+    Operations const &sym_xsg, MagneticOperations const &magnetic_symmetry,
+    double symprec) {
+  MagOps const changed_representatives =
       distinct_changed_magnetic_symmetry(tmat, shift, representatives);
 
   std::vector<Vector3d> const pure_trans =
-      spin::collect_pure_translations(magnetic_symmetry);
+      magnetic_symmetry.pure_translations();
   auto const changed_pure =
       changed_pure_translations(tmat, pure_trans, symprec);
   if (!changed_pure) {
@@ -272,25 +270,25 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
   // rotation, first occurrence winning.
   auto const factors = unique_by_rotation(
       sym_xsg | std::views::transform([](auto const &op) {
-        return MagneticSymmetryOperation{op.rotation, op.translation, false};
+        return MagneticSymmetryOperation{op, false};
       }),
-      &MagneticSymmetryOperation::rotation);
-  MagneticSymmetryOperations const changed_factors =
+      [](MagneticSymmetryOperation const &op) { return op.spatial.rotation; });
+  MagOps const changed_factors =
       distinct_changed_magnetic_symmetry(tmat, shift, factors);
 
-  MagneticSymmetryOperations changed;
+  MagOps changed;
   changed.reserve(changed_representatives.size() * changed_pure->size() *
                   changed_factors.size());
   for (auto const &pure : *changed_pure) {
     for (auto const &rep : changed_representatives) {
       for (auto const &factor : changed_factors) {
         // (I, ti)(Pj, tj)(Pk, tk) = (Pj Pk, Pj tk + tj + ti).
-        Matrix3i const rot = rep.rotation * factor.rotation;
-        Vector3d const trans = math::wrap_to_unit_cell(
-            Vector3d(rep.rotation.cast<double>() * factor.translation +
-                     rep.translation + pure));
+        Matrix3i const rot = rep.spatial.rotation * factor.spatial.rotation;
+        Vector3d const trans = math::wrap_to_unit_cell(Vector3d(
+            rep.spatial.rotation.cast<double>() * factor.spatial.translation +
+            rep.spatial.translation + pure));
         changed.push_back(
-            {rot, trans, rep.time_reversal != factor.time_reversal});
+            {{rot, trans}, rep.time_reversal != factor.time_reversal});
       }
     }
   }
@@ -300,21 +298,23 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
 // Whether two magnetic symmetries are equal as sets (rotation, translation
 // mod 1, time reversal). Rotation and time reversal select a bucket of b
 // exactly; only the translations inside it are compared with tolerance.
-[[nodiscard]] bool same_magnetic_symmetry(MagneticSymmetryOperations const &a,
-                                          MagneticSymmetryOperations const &b,
+[[nodiscard]] bool same_magnetic_symmetry(MagneticOperations const &a,
+                                          MagneticOperations const &b,
                                           double symprec) {
   if (a.size() != b.size()) {
     return false;
   }
-  OperationMultimap const b_index = index_by_operation_key(b);
+  OperationMultimap const b_index = index_by_operation_key(b.span());
   return std::ranges::all_of(a, [&](MagneticSymmetryOperation const &oa) {
-    auto const [lo, hi] = b_index.equal_range({oa.rotation, oa.time_reversal});
+    auto const [lo, hi] =
+        b_index.equal_range({oa.spatial.rotation, oa.time_reversal});
     return std::ranges::any_of(lo, hi, [&](auto const &entry) {
       auto const &ob = b[static_cast<std::size_t>(entry.second)];
       // NB: strictly below symprec, unlike same_operation's <=; kept as is.
-      return approx_equal(math::nearest_offset(
-                              Vector3d(oa.translation - ob.translation)),
-                          Vector3d::Zero(), symprec);
+      return approx_equal(
+          math::nearest_offset(
+              Vector3d(oa.spatial.translation - ob.spatial.translation)),
+          Vector3d::Zero(), symprec);
     });
   });
 }
@@ -326,7 +326,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
 [[nodiscard]] Matrix3d rigid_rotation(Matrix3d const &lattice,
                                       Matrix3d const &tmat,
                                       Spacegroup const &ref_sg) {
-  Matrix3d const ideal_latt = refine::conventional_lattice(ref_sg);
+  Lattice const ideal_latt = refine::conventional_lattice(ref_sg);
   static_cast<void>(ideal_latt); // unused in the product (see note above)
   return lattice * tmat.inverse() * tmat * lattice.inverse();
 }
@@ -334,7 +334,7 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
 struct ReferenceSpaceGroup {
   MagneticType type;
   Spacegroup ref_sg;
-  MagneticSymmetryOperations changed_symmetry;
+  MagOps changed_symmetry;
   Matrix3d tmat;
   Vector3d shift;
 };
@@ -343,7 +343,7 @@ struct ReferenceSpaceGroup {
 // XSG for type IV), and the magnetic symmetry transformed into that setting.
 [[nodiscard]] std::optional<ReferenceSpaceGroup>
 get_reference_space_group(Matrix3d const &lattice,
-                          MagneticSymmetryOperations const &magnetic_symmetry,
+                          MagneticOperations const &magnetic_symmetry,
                           double symprec) {
   auto fsg = space_group_of_magnetic_symmetry(magnetic_symmetry,
                                               SpaceGroupKind::family, symprec);
@@ -362,7 +362,7 @@ get_reference_space_group(Matrix3d const &lattice,
     return std::nullopt;
   }
   MagneticType const type = type_rep->first;
-  MagneticSymmetryOperations const &representatives = type_rep->second;
+  MagOps const &representatives = type_rep->second;
 
   Spacegroup ref_sg =
       (type == MagneticType::type_iv) ? xsg->second : fsg->second;
@@ -385,9 +385,10 @@ get_reference_space_group(Matrix3d const &lattice,
 
 } // namespace
 
-Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
-    Matrix3d const &lattice,
-    MagneticSymmetryOperations const &magnetic_symmetry, double symprec) {
+Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
+  Matrix3d const &lattice = lattice_.matrix();
+  MagneticOperations const &magnetic_symmetry = operations_;
+  double const symprec = tol_.symprec;
   auto reference =
       get_reference_space_group(lattice, magnetic_symmetry, symprec);
   if (!reference) {
@@ -427,7 +428,8 @@ Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
         Vector3d const cor_shift = transform.translation;
         auto const symmetry_cor = distinct_changed_magnetic_symmetry(
             cor, cor_shift, reference->changed_symmetry);
-        if (same_magnetic_symmetry(msg_uni, symmetry_cor, symprec)) {
+        if (same_magnetic_symmetry(msg_uni,
+                                   MagneticOperations{symmetry_cor}, symprec)) {
           return Correction{uni, cor, cor_shift};
         }
       }
@@ -459,19 +461,23 @@ Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
                                     rigid_rot};
 }
 
-Result<MagneticCell>
-transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
-               Vector3d const &origin_shift, Matrix3d const &rigid_rotation,
-               MagneticSymmetryOperations const &magnetic_symmetry,
-               double symprec) {
+Result<MagneticCell> MagneticIdentification::transform(
+    MagneticCell const &mcell,
+    MagneticTypeIdentification const &identification) const {
+  Matrix3d const &transformation_matrix = identification.transformation_matrix;
+  Vector3d const &origin_shift = identification.origin_shift;
+  Matrix3d const &rigid_rotation = identification.std_rotation_matrix;
+  MagneticOperations const &magnetic_symmetry = operations_;
+  double const symprec = tol_.symprec;
   Cell const &cell = mcell.cell();
   bool const collinear = mcell.rank() == SiteTensor::collinear;
 
   // 1. Transform the cell to primitive using the magnetic pure translations.
   std::vector<Vector3d> const pure_trans =
-      spin::collect_pure_translations(magnetic_symmetry);
-  BOOST_LEAF_AUTO(prim, symmetry::find_primitive_with_pure_translations(
-                            cell, pure_trans, symprec));
+      magnetic_symmetry.pure_translations();
+  symmetry::PrimitiveFinder<GroupFamily::space> const finder(
+      cell, {symprec, std::nullopt});
+  BOOST_LEAF_AUTO(prim, finder.from_pure_translations(pure_trans));
   Cell const &prim_cell = prim.cell;
   // tmat_prm = tmat . cell.lattice^-1 . primitive.lattice.
   Matrix3d const tmat_prm =

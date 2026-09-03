@@ -9,7 +9,7 @@
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/magnetic_dataset.hpp>
 
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/integer_matrix.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -156,8 +156,8 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
     bool const tr = ref->time_reversals[s] != 0;
     bool found = false;
     for (auto const &op : got->operations) {
-      if (op.rotation == r && op.time_reversal == tr &&
-          fractional_overlap(op.translation, t, symprec)) {
+      if (op.spatial.rotation == r && op.time_reversal == tr &&
+          fractional_overlap(op.spatial.translation, t, symprec)) {
         found = true;
         break;
       }

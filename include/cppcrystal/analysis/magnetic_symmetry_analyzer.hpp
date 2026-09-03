@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cppcrystal/analysis/detail/lazy.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/msg_database.hpp>
 #include <cppcrystal/magnetic_dataset.hpp>
-#include <cppcrystal/spin/spin.hpp>
 
 #include <optional>
 #include <type_traits>
@@ -41,7 +41,7 @@ public:
   }
 
   // Projections of the dataset.
-  [[nodiscard]] Result<MagneticSymmetryOperations> operations() const {
+  [[nodiscard]] Result<MagneticOperations> operations() const {
     return project<&MagneticDataset::operations>();
   }
   [[nodiscard]] Result<int> uni_number() const {
@@ -58,23 +58,12 @@ public:
     return data::magnetic_spacegroup_type(uni);
   }
 
-  // The full magnetic symmetry search of the input cell: the magnetic
-  // operations, each atom's magnetic-orbit representative, the atom
-  // permutations under every operation, and the primitive lattice implied by
-  // the magnetic pure translations. Derives the spatial symmetry
-  // (symmetry::find_symmetry of the underlying cell) and runs
-  // spin::operations_with_site_tensors with time reversal. Distinct from
-  // operations(), which is just the dataset's magnetic operations. Cached
-  // independently.
-  [[nodiscard]] Result<spin::MagneticSymmetrySearch> symmetry_search() const;
-
   // Standardized magnetic cell assembled from the dataset's std_* fields
   // (idealized lattice, positions, types, and the rotated site tensors).
   [[nodiscard]] Result<MagneticCell> standardized_cell() const;
 
-  // Force both lazy caches (the magnetic dataset and the independently-cached
-  // symmetry search). After warm() succeeds this const instance may be shared
-  // read-only across threads.
+  // Force the lazy dataset cache. After warm() succeeds this const instance
+  // may be shared read-only across threads.
   Result<void> warm() const;
 
 private:
@@ -95,7 +84,6 @@ private:
   MagneticTolerance tol_;
 
   detail::Lazy<MagneticDataset> dataset_;
-  detail::Lazy<spin::MagneticSymmetrySearch> symmetry_search_;
 };
 
 } // namespace cppcrystal::analysis

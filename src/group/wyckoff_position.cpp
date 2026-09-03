@@ -1,8 +1,8 @@
 #include <cppcrystal/group/wyckoff_position.hpp>
 
-#include <cppcrystal/core/matrix_order.hpp>
+#include "core/matrix_order.hpp"
 #include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/math/fractional.hpp>
+#include "math/fractional.hpp"
 
 #include <vector>
 

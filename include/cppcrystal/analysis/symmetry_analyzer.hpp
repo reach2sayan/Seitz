@@ -1,16 +1,15 @@
 #pragma once
 
 #include <cppcrystal/analysis/detail/lazy.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/dataset.hpp>
-#include <cppcrystal/spacegroup/spacegroup.hpp>
 #include <cppcrystal/standardize.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
 
 #include <optional>
 #include <string>
@@ -51,7 +50,7 @@ public:
   }
 
   // Projections of the dataset.
-  [[nodiscard]] Result<SymmetryOperations> operations() const {
+  [[nodiscard]] Result<Operations> operations() const {
     return project<&Dataset::operations>();
   }
   [[nodiscard]] Result<int> spacegroup_number() const {
@@ -76,7 +75,7 @@ public:
   // the centering translations of a non-primitive cell
   // (symmetry::find_symmetry). Distinct from operations(), which are the
   // dataset's operations in the input basis. Cached independently.
-  [[nodiscard]] Result<SymmetryOperations> cell_operations() const;
+  [[nodiscard]] Result<Operations> cell_operations() const;
 
   // The lattice point group: the rotations (in the cell basis) that map the
   // Delaunay-reduced lattice metric onto itself (symmetry::lattice_symmetry).
@@ -93,16 +92,14 @@ public:
   [[nodiscard]] Result<Cell> standardized_cell(CellSetting setting,
                                                Idealize idealize) const;
 
-  // Pipeline intermediates, cached independently of the full dataset so a
-  // caller that only wants the primitive cell or the matched Hall setting does
-  // not pay for standardization.
-  [[nodiscard]] Result<symmetry::Primitive> primitive() const;
+  // The primitive cell, cached independently of the full dataset so a caller
+  // that only wants it does not pay for standardization. The Primitive and
+  // Spacegroup intermediates behind it are private to the pipeline.
   [[nodiscard]] Result<Cell> primitive_cell() const;
-  [[nodiscard]] Result<spacegroup::Spacegroup> spacegroup() const;
 
-  // Force every lazy cache (the dataset plus the independently-cached pipeline
-  // intermediates: primitive, matched spacegroup, raw cell operations, lattice
-  // symmetry). Returns the first error encountered, or success once all caches
+  // Force every lazy cache (the dataset plus the independently-cached
+  // primitive cell, raw cell operations and lattice symmetry). Returns the
+  // first error encountered, or success once all caches
   // are populated. After warm() succeeds this const instance may be shared
   // read-only across threads — all getters then hit a filled cache.
   Result<void> warm() const;
@@ -112,9 +109,6 @@ private:
       : cell_(std::move(cell)), tol_(tol), hall_number_(hall_number) {}
 
   [[nodiscard]] Result<Dataset const *> cached_dataset() const;
-  [[nodiscard]] Result<symmetry::Primitive const *> cached_primitive() const;
-  [[nodiscard]] Result<spacegroup::Spacegroup const *>
-  cached_spacegroup() const;
 
   // Copy one field out of the memoized dataset.
   template <auto Member> [[nodiscard]] auto project() const
@@ -129,9 +123,8 @@ private:
   int hall_number_ = 0;
 
   detail::Lazy<Dataset> dataset_;
-  detail::Lazy<symmetry::Primitive> primitive_;
-  detail::Lazy<spacegroup::Spacegroup> spacegroup_;
-  detail::Lazy<SymmetryOperations> cell_operations_;
+  detail::Lazy<Cell> primitive_cell_;
+  detail::Lazy<Operations> cell_operations_;
   detail::Lazy<PointSymmetry> lattice_symmetry_;
 };
 

@@ -1,6 +1,6 @@
-#include <cppcrystal/core/position_index.hpp>
+#include "core/position_index.hpp"
 
-#include <cppcrystal/math/fractional.hpp>
+#include "math/fractional.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -1,4 +1,9 @@
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
+
+#include "core/family_dispatch.hpp"
+#include "symmetry/primitive.hpp"
+#include "symmetry/search.hpp"
 
 #include <utility>
 
@@ -9,36 +14,24 @@ SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, Tolerance tol,
   return SymmetryAnalyzer{std::move(cell), tol, hall_number};
 }
 
-Result<symmetry::Primitive const *> SymmetryAnalyzer::cached_primitive() const {
-  return primitive_.get([&] {
-    return symmetry::find_primitive(cell_, tol_);
-  });
-}
-
-Result<spacegroup::Spacegroup const *>
-SymmetryAnalyzer::cached_spacegroup() const {
-  return spacegroup_.get([&]() -> Result<spacegroup::Spacegroup> {
-    BOOST_LEAF_AUTO(prim, cached_primitive());
-    return spacegroup::search_spacegroup(*prim, hall_number_, tol_);
-  });
-}
-
 Result<Dataset const *> SymmetryAnalyzer::cached_dataset() const {
-  return dataset_.get([&] {
-    return get_dataset(cell_, tol_, hall_number_);
-  });
+  return dataset_.get([&] { return get_dataset(cell_, tol_, hall_number_); });
 }
 
-Result<SymmetryOperations> SymmetryAnalyzer::cell_operations() const {
+Result<Operations> SymmetryAnalyzer::cell_operations() const {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {
-    return symmetry::find_symmetry(cell_, tol_);
+    return dispatch_family(cell_.periodicity(), [&]<GroupFamily F>() {
+      return symmetry::SymmetrySearch<F>{cell_, tol_}.operations();
+    });
   }));
   return *ops;
 }
 
 Result<PointSymmetry> SymmetryAnalyzer::lattice_symmetry() const {
   BOOST_LEAF_AUTO(ps, lattice_symmetry_.get([&] {
-    return symmetry::lattice_symmetry(cell_, tol_);
+    return dispatch_family(cell_.periodicity(), [&]<GroupFamily F>() {
+      return symmetry::SymmetrySearch<F>{cell_, tol_}.lattice_symmetry();
+    });
   }));
   return *ps;
 }
@@ -53,24 +46,21 @@ Result<Cell> SymmetryAnalyzer::standardized_cell(CellSetting setting,
   return standardize_cell(cell_, setting, idealize, tol_);
 }
 
-Result<symmetry::Primitive> SymmetryAnalyzer::primitive() const {
-  BOOST_LEAF_AUTO(prim, cached_primitive());
-  return *prim;
-}
-
 Result<Cell> SymmetryAnalyzer::primitive_cell() const {
-  BOOST_LEAF_AUTO(prim, cached_primitive());
-  return prim->cell;
-}
-
-Result<spacegroup::Spacegroup> SymmetryAnalyzer::spacegroup() const {
-  BOOST_LEAF_AUTO(sg, cached_spacegroup());
-  return *sg;
+  BOOST_LEAF_AUTO(cell, primitive_cell_.get([&]() -> Result<Cell> {
+    return dispatch_family(
+        cell_.periodicity(), [&]<GroupFamily F>() -> Result<Cell> {
+          symmetry::PrimitiveFinder<F> const finder(cell_, tol_);
+          BOOST_LEAF_AUTO(prim, finder.find());
+          return prim.cell;
+        });
+  }));
+  return *cell;
 }
 
 Result<void> SymmetryAnalyzer::warm() const {
   BOOST_LEAF_CHECK(cached_dataset());
-  BOOST_LEAF_CHECK(cached_spacegroup()); // also fills cached_primitive()
+  BOOST_LEAF_CHECK(primitive_cell());
   BOOST_LEAF_CHECK(cell_operations());
   BOOST_LEAF_CHECK(lattice_symmetry());
   return {};

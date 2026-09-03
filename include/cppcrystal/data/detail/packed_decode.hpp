@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -59,18 +60,18 @@ make_operation(DecodedOp const &d) noexcept {
 // over a decoded-operation array. Entry 0 of the result stays empty — the
 // out-of-range fallback the lookup helpers hand back.
 template <std::size_t N, std::size_t M>
-[[nodiscard]] std::array<SymmetryOperations, N>
+[[nodiscard]] std::array<Operations, N>
 build_operation_table(std::array<std::array<int, 2>, N> const &index,
                       std::array<DecodedOp, M> const &decoded) {
-  std::array<SymmetryOperations, N> ops;
+  std::array<Operations, N> ops;
   for (std::size_t key = 1; key < N; ++key) {
     auto const [count, offset] = index[key];
-    SymmetryOperations v;
+    std::vector<SymmetryOperation> v;
     v.reserve(static_cast<std::size_t>(count));
     for (int i = 0; i < count; ++i) {
       v.push_back(make_operation(decoded[static_cast<std::size_t>(offset + i)]));
     }
-    ops[key] = std::move(v);
+    ops[key] = Operations{std::move(v)};
   }
   return ops;
 }

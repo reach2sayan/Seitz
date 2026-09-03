@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -68,8 +69,8 @@ private:
   friend class SpaceGroup;
   WyckoffPosition(int multiplicity, int letter, int dof,
                   std::string_view symbol, Matrix3i repr_rotation,
-                  Vector3d repr_translation, SymmetryOperations orbit_ops,
-                  SymmetryOperations site_symmetry)
+                  Vector3d repr_translation, Operations orbit_ops,
+                  Operations site_symmetry)
       : multiplicity_(multiplicity), letter_(letter), dof_(dof),
         symbol_(symbol), repr_rotation_(std::move(repr_rotation)),
         repr_translation_(std::move(repr_translation)),
@@ -86,8 +87,8 @@ private:
   Vector3d repr_translation_{Vector3d::Zero()};
   // Coset representatives generating the orbit (one per orbit point) and the
   // site-symmetry stabilizer, both partitioned from the conventional operations.
-  SymmetryOperations orbit_ops_;
-  SymmetryOperations site_symmetry_;
+  Operations orbit_ops_;
+  Operations site_symmetry_;
 };
 
 } // namespace cppcrystal::group

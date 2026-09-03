@@ -5,11 +5,12 @@
 
 #include "oracle.hpp"
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/spin/spin.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "spin/search.hpp"
+#include "symmetry/search.hpp"
 
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/integer_matrix.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -23,7 +24,7 @@ using cppcrystal::Cell;
 using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
 using cppcrystal::MagneticCell;
-using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::MagneticOperations;
 using cppcrystal::Matrix3d;
 using cppcrystal::Matrix3i;
 using cppcrystal::noncollinear_tensors;
@@ -47,7 +48,7 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
 // per atom. Returns operations with time_reversal derived from spin_flips
 // (spin_flips = 1 - 2*timerev, so timerev <=> spin_flips == -1).
 struct Reference {
-  MagneticSymmetryOperations operations;
+  std::vector<cppcrystal::MagneticSymmetryOperation> operations;
   std::vector<int> equivalent_atoms;
   Matrix3d primitive_lattice;
 };
@@ -82,22 +83,22 @@ Reference reference_magnetic(Cell const &cell, std::vector<double> const &tensor
                trans[static_cast<std::size_t>(3 * s + 1)],
                trans[static_cast<std::size_t>(3 * s + 2)]);
     bool const time_reversal = spin_flips[static_cast<std::size_t>(s)] == -1;
-    ref.operations.push_back({r, t, time_reversal});
+    ref.operations.push_back({{r, t}, time_reversal});
   }
   ref.equivalent_atoms = equiv;
   cppcrystal::oracle::from_c_lattice(ref.primitive_lattice, prim);
   return ref;
 }
 
-bool contains_operation(MagneticSymmetryOperations const &ops,
+bool contains_operation(auto const &ops,
                         cppcrystal::MagneticSymmetryOperation const &target,
                         double symprec) {
   for (auto const &op : ops) {
-    if (op.rotation != target.rotation ||
+    if (op.spatial.rotation != target.spatial.rotation ||
         op.time_reversal != target.time_reversal) {
       continue;
     }
-    Vector3d d = op.translation - target.translation;
+    Vector3d d = op.spatial.translation - target.spatial.translation;
     d = d.unaryExpr([](double x) { return x - std::round(x); });
     if (d.cwiseAbs().maxCoeff() <= symprec) {
       return true;
@@ -123,15 +124,17 @@ void check(MagneticCell const &input, std::vector<double> const &tensors,
   MagneticCell const mcell(input.cell(), input.tensors(),
                            is_axial ? cppcrystal::TensorKind::axial
                                     : cppcrystal::TensorKind::polar);
-  auto const sym_nonspin =
-      cppcrystal::symmetry::find_symmetry(mcell.cell(), {symprec});
+  cppcrystal::symmetry::SymmetrySearch<cppcrystal::GroupFamily::space> const
+      search(mcell.cell(), {symprec});
+  auto const sym_nonspin = search.operations();
   REQUIRE(sym_nonspin);
 
-  auto const got = cppcrystal::spin::operations_with_site_tensors(
-      sym_nonspin.value(), mcell,
-      with_time_reversal ? cppcrystal::TimeReversal::on
-                         : cppcrystal::TimeReversal::off,
-      {{symprec}});
+  cppcrystal::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
+                                                {{symprec}});
+  auto const got =
+      with_time_reversal
+          ? spin_search.operations<cppcrystal::TimeReversal::on>()
+          : spin_search.operations<cppcrystal::TimeReversal::off>();
   REQUIRE(got);
 
   auto const ref = reference_magnetic(mcell.cell(), tensors, tensor_rank,

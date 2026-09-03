@@ -1,7 +1,7 @@
 #include "oracle.hpp"
 
-#include <cppcrystal/symmetry/find_symmetry.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
+#include "symmetry/search.hpp"
+#include "symmetry/pointgroup.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,14 +40,16 @@ Cell hexagonal() {
 }
 } // namespace
 
-TEST_CASE("get_pointgroup matches spg_get_pointgroup", "[oracle][pointgroup]") {
+TEST_CASE("identify_point_group matches spg_get_pointgroup",
+          "[oracle][pointgroup]") {
   for (Cell const &cell : {primitive_cubic(4.0), rutile(), hexagonal()}) {
-    auto ops = symmetry::find_symmetry(cell, {1e-5});
+    auto ops =
+        symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}.operations();
     REQUIRE(ops);
     // Feed identical rotations to both implementations so axis selection and
     // de-duplication order match.
-    auto const rotations = symmetry::rotations_of(*ops);
-    auto ours = symmetry::get_pointgroup(rotations);
+    auto const rotations = ops->rotations();
+    auto ours = symmetry::identify_point_group<GroupFamily::space>(rotations);
     REQUIRE(ours);
     auto const ref = oracle::reference_pointgroup(rotations);
 

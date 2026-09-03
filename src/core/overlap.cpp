@@ -1,4 +1,4 @@
-#include <cppcrystal/core/overlap.hpp>
+#include "core/overlap.hpp"
 
 #include <boost/container/small_vector.hpp>
 

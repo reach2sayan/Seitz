@@ -1,10 +1,10 @@
 #include <cppcrystal/standardize.hpp>
 
-#include <cppcrystal/core/centering.hpp>
+#include "core/centering.hpp"
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/dataset.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
+#include "math/fractional.hpp"
+#include "symmetry/primitive.hpp"
 
 #include <utility>
 
@@ -29,7 +29,9 @@ using data::Centering;
                                                   double symprec) {
   Lattice const prim_lattice{cell.lattice().matrix() * trans_mat.inverse() *
                              centering_matrix_inv(centering)};
-  auto trimmed = symmetry::trim_to_lattice(prim_lattice, cell, symprec);
+  symmetry::PrimitiveFinder<GroupFamily::space> const finder(
+      cell, {symprec, std::nullopt});
+  auto trimmed = finder.trim_to(prim_lattice);
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
   }
@@ -67,8 +69,9 @@ using data::Centering;
 
   Cell const expanded(Lattice{conv_lattice}, to_positions(pos), std::move(types));
   // Fold/normalize the expanded cell.
-  auto trimmed =
-      symmetry::trim_to_lattice(Lattice{conv_lattice}, expanded, symprec);
+  symmetry::PrimitiveFinder<GroupFamily::space> const finder(
+      expanded, {symprec, std::nullopt});
+  auto trimmed = finder.trim_to(Lattice{conv_lattice});
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
   }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/fractional.hpp>
 #include <cppcrystal/core/types.hpp>
 
 #include <Eigen/Dense>
@@ -7,28 +8,12 @@
 #include <cmath>
 #include <optional>
 
-// Small numerical helpers backing the symmetry search, where exact semantics
-// matter: integer rounding, a checked real inverse, and an exact inverse for
-// the unimodular integer rotation matrices. General matrix arithmetic uses
-// Eigen operators at the call site.
+// Numerical helpers backing the symmetry search where exact semantics matter:
+// a checked real inverse and an exact inverse for the unimodular integer
+// rotation matrices. The rounding primitives live in core/fractional.hpp,
+// which the public headers need inline. General matrix arithmetic uses Eigen
+// operators at the call site.
 namespace cppcrystal::math {
-
-// Round to the nearest integer, ties away from zero (matching the truncation
-// behaviour the symmetry search depends on).
-[[nodiscard]] constexpr int nint(double a) noexcept {
-  return a < 0.0 ? static_cast<int>(a - 0.5) : static_cast<int>(a + 0.5);
-}
-
-[[nodiscard]] inline auto round_to_int(MatrixExpr auto const &a) noexcept {
-  return a.unaryExpr([](double x) { return nint(x); }).eval();
-}
-
-// Displacement from each coordinate to its nearest integer, x - nint(x). For a
-// fractional position this is the offset to the nearest lattice point, the
-// quantity that is invariant under integer lattice translations.
-[[nodiscard]] inline auto nearest_offset(MatrixExpr auto const &a) noexcept {
-  return a.unaryExpr([](double x) { return x - nint(x); });
-}
 
 // True iff every entry of `a` is within `symprec` of an integer.
 [[nodiscard]] inline bool is_int_matrix(const Matrix3d &a,

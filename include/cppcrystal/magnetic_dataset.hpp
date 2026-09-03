@@ -1,14 +1,21 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/magnetic/magnetic_spacegroup.hpp> // magnetic::MagneticType
 
 #include <optional>
 #include <vector>
+
+namespace cppcrystal::magnetic {
+
+// Construction type of a magnetic space group (Barnighausen / BNS types I-IV).
+enum class MagneticType { type_i = 1, type_ii = 2, type_iii = 3, type_iv = 4 };
+
+} // namespace cppcrystal::magnetic
 
 namespace cppcrystal {
 
@@ -23,7 +30,7 @@ struct MagneticDataset {
   SiteTensor tensor_rank = SiteTensor::collinear;
 
   // Magnetic operations of the input cell.
-  MagneticSymmetryOperations operations;
+  MagneticOperations operations;
   // equivalent_atoms[i] = representative atom of i's magnetic orbit.
   std::vector<int> equivalent_atoms;
 

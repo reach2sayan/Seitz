@@ -1,7 +1,7 @@
 #include "oracle.hpp"
 
 #include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
+#include "symmetry/primitive.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -51,7 +51,8 @@ TEST_CASE("find_primitive matches spg_find_primitive (size, lattice, volume)",
           "[oracle][primitive]") {
   for (Cell const &cell :
        {fcc_conventional(4.0), rock_salt(5.6), body_centered_tetragonal()}) {
-    auto ours = symmetry::find_primitive(cell, {1e-5});
+    auto ours =
+        symmetry::PrimitiveFinder<GroupFamily::space>{cell, {1e-5}}.find();
     REQUIRE(ours);
     Cell const ref = oracle::reference_find_primitive(cell, 1e-5);
 

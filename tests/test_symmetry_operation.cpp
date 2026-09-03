@@ -1,4 +1,5 @@
-#include <cppcrystal/core/matrix_order.hpp>
+#include "core/matrix_order.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -56,7 +57,7 @@ TEST_CASE("index_by_rotation keeps original order within a rotation",
   SymmetryOperation const id{Matrix3i::Identity(), Vector3d::Zero()};
   SymmetryOperation const id_shifted{Matrix3i::Identity(),
                                      Vector3d(0.5, 0.5, 0.5)};
-  SymmetryOperations const ops{rot_z_90(), id, id_shifted};
+  Operations const ops{std::vector<SymmetryOperation>{rot_z_90(), id, id_shifted}};
 
   auto const by_rot = index_by_rotation(ops, &SymmetryOperation::rotation);
   REQUIRE(by_rot.size() == 3);
@@ -68,7 +69,8 @@ TEST_CASE("index_by_rotation keeps original order within a rotation",
   CHECK(by_rot.find(-Matrix3i::Identity()) == by_rot.end());
 
   CHECK(has_duplicate_rotation(ops, &SymmetryOperation::rotation));
-  CHECK_FALSE(has_duplicate_rotation(SymmetryOperations{rot_z_90(), id},
-                                     &SymmetryOperation::rotation));
+  CHECK_FALSE(has_duplicate_rotation(
+      Operations{std::vector<SymmetryOperation>{rot_z_90(), id}},
+      &SymmetryOperation::rotation));
   CHECK(rotation_set(ops, &SymmetryOperation::rotation).size() == 2);
 }

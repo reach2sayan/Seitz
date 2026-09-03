@@ -1,10 +1,10 @@
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 
-#include <cppcrystal/core/matrix_order.hpp> // unique_by_rotation
+#include "core/matrix_order.hpp" // unique_by_rotation
 #include <cppcrystal/core/tolerance.hpp>    // approx_equal
 #include <cppcrystal/dataset.hpp>           // get_dataset
 #include <cppcrystal/kpoint/grid.hpp>
-#include <cppcrystal/math/fractional.hpp> // math::nint
+#include "math/fractional.hpp" // math::nint
 
 #include <algorithm>
 #include <array>

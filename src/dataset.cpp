@@ -1,13 +1,13 @@
 #include <cppcrystal/dataset.hpp>
 
 #include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/validation.hpp>
-#include <cppcrystal/refine/operations.hpp>
-#include <cppcrystal/refine/refinement.hpp>
-#include <cppcrystal/refine/standardize.hpp>
-#include <cppcrystal/spacegroup/spacegroup.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>
+#include "core/validation.hpp"
+#include "refine/refinement.hpp"
+#include "refine/standardize.hpp"
+#include "spacegroup/spacegroup.hpp"
+#include "symmetry/pointgroup.hpp"
+#include "core/family_dispatch.hpp"
+#include "symmetry/primitive.hpp"
 
 // The determination + refinement pipeline, 3D space-group path. The outer loop
 // progressively tightens the tolerance in case a given tolerance yields an
@@ -20,41 +20,41 @@ namespace {
 constexpr int kNumAttemptOuter = 10;
 constexpr double kReduceRateOuter = 0.9; // tolerance shrink factor per attempt
 
-} // namespace
-
-Result<Dataset> get_dataset(Cell const &cell, Tolerance const &tol,
-                            int hall_number) {
-  if (auto valid = validate_cell(cell); !valid) {
-    return valid.error();
-  }
+// The determination + refinement pipeline for one family. Everything below the
+// dispatch in get_dataset is compile-time-specialised on it.
+template <GroupFamily F>
+[[nodiscard]] Result<Dataset> run_pipeline(Cell const &cell,
+                                           Tolerance const &tol,
+                                           int hall_number) {
   Tolerance attempt_tol = tol;
   for (int attempt = 0; attempt < kNumAttemptOuter;
        ++attempt, attempt_tol.symprec *= kReduceRateOuter) {
-    auto const primitive = symmetry::find_primitive(cell, attempt_tol);
+    symmetry::PrimitiveFinder<F> const finder(cell, attempt_tol);
+    auto const primitive = finder.find();
     if (!primitive) {
       continue;
     }
     Tolerance const &found = primitive->tolerance;
-    auto const sg =
-        spacegroup::search_spacegroup(*primitive, hall_number, found);
+    spacegroup::SpacegroupMatcher<F> const matcher(*primitive, hall_number);
+    auto const sg = matcher.search(found);
     if (!sg) {
       continue;
     }
 
     // Standardize: orient the bravais lattice, recover the exact operations in
     // the input cell, and build the idealized cell + Wyckoff data.
-    spacegroup::Spacegroup const sg2 =
-        refine::find_similar_bravais_lattice(*sg, found.symprec);
+    refine::Refinement<F> const refinement =
+        refine::Refinement<F>{*sg, primitive->cell, cell, found}
+            .similar_bravais();
+    spacegroup::Spacegroup const &sg2 = refinement.matched();
 
-    auto const operations =
-        refine::refined_operations(sg2, primitive->cell, cell, found.symprec);
+    auto const operations = refinement.operations();
     if (!operations) {
       continue;
     }
 
     auto const std =
-        refine::get_wyckoff_positions(sg2, primitive->cell, cell, *operations,
-                                      primitive->mapping_table, found.symprec);
+        refinement.standardize(*operations, primitive->mapping_table);
     if (!std) {
       continue;
     }
@@ -94,6 +94,19 @@ Result<Dataset> get_dataset(Cell const &cell, Tolerance const &tol,
     };
   }
   return leaf::new_error(e_spacegroup_search_failed{});
+}
+
+} // namespace
+
+Result<Dataset> get_dataset(Cell const &cell, Tolerance const &tol,
+                            int hall_number) {
+  if (auto valid = validate_cell(cell); !valid) {
+    return valid.error();
+  }
+  // The one runtime branch on the family; the pipeline below it is templated.
+  return dispatch_family(cell.periodicity(), [&]<GroupFamily F>() {
+    return run_pipeline<F>(cell, tol, hall_number);
+  });
 }
 
 } // namespace cppcrystal

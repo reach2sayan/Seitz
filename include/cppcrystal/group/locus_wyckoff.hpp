@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -71,8 +72,8 @@ public:
 private:
   friend struct detail::WyckoffFactory;
   LocusWyckoff(int multiplicity, int dof, char letter, Vector3d locus_origin,
-               Matrix3d locus_basis, SymmetryOperations orbit_ops,
-               SymmetryOperations site_symmetry)
+               Matrix3d locus_basis, Operations orbit_ops,
+               Operations site_symmetry)
       : multiplicity_(multiplicity), dof_(dof), letter_(letter),
         locus_origin_(std::move(locus_origin)),
         locus_basis_(std::move(locus_basis)), orbit_ops_(std::move(orbit_ops)),
@@ -84,8 +85,8 @@ private:
   Vector3d locus_origin_{Vector3d::Zero()};
   // Columns 0..dof_-1 are a basis of the locus directions; the rest unused.
   Matrix3d locus_basis_{Matrix3d::Zero()};
-  SymmetryOperations orbit_ops_;
-  SymmetryOperations site_symmetry_;
+  Operations orbit_ops_;
+  Operations site_symmetry_;
 };
 
 // Shared state and accessors of the derived group families (PointGroup,
@@ -116,7 +117,7 @@ protected:
 
   int number_ = 0;
   std::string_view symbol_;
-  SymmetryOperations operations_;
+  Operations operations_;
   std::vector<LocusWyckoff> positions_;
 };
 

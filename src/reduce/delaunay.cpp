@@ -1,7 +1,7 @@
 #include <cppcrystal/core/lattice.hpp>
 
 #include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/integer_matrix.hpp"
 
 #include <array>
 #include <cmath>

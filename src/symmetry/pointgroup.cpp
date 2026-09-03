@@ -1,6 +1,7 @@
-#include <cppcrystal/symmetry/pointgroup.hpp>
+#include <cppcrystal/core/operation_set.hpp>
+#include "symmetry/pointgroup.hpp"
 
-#include <cppcrystal/core/matrix_order.hpp>
+#include "core/matrix_order.hpp"
 
 #include <boost/container/static_vector.hpp>
 
@@ -674,17 +675,24 @@ PointGroup pointgroup_by_number(int number) noexcept {
           static_cast<CrystalClass>(number)};
 }
 
-Result<PointgroupTransform> get_pointgroup(std::span<Matrix3i const> rotations,
-                                           std::optional<int> aperiodic_axis) {
+template <GroupFamily F>
+Result<PointgroupTransform>
+identify_point_group(std::span<Matrix3i const> rotations,
+                     std::optional<int> layer_axis) {
   PointSymmetry const ps = unique_rotations(rotations);
   int const pg_num = pointgroup_number(ps);
   if (pg_num == 0) {
     return leaf::new_error(e_pointgroup_not_found{});
   }
-  // Layer groups have no cubic point groups (numbers 28..32).
-  if (aperiodic_axis && pg_num >= 28) {
-    return leaf::new_error(e_pointgroup_not_found{});
+  if constexpr (F == GroupFamily::layer) {
+    // Layer groups have no cubic point groups (numbers 28..32).
+    if (pg_num >= 28) {
+      return leaf::new_error(e_pointgroup_not_found{});
+    }
+  } else {
+    layer_axis = std::nullopt; // the 3D path never sorts for an aperiodic axis
   }
+  std::optional<int> const aperiodic_axis = layer_axis;
 
   PointgroupTransform result;
   result.pointgroup = pointgroup_by_number(pg_num);
@@ -696,14 +704,11 @@ Result<PointgroupTransform> get_pointgroup(std::span<Matrix3i const> rotations,
   return result;
 }
 
-std::vector<Matrix3i> rotations_of(SymmetryOperations const &ops) {
-  std::vector<Matrix3i> r;
-  r.reserve(ops.size());
-
-  std::ranges::transform(ops, std::back_inserter(r),
-                         &SymmetryOperation::rotation);
-
-  return r;
-}
+template Result<PointgroupTransform>
+identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
+                                         std::optional<int>);
+template Result<PointgroupTransform>
+identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
+                                         std::optional<int>);
 
 } // namespace cppcrystal::symmetry

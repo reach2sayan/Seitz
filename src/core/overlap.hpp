@@ -2,7 +2,7 @@
 
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/position_index.hpp>
+#include "core/position_index.hpp"
 #include <cppcrystal/core/types.hpp>
 
 namespace cppcrystal {

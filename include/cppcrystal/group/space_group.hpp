@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
@@ -72,10 +73,10 @@ private:
   // friend).
   [[nodiscard]] static WyckoffPosition
   build_position(data::WyckoffEntry const &entry,
-                 SymmetryOperations const &conv_ops);
+                 Operations const &conv_ops);
 
   data::SpacegroupType type_;
-  SymmetryOperations operations_;
+  Operations operations_;
   std::vector<WyckoffPosition> positions_;
 };
 

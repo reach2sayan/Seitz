@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include <cppcrystal/core/fractional.hpp>
+#include <cppcrystal/core/keys.hpp>
 
+#include <algorithm>
 #include <array>
 #include <optional>
 #include <ranges>
@@ -21,6 +22,15 @@ using CellPeriodicity = std::array<AxisKind, 3>;
 // The fully-periodic descriptor (a 3D space-group cell).
 [[nodiscard]] constexpr CellPeriodicity all_periodic() noexcept {
   return {AxisKind::periodic, AxisKind::periodic, AxisKind::periodic};
+}
+
+// The family a cell's periodicity puts it in: one aperiodic axis is a layer
+// group, all-periodic is a 3D space group. (Rod and cluster cells are handled
+// by the generation layer, not the space-group search.)
+[[nodiscard]] constexpr GroupFamily
+family_of(CellPeriodicity const &p) noexcept {
+  return std::ranges::contains(p, AxisKind::aperiodic) ? GroupFamily::layer
+                                                       : GroupFamily::space;
 }
 
 // The layer-group descriptor: periodic in the plane, aperiodic along `axis`

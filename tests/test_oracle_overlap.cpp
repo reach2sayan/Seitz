@@ -1,6 +1,6 @@
 #include "oracle.hpp"
 
-#include <cppcrystal/core/overlap.hpp>
+#include "core/overlap.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -51,7 +51,7 @@ TEST_CASE("a corrupted reference op is rejected", "[oracle][overlap]") {
   auto ops = oracle::reference_symmetry(cell, 1e-5);
   REQUIRE(ops.size() > 1);
   // Shift a real operation's translation off by a clearly non-symmetric amount.
-  SymmetryOperation bad = ops.front();
+  SymmetryOperation bad = ops[0];
   bad.translation += Vector3d(0.13, 0.0, 0.0);
   CHECK_FALSE(checker.check_total_overlap(bad.translation, bad.rotation));
 }

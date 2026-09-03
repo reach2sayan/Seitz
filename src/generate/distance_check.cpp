@@ -1,8 +1,8 @@
 #include <cppcrystal/generate/distance_check.hpp>
 
-#include <cppcrystal/core/position_index.hpp>
+#include "core/position_index.hpp"
 #include <cppcrystal/data/element_data.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/integer_matrix.hpp"
 
 #include <algorithm>
 #include <cmath>

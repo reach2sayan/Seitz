@@ -1,11 +1,12 @@
-#include <cppcrystal/refine/refinement.hpp>
+#include "refine/refinement.hpp"
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
+#include "symmetry/pointgroup.hpp"
 
 #include <cmath>
 #include <ranges>
@@ -139,38 +140,39 @@ namespace {
 
 } // namespace
 
-Matrix3d conventional_lattice(spacegroup::Spacegroup const &sg) {
+Lattice conventional_lattice(spacegroup::Spacegroup const &sg) {
   Matrix3d const g = Lattice{sg.bravais_lattice}.metric();
   Holohedry const holohedry =
       symmetry::pointgroup_by_number(sg.type.pointgroup_number).holohedry;
 
-  switch (holohedry) {
-  case Holohedry::triclinic:
-    return set_tricli(g);
-  case Holohedry::monoclinic:
-    return set_monocli(g, sg.type.choice);
-  case Holohedry::orthorhombic:
-    return set_ortho(g);
-  case Holohedry::tetragonal:
-    return set_tetra(g);
-  case Holohedry::trigonal:
-    return (!sg.type.choice.empty() && sg.type.choice[0] == 'R')
-               ? set_rhomb(g)
-               : set_trigo(g);
-  case Holohedry::hexagonal:
-    return set_trigo(g);
-  case Holohedry::cubic:
-    return set_cubic(g);
-  default:
-    return Matrix3d::Zero();
-  }
+  return Lattice{[&]() -> Matrix3d {
+    switch (holohedry) {
+    case Holohedry::triclinic:
+      return set_tricli(g);
+    case Holohedry::monoclinic:
+      return set_monocli(g, sg.type.choice);
+    case Holohedry::orthorhombic:
+      return set_ortho(g);
+    case Holohedry::tetragonal:
+      return set_tetra(g);
+    case Holohedry::trigonal:
+      return (!sg.type.choice.empty() && sg.type.choice[0] == 'R')
+                 ? set_rhomb(g)
+                 : set_trigo(g);
+    case Holohedry::hexagonal:
+      return set_trigo(g);
+    case Holohedry::cubic:
+      return set_cubic(g);
+    default:
+      return Matrix3d::Zero();
+    }
+  }()};
 }
 
 spacegroup::Spacegroup find_similar_bravais_lattice(spacegroup::Spacegroup sg,
                                                     double symprec) {
-  SymmetryOperations const conv_sym =
-      operations_from_database(sg.type.hall_number);
-  Matrix3d const std_lattice = conventional_lattice(sg);
+  Operations const conv_sym = operations_from_database(sg.type.hall_number);
+  Matrix3d const std_lattice = conventional_lattice(sg).matrix();
 
   // Find the proper-rotation setting closest (Frobenius) to the idealized one.
   double min_length = sg.bravais_lattice.norm();

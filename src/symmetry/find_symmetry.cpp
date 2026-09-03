@@ -1,11 +1,12 @@
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "symmetry/search.hpp"
 
-#include <cppcrystal/core/matrix_order.hpp>
-#include <cppcrystal/core/overlap.hpp>
+#include "core/matrix_order.hpp"
+#include "core/overlap.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/validation.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "core/validation.hpp"
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
 
 #include <boost/container/flat_map.hpp>
 
@@ -102,6 +103,7 @@ constexpr int kRelativeAxes[26][3] = {
 
 // Collect lattice symmetries in the Delaunay basis. std::nullopt signals an
 // overflow (> 48 operations), which asks the caller to tighten the tolerance.
+template <GroupFamily F>
 [[nodiscard]] std::optional<PointSymmetry>
 collect_metric_symmetries(Matrix3d const &min_lattice,
                           Matrix3d const &metric_orig, double symprec,
@@ -109,14 +111,16 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
                           std::optional<int> aperiodic_axis) {
   // Layer groups admit at most 24 lattice symmetries (the aperiodic axis halves
   // the 48 of a 3D point group); overflowing the cap asks for a tighter angle.
-  std::size_t const cap = aperiodic_axis ? 24 : 48;
+  constexpr std::size_t cap = F == GroupFamily::layer ? 24 : 48;
   PointSymmetry found;
   for (auto const &[ai, aj, ak] : std::views::cartesian_product(
            kRelativeAxes, kRelativeAxes, kRelativeAxes)) {
     Matrix3i axes;
     axes << axis(ai), axis(aj), axis(ak);
-    if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
-      continue;
+    if constexpr (F == GroupFamily::layer) {
+      if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
+        continue;
+      }
     }
     if (int const det = axes.determinant(); det != 1 && det != -1) {
       continue;
@@ -198,23 +202,29 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
 
 } // namespace
 
-Result<PointSymmetry> lattice_symmetry(Cell const &cell,
-                                       Tolerance const &tol) {
-  double const symprec = tol.symprec;
+template <GroupFamily F>
+Result<PointSymmetry> SymmetrySearch<F>::lattice_symmetry() const {
+  Cell const &cell = cell_;
+  double const symprec = tol_.symprec;
   std::optional<int> const layer_axis = aperiodic_axis(cell.periodicity());
   // A layer cell reduces only the two periodic lattice vectors, leaving the
   // aperiodic axis fixed; a 3D cell uses the full Delaunay reduction.
-  auto const min_lattice = layer_axis
-                               ? cell.lattice().delaunay(*layer_axis, symprec)
-                               : cell.lattice().delaunay(symprec);
+  auto const min_lattice = [&] {
+    if constexpr (F == GroupFamily::layer) {
+      return cell.lattice().delaunay(layer_axis.value_or(2), symprec);
+    } else {
+      return cell.lattice().delaunay(symprec);
+    }
+  }();
   if (!min_lattice) {
     return leaf::new_error(e_symmetry_operation_search_failed{});
   }
   Matrix3d const metric_orig = min_lattice->metric();
-  AngleTolerance angle = tol.angle_tolerance;
+  AngleTolerance angle = tol_.angle_tolerance;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
-    auto found = collect_metric_symmetries(min_lattice->matrix(), metric_orig,
-                                           symprec, angle, layer_axis);
+    auto found = collect_metric_symmetries<F>(min_lattice->matrix(),
+                                              metric_orig, symprec, angle,
+                                              layer_axis);
     if (found) {
       return transform_pointsymmetry(*found, cell.lattice().matrix(),
                                      min_lattice->matrix());
@@ -227,12 +237,13 @@ Result<PointSymmetry> lattice_symmetry(Cell const &cell,
   return leaf::new_error(e_symmetry_operation_search_failed{});
 }
 
-Result<SymmetryOperations> find_symmetry(Cell const &cell,
-                                         Tolerance const &tol) {
+template <GroupFamily F>
+Result<Operations> SymmetrySearch<F>::operations() const {
+  Cell const &cell = cell_;
   if (auto valid = validate_cell(cell); !valid) {
     return valid.error();
   }
-  BOOST_LEAF_AUTO(lat_sym, lattice_symmetry(cell, tol));
+  BOOST_LEAF_AUTO(lat_sym, lattice_symmetry());
   if (lat_sym.empty())
     return leaf::new_error(e_symmetry_operation_search_failed{});
 
@@ -240,20 +251,21 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell,
   if (!min_index)
     return leaf::new_error(e_empty_cell{});
 
-  OverlapChecker const checker(cell, tol.symprec);
-  SymmetryOperations ops;
+  OverlapChecker const checker(cell, tol_.symprec);
+  std::vector<SymmetryOperation> ops;
   for (Matrix3i const &rot : lat_sym)
     for (Vector3d const &t :
          translations_for_rotation(cell, checker, rot, *min_index))
       ops.push_back({rot, t});
 
-  return ops;
+  return Operations{std::move(ops)};
 }
 
-SymmetryOperations reduce_symmetry(Cell const &cell,
-                                   SymmetryOperations const &operations,
-                                   Tolerance const &tol) {
-  auto const lat_sym = lattice_symmetry(cell, tol);
+template <GroupFamily F>
+Operations SymmetrySearch<F>::reduce(Operations const &operations,
+                                     Tolerance const &tol) const {
+  Cell const &cell = cell_;
+  auto const lat_sym = SymmetrySearch{cell, tol}.lattice_symmetry();
   if (!lat_sym) {
     return {};
   }
@@ -263,17 +275,22 @@ SymmetryOperations reduce_symmetry(Cell const &cell,
     return lattice_rotations.contains(op.rotation) &&
            checker.check_total_overlap(op.translation, op.rotation);
   };
-  auto kept = operations | std::views::filter(survives);
-  return {kept.begin(), kept.end()};
+  return Operations{std::from_range,
+                    operations | std::views::filter(survives)};
 }
 
-std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
+template <GroupFamily F>
+std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
+  Cell const &cell = cell_;
   std::optional<int> const min_index = index_with_least_atoms(cell);
   if (!min_index)
     return {};
-  OverlapChecker const checker(cell, symprec);
+  OverlapChecker const checker(cell, tol_.symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
                                    *min_index);
 }
+
+template class SymmetrySearch<GroupFamily::space>;
+template class SymmetrySearch<GroupFamily::layer>;
 
 } // namespace cppcrystal::symmetry

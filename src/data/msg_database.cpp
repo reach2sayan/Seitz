@@ -1,5 +1,6 @@
 #include <cppcrystal/data/msg_database.hpp>
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/mdspan.hpp>
 
 #include <cppcrystal/data/detail/packed_decode.hpp>
@@ -115,7 +116,7 @@ template <class T, class Build>
   return table;
 }
 
-[[nodiscard]] MagneticSymmetryOperations build_operations(int uni_number,
+[[nodiscard]] MagneticOperations build_operations(int uni_number,
                                                           int offset) {
   auto const &idx = kMagneticOperationIndex[static_cast<std::size_t>(uni_number)]
                                            [static_cast<std::size_t>(offset)];
@@ -123,13 +124,13 @@ template <class T, class Build>
   auto const decoded =
       std::ranges::subrange(kDecodedMagneticOps.begin() + start,
                             kDecodedMagneticOps.begin() + start + count);
-  MagneticSymmetryOperations ops;
+  std::vector<MagneticSymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(count));
   std::ranges::transform(decoded, std::back_inserter(ops), make_magnetic);
-  return ops;
+  return MagneticOperations{std::move(ops)};
 }
 
-[[nodiscard]] SymmetryOperations build_transformations(int uni_number,
+[[nodiscard]] Operations build_transformations(int uni_number,
                                                        int offset) {
   AltTable const table(kDecodedAltTransformations.data());
   auto const row = md::submdspan(table, static_cast<std::size_t>(uni_number),
@@ -137,29 +138,29 @@ template <class T, class Build>
                                  md::full_extent);
   // The identity transformation is always first; the rest run up to the
   // nullopt terminator.
-  SymmetryOperations transforms;
+  std::vector<SymmetryOperation> transforms;
   transforms.push_back(
       {.rotation = Matrix3i::Identity(), .translation = Vector3d::Zero()});
   for (std::size_t i = 0; i < row.extent(0) && row[i]; ++i) {
     transforms.push_back(make_operation(*row[i]));
   }
-  return transforms;
+  return Operations{std::move(transforms)};
 }
 
 } // namespace
 
-MagneticSymmetryOperations const &
+MagneticOperations const &
 magnetic_operations_from_database(int uni_number, int hall_number) {
   static auto const table =
-      build_setting_table<MagneticSymmetryOperations>(build_operations);
+      build_setting_table<MagneticOperations>(build_operations);
   auto const offset = hall_number_offset(uni_number, hall_number);
   return table[offset ? setting_slot(uni_number, *offset) : 0];
 }
 
-SymmetryOperations const &magnetic_std_transformations(int uni_number,
+Operations const &magnetic_std_transformations(int uni_number,
                                                        int hall_number) {
   static auto const table =
-      build_setting_table<SymmetryOperations>(build_transformations);
+      build_setting_table<Operations>(build_transformations);
   auto const offset = hall_number_offset(uni_number, hall_number);
   return table[offset ? setting_slot(uni_number, *offset) : 0];
 }

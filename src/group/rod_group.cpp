@@ -1,9 +1,10 @@
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/group/rod_group.hpp>
 
-#include <cppcrystal/data/rod_database.hpp>
+#include "data/rod_database.hpp"
 #include <cppcrystal/group/detail/locus_arrangement.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/subspace.hpp>
+#include "math/fractional.hpp"
+#include "math/subspace.hpp"
 
 #include <Eigen/Dense>
 
@@ -218,7 +219,7 @@ Result<RodGroup> RodGroup::from_number(int number) {
         "(expected 1..75)"});
   }
 
-  SymmetryOperations ops = data::rod_operations_from_database(number);
+  Operations ops = data::rod_operations_from_database(number);
   if (ops.empty()) {
     return leaf::new_error(e_message{
         "RodGroup::from_number: no operations for this rod group (is the "

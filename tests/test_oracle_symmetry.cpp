@@ -1,6 +1,7 @@
+#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
 
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "symmetry/search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -10,8 +11,8 @@ namespace {
 // Returns true iff the two operation collections are equal as sets (rotations
 // exact, translations modulo the lattice within tolerance). spg_get_symmetry
 // returns operations in a different order than we discover them.
-bool same_operation_set(SymmetryOperations const &a,
-                        SymmetryOperations const &b, double tol) {
+bool same_operation_set(Operations const &a,
+                        Operations const &b, double tol) {
   if (a.size() != b.size())
     return false;
   for (auto const &oa : a) {
@@ -79,7 +80,8 @@ TEST_CASE("find_symmetry matches spg_get_symmetry as a set",
           "[oracle][symmetry]") {
   for (Cell const &cell :
        {primitive_cubic(4.0), rutile(), rock_salt(5.6), triclinic()}) {
-    auto ours = symmetry::find_symmetry(cell, {1e-5});
+    auto ours =
+        symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}.operations();
     REQUIRE(ours);
     auto const ref = oracle::reference_symmetry(cell, 1e-5);
     INFO("ours = " << ours->size() << ", reference = " << ref.size());

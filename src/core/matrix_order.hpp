@@ -123,7 +123,7 @@ struct OperationKeyLess {
 
 template <class Op>
 concept MagneticOperationLike = requires(Op const &op) {
-  { op.rotation } -> std::convertible_to<Matrix3i>;
+  { op.spatial.rotation } -> std::convertible_to<Matrix3i>;
   { op.time_reversal } -> std::convertible_to<bool>;
 };
 
@@ -137,7 +137,7 @@ template <std::ranges::random_access_range R>
   std::vector<std::pair<OperationKey, int>> pairs;
   pairs.reserve(std::ranges::size(range));
   for (auto const [i, op] : range | std::views::enumerate) {
-    pairs.emplace_back(OperationKey{op.rotation, op.time_reversal},
+    pairs.emplace_back(OperationKey{op.spatial.rotation, op.time_reversal},
                        static_cast<int>(i));
   }
   return detail::ordered_multimap(std::move(pairs), OperationKeyLess{});

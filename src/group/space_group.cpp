@@ -1,9 +1,10 @@
 #include <cppcrystal/group/space_group.hpp>
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/group/detail/locus_arrangement.hpp>
-#include <cppcrystal/math/fractional.hpp>
+#include "math/fractional.hpp"
 
 #include <Eigen/Dense>
 
@@ -29,7 +30,7 @@ namespace {
 } // namespace
 
 WyckoffPosition SpaceGroup::build_position(data::WyckoffEntry const &entry,
-                                           SymmetryOperations const &conv_ops) {
+                                           Operations const &conv_ops) {
   data::WyckoffCoordinate const wc =
       data::wyckoff_coordinate(entry.global_index);
 

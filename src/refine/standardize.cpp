@@ -1,11 +1,12 @@
-#include <cppcrystal/refine/standardize.hpp>
+#include <cppcrystal/core/operation_set.hpp>
+#include "refine/refinement.hpp"
 
-#include <cppcrystal/core/overlap.hpp>
-#include <cppcrystal/core/position_index.hpp>
+#include "core/overlap.hpp"
+#include "core/position_index.hpp"
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/refine/refinement.hpp>
-#include <cppcrystal/refine/site_symmetry.hpp>
+#include "math/fractional.hpp"
+#include "refine/refinement.hpp"
+#include "refine/site_symmetry.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -25,12 +26,17 @@ namespace {
 
 // In the conventional/standardized setting a layer group always has its
 // aperiodic axis as c (axis 2); a 3D group is periodic on all three.
-[[nodiscard]] CellPeriodicity conventional_periodicity(int hall_number) {
-  return hall_number < 0 ? aperiodic_along(2) : all_periodic();
+template <GroupFamily F>
+[[nodiscard]] constexpr CellPeriodicity conventional_periodicity() noexcept {
+  if constexpr (F == GroupFamily::layer) {
+    return aperiodic_along(2);
+  } else {
+    return all_periodic();
+  }
 }
 
 // Number of pure (identity-rotation) translations among the conventional ops.
-[[nodiscard]] int num_pure_translations(SymmetryOperations const &conv_sym) {
+[[nodiscard]] int num_pure_translations(Operations const &conv_sym) {
   return static_cast<int>(std::ranges::count_if(
       conv_sym, &SymmetryOperation::is_identity_rotation));
 }
@@ -64,7 +70,7 @@ struct Bravais {
 
 [[nodiscard]] Bravais expand_in_bravais(Cell const &conv_prim,
                                         Lattice const &std_lattice,
-                                        SymmetryOperations const &conv_sym,
+                                        Operations const &conv_sym,
                                         ExactPositions const &exact,
                                         CellPeriodicity const &periodicity) {
   auto const total =
@@ -107,7 +113,7 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
 // onto among the atoms before it; `i` itself when none is found.
 [[nodiscard]] int search_equivalent_atom(int i, Cell const &cell,
                                          PositionIndex const &index,
-                                         SymmetryOperations const &operations) {
+                                         Operations const &operations) {
   for (auto const &op : operations) {
     if (auto const j = index.first_match(op.apply(cell.position(i)),
                                          cell.type(i),
@@ -123,7 +129,7 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
 // primitive atom; the class heads chain through the first symmetry image found
 // (a first-match chain, deliberately not a full connected-components closure).
 [[nodiscard]] std::vector<int>
-equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
+equivalent_atoms_broken(Cell const &cell, Operations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
   PositionIndex const index(cell, symprec);
   auto const first_sharing = first_index_of(mapping_table, mapping_table.size());
@@ -170,17 +176,20 @@ crystallographic_orbits(ExactPositions const &exact,
 
 } // namespace
 
+template <GroupFamily F>
 std::optional<Standardized>
-get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
-                      Cell const &cell,
-                      SymmetryOperations const &cell_operations,
-                      std::vector<int> const &mapping_table, double symprec) {
+Refinement<F>::standardize(Operations const &cell_operations,
+                           std::vector<int> const &mapping_table) const {
+  spacegroup::Spacegroup const &sg = matched_;
+  Cell const &primitive = primitive_;
+  Cell const &cell = cell_;
+  double const symprec = tol_.symprec;
   int const hall = sg.type.hall_number;
-  SymmetryOperations const conv_sym = operations_from_database(hall);
+  Operations const conv_sym = operations_from_database(hall);
   int const multi = num_pure_translations(conv_sym);
-  CellPeriodicity const conv_periodicity = conventional_periodicity(hall);
+  constexpr CellPeriodicity conv_periodicity = conventional_periodicity<F>();
 
-  Lattice const std_lattice{conventional_lattice(sg)};
+  Lattice const std_lattice = conventional_lattice();
   Cell const conv_prim =
       conventional_primitive(sg, primitive, std_lattice, conv_periodicity);
 
@@ -222,5 +231,12 @@ get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
 
   return out;
 }
+
+template std::optional<Standardized>
+Refinement<GroupFamily::space>::standardize(Operations const &,
+                                            std::vector<int> const &) const;
+template std::optional<Standardized>
+Refinement<GroupFamily::layer>::standardize(Operations const &,
+                                            std::vector<int> const &) const;
 
 } // namespace cppcrystal::refine

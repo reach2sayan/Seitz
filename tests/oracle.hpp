@@ -11,6 +11,7 @@
 // `Eigen::Map<Matrix3d>(&L[0][0])` (column-major map of row-major data silently
 // transposes).
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 
@@ -67,7 +68,7 @@ struct CCell {
 
 // Symmetry operations as found by the reference spg_get_symmetry, in the input
 // cell's basis (rotations integer, translations fractional).
-inline SymmetryOperations reference_symmetry(Cell const &cell, double symprec) {
+inline Operations reference_symmetry(Cell const &cell, double symprec) {
   CCell c(cell);
   int const n = c.num_atom();
   int const mult =
@@ -78,7 +79,7 @@ inline SymmetryOperations reference_symmetry(Cell const &cell, double symprec) {
       spg_get_symmetry(reinterpret_cast<int(*)[3][3]>(rot.data()),
                        reinterpret_cast<double(*)[3]>(trans.data()), mult,
                        c.lattice, c.pos(), c.types.data(), n, symprec);
-  SymmetryOperations ops;
+  std::vector<SymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(found));
   for (int s = 0; s < found; ++s) {
     Matrix3i r;
@@ -90,7 +91,7 @@ inline SymmetryOperations reference_symmetry(Cell const &cell, double symprec) {
                trans[static_cast<std::size_t>(3 * s + 2)]);
     ops.push_back({r, t});
   }
-  return ops;
+  return Operations{std::move(ops)};
 }
 
 // Reference international space-group number (0 on failure).
@@ -148,11 +149,11 @@ inline Cell reference_find_primitive(Cell const &cell, double symprec) {
 
 // Reference database operations for a Hall number
 // (spg_get_symmetry_from_database).
-inline SymmetryOperations reference_database_operations(int hall_number) {
+inline Operations reference_database_operations(int hall_number) {
   int rot[192][3][3];
   double trans[192][3];
   int const n = spg_get_symmetry_from_database(rot, trans, hall_number);
-  SymmetryOperations ops;
+  std::vector<SymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(n));
   for (int s = 0; s < n; ++s) {
     Matrix3i r;
@@ -161,7 +162,7 @@ inline SymmetryOperations reference_database_operations(int hall_number) {
         r(i, j) = rot[s][i][j];
     ops.push_back({r, Vector3d(trans[s][0], trans[s][1], trans[s][2])});
   }
-  return ops;
+  return Operations{std::move(ops)};
 }
 
 inline SpglibSpacegroupType reference_spacegroup_type(int hall_number) {
@@ -178,7 +179,8 @@ struct RefDataset {
   std::string choice;
   std::string pointgroup;
   int n_operations = 0;
-  SymmetryOperations operations;
+  // A mirror of the C reference's flat arrays, so it stays a plain vector.
+  std::vector<SymmetryOperation> operations;
   int n_std_atoms = 0;
   Matrix3d std_lattice;
   Matrix3d std_rotation_matrix;

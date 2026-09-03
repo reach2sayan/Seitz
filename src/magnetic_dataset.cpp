@@ -1,9 +1,9 @@
 #include <cppcrystal/magnetic_dataset.hpp>
 
-#include <cppcrystal/core/validation.hpp>
-#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
-#include <cppcrystal/spin/spin.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "core/validation.hpp"
+#include "magnetic/identify.hpp"
+#include "spin/search.hpp"
+#include "symmetry/search.hpp"
 
 namespace cppcrystal {
 
@@ -15,26 +15,24 @@ Result<MagneticDataset> get_magnetic_dataset(MagneticCell const &cell,
   if (auto valid = validate_cell(cell.cell()); !valid) {
     return valid.error();
   }
-  double const symprec = tol.symprec;
 
   // 1. Magnetic symmetry of the input cell.
-  BOOST_LEAF_AUTO(sym_nonspin, symmetry::find_symmetry(cell.cell(), tol));
-  BOOST_LEAF_AUTO(search, spin::operations_with_site_tensors(
-                              sym_nonspin, cell, kTimeReversal, tol));
+  // The magnetic search is a 3D path only.
+  symmetry::SymmetrySearch<GroupFamily::space> const spatial(cell.cell(), tol);
+  BOOST_LEAF_AUTO(sym_nonspin, spatial.operations());
+  spin::SpinSearch const spin_search(cell, sym_nonspin, tol);
+  BOOST_LEAF_AUTO(search, spin_search.operations<kTimeReversal>());
 
   // 2. Identify the magnetic space-group type.
-  BOOST_LEAF_AUTO(ident, magnetic::identify_magnetic_spacegroup_type(
-                             cell.cell().lattice().matrix(), search.operations,
-                             symprec));
+  magnetic::MagneticIdentification const identification(
+      cell.cell().lattice(), search.operations, tol);
+  BOOST_LEAF_AUTO(ident, identification.identify());
 
   // 3. Idealize positions and site tensors.
-  MagneticCell const exact = spin::idealized_cell(search, cell, kTimeReversal);
+  MagneticCell const exact = spin_search.idealized<kTimeReversal>(search);
 
   // 4. Transform the idealized cell into the standardized setting.
-  BOOST_LEAF_AUTO(std_cell,
-                  magnetic::transform_cell(
-                      exact, ident.transformation_matrix, ident.origin_shift,
-                      ident.std_rotation_matrix, search.operations, symprec));
+  BOOST_LEAF_AUTO(std_cell, identification.transform(exact, ident));
 
   MagneticDataset const dataset{
       .uni_number = ident.uni_number,

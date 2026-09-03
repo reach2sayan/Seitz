@@ -3,6 +3,7 @@
 // original direct constexpr-array indexing for every Hall number. This is
 // independent of the reference oracle, so it runs in the standalone suite.
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
 #include <cppcrystal/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
 #include <cppcrystal/data/spg_database.hpp>                // accessors (new indexing)
@@ -38,15 +39,15 @@ SymmetryOperation decode_operation(int encoded) {
 
 // Old style: decode operations straight from the flat array using the
 // {count, start} offsets.
-SymmetryOperations operations_by_offset(int hall) {
+Operations operations_by_offset(int hall) {
   auto const &idx =
       data::kSymmetryOperationIndex[static_cast<std::size_t>(hall)];
-  SymmetryOperations ops;
+  std::vector<SymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(idx[0]));
   for (int i = 0; i < idx[0]; ++i)
     ops.push_back(decode_operation(
         data::kSymmetryOperations[static_cast<std::size_t>(idx[1] + i)]));
-  return ops;
+  return Operations{std::move(ops)};
 }
 } // namespace
 

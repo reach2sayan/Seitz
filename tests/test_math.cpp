@@ -1,5 +1,5 @@
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

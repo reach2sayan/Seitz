@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
@@ -71,12 +72,12 @@ uni_candidates(int hall_number) noexcept {
 // The operations of a UNI number in the given Hall setting (0 = its first
 // setting), materialised once per setting; empty when (uni, hall) is not a
 // valid pairing.
-[[nodiscard]] MagneticSymmetryOperations const &
+[[nodiscard]] MagneticOperations const &
 magnetic_operations_from_database(int uni_number, int hall_number = 0);
 
 // The alternative standardized-setting transformations of a UNI number in the
 // given Hall setting, identity first; empty when (uni, hall) is not valid.
-[[nodiscard]] SymmetryOperations const &
+[[nodiscard]] Operations const &
 magnetic_std_transformations(int uni_number, int hall_number = 0);
 
 } // namespace cppcrystal::data

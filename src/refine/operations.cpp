@@ -1,10 +1,11 @@
-#include <cppcrystal/refine/operations.hpp>
+#include <cppcrystal/core/operation_set.hpp>
+#include "refine/refinement.hpp"
 
-#include <cppcrystal/core/matrix_order.hpp>
-#include <cppcrystal/core/position_index.hpp>
+#include "core/matrix_order.hpp"
+#include "core/position_index.hpp"
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
 
 #include <algorithm>
 #include <ranges>
@@ -17,34 +18,25 @@ using data::operations_from_database;
 namespace {
 
 // t' = t + (R - E) w (the database ops in the shifted origin).
-[[nodiscard]] SymmetryOperations
-with_origin_shift(SymmetryOperations const &conv_sym, Vector3d const &shift) {
-  SymmetryOperations out;
-  out.reserve(conv_sym.size());
-  std::ranges::transform(
-      conv_sym, std::back_inserter(out), [&](const auto &op) {
-        const Matrix3d r_minus_e =
-            op.rotation.template cast<double>() - Matrix3d::Identity();
-
-        return SymmetryOperation{op.rotation,
-                                 Vector3d(op.translation + r_minus_e * shift)};
-      });
-
-  return out;
+[[nodiscard]] Operations with_origin_shift(Operations const &conv_sym,
+                                           Vector3d const &shift) {
+  return Operations{
+      std::from_range, conv_sym | std::views::transform([&](auto const &op) {
+                         Matrix3d const r_minus_e =
+                             op.rotation.template cast<double>() -
+                             Matrix3d::Identity();
+                         return SymmetryOperation{
+                             op.rotation,
+                             Vector3d(op.translation + r_minus_e * shift)};
+                       })};
 }
 
 // Keep the first operation of each distinct rotation and transform it to the
 // primitive setting (R' = T R T^-1, t' = T t).
-[[nodiscard]] SymmetryOperations
-primitive_db_symmetry(Matrix3d const &t_mat,
-                      SymmetryOperations const &conv_sym) {
-  Matrix3d const inv_mat = t_mat.inverse();
-  SymmetryOperations out;
-  for (auto const &op :
-       unique_by_rotation(conv_sym, &SymmetryOperation::rotation)) {
-    out.push_back(conjugated_by(op, t_mat, inv_mat));
-  }
-  return out;
+[[nodiscard]] Operations primitive_db_symmetry(Matrix3d const &t_mat,
+                                               Operations const &conv_sym) {
+  return Operations{unique_by_rotation(conv_sym, &SymmetryOperation::rotation)}
+      .conjugated_by(t_mat, t_mat.inverse());
 }
 
 // Bounding-box extent of the parallelepiped spanned by the columns of the
@@ -90,11 +82,11 @@ unique_translations(Matrix3d const &lattice,
 
 // Transform the primitive ops to the input cell (R' = T^-1 R T), keeping only
 // those that map the input lattice exactly.
-[[nodiscard]] SymmetryOperations
+[[nodiscard]] Operations
 symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
                           Matrix3d const &lattice,
-                          SymmetryOperations const &prim_sym, double symprec) {
-  SymmetryOperations out;
+                          Operations const &prim_sym, double symprec) {
+  std::vector<SymmetryOperation> out;
   out.reserve(prim_sym.size());
   for (auto const &op : prim_sym) {
     Matrix3d const rot_d =
@@ -107,14 +99,14 @@ symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
     }
   }
   out.shrink_to_fit();
-  return out;
+  return Operations{std::move(out)};
 }
 
 // Copy the operations onto every lattice point (fold all axes).
-[[nodiscard]] SymmetryOperations
+[[nodiscard]] Operations
 upon_lattice_points(std::vector<Vector3d> const &pure_trans,
-                    SymmetryOperations const &t_sym) {
-  SymmetryOperations out;
+                    Operations const &t_sym) {
+  std::vector<SymmetryOperation> out;
   out.reserve(pure_trans.size() * t_sym.size());
   for (Vector3d const &p : pure_trans) {
     for (auto const &op : t_sym) {
@@ -122,19 +114,19 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
     }
   }
   out.shrink_to_fit();
-  return out;
+  return Operations{std::move(out)};
 }
 
 // Recover the symmetry operations in the original input cell.
-[[nodiscard]] std::optional<SymmetryOperations>
-recover_in_original_cell(SymmetryOperations const &prim_sym,
+[[nodiscard]] std::optional<Operations>
+recover_in_original_cell(Operations const &prim_sym,
                          Matrix3i const &t_mat, Matrix3d const &lattice,
                          int multiplicity, double symprec) {
   Matrix3d const inv_tmat = t_mat.cast<double>().inverse();
   std::vector<Vector3d> const pure_trans = unique_translations(
       lattice, lattice_translations(surrounding_frame(t_mat), inv_tmat),
       symprec);
-  SymmetryOperations const t_sym =
+  Operations const t_sym =
       symmetry_in_original_cell(t_mat, inv_tmat, lattice, prim_sym, symprec);
 
   if (static_cast<int>(pure_trans.size()) != multiplicity) {
@@ -145,17 +137,20 @@ recover_in_original_cell(SymmetryOperations const &prim_sym,
 
 } // namespace
 
-std::optional<SymmetryOperations>
-refined_operations(spacegroup::Spacegroup const &sg, Cell const &primitive,
-                   Cell const &cell, double symprec) {
-  SymmetryOperations const conv_sym =
+template <GroupFamily F>
+std::optional<Operations> Refinement<F>::operations() const {
+  spacegroup::Spacegroup const &sg = matched_;
+  Cell const &primitive = primitive_;
+  Cell const &cell = cell_;
+  double const symprec = tol_.symprec;
+  Operations const conv_sym =
       operations_from_database(sg.type.hall_number);
 
   Matrix3d const inv_prim = primitive.lattice().matrix().inverse();
 
   // Conventional ops in the shifted origin, transformed to the primitive cell.
   Matrix3d const t_mat_pb = inv_prim * sg.bravais_lattice;
-  SymmetryOperations const prim_sym = primitive_db_symmetry(
+  Operations const prim_sym = primitive_db_symmetry(
       t_mat_pb, with_origin_shift(conv_sym, sg.origin_shift));
 
   // Recover them in the input cell.
@@ -165,5 +160,10 @@ refined_operations(spacegroup::Spacegroup const &sg, Cell const &primitive,
   return recover_in_original_cell(prim_sym, t_mat_pc, cell.lattice().matrix(),
                                   multiplicity, symprec);
 }
+
+template std::optional<Operations>
+Refinement<GroupFamily::space>::operations() const;
+template std::optional<Operations>
+Refinement<GroupFamily::layer>::operations() const;
 
 } // namespace cppcrystal::refine

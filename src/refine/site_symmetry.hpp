@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -27,7 +28,7 @@ using ExactPositions = std::vector<ExactPosition>;
 // the Wyckoff labels
 // could not be resolved at any of the attempted tolerances.
 [[nodiscard]] std::optional<ExactPositions>
-exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
+exact_positions(Cell const &conv_prim, Operations const &conv_sym,
                 int num_pure_trans, int hall_number, double symprec);
 
 } // namespace cppcrystal::refine

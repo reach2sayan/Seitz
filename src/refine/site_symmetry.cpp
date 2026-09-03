@@ -1,10 +1,11 @@
-#include <cppcrystal/refine/site_symmetry.hpp>
+#include "refine/site_symmetry.hpp"
 
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/position_index.hpp>
+#include "core/position_index.hpp"
 #include <cppcrystal/data/sitesym_database.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
+#include "math/fractional.hpp"
+#include "math/integer_matrix.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -26,7 +27,7 @@ constexpr double kIncreaseRate = 1.05;
 // Average the site-symmetry operations that fix `position` to pin it onto its
 // exact special position.
 [[nodiscard]] Vector3d set_exact_location(Vector3d const &position,
-                                          SymmetryOperations const &conv_sym,
+                                          Operations const &conv_sym,
                                           Matrix3d const &lattice,
                                           double symprec,
                                           CellPeriodicity const &periodicity) {
@@ -58,7 +59,7 @@ struct Equivalent {
 // in (representative, operation) order; the first claim wins. Wyckoff letters
 // and symbols are filled in later by set_wyckoff_labels.
 [[nodiscard]] ExactPositions
-get_exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
+get_exact_positions(Cell const &conv_prim, Operations const &conv_sym,
                     double symprec) {
   CellPeriodicity const &periodicity = conv_prim.periodicity();
   PositionIndex const index(conv_prim, symprec);
@@ -101,7 +102,7 @@ struct WyckoffLabel {
 // points coinciding with it AND fixed by the candidate's site-symmetry
 // generator, times the candidate multiplicity, equals the group order.
 [[nodiscard]] std::optional<WyckoffLabel>
-get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sym,
+get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
                      int hall_number, double symprec,
                      CellPeriodicity const &periodicity) {
@@ -158,7 +159,7 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
 // the equivalent atoms. False if any lookup failed.
 [[nodiscard]] bool set_wyckoff_labels(ExactPositions &atoms,
                                       Cell const &conv_prim,
-                                      SymmetryOperations const &conv_sym,
+                                      Operations const &conv_sym,
                                       int num_pure_trans, int hall_number,
                                       double symprec) {
   CellPeriodicity const &periodicity = conv_prim.periodicity();
@@ -196,7 +197,7 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
 } // namespace
 
 std::optional<ExactPositions>
-exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
+exact_positions(Cell const &conv_prim, Operations const &conv_sym,
                 int num_pure_trans, int hall_number, double symprec) {
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {

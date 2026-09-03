@@ -9,7 +9,7 @@
 #include <cppcrystal/kpoint/grid.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 #include <cppcrystal/magnetic_dataset.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
+#include "symmetry/search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -65,8 +65,11 @@ Cell valid_cell() {
 
 TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {
   CHECK(classify([] { return get_dataset(empty_cell(), {1e-5}); }) == Err::empty);
-  CHECK(classify([] { return symmetry::find_symmetry(empty_cell(), {1e-5}); }) ==
-        Err::empty);
+  CHECK(classify([] {
+          Cell const cell = empty_cell();
+          return symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}
+              .operations();
+        }) == Err::empty);
   MagneticCell const m(empty_cell(), SiteTensors{CollinearTensors{}},
                        TensorKind::axial);
   CHECK(classify([&] { return get_magnetic_dataset(m, {1e-5}); }) ==
@@ -77,7 +80,9 @@ TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
   CHECK(classify([] { return get_dataset(singular_cell(), {1e-5}); }) ==
         Err::invalid_lattice);
   CHECK(classify([] {
-          return symmetry::find_symmetry(singular_cell(), {1e-5});
+          Cell const cell = singular_cell();
+          return symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}
+              .operations();
         }) == Err::invalid_lattice);
   MagneticCell const m(singular_cell(), SiteTensors{CollinearTensors{1.0}},
                        TensorKind::axial);

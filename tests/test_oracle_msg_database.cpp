@@ -3,6 +3,7 @@
 // the reference spglib (spg_get_magnetic_spacegroup_type /
 // spg_get_magnetic_symmetry_from_database) bit-for-bit.
 
+#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
 
 #include <cppcrystal/data/msg_database.hpp>
@@ -16,12 +17,12 @@
 namespace {
 
 using cppcrystal::Matrix3i;
-using cppcrystal::MagneticSymmetryOperations;
+using cppcrystal::MagneticOperations;
 using cppcrystal::Vector3d;
 
 // Reference magnetic operations for (uni_number, hall_number) via spglib's
 // spg_get_magnetic_symmetry_from_database (max 384 operations).
-MagneticSymmetryOperations reference_magnetic_operations(int uni_number,
+MagneticOperations reference_magnetic_operations(int uni_number,
                                                          int hall_number) {
   std::array<int, 384 * 9> rot{};
   std::array<double, 384 * 3> trans{};
@@ -30,7 +31,7 @@ MagneticSymmetryOperations reference_magnetic_operations(int uni_number,
       reinterpret_cast<int(*)[3][3]>(rot.data()),
       reinterpret_cast<double(*)[3]>(trans.data()), timerev.data(), uni_number,
       hall_number);
-  MagneticSymmetryOperations ops;
+  std::vector<cppcrystal::MagneticSymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(n));
   for (int s = 0; s < n; ++s) {
     Matrix3i r;
@@ -40,19 +41,20 @@ MagneticSymmetryOperations reference_magnetic_operations(int uni_number,
     Vector3d t(trans[static_cast<std::size_t>(3 * s + 0)],
                trans[static_cast<std::size_t>(3 * s + 1)],
                trans[static_cast<std::size_t>(3 * s + 2)]);
-    ops.push_back({r, t, timerev[static_cast<std::size_t>(s)] != 0});
+    ops.push_back({{r, t}, timerev[static_cast<std::size_t>(s)] != 0});
   }
-  return ops;
+  return MagneticOperations{std::move(ops)};
 }
 
-void require_same_operations(MagneticSymmetryOperations const &got,
-                             MagneticSymmetryOperations const &ref) {
+void require_same_operations(MagneticOperations const &got,
+                             MagneticOperations const &ref) {
   REQUIRE(got.size() == ref.size());
   for (std::size_t i = 0; i < ref.size(); ++i) {
     INFO("operation index " << i);
-    REQUIRE(got[i].rotation == ref[i].rotation);
-    REQUIRE((got[i].translation - ref[i].translation).cwiseAbs().maxCoeff() <
-            1e-12);
+    REQUIRE(got[i].spatial.rotation == ref[i].spatial.rotation);
+    REQUIRE((got[i].spatial.translation - ref[i].spatial.translation)
+                .cwiseAbs()
+                .maxCoeff() < 1e-12);
     REQUIRE(got[i].time_reversal == ref[i].time_reversal);
   }
 }

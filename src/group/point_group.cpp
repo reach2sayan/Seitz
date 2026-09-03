@@ -1,10 +1,11 @@
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/group/point_group.hpp>
 
-#include <cppcrystal/core/matrix_order.hpp>
+#include "core/matrix_order.hpp"
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/group/detail/locus_arrangement.hpp>
-#include <cppcrystal/math/subspace.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
+#include "math/subspace.hpp"
+#include "symmetry/pointgroup.hpp"
 
 #include <Eigen/Dense>
 
@@ -33,13 +34,13 @@ constexpr std::array<int, 33> kRepresentativeSpacegroup = {
 // g.stab). Applying each to a point of the locus generates its orbit, so the
 // count is the multiplicity (|G| / |stab|) exactly — independent of any sampled
 // point. Operations have zero translation, so composition is rotation product.
-[[nodiscard]] SymmetryOperations
+[[nodiscard]] Operations
 coset_representatives(std::span<SymmetryOperation const> ops,
-                      SymmetryOperations const &stab) {
+                      Operations const &stab) {
   RotationMultimap<int> const by_rotation =
       index_by_rotation(ops, &SymmetryOperation::rotation);
   std::vector<bool> covered(ops.size(), false);
-  SymmetryOperations reps;
+  std::vector<SymmetryOperation> reps;
   for (auto const [i, g] : ops | std::views::enumerate) {
     if (covered[static_cast<std::size_t>(i)]) {
       continue;
@@ -52,7 +53,7 @@ coset_representatives(std::span<SymmetryOperation const> ops,
       }
     }
   }
-  return reps;
+  return Operations{std::move(reps)};
 }
 
 // The geometry policy of a point group: loci are linear subspaces of R^3 held
@@ -111,12 +112,11 @@ struct PointGeometry {
   // The site-symmetry group (the pointwise stabiliser of the locus, exact) and
   // the coset representatives that build the orbit (count = multiplicity).
   [[nodiscard]] detail::DerivedLocus derive(Locus const &l) const {
-    SymmetryOperations site_symmetry;
-    std::ranges::copy(ops | std::views::filter([&](SymmetryOperation const &op) {
-                        return fixes(op.rotation, l);
-                      }),
-                      std::back_inserter(site_symmetry));
-    SymmetryOperations orbit_ops = coset_representatives(ops, site_symmetry);
+    Operations const site_symmetry{
+        std::from_range,
+        ops | std::views::filter(
+                  [&](SymmetryOperation const &op) { return fixes(op.rotation, l); })};
+    Operations orbit_ops = coset_representatives(ops, site_symmetry);
 
     Matrix3d locus_basis = Matrix3d::Zero();
     locus_basis.leftCols(l.dim()) = l.basis;
@@ -144,7 +144,7 @@ Result<PointGroup> PointGroup::from_number(int number) {
     return leaf::new_error(e_message{
         "PointGroup::from_number: representative space group not found"});
   }
-  SymmetryOperations const conv = data::operations_from_database(halls.front());
+  Operations const conv = data::operations_from_database(halls.front());
 
   PointGroup pg;
   pg.number_ = number;
@@ -153,11 +153,11 @@ Result<PointGroup> PointGroup::from_number(int number) {
   pg.representative_spacegroup_ = rep;
 
   // The point group = the distinct rotation parts (zero translation).
-  pg.operations_ = unique_by_rotation(
+  pg.operations_ = Operations{unique_by_rotation(
       conv | std::views::transform([](SymmetryOperation const &op) {
         return SymmetryOperation{op.rotation, Vector3d::Zero()};
       }),
-      &SymmetryOperation::rotation);
+      &SymmetryOperation::rotation)};
 
   pg.positions_ = detail::derive_wyckoff_positions(
       pg.operations_, PointGeometry{pg.operations_});

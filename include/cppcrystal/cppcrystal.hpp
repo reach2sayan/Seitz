@@ -1,17 +1,18 @@
 #pragma once
 
-// Umbrella header: includes the full public API.
+// Umbrella header: the full public API. The determination pipeline
+// (symmetry/, spacegroup/, refine/, spin/, magnetic/, and the numeric and
+// container helpers behind them) is private to src/ and deliberately absent.
 
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
-#include <cppcrystal/analysis/operation_set.hpp>
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/centering.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/fractional.hpp>
 #include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
-#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
@@ -25,19 +26,10 @@
 #include <cppcrystal/generate/wyckoff_combinations.hpp>
 #include <cppcrystal/group/space_group.hpp>
 #include <cppcrystal/group/wyckoff_position.hpp>
-#include <cppcrystal/standardize.hpp>
 #include <cppcrystal/kpoint/brillouin_zone.hpp>
 #include <cppcrystal/kpoint/grid.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh_builder.hpp>
-#include <cppcrystal/magnetic/magnetic_spacegroup.hpp>
 #include <cppcrystal/magnetic_dataset.hpp>
-#include <cppcrystal/math/fractional.hpp>
-#include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/spacegroup/hall_symbol.hpp>
-#include <cppcrystal/spacegroup/spacegroup.hpp>
+#include <cppcrystal/standardize.hpp>
 #include <cppcrystal/warmup.hpp>
-#include <cppcrystal/spin/spin.hpp>
-#include <cppcrystal/symmetry/find_symmetry.hpp>
-#include <cppcrystal/symmetry/pointgroup.hpp>
-#include <cppcrystal/symmetry/primitive.hpp>

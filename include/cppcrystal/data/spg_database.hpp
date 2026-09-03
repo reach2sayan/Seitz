@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/matrix_order.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
@@ -293,12 +293,7 @@ static_assert(spacegroup_type(-kNumLayerHallNumbers).number == kNumLayerGroups);
 static_assert(spacegroup_type(0).number == 0);    // sentinel
 static_assert(spacegroup_type(-117).number == 0); // out of range
 
-[[nodiscard]] SymmetryOperations const &
+[[nodiscard]] Operations const &
 operations_from_database(int hall_number);
-
-// rotation -> indices into operations_from_database(hall_number), built once
-// per setting. Empty for an out-of-range Hall number.
-[[nodiscard]] RotationMultimap<int> const &
-operations_by_rotation(int hall_number);
 
 } // namespace cppcrystal::data
