@@ -174,7 +174,7 @@ shortest_vectors(std::array<Vector3d, 3> const &basis,
 
 } // namespace
 
-Result<Lattice> Lattice::delaunay(int unique_axis, double symprec) const {
+Result<Lattice> Lattice::delaunay_in_plane(int unique_axis, double symprec) const {
   Matrix3d const &lattice = basis_;
   // The two in-plane axes (j < k) are those other than the unique axis.
   static constexpr std::array<std::array<int, 2>, 3> planes{{

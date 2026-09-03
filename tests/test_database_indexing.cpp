@@ -5,7 +5,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
-#include <cppcrystal/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
+#include "data/spacegroup_operation_tables.hpp" // raw ops (old indexing)
 #include <cppcrystal/data/spg_database.hpp>                // accessors (new indexing)
 
 #include "helpers.hpp"

@@ -3,8 +3,8 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/mdspan.hpp>
 
-#include <cppcrystal/data/detail/packed_decode.hpp>
-#include <cppcrystal/data/magnetic_spacegroup_operation_tables.hpp>
+#include "data/packed_decode.hpp"
+#include "data/magnetic_spacegroup_operation_tables.hpp"
 
 #include <array>
 #include <cstddef>

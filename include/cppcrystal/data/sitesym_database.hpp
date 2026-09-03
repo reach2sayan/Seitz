@@ -7,7 +7,7 @@
 #include <vector>
 
 // Decoder for the site-symmetry / Wyckoff database (generated tables in
-// data/sitesym_tables.hpp). The
+// src/data/sitesym_tables.hpp). The
 // encoded tables and the compile-time decode are an implementation detail of
 // sitesym_database.cpp; this header exposes only the decoded, Eigen-valued API.
 namespace cppcrystal::data {

@@ -1,7 +1,7 @@
 #include "data/operation_index.hpp"
 
 #include <cppcrystal/data/detail/lookup.hpp>
-#include <cppcrystal/data/spacegroup_operation_tables.hpp>
+#include "data/spacegroup_operation_tables.hpp"
 
 #include <cstddef>
 #include <vector>

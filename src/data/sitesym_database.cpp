@@ -1,7 +1,7 @@
 #include <cppcrystal/data/sitesym_database.hpp>
 
 #include <cppcrystal/data/detail/lookup.hpp>
-#include <cppcrystal/data/sitesym_tables.hpp>
+#include "data/sitesym_tables.hpp"
 
 #include <array>
 #include <cstddef>

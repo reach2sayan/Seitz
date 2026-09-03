@@ -63,7 +63,7 @@ template <GroupFamily F>
                                              CellPeriodicity const &periodicity,
                                              double symprec) {
   if constexpr (F == GroupFamily::layer) {
-    return lattice.delaunay(aperiodic_axis(periodicity).value_or(2), symprec);
+    return lattice.delaunay_in_plane(aperiodic_axis(periodicity).value_or(2), symprec);
   } else {
     return lattice.delaunay(symprec);
   }

@@ -2,8 +2,8 @@
 #include <cppcrystal/data/spg_database.hpp>
 
 #include <cppcrystal/data/detail/lookup.hpp>
-#include <cppcrystal/data/detail/packed_decode.hpp>
-#include <cppcrystal/data/spacegroup_operation_tables.hpp>
+#include "data/packed_decode.hpp"
+#include "data/spacegroup_operation_tables.hpp"
 
 #include <array>
 

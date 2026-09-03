@@ -2,7 +2,7 @@
 #include <cppcrystal/group/rod_group.hpp>
 
 #include "data/rod_database.hpp"
-#include <cppcrystal/group/detail/locus_arrangement.hpp>
+#include "group/locus_arrangement.hpp"
 #include "math/fractional.hpp"
 #include "math/subspace.hpp"
 

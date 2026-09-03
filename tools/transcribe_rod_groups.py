@@ -30,7 +30,7 @@ Usage:
     pip install pyxtal            # provides pymatgen (SymmOp.affine_matrix) too
     transcribe_rod_groups.py [out.hpp]
 
-`out.hpp` defaults to data/rod_group_tables.hpp relative to the repo root.
+`out.hpp` defaults to src/data/rod_group_tables.hpp relative to the repo root.
 """
 import os
 import sys
@@ -42,7 +42,7 @@ PERIODIC_AXIS = 2  # c; PyXtal rod-group convention
 # Default output, resolved relative to this file (tools/ -> repo root).
 DEFAULT_OUT = os.path.normpath(
     os.path.join(os.path.dirname(__file__), os.pardir,
-                 "include", "cppcrystal", "data", "rod_group_tables.hpp"))
+                 "src", "data", "rod_group_tables.hpp"))
 
 
 def require_pyxtal():

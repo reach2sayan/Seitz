@@ -12,6 +12,7 @@
 #include <cppcrystal/group/rod_group.hpp>
 #include <cppcrystal/group/space_group.hpp>
 #include <cppcrystal/group/subgroup_graph.hpp>
+#include <cppcrystal/warmup.hpp>
 
 #include "helpers.hpp"
 
@@ -62,9 +63,11 @@ TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
   REQUIRE(a->degrees_of_freedom() == 0);
   REQUIRE(a->site_symmetry() == "m-3m");
 
-  // 1a has no free coordinate: its orbit is the single fixed point.
+  // 1a has no free coordinate: its orbit is the single fixed point, and every
+  // point projects onto it whatever the free parameters say.
   Positions const orbit = a->orbit(Vector3d{0.3, 0.4, 0.5});
   REQUIRE(orbit.rows() == 1);
+  REQUIRE(a->canonical(Vector3d{0.3, 0.4, 0.5}).isApprox(a->sample({})));
 
   REQUIRE(sg->wyckoffs().back().multiplicity() == 48);
 }
@@ -264,6 +267,11 @@ TEST_CASE("every t-subgroup edge is order-consistent", "[subgroup]") {
       // A translationengleiche subgroup keeps the lattice, so the index equals
       // the ratio of point-group orders.
       REQUIRE(pg_order(n) == rel.index * pg_order(rel.number));
+      // The in-edges are the same edge set read the other way round.
+      auto const supers = group::SubgroupGraph::minimal_supergroups(rel.number);
+      REQUIRE(std::ranges::any_of(supers, [&](auto const &up) {
+        return up.number == n && up.index == rel.index;
+      }));
       ++edges;
     }
   }
@@ -373,6 +381,11 @@ TEST_CASE("point-group orders match the textbook values", "[cluster]") {
   REQUIRE(order_of(25) == 12); // 6mm (C6v)
   REQUIRE(order_of(27) == 24); // 6/mmm (D6h)
   REQUIRE(order_of(32) == 48); // m-3m (Oh)
+  auto const symbol_of = [](int number) {
+    return must(group::PointGroup::from_number(number)).schoenflies();
+  };
+  REQUIRE(symbol_of(5) == "C2h");
+  REQUIRE(symbol_of(32) == "Oh");
 }
 
 TEST_CASE("from_number rejects out-of-range point groups", "[cluster]") {
@@ -492,4 +505,19 @@ TEST_CASE("rod generation is deterministic in the seed", "[rod]") {
   auto b = must(gen(comp));
   REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
   REQUIRE(a.cell.types() == b.cell.types());
+}
+
+TEST_CASE("warmup builds the shared per-setting caches", "[warmup]") {
+  // Priming is idempotent and races the ordinary first-use path safely: every
+  // caller ends up with the same flyweight whichever built it.
+  warmup_async(Warm::layer_groups).get();
+  warmup(Warm::all);
+  for (auto const family : {GroupFamily::space, GroupFamily::layer}) {
+    for (int index : {1, hall_settings(family)}) {
+      auto const key = *HallNumber::of(family, index);
+      auto const &group = group::SpaceGroup::of(key);
+      CHECK(&group == &group::SpaceGroup::of(key)); // shared, not rebuilt
+      CHECK_FALSE(group.wyckoffs().empty());
+    }
+  }
 }

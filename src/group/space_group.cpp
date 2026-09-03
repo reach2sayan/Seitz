@@ -3,7 +3,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
-#include <cppcrystal/group/detail/locus_arrangement.hpp>
+#include "group/locus_arrangement.hpp"
 #include "math/fractional.hpp"
 
 #include <Eigen/Dense>

@@ -6,6 +6,14 @@ include(FetchContent)
 # As a subproject PROJECT_IS_TOP_LEVEL is false, so Eigen's tests/blas/lapack/docs/
 # demos/pkgconfig/cmake-package all default OFF — only the Eigen3::Eigen interface
 # target is created. SYSTEM keeps Eigen's headers out of our -Wconversion warning set.
+# Eigen and Boost are fetched, not taken from the system, and both are public
+# dependencies of the exported cppcrystal target — so they must be installable
+# too, or install(EXPORT) has nothing to point find_dependency() at. Both default
+# to skipping their install rules when they are subprojects; turn them back on so
+# `cmake --install` writes one self-contained prefix.
+set(EIGEN_BUILD_CMAKE_PACKAGE ON CACHE BOOL "" FORCE)
+set(BOOST_SKIP_INSTALL_RULES OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(Eigen3
         GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
         GIT_TAG 5.0.0

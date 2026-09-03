@@ -25,16 +25,15 @@ compiled into the binary as `constexpr` catalogs and decoded on demand.
 
 | Capability | Entry point | Notes |
 |---|---|---|
-| Space-group determination | `get_dataset(cell)` | identity, operations, standardized cell, per-atom Wyckoff data |
-| Layer / rod / point groups | `get_layer_dataset`, `RodGroup`, `PointGroup` | 2D-, 1D-, and 0D-periodic crystals |
-| Stateful analysis | `analysis::SymmetryAnalyzer` | owns a cell, memoizes every derived query |
-| Cell standardization | `standardize_cell`, `find_primitive`, `refine_cell` | primitive/conventional × idealized/as-input |
-| Lattice reduction | `reduce::delaunay_reduce`, `reduce::niggli_reduce` | also 2D Delaunay for layers |
-| Group catalogs | `group::SpaceGroup`, `PointGroup`, `RodGroup` | structure-free, queryable Wyckoff positions |
+| Space-group determination | `analysis::SymmetryAnalyzer::from_cell(cell)` | owns the cell, memoizes every derived query |
+| Layer groups | the same analyzer | a `Cell` with one aperiodic axis takes the layer path |
+| Cell standardization | `.standardized_cell<Setting, Idealize>()` | primitive/conventional × idealized/as-input |
+| Magnetic structures | `analysis::MagneticSymmetryAnalyzer::from_cell(mcell)` | magnetic space-group identification, standardized magnetic cell |
+| Lattice reduction | `Lattice::niggli`, `::delaunay`, `::delaunay_in_plane` | on the lattice itself; the in-plane form for layers and monoclinic cells |
+| Group catalogs | `group::SpaceGroup::of`, `PointGroup`, `RodGroup` | structure-free, queryable Wyckoff positions |
 | Subgroup relations | `group::SubgroupGraph` | translationengleiche maximal-subgroup lattice of all 230 groups |
-| Crystal generation | `generate::random_crystal`, `random_layer_crystal`, `random_cluster` | place a composition on Wyckoff sites at random |
-| Magnetic structures | `get_magnetic_dataset(mcell)` | magnetic space-group identification, standardized magnetic cell |
-| Reciprocal-space meshes | `kpoint::ir_reciprocal_mesh`, `stabilized_reciprocal_mesh` | irreducible k-points, Brillouin-zone folding |
+| Structure generation | `generate::Generator<G>` | one generator over space, layer, rod and point groups |
+| Reciprocal-space meshes | `kpoint::Mesh`, `ReciprocalMesh`, `BrillouinZone` | irreducible k-points, Brillouin-zone folding |
 
 A single umbrella header pulls in the whole API:
 
@@ -48,70 +47,71 @@ A single umbrella header pulls in the whole API:
 
 ### Determine a space group
 
+There is one entry point, and it is an object. `SymmetryAnalyzer` owns the cell
+and the tolerances and memoizes each stage of the pipeline, so determination runs
+once and every projection is served from that cache:
+
 ```cpp
 #include <cppcrystal/cppcrystal.hpp>
+using namespace cppcrystal;
 
-cppcrystal::Cell rutile{lattice, positions, types}; // lattice columns = basis vectors
-auto result = cppcrystal::get_dataset(rutile);
+Cell const rutile{Lattice{basis}, positions, types}; // lattice columns = basis vectors
+auto const sa = analysis::SymmetryAnalyzer::from_cell(rutile);
 
-cppcrystal::leaf::try_handle_all(
-    [&]() -> cppcrystal::Result<void> {
-      BOOST_LEAF_AUTO(ds, cppcrystal::get_dataset(rutile));
-      std::printf("space group %d (%s)\n",
-                  ds.spacegroup_number,
-                  std::string(ds.international_symbol).c_str());
+leaf::try_handle_all(
+    [&]() -> Result<void> {
+      BOOST_LEAF_AUTO(hall, sa.hall());          // runs determination
+      BOOST_LEAF_AUTO(ops, sa.operations());     // reuses it
+      BOOST_LEAF_AUTO(prim, sa.primitive_cell()); // reuses it
+      std::printf("space group %d (%s), %zu operations\n",
+                  data::spacegroup_type(hall).number,
+                  data::spacegroup_type(hall).international_short.data(),
+                  ops.size());
       return {};
     },
-    [](cppcrystal::e_spacegroup_search_failed) {
+    [](e_spacegroup_search_failed) {
       std::puts("no space group found at this tolerance");
     });
 ```
 
-`Dataset` carries the international and Hall numbers, the operations of the input
-cell, the transformation onto the conventional setting, the fully standardized
-cell, and per-atom Wyckoff letters, site-symmetry symbols, and equivalence
-classes.
-
-### Reuse work with the analyzer
-
-When you need several derived quantities from one cell, build a
-`SymmetryAnalyzer`. It owns the cell and the tolerances and caches each stage of
-the pipeline, so the dataset is computed once and every projection
-(`operations()`, `wyckoffs()`, `primitive_cell()`, `standardized_cell()`, …) is
-served from that cache:
-
-```cpp
-auto sa = cppcrystal::analysis::SymmetryAnalyzer::from_cell(rutile);
-auto number = sa.spacegroup_number();   // runs determination
-auto prim   = sa.primitive_cell();      // reuses it
-auto std    = sa.standardized_cell();   // reuses it
-```
-
 The analyzer is immutable after construction — to analyze at a different
-tolerance, build a new one.
+tolerance, build a new one. Its projections hand back references into the memo,
+so it must outlive them: the rvalue overloads are deleted, which makes
+`from_cell(cell).hall()` a compile error rather than a dangling read. A layer
+cell (one aperiodic axis) goes through the same object; the periodicity picks the
+path.
+
+`Dataset` carries the Hall key, the Bravais lattice, the conventional `Setting`,
+the operations of the input cell, one `Site` per atom (Wyckoff letter,
+site-symmetry symbol, equivalence class) and the fully standardized `Cell`.
 
 ### Generate a random crystal
 
 ```cpp
-auto sg   = cppcrystal::group::SpaceGroup::from_number(225).value();   // Fm-3m
-auto comp = cppcrystal::Composition{{ {/*Z=*/11, 4}, {/*Z=*/17, 4} }}; // NaCl
-auto xtal = cppcrystal::generate::random_crystal(sg, comp);
+BOOST_LEAF_AUTO(fm3m, group::SpaceGroup::from_number(GroupFamily::space, 225));
+generate::Composition const nacl{{11, 4}, {17, 4}};   // Na4 Cl4
+
+BOOST_LEAF_AUTO(xtal, generate::Generator(*fm3m, {.seed = 42})(nacl));
+// xtal.cell        -> the generated Cell
+// xtal.assignment  -> which Wyckoff position each atom was seated on
 ```
 
-`random_crystal` enumerates the valid ways to seat the composition on the group's
+`Generator` enumerates the valid ways to seat the composition on the group's
 Wyckoff positions, then resamples free coordinates and the lattice until the
-minimum-distance criterion is met. The same shape generates 2D layers
-(`random_layer_crystal`), 1D rods (rod-group overload), and 0D clusters
-(`random_cluster` over a `PointGroup`).
+minimum-distance criterion is met. The same generator covers every family:
+substitute a layer `SpaceGroup`, a `RodGroup` or a `PointGroup` and the traits
+supply that family's periodicity, seed window and random metric. The result is
+always a `Cell` that describes itself — a cluster is simply a cell with no
+periodic axis.
 
 ### Irreducible k-points
 
 ```cpp
-auto mesh = cppcrystal::kpoint::ir_reciprocal_mesh(
-    cell, /*mesh=*/{8, 8, 8}, /*is_shift=*/{0, 0, 0},
-    /*time_reversal=*/true);
-// mesh.num_ir  -> count of irreducible points
-// mesh.mapping -> each grid point's irreducible representative
+auto const mesh = *kpoint::Mesh::of({8, 8, 8});   // rejects a non-positive mesh
+auto rmesh = sa.reciprocal_mesh(mesh, TimeReversal::yes);
+// rmesh->num_irreducible()  -> count of irreducible points
+// rmesh->mapping()          -> each grid point's irreducible representative
+// rmesh->brillouin_zone(lattice) -> Brillouin-zone folding
 ```
 
 ---
@@ -121,8 +121,14 @@ auto mesh = cppcrystal::kpoint::ir_reciprocal_mesh(
 **Errors are values.** Nothing throws and no function returns a magic sentinel.
 A fallible call returns `Result<T>` (`= boost::leaf::result<T>`); failures carry
 typed context — `e_spacegroup_search_failed`, `e_invalid_lattice{det}`,
-`e_invalid_mesh`, `e_magnetic_symmetry_search_failed`, and so on. "Absent" is
-`std::optional`, never `-1`.
+`e_magnetic_symmetry_search_failed`, and so on. "Absent" is `std::optional`,
+never `-1`.
+
+**Invalid states are unrepresentable, so most errors never arise.** A
+`HallNumber` carries its family and a validated index (there is no negative-Hall
+convention and no sentinel row in any catalog); a `UniNumber` and a
+`kpoint::Mesh` are likewise built through an `of()` that is the only way in and
+the only place the check lives. A function taking one of these keys is total.
 
 **Cells describe periodicity per axis.** A `Cell` holds a column-major lattice,
 fractional positions, integer types, and a `CellPeriodicity`. The same type
@@ -144,30 +150,44 @@ decoded lazily at runtime and cached. Generated tables are split into a public
 metadata header and a private operation header so the encoded packing never
 reaches a public interface.
 
-**Thread-safety.** The shared global tables are primed by `cppcrystal::warmup()` and
-are race-free for concurrent reads afterward. Per-instance analyzer caches are
-not; call `.warm()` on one thread before sharing an analyzer read-only.
+**The family is a compile-time parameter.** Space and layer groups run the same
+pipeline, instantiated as `if constexpr` on a `GroupFamily` template argument
+rather than branching on the sign of a Hall number at each stage; a single
+`dispatch_family()` is the one runtime branch, at the top.
+
+**Thread-safety.** `group::SpaceGroup::of` is a flyweight — one immutable object
+per Hall setting, built on first use under a guard and shared thereafter — and
+the generated tables are read-only after their one-time decode, so concurrent
+reads are race-free. `cppcrystal::warmup()` builds every setting up front (both
+families, in about 30 ms) to move that cost off the query path. Per-instance
+analyzer caches are not shared; build one analyzer per thread, or warm it before
+sharing it read-only.
 
 ### Source layout
 
+The public interface and the implementation are separated by directory, not by
+convention: `#include <cppcrystal/…>` is the API, `#include "module/x.hpp"` is
+internal, and only `include/` is installed.
+
 ```
-include/cppcrystal/         public headers
-  core/                 Cell, symmetry operations, errors, tolerance, periodicity
+include/cppcrystal/       the public API — everything the umbrella header reaches
+  core/                 Cell, Lattice, keys, operations, errors, tolerance, periodicity
   analysis/             SymmetryAnalyzer, MagneticSymmetryAnalyzer (memoizing facades)
   group/                SpaceGroup, PointGroup, RodGroup, Wyckoff, SubgroupGraph
-  generate/             random_crystal / random_cluster + Wyckoff combinatorics
+  generate/             Generator<G>, Wyckoff assignments, distance checking
+  kpoint/               Mesh, ReciprocalMesh, BrillouinZone
+  data/                 constexpr symmetry / magnetic / element catalogs
+src/                      the implementation, headers beside their .cpp files
   symmetry/             symmetry search, point-group matching, primitive cell
   spacegroup/           Hall-symbol matching, space-group determination
   reduce/               Delaunay and Niggli lattice reduction
   refine/               standardization and Wyckoff refinement
   magnetic/  spin/      magnetic space-group identification and search
-  kpoint/               grids, irreducible meshes, Brillouin-zone mapping
-  data/                 constexpr symmetry / magnetic / element catalogs
+  data/                 the generated operation tables and their decoders
   math/                 integer matrices, fractional coordinates
-src/                    implementations, mirroring the header tree
-tools/                  offline data-table generators (Python + one C++ tool)
-tests/                  unit tests and oracle tests against reference spglib
-docs/                   workflow flowchart and porting status
+tools/                    offline data-table generators (Python + one C++ tool)
+tests/                    unit tests and oracle tests against reference spglib
+docs/                     workflow flowchart
 ```
 
 See [`docs/WORKFLOW.md`](docs/WORKFLOW.md) for a flowchart of the determination,
@@ -177,9 +197,11 @@ generation, magnetic, and k-point pipelines.
 
 ## Building
 
-Requires a C++23 compiler (GCC 13+/Clang 17+), CMake ≥ 3.28, **Eigen 3.4**, and
-**Boost 1.83** (headers only, for `boost::leaf`). **Catch2 3** is fetched for the
-tests.
+Requires a C++23 compiler (the presets use **g++-15**) and CMake ≥ 3.28.
+Everything else is fetched: **Eigen 5.0.0** (the first release whose fixed-size
+matrices are literal types, so they can be built in `constexpr` context),
+**Boost 1.88** (`container`, `leaf`, `parser`, `preprocessor`), and **Catch2 3**
+for the tests. Nothing needs to be installed on the system.
 
 ```bash
 cmake --preset default              # configure (Debug)
@@ -208,10 +230,31 @@ cmake --preset oracle && ctest --test-dir cmake-build-debug
 
 ### Use it in your project
 
+As a subdirectory:
+
 ```cmake
 add_subdirectory(CppCrystal)
 target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
 ```
+
+Or installed, with only `include/` shipping — the pipeline headers under `src/`
+are on the library's `PRIVATE` include path and are not part of the exported
+interface, so an installed consumer reaches exactly what the umbrella header
+reaches and no more:
+
+```bash
+cmake --install cmake-build-release --prefix /your/prefix
+```
+
+```cmake
+find_package(CppCrystal REQUIRED)
+target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
+```
+
+Eigen and Boost are public dependencies of the exported target, and this project
+fetches both rather than taking them from the system, so `cmake --install` writes
+their CMake packages into the same prefix. The result is self-contained: a
+consumer needs nothing installed system-wide.
 
 ---
 
@@ -238,7 +281,7 @@ copyleft, so this combined and derived work is distributed under the
 BSD-3-Clause license. The original spglib and PyXtal copyright notices are
 retained for the portions derived from them — the symmetry core and the
 `spacegroup_*` / `msg_*` / `sitesym_*` / `hall_generators*` data tables from
-spglib, and the rod-group tables (`rod_group_tables.hpp`) from PyXtal. The full
+spglib, and the rod-group tables (`src/data/rod_group_tables.hpp`) from PyXtal. The full
 verbatim notices are in the [THIRD-PARTY NOTICES](LICENSE) section of the
 license file. The element covalent-radius data is from Cordero et al. (2008),
 cited there.

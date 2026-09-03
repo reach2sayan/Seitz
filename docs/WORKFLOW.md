@@ -10,20 +10,20 @@ does the work.
 flowchart TD
     Cell["Cell<br/>(lattice, positions, types, periodicity)"]
 
-    Cell --> Det["Space-group determination<br/>get_dataset"]
-    Cell --> Mag["Magnetic analysis<br/>get_magnetic_dataset"]
-    Cell --> KP["Reciprocal-space reduction<br/>kpoint::ir_reciprocal_mesh"]
+    Cell --> Det["analysis::SymmetryAnalyzer"]
+    Cell --> Mag["analysis::MagneticSymmetryAnalyzer"]
+    Det --> KP["SymmetryAnalyzer::reciprocal_mesh<br/>(Mesh, TimeReversal)"]
 
     Group["Group catalog<br/>SpaceGroup / PointGroup / RodGroup"]
-    Group --> Gen["Structure generation<br/>random_crystal / random_cluster"]
+    Group --> Gen["generate::Generator&lt;G&gt;"]
 
     Det --> Dataset["Dataset"]
     Mag --> MDataset["MagneticDataset"]
-    KP --> Mesh["Ir mesh + mapping"]
-    Gen --> Xtal["GeneratedCrystal / GeneratedCluster"]
+    KP --> Mesh["ReciprocalMesh<br/>(+ BrillouinZone)"]
+    Gen --> Xtal["Generated<br/>(Cell + assignment)"]
 ```
 
-## Space-group determination — `get_dataset`
+## Space-group determination — `SymmetryAnalyzer`
 
 The core pipeline. A cell goes in; a fully classified, standardized dataset
 comes out.
@@ -46,11 +46,14 @@ flowchart TD
 ```
 
 The Wyckoff data comes from the site-symmetry database keyed by the matched Hall
-number; the standardized cell is the idealized conventional setting, and the
+key; the standardized cell is the idealized conventional setting, and the
 recovered operations are expressed back in the original input basis.
 
-`get_layer_dataset` runs the same pipeline with one aperiodic axis set on the
-cell; matching then draws from the layer-group settings (negative Hall numbers).
+A layer cell — one whose periodicity has an aperiodic axis — runs the same
+pipeline, instantiated with `GroupFamily::layer` instead of `GroupFamily::space`.
+The family is a compile-time template parameter, so every stage's family
+difference is an `if constexpr`, not a runtime test on a Hall number's sign;
+`dispatch_family()` at the top is the single runtime branch.
 
 ### The analyzer facade
 
@@ -59,38 +62,51 @@ projection of one cached dataset (or of an independently cached intermediate):
 
 ```mermaid
 flowchart LR
-    SA["SymmetryAnalyzer<br/>(owns Cell + tolerances)"]
+    SA["Analyzer&lt;Derived, Traits&gt;<br/>(owns Cell + tolerances)"]
     SA -.cached.-> DS["dataset()"]
-    DS --> N["spacegroup_number()"]
-    DS --> W["wyckoffs()"]
-    DS --> ST["standardized_cell()"]
+    DS --> N["hall()"]
+    DS --> W["sites()"]
+    DS --> ST["standardized_cell&lt;Setting, Idealize&gt;()"]
+    DS --> RM["reciprocal_mesh(Mesh, TimeReversal)"]
     SA -.cached.-> PR["primitive()"]
     PR --> PC["primitive_cell()"]
-    SA -.cached.-> SG["spacegroup()"]
 ```
 
-## Structure generation — `random_crystal`
+`SymmetryAnalyzer` and `MagneticSymmetryAnalyzer` are the two `Derived` types:
+the memo, the projections and the `const &`-qualified accessors live once in
+`Analyzer`, and each `Traits` supplies the cell type, the dataset type and the
+one pipeline call that fills it. The projections return references into the memo,
+so the rvalue overloads are deleted — the analyzer must outlive what it hands
+back.
+
+## Structure generation — `Generator<G>`
 
 Generation is the determination pipeline run in reverse: pick a group, seat a
 composition on its Wyckoff sites, and materialize coordinates.
 
 ```mermaid
 flowchart TD
-    A["SpaceGroup + Composition"] --> B["list_wyckoff_combinations<br/>(valid seatings of the atoms<br/>on Wyckoff positions)"]
+    A["Generator&lt;G&gt;<br/>(group + GenerateOptions)"] --> B["enumerate_assignments<br/>(valid seatings of the atoms<br/>on Wyckoff positions)"]
     B -->|none fit| Err["error: composition cannot be placed"]
-    B --> C["for each combination"]
-    C --> D["sample a random lattice<br/>(compatible metric, volume_factor)"]
-    D --> E["sample free coordinates<br/>of each occupied Wyckoff site"]
-    E --> F{"distance_check<br/>(minimum-distance criterion)"}
+    B --> R{"Placement::general_only?"}
+    R --> C["shuffle, then for each assignment"]
+    C --> D["GroupTraits&lt;G&gt;::lattice<br/>(the family's random metric)"]
+    D --> E["seed from GroupTraits&lt;G&gt;::seed_box,<br/>project onto the Wyckoff locus,<br/>expand the orbit"]
+    E --> F{"distances_valid<br/>(minimum-distance criterion)"}
     F -->|fail| D
-    F -->|pass| G["GeneratedCrystal<br/>(Cell + assignment)"]
+    F -->|pass| G["Generated<br/>(Cell + assignment)"]
 ```
 
-`random_layer_crystal` and the rod-group overload share this loop with 2D/1D
-lattices; `random_cluster` replaces the lattice with a point-group metric and
-runs an all-pairs (non-periodic) distance check.
+One generator covers every family. `GroupTraits<G>` answers the only four
+questions that differ — what to call the family in an error, how its cell is
+periodic, where in that cell a seed coordinate belongs, and the random metric one
+attempt is drawn in — and a layer group is not a separate specialisation but a
+`SpaceGroup` whose Hall key names the layer family. Because the cell carries its
+own periodicity, the orbit expansion and the distance check need no family branch
+at all: a cluster is a cell with no periodic axis, and the same
+`distances_valid(Cell)` is its all-pairs Euclidean check.
 
-## Magnetic analysis — `get_magnetic_dataset`
+## Magnetic analysis — `MagneticSymmetryAnalyzer`
 
 ```mermaid
 flowchart TD
@@ -103,22 +119,25 @@ flowchart TD
     F --> G
 ```
 
-## Reciprocal-space reduction — `kpoint::ir_reciprocal_mesh`
+## Reciprocal-space reduction — `kpoint::ReciprocalMesh`
 
 ```mermaid
 flowchart TD
-    A["Cell + mesh + shift + time_reversal"] --> V{"valid mesh?"}
-    V -->|non-positive| Err["e_invalid_mesh"]
-    V -->|ok| B["get_dataset<br/>(rotations of the cell)"]
-    B --> C["point_group_reciprocal<br/>(transpose ops; add −op for time reversal)"]
-    C --> D["all_grid_addresses<br/>(enumerate the mesh)"]
+    A["Mesh::of(divisions, shift)"] -->|non-positive| Err["nullopt — an invalid<br/>mesh is unrepresentable"]
+    A --> B["SymmetryAnalyzer::reciprocal_mesh<br/>(the cell's rotations)"]
+    B --> C["ReciprocalMesh::from_rotations<br/>(transpose ops; add −op for time reversal)"]
+    C --> D["Mesh::addresses<br/>(enumerate the mesh)"]
     D --> E["map each grid point to its<br/>orbit-minimum representative"]
-    E --> F["Ir mesh: num_ir + mapping<br/>(+ stabilized / BZ variants)"]
+    E --> F["ReciprocalMesh: num_irreducible + mapping"]
+    F --> G["stabilized(qpoints)<br/>brillouin_zone(lattice)"]
 ```
 
 The irreducible representative is taken as the orbit minimum directly: the
 reciprocal group is closed, so one pass over the rotations reaches every point in
-an orbit, giving a canonical mapping independent of iteration order.
+an orbit, giving a canonical mapping independent of iteration order. `Mesh` is
+constexpr throughout — its index/address round trip is `static_assert`ed in the
+header rather than tested at runtime — and it carries its own shift, so the
+`(mesh, is_shift)` pair no longer travels separately.
 
 ## Where the symmetry data comes from
 
@@ -139,5 +158,6 @@ flowchart LR
 Metadata (numbers, symbols, centering, multiplicities) is decoded once at
 compile time and indexed directly by the group's key. Operation matrices, which
 cannot be `constexpr` because they are `Eigen` types, are decoded on first use
-and cached. `cppcrystal::warmup()` primes these caches up front so they are race-free
-for concurrent reads.
+and cached. `cppcrystal::warmup()` builds every Hall setting of both families up
+front — about 30 ms — so the caches are race-free for concurrent reads and the
+cost is off the query path.

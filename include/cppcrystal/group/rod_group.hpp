@@ -19,7 +19,7 @@ namespace cppcrystal::group {
 class RodGroup : public GroupBase {
 public:
   // Build by rod-group number (1..75). Requires the generated rod tables
-  // (data/rod_group_tables.hpp via tools/transcribe_rod_groups.py).
+  // (src/data/rod_group_tables.hpp via tools/transcribe_rod_groups.py).
   [[nodiscard]] static Result<RodGroup> from_number(int number);
 
   // The single periodic axis (0=a, 1=b, 2=c); orbit expansion folds only this

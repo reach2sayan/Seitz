@@ -93,7 +93,7 @@ TEST_CASE("delaunay reduction shortens the basis", "[lattice][reduce]") {
 TEST_CASE("2D delaunay reduction leaves the unique axis spanning the same line",
           "[lattice][reduce]") {
   Lattice const in = sheared();
-  auto red = in.delaunay(/*unique_axis=*/2, 1e-5);
+  auto red = in.delaunay_in_plane(2, 1e-5);
   REQUIRE(red);
   // The unique axis is kept (up to the sign flip that keeps the cell
   // right-handed); the other two are reduced within their plane.

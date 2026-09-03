@@ -56,12 +56,6 @@ public:
     return stabiliser_;
   }
 
-  // Coset representatives generating the orbit, one per orbit point.
-  [[nodiscard]] std::span<SymmetryOperation const>
-  orbit_operations() const noexcept {
-    return orbit_ops_;
-  }
-
   // A point on the locus from `degrees_of_freedom()` free parameters:
   // origin + sum_i params[i] * basis.col(i). Extra parameters are ignored; a
   // 0-DOF position returns its fixed point regardless.
@@ -73,11 +67,6 @@ public:
           return acc + params[static_cast<std::size_t>(i)] * basis_.col(i);
         });
   }
-
-  // The i-th free direction of the locus (fractional), 0 <= i < dof. Rod bases
-  // are axis-separated: a direction is either the periodic axis or lies in the
-  // aperiodic cross-section, which is how generators decide how to sample it.
-  [[nodiscard]] Vector3d free_direction(int i) const { return basis_.col(i); }
 
   // Project a point onto the locus, so a coordinate that is only approximately
   // on the position still yields the exact orbit.

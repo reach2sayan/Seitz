@@ -71,9 +71,11 @@ public:
 
   // 2D Delaunay reduction within the plane spanned by the two axes other than
   // `unique_axis`, whose column is left untouched (up to a sign flip that keeps
-  // the result right-handed). The extra argument distinguishes this from the 3D
-  // overload above.
-  [[nodiscard]] Result<Lattice> delaunay(int unique_axis, double symprec) const;
+  // the result right-handed). Named rather than overloaded on arity: the axis
+  // to hold fixed is a different question from the 3D reduction, not an extra
+  // detail of it — a layer's aperiodic c, or a monoclinic cell's unique b.
+  [[nodiscard]] Result<Lattice> delaunay_in_plane(int unique_axis,
+                                                  double symprec) const;
 
 private:
   Matrix3d basis_{Matrix3d::Identity()};

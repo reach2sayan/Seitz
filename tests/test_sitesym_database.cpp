@@ -1,5 +1,5 @@
 #include <cppcrystal/data/sitesym_database.hpp>
-#include <cppcrystal/data/sitesym_tables.hpp>
+#include "data/sitesym_tables.hpp"
 
 #include "helpers.hpp"
 

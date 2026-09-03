@@ -2,7 +2,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/data/rod_group_tables.hpp>
+#include "data/rod_group_tables.hpp"
 
 #include <cstddef>
 #include <ranges>

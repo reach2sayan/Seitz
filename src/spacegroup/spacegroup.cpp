@@ -5,7 +5,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/hall_classification.hpp>
+#include "data/hall_classification.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "symmetry/search.hpp"
@@ -474,7 +474,7 @@ change_basis_monocli(Matrix3d const &conv_lattice,
                      Matrix3d const &primitive_lattice, double symprec,
                      std::optional<int> aperiodic_axis_conv) {
   int const keep_axis = aperiodic_axis_conv.value_or(1);
-  auto const smallest = Lattice{conv_lattice}.delaunay(keep_axis, symprec);
+  auto const smallest = Lattice{conv_lattice}.delaunay_in_plane(keep_axis, symprec);
   if (!smallest) {
     return std::nullopt;
   }

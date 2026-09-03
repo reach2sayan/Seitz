@@ -8,7 +8,7 @@
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/hall_classification.hpp>
+#include "data/hall_classification.hpp"
 #include "data/hall_generators_view.hpp"
 
 #include <boost/container/small_vector.hpp>

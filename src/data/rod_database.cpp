@@ -1,7 +1,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include "data/rod_database.hpp"
 
-#include <cppcrystal/data/rod_group_tables.hpp>
+#include "data/rod_group_tables.hpp"
 
 namespace cppcrystal::data {
 

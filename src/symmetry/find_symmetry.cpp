@@ -211,7 +211,7 @@ Result<PointSymmetry> SymmetrySearch<F>::lattice_symmetry() const {
   // aperiodic axis fixed; a 3D cell uses the full Delaunay reduction.
   auto const min_lattice = [&] {
     if constexpr (F == GroupFamily::layer) {
-      return cell.lattice().delaunay(layer_axis.value_or(2), symprec);
+      return cell.lattice().delaunay_in_plane(layer_axis.value_or(2), symprec);
     } else {
       return cell.lattice().delaunay(symprec);
     }
