@@ -1,7 +1,7 @@
 #include "data/sitesym_database.hpp"
 
-#include <cppcrystal/data/detail/lookup.hpp>
 #include "data/sitesym_tables.hpp"
+#include <cppcrystal/data/detail/lookup.hpp>
 
 #include <array>
 #include <cstddef>
@@ -36,8 +36,8 @@ constexpr auto kWyckoffDecoded = [] {
     // Rotation: base-45 row codes, each digit base-9/3 decoded to
     // {-2..2}/{-1..1}.
     int const rot_enc = code % kRotEncMod;
-    std::array const rows = {
-        rot_enc / kRow2, (rot_enc % kRow2) / kRowBase, rot_enc % kRowBase};
+    std::array const rows = {rot_enc / kRow2, (rot_enc % kRow2) / kRowBase,
+                             rot_enc % kRowBase};
     for (std::size_t i = 0; i < 3; ++i) {
       out[k].rot[i * 3 + 0] = static_cast<std::int8_t>(rows[i] / 9 - 2);
       out[k].rot[i * 3 + 1] = static_cast<std::int8_t>((rows[i] % 9) / 3 - 1);

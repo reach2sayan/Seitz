@@ -29,12 +29,11 @@ public:
   // Primitive lattice implied by the magnetic pure translations.
   Matrix3d primitive_lattice{Matrix3d::Identity()};
 
-  MagneticSymmetrySearch(MagneticOperations ops,
-                         std::vector<int> equivalent,
+  MagneticSymmetrySearch(MagneticOperations ops, std::vector<int> equivalent,
                          std::vector<int> permutations, Matrix3d prim_lattice)
-      : operations(std::move(ops)), equivalent_atoms(std::move(equivalent)),
-        primitive_lattice(std::move(prim_lattice)),
-        permutations_(std::move(permutations)) {}
+      : operations{std::move(ops)}, equivalent_atoms{std::move(equivalent)},
+        primitive_lattice{std::move(prim_lattice)},
+        permutations_{std::move(permutations)} {}
 
   // permutations()[p, i] = image of atom i under operation p: a
   // (#operations x #atoms) view over the private flat buffer.
@@ -60,7 +59,7 @@ class SpinSearch {
 public:
   SpinSearch(MagneticCell const &cell, Operations const &spatial,
              MagneticTolerance const &tol) noexcept
-      : cell_(cell), spatial_(spatial), tol_(tol) {}
+      : cell_{cell}, spatial_{spatial}, tol_{tol} {}
 
   // The magnetic operations, orbits, permutations and primitive lattice.
   // `TimeReversal::on` allows anti-operations (moment-reversing) and yields the

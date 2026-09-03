@@ -1,11 +1,11 @@
 #include "refine/site_symmetry.hpp"
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
 #include "core/position_index.hpp"
 #include "data/sitesym_database.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -58,9 +58,9 @@ struct Equivalent {
 // orbit under the conventional operations claims every later atom it lands on,
 // in (representative, operation) order; the first claim wins. Wyckoff letters
 // and symbols are filled in later by set_wyckoff_labels.
-[[nodiscard]] ExactPositions
-get_exact_positions(Cell const &conv_prim, Operations const &conv_sym,
-                    double symprec) {
+[[nodiscard]] ExactPositions get_exact_positions(Cell const &conv_prim,
+                                                 Operations const &conv_sym,
+                                                 double symprec) {
   CellPeriodicity const &periodicity = conv_prim.periodicity();
   PositionIndex const index(conv_prim, symprec);
   auto const n = static_cast<std::size_t>(conv_prim.size());
@@ -115,8 +115,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
   // Coincidence classes of the orbit, found once through an index over it.
   Positions const orbit_positions = to_positions(orbit);
   Types const orbit_types(orbit.size(), 0);
-  PositionIndex const index(BucketGeometry::of(lattice, symprec, periodicity),
-                            orbit_positions, orbit_types, lattice, symprec,
+  PositionIndex const index(orbit_positions, orbit_types, lattice, symprec,
                             periodicity);
   std::vector<std::vector<int>> classes;
   classes.reserve(orbit.size());
@@ -135,7 +134,8 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
     // Which orbit points the candidate's site-symmetry generator fixes.
     std::vector<bool> fixed(orbit.size());
     for (auto const [k, point] : orbit | std::views::enumerate) {
-      Vector3d const mapped = wc.rotation.cast<double>() * point + wc.translation;
+      Vector3d const mapped =
+          wc.rotation.cast<double>() * point + wc.translation;
       fixed[static_cast<std::size_t>(k)] =
           coincident(point, mapped, lattice, symprec, periodicity);
     }
@@ -148,9 +148,8 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
         });
     if (consistent) {
       // The database stores Wyckoff positions in reverse order (g f e ... a).
-      return WyckoffLabel{
-          range.count - wi - 1,
-          data::site_symmetry_symbol(range.start + wi)};
+      return WyckoffLabel{range.count - wi - 1,
+                          data::site_symmetry_symbol(range.start + wi)};
     }
   }
   return std::nullopt;
@@ -197,14 +196,15 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
 
 } // namespace
 
-std::optional<ExactPositions>
-exact_positions(Cell const &conv_prim, Operations const &conv_sym,
-                int num_pure_trans, HallNumber hall, double symprec) {
+std::optional<ExactPositions> exact_positions(Cell const &conv_prim,
+                                              Operations const &conv_sym,
+                                              int num_pure_trans,
+                                              HallNumber hall, double symprec) {
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     ExactPositions exact = get_exact_positions(conv_prim, conv_sym, tolerance);
-    if (set_wyckoff_labels(exact, conv_prim, conv_sym, num_pure_trans,
-                           hall, symprec)) {
+    if (set_wyckoff_labels(exact, conv_prim, conv_sym, num_pure_trans, hall,
+                           symprec)) {
       return exact;
     }
     tolerance *= kIncreaseRate;

@@ -16,7 +16,8 @@ template <GroupFamily F>
 Result<Cell> Refinement<F>::to_primitive(Cell const &cell,
                                          Matrix3d const &transformation) const {
   //   prim_lattice = cell.lattice . transformation^-1 . M^-1(centering)
-  Lattice const prim_lattice{cell.lattice().matrix() * transformation.inverse() *
+  Lattice const prim_lattice{cell.lattice().matrix() *
+                             transformation.inverse() *
                              centering_matrix_inv(matched_.type().centering)};
   symmetry::PrimitiveFinder<F> const finder(cell, tol_);
   auto trimmed = finder.trim_to(prim_lattice);

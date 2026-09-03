@@ -54,8 +54,8 @@ public:
     std::size_t stride = 1;
     std::size_t index = 0;
     for (std::size_t i = 0; i < 3; ++i) {
-      index += static_cast<std::size_t>(modulo(address[i], divisions_[i])) *
-               stride;
+      index +=
+          static_cast<std::size_t>(modulo(address[i], divisions_[i])) * stride;
       stride *= static_cast<std::size_t>(divisions_[i]);
     }
     return index;
@@ -117,7 +117,7 @@ public:
 
 private:
   constexpr Mesh(Address divisions, std::array<bool, 3> shift) noexcept
-      : divisions_(divisions), shift_(shift) {}
+      : divisions_{divisions}, shift_{shift} {}
 
   // Euclidean modulo into [0, m), and floor division by 2 (which differs from
   // C++ truncation for negative addresses).
@@ -178,8 +178,7 @@ public:
 
   // Relocate the grid into the first Brillouin zone of `reciprocal` (columns =
   // reciprocal basis vectors).
-  [[nodiscard]] BrillouinZone
-  brillouin_zone(Lattice const &reciprocal) const;
+  [[nodiscard]] BrillouinZone brillouin_zone(Lattice const &reciprocal) const;
 
 private:
   ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations);
@@ -219,8 +218,8 @@ private:
   BrillouinZone(Mesh mesh, std::span<Matrix3i const> rotations,
                 std::vector<Address> addresses,
                 std::vector<std::optional<std::size_t>> map)
-      : mesh_(mesh), rotations_(rotations.begin(), rotations.end()),
-        addresses_(std::move(addresses)), map_(std::move(map)) {}
+      : mesh_{mesh}, rotations_(rotations.begin(), rotations.end()),
+        addresses_{std::move(addresses)}, map_{std::move(map)} {}
 
   Mesh mesh_;
   std::vector<Matrix3i> rotations_;

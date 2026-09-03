@@ -58,7 +58,8 @@ inline constexpr auto kCenteringMatrixInvNum = [] {
   t[centering_index(data::Centering::a_face)] = {2, 0, 0, 0, 1, -1, 0, 1, 1};
   t[centering_index(data::Centering::b_face)] = {1, 0, -1, 0, 2, 0, 1, 0, 1};
   t[centering_index(data::Centering::c_face)] = {1, 1, 0, -1, 1, 0, 0, 0, 2};
-  t[centering_index(data::Centering::r_center)] = {2, -1, -1, 1, 1, -2, 1, 1, 1};
+  t[centering_index(data::Centering::r_center)] = {2,  -1, -1, 1, 1,
+                                                   -2, 1,  1,  1};
   return t;
 }();
 

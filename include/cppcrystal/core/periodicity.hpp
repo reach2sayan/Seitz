@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
 #include <cppcrystal/core/fractional.hpp>
 #include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/core/types.hpp>
 
 #include <algorithm>
 #include <array>
@@ -79,8 +79,8 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
 // Minimal-image fractional offset of `diff`: every periodic component is
 // folded to its nearest-lattice-point residue, every aperiodic component is
 // left as the raw difference (no images along it).
-[[nodiscard]] inline Vector3d
-minimal_image(Vector3d const &diff, CellPeriodicity const &p) noexcept {
+[[nodiscard]] inline Vector3d minimal_image(Vector3d const &diff,
+                                            CellPeriodicity const &p) noexcept {
   Vector3d out = math::nearest_offset(diff);
   for (auto const [axis, kind] : p | std::views::enumerate) {
     if (kind == AxisKind::aperiodic) {

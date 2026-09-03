@@ -128,12 +128,11 @@ spacegroup_type(HallNumber hall) noexcept {
 template <GroupFamily F>
 inline constexpr auto kHallsByNumber =
     detail::bucket_index<static_cast<std::size_t>(hall_settings(F)),
-                         static_cast<std::size_t>(
-                             SpacegroupFamily<F>::groups) + 1>(
-        [](int index) {
-          return kCatalog<SpacegroupFamily<F>>.rows[
+                         static_cast<std::size_t>(SpacegroupFamily<F>::groups) +
+                             1>([](int index) {
+      return kCatalog<SpacegroupFamily<F>>.rows[
               static_cast<std::size_t>(index) - 1].number;
-        });
+    });
 
 // Every Hall setting index of an international number; empty if out of range.
 template <GroupFamily F>
@@ -175,8 +174,7 @@ default_halls_with_pointgroup(int pointgroup_number) noexcept {
 
 namespace detail {
 // Every group lands in exactly one point-group bucket, under its own number.
-template <GroupFamily F>
-constexpr bool pointgroup_index_well_formed() {
+template <GroupFamily F> constexpr bool pointgroup_index_well_formed() {
   std::size_t total = 0;
   for (int pg = 0; pg <= kNumPointgroups; ++pg) {
     for (int index : kDefaultHallsByPointgroup<F>[pg]) {
@@ -228,14 +226,15 @@ static_assert(default_hall<GroupFamily::layer>(1)->index() == 1);
 static_assert(default_hall<GroupFamily::layer>(80).has_value());
 static_assert(!default_hall<GroupFamily::layer>(81).has_value());
 static_assert(!HallNumber::of(GroupFamily::space, 0).has_value());
-static_assert(!HallNumber::of(GroupFamily::space, kSpaceHallSettings + 1).has_value());
-static_assert(!HallNumber::of(GroupFamily::layer, kLayerHallSettings + 1)
-                   .has_value());
+static_assert(
+    !HallNumber::of(GroupFamily::space, kSpaceHallSettings + 1).has_value());
+static_assert(
+    !HallNumber::of(GroupFamily::layer, kLayerHallSettings + 1).has_value());
 static_assert(spacegroup_type(*HallNumber::of(GroupFamily::layer, 1)).number ==
               1);
-static_assert(
-    spacegroup_type(*HallNumber::of(GroupFamily::layer, kLayerHallSettings))
-        .number == kNumLayerGroups);
+static_assert(spacegroup_type(*HallNumber::of(GroupFamily::layer,
+                                              kLayerHallSettings))
+                  .number == kNumLayerGroups);
 
 // ---- operations ------------------------------------------------------------
 

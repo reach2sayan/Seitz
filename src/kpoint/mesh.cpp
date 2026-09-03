@@ -17,7 +17,9 @@ namespace cppcrystal::kpoint {
 
 namespace {
 
-[[nodiscard]] Vector3i to_eigen(Address a) noexcept { return {a[0], a[1], a[2]}; }
+[[nodiscard]] Vector3i to_eigen(Address a) noexcept {
+  return {a[0], a[1], a[2]};
+}
 [[nodiscard]] Address from_eigen(Vector3i const &v) noexcept {
   return {v[0], v[1], v[2]};
 }
@@ -28,9 +30,8 @@ namespace {
 // the reference.
 [[nodiscard]] bool has_conventional_symmetry(Mesh const &mesh,
                                              std::span<Matrix3i const> rots) {
-  if (std::ranges::any_of(rots, [](Matrix3i const &rot) {
-        return rot.cwiseAbs().sum() > 3;
-      })) {
+  if (std::ranges::any_of(
+          rots, [](Matrix3i const &rot) { return rot.cwiseAbs().sum() > 3; })) {
     return false;
   }
 
@@ -52,9 +53,9 @@ namespace {
 // Smallest grid-point index in the orbit of `doubled` under the reciprocal
 // group. The group is closed, so iterating every rotation reaches the whole
 // orbit and the minimum is canonical.
-[[nodiscard]] std::size_t normal_representative(
-    Address doubled, Mesh const &mesh, std::size_t self,
-    std::span<Matrix3i const> rots) {
+[[nodiscard]] std::size_t
+normal_representative(Address doubled, Mesh const &mesh, std::size_t self,
+                      std::span<Matrix3i const> rots) {
   Vector3i const ad = to_eigen(doubled);
   std::size_t best = self;
   for (Matrix3i const &rot : rots) {
@@ -66,10 +67,10 @@ namespace {
 // As above, but for the distortion path: the rotation is applied in 64-bit
 // (scaled by `divisor`) and a rotated point is only valid when it divides
 // evenly and its parity matches the shift.
-[[nodiscard]] std::size_t distortion_representative(
-    Address doubled, Mesh const &mesh, std::size_t self,
-    std::array<std::int64_t, 3> const &divisor,
-    std::span<Matrix3i const> rots) {
+[[nodiscard]] std::size_t
+distortion_representative(Address doubled, Mesh const &mesh, std::size_t self,
+                          std::array<std::int64_t, 3> const &divisor,
+                          std::span<Matrix3i const> rots) {
   auto const &shift = mesh.shift();
   std::array<std::int64_t, 3> long_address{};
   for (std::size_t j = 0; j < 3; ++j) {
@@ -130,7 +131,8 @@ inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
                                   Address const &divisions) {
   auto const lengths =
       std::views::iota(0, 3) | std::views::transform([&](int i) {
-        auto const d = static_cast<double>(divisions[static_cast<std::size_t>(i)]);
+        auto const d =
+            static_cast<double>(divisions[static_cast<std::size_t>(i)]);
         return reciprocal.col(i).squaredNorm() / (d * d);
       });
   return 0.01 * *std::ranges::max_element(lengths);
@@ -149,24 +151,25 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
   };
 
   mapping_.reserve(mesh_.size());
-  for (auto const [index, address] : mesh_.addresses() | std::views::enumerate) {
+  for (auto const [index, address] :
+       mesh_.addresses() | std::views::enumerate) {
     auto const i = static_cast<std::size_t>(index);
     Address const doubled = mesh_.doubled_address(address);
-    mapping_.push_back(normal ? normal_representative(doubled, mesh_, i,
-                                                      rotations_)
-                              : distortion_representative(doubled, mesh_, i,
-                                                          divisor, rotations_));
+    mapping_.push_back(
+        normal ? normal_representative(doubled, mesh_, i, rotations_)
+               : distortion_representative(doubled, mesh_, i, divisor,
+                                           rotations_));
   }
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
-      mapping_ | std::views::enumerate,
-      [](auto const &e) {
+      mapping_ | std::views::enumerate, [](auto const &e) {
         return std::get<1>(e) == static_cast<std::size_t>(std::get<0>(e));
       }));
 }
 
-ReciprocalMesh ReciprocalMesh::from_rotations(
-    Mesh mesh, std::span<Matrix3i const> real_rotations,
-    TimeReversal time_reversal) {
+ReciprocalMesh
+ReciprocalMesh::from_rotations(Mesh mesh,
+                               std::span<Matrix3i const> real_rotations,
+                               TimeReversal time_reversal) {
   // All transposes first, then (with time reversal) all inversion partners
   // (-transpose); de-duplication keeps first occurrence, so order matters.
   std::vector<Matrix3i> candidates;
@@ -196,22 +199,22 @@ ReciprocalMesh::stabilized(std::span<Vector3d const> qpoints) const {
     });
   };
   return ReciprocalMesh{
-      mesh_, std::vector<Matrix3i>{
-                 std::from_range,
-                 rotations_ | std::views::filter(preserves_qpoints)}};
+      mesh_,
+      std::vector<Matrix3i>{
+          std::from_range, rotations_ | std::views::filter(preserves_qpoints)}};
 }
 
 std::vector<std::size_t> ReciprocalMesh::images_of(Address address) const {
-  Vector3i const doubled = to_eigen(address) * 2 + to_eigen({
-      mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
-      mesh_.shift()[2] ? 1 : 0});
+  Vector3i const doubled =
+      to_eigen(address) * 2 +
+      to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
+                mesh_.shift()[2] ? 1 : 0});
   std::vector<std::size_t> out;
   out.reserve(rotations_.size());
-  std::ranges::transform(rotations_, std::back_inserter(out),
-                         [&](Matrix3i const &rot) {
-                           return mesh_.index_of_doubled(
-                               from_eigen(rot * doubled));
-                         });
+  std::ranges::transform(
+      rotations_, std::back_inserter(out), [&](Matrix3i const &rot) {
+        return mesh_.index_of_doubled(from_eigen(rot * doubled));
+      });
   return out;
 }
 
@@ -227,7 +230,8 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   // original index); boundary duplicates are appended afterwards.
   std::vector<Address> addresses(mesh_.size());
 
-  for (auto const [index, address] : mesh_.addresses() | std::views::enumerate) {
+  for (auto const [index, address] :
+       mesh_.addresses() | std::views::enumerate) {
     auto const i = static_cast<std::size_t>(index);
     // Squared distance to the origin of each candidate image.
     std::array<double, kBzSearchSpace.size()> distance{};
@@ -281,9 +285,10 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
 std::vector<std::optional<std::size_t>>
 BrillouinZone::images_of(Address address) const {
   // mesh_ is already the doubled mesh.
-  Vector3i const doubled = to_eigen(address) * 2 + to_eigen({
-      mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
-      mesh_.shift()[2] ? 1 : 0});
+  Vector3i const doubled =
+      to_eigen(address) * 2 +
+      to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
+                mesh_.shift()[2] ? 1 : 0});
   std::vector<std::optional<std::size_t>> out;
   out.reserve(rotations_.size());
   std::ranges::transform(

@@ -102,7 +102,6 @@ private:
   // cell. One runtime branch on the family at the top; everything below it is
   // compile-time specialised.
   [[nodiscard]] Result<Dataset> determine() const;
-  [[nodiscard]] Result<void> warm_derived() const;
 
   std::optional<HallNumber> setting_;
 

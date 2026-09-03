@@ -78,9 +78,9 @@ public:
   // first. Only the periodic axes are folded into the cell: folding an
   // aperiodic one would send a c-flipping image of a layer to 1-z instead of
   // -z. Row count equals multiplicity() for a generic `xyz`.
-  [[nodiscard]] Positions orbit(Vector3d const &xyz,
-                                CellPeriodicity const &periodicity =
-                                    all_periodic()) const;
+  [[nodiscard]] Positions
+  orbit(Vector3d const &xyz,
+        CellPeriodicity const &periodicity = all_periodic()) const;
 
 private:
   friend struct detail::WyckoffFactory;
@@ -117,15 +117,12 @@ class GroupBase {
 public:
   [[nodiscard]] int number() const noexcept { return number_; }
   [[nodiscard]] std::string_view symbol() const noexcept { return symbol_; }
-
   [[nodiscard]] int order() const noexcept {
     return static_cast<int>(operations_.size());
   }
-
   [[nodiscard]] std::span<SymmetryOperation const> operations() const noexcept {
     return operations_;
   }
-
   // The Wyckoff positions, ordered by ascending letter ('a' = the most
   // special); the last is the general position.
   [[nodiscard]] std::span<Wyckoff const> wyckoffs() const noexcept {
@@ -138,14 +135,13 @@ public:
         it != positions_.end()) {
       return &*it;
     }
-    return leaf::new_error(e_message{
-        std::string("wyckoff: no Wyckoff position '") + letter +
-        "' in this group"});
+    return leaf::new_error(
+        e_message{std::string("wyckoff: no Wyckoff position '") + letter +
+                  "' in this group"});
   }
 
 protected:
   GroupBase() = default;
-
   int number_ = 0;
   std::string_view symbol_;
   Operations operations_;

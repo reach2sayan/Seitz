@@ -1,10 +1,10 @@
 #include <cppcrystal/data/msg_database.hpp>
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/mdspan.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 
-#include "data/packed_decode.hpp"
 #include "data/magnetic_spacegroup_operation_tables.hpp"
+#include "data/packed_decode.hpp"
 
 #include <array>
 #include <cstddef>
@@ -15,8 +15,8 @@ namespace cppcrystal::data {
 
 namespace {
 
-using detail::DecodedOp;
 using detail::decode_packed;
+using detail::DecodedOp;
 using detail::make_operation;
 
 // 34012224 = 3^9 * 12^3, the base separating the time-reversal flag from the
@@ -110,10 +110,10 @@ template <class T, class Build>
   return table;
 }
 
-[[nodiscard]] MagneticOperations build_operations(int uni_number,
-                                                          int offset) {
-  auto const &idx = kMagneticOperationIndex[static_cast<std::size_t>(uni_number)]
-                                           [static_cast<std::size_t>(offset)];
+[[nodiscard]] MagneticOperations build_operations(int uni_number, int offset) {
+  auto const &idx =
+      kMagneticOperationIndex[static_cast<std::size_t>(uni_number)]
+                             [static_cast<std::size_t>(offset)];
   auto const [count, start] = idx;
   auto const decoded =
       std::ranges::subrange(kDecodedMagneticOps.begin() + start,
@@ -124,12 +124,11 @@ template <class T, class Build>
   return MagneticOperations{std::move(ops)};
 }
 
-[[nodiscard]] Operations build_transformations(int uni_number,
-                                                       int offset) {
+[[nodiscard]] Operations build_transformations(int uni_number, int offset) {
   AltTable const table(kDecodedAltTransformations.data());
-  auto const row = md::submdspan(table, static_cast<std::size_t>(uni_number),
-                                 static_cast<std::size_t>(offset),
-                                 md::full_extent);
+  auto const row =
+      md::submdspan(table, static_cast<std::size_t>(uni_number),
+                    static_cast<std::size_t>(offset), md::full_extent);
   // The identity transformation is always first; the rest run up to the
   // nullopt terminator.
   std::vector<SymmetryOperation> transforms;
@@ -152,8 +151,8 @@ magnetic_operations_from_database(UniNumber uni,
   return table[offset ? setting_slot(uni.value(), *offset) : 0];
 }
 
-Operations const &
-magnetic_std_transformations(UniNumber uni, std::optional<HallNumber> hall) {
+Operations const &magnetic_std_transformations(UniNumber uni,
+                                               std::optional<HallNumber> hall) {
   static auto const table =
       build_setting_table<Operations>(build_transformations);
   auto const offset = hall_number_offset(uni, hall);

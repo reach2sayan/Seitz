@@ -19,9 +19,15 @@
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <map>
+#include <ranges>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 
 using namespace cppcrystal;
@@ -30,19 +36,59 @@ namespace {
 // Unwrap a move-only Result<T>, failing the test on an error result.
 using cppcrystal::test::errored;
 using cppcrystal::test::must;
+
+// Order of the point group named by a tabulated site-symmetry symbol. The
+// symbols are oriented Hermann-Mauguin symbols ("..2", "m.mm", "-4m.2"): the
+// dots mark direction slots and carry no group information, and a few symbols
+// differ from the standard one only by the order of the axes. Everything else
+// is one of the 32 point-group symbols.
+[[nodiscard]] int site_symmetry_order(std::string_view symbol) {
+  std::string key;
+  std::ranges::copy(symbol | std::views::filter([](char c) { return c != '.'; }),
+                    std::back_inserter(key));
+  static std::map<std::string_view, std::string_view> const kPermuted{
+      {"2mm", "mm2"}, {"m2m", "mm2"}, {"-4m2", "-42m"}, {"-6m2", "-62m"}};
+  if (auto const it = kPermuted.find(key); it != kPermuted.end()) {
+    key = it->second;
+  }
+  static std::map<std::string_view, int> const kOrder{
+      {"1", 1},     {"-1", 2},   {"2", 2},     {"m", 2},     {"2/m", 4},
+      {"222", 4},   {"mm2", 4},  {"mmm", 8},   {"4", 4},     {"-4", 4},
+      {"4/m", 8},   {"422", 8},  {"4mm", 8},   {"-42m", 8},  {"4/mmm", 16},
+      {"3", 3},     {"-3", 6},   {"32", 6},    {"3m", 6},    {"-3m", 12},
+      {"6", 6},     {"-6", 6},   {"6/m", 12},  {"622", 12},  {"6mm", 12},
+      {"-62m", 12}, {"6/mmm", 24}, {"23", 12}, {"m-3", 24},  {"432", 24},
+      {"-43m", 24}, {"m-3m", 48}};
+  auto const it = kOrder.find(key);
+  REQUIRE(it != kOrder.end());
+  return it->second;
+}
 } // namespace
 
 TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
           "[group]") {
+  // Three independently sourced quantities meet in one identity: the tabulated
+  // multiplicity, the stabiliser computed from the tabulated operations at a
+  // generic point of the tabulated locus, and the orbit actually expanded from
+  // a generic seed. The tabulated site-symmetry symbol pins the stabiliser's
+  // order a second way, so a symbol and multiplicity mistabulated together
+  // would still be caught.
+  Vector3d const seed{0.1234, 0.2718, 0.3142};
   int checked = 0;
   for (int number = 1; number <= 230; ++number) {
     auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, number));
     auto const nops = static_cast<int>(sg->operations().size());
     REQUIRE(nops > 0);
     for (auto const &wp : sg->wyckoffs()) {
+      INFO("space group " << number << ", position " << wp.letter() << " ("
+                          << wp.site_symmetry() << ")");
       auto const order = static_cast<int>(wp.operations().size());
       // multiplicity * |site-symmetry group| == |conventional operations|
       REQUIRE(wp.multiplicity() * order == nops);
+      // The expanded orbit of a generic point has exactly that many points.
+      REQUIRE(wp.orbit(seed).rows() == wp.multiplicity());
+      // The tabulated symbol names a point group of the stabiliser's order.
+      REQUIRE(site_symmetry_order(wp.site_symmetry()) == order);
       ++checked;
     }
     // The general position is last, fully free, with trivial site symmetry.
@@ -145,6 +191,9 @@ TEST_CASE("incompatible composition is rejected", "[generate]") {
 
 TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
           "[layergen]") {
+  // The same three-way check as for the space groups; the orbit folds only
+  // the periodic plane, so a c-flipped image stays at -z rather than 1-z.
+  Vector3d const seed{0.1234, 0.2718, 0.3142};
   for (int number = 1; number <= 80; ++number) {
     auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
     REQUIRE(lg->number() == number);
@@ -152,8 +201,12 @@ TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
     auto const nops = static_cast<int>(lg->operations().size());
     REQUIRE(nops > 0);
     for (auto const &wp : lg->wyckoffs()) {
-      REQUIRE(wp.multiplicity() * static_cast<int>(wp.operations().size()) ==
-              nops);
+      INFO("layer group " << number << ", position " << wp.letter() << " ("
+                          << wp.site_symmetry() << ")");
+      auto const order = static_cast<int>(wp.operations().size());
+      REQUIRE(wp.multiplicity() * order == nops);
+      REQUIRE(wp.orbit(seed, aperiodic_along(2)).rows() == wp.multiplicity());
+      REQUIRE(site_symmetry_order(wp.site_symmetry()) == order);
     }
   }
 }

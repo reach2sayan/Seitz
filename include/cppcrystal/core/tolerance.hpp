@@ -23,8 +23,7 @@ inline constexpr double kZeroPrec = 1e-10;
 // Entry-wise tolerance comparison: every |a - b| entry strictly below tol.
 // The single definition of "equal within tolerance" for vectors and matrices.
 [[nodiscard]] bool approx_equal(MatrixExpr auto const &a,
-                                MatrixExpr auto const &b,
-                                double tol) noexcept {
+                                MatrixExpr auto const &b, double tol) noexcept {
   return ((a - b).cwiseAbs().maxCoeff() < tol);
 }
 
@@ -43,7 +42,6 @@ struct Tolerance {
 // symprec when unset.
 struct MagneticTolerance : Tolerance {
   std::optional<double> moment;
-
   [[nodiscard]] double moment_or_symprec() const noexcept {
     return moment.value_or(symprec);
   }

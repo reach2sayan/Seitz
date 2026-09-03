@@ -77,8 +77,8 @@ namespace detail {
 // multimap: equal_range(key) then walks the elements with that key in their
 // original order, and find(key) is the first of them.
 template <class Key, class Less>
-[[nodiscard]] auto
-ordered_multimap(std::vector<std::pair<Key, int>> pairs, Less less) {
+[[nodiscard]] auto ordered_multimap(std::vector<std::pair<Key, int>> pairs,
+                                    Less less) {
   std::ranges::sort(pairs, [&](auto const &a, auto const &b) {
     if (less(a.first, b.first)) {
       return true;
@@ -148,7 +148,8 @@ template <std::ranges::random_access_range R>
 // ranges::unique for an unsorted container — first occurrence wins.
 template <std::ranges::forward_range C, class Equiv>
 bool push_unique(C &out, std::ranges::range_value_t<C> value, Equiv &&equiv) {
-  if (std::ranges::any_of(out, [&](auto const &e) { return equiv(e, value); })) {
+  if (std::ranges::any_of(out,
+                          [&](auto const &e) { return equiv(e, value); })) {
     return false;
   }
   out.push_back(std::move(value));

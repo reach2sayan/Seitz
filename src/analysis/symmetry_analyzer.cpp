@@ -57,7 +57,8 @@ attempt(Cell const &cell, Tolerance const &tol,
 
   std::vector<Site> sites;
   sites.reserve(standardized->wyckoffs.size());
-  for (auto const [i, wyckoff] : standardized->wyckoffs | std::views::enumerate) {
+  for (auto const [i, wyckoff] :
+       standardized->wyckoffs | std::views::enumerate) {
     auto const u = static_cast<std::size_t>(i);
     sites.push_back(Site{wyckoff, standardized->site_symmetry_symbols[u],
                          standardized->equivalent_atoms[u],
@@ -90,17 +91,17 @@ Result<Dataset> SymmetryAnalyzer::determine() const {
   // The one runtime branch on the family; everything below is templated. The
   // outer loop progressively tightens the tolerance in case a given one yields
   // an inconsistent cell.
-  return dispatch_family(
-      cell_.periodicity(), [&]<GroupFamily F>() -> Result<Dataset> {
-        Tolerance tol = tol_;
-        for (int i = 0; i < kNumAttemptOuter;
-             ++i, tol.symprec *= kReduceRateOuter) {
-          if (auto ds = attempt<F>(cell_, tol, setting_)) {
-            return std::move(*ds);
-          }
-        }
-        return leaf::new_error(e_spacegroup_search_failed{});
-      });
+  return dispatch_family(cell_.periodicity(),
+                         [&]<GroupFamily F>() -> Result<Dataset> {
+                           Tolerance tol = tol_;
+                           for (int i = 0; i < kNumAttemptOuter;
+                                ++i, tol.symprec *= kReduceRateOuter) {
+                             if (auto ds = attempt<F>(cell_, tol, setting_)) {
+                               return std::move(*ds);
+                             }
+                           }
+                           return leaf::new_error(e_spacegroup_search_failed{});
+                         });
 }
 
 template <CellSetting S, Idealize I>
@@ -122,9 +123,8 @@ Result<Cell> SymmetryAnalyzer::standardized_cell() const {
           }
         } else {
           // Transform the input cell instead, preserving its real geometry.
-          BOOST_LEAF_AUTO(primitive,
-                          refinement.to_primitive(cell_,
-                                                  ds->setting.transformation));
+          BOOST_LEAF_AUTO(primitive, refinement.to_primitive(
+                                         cell_, ds->setting.transformation));
           if constexpr (S == CellSetting::primitive) {
             return primitive;
           } else {
@@ -138,17 +138,17 @@ Result<Cell> SymmetryAnalyzer::standardized_cell() const {
 }
 
 template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
-                                    Idealize::yes>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::yes>()
+    const;
 template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
-                                    Idealize::no>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::no>()
+    const;
 template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
-                                    Idealize::yes>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::yes>()
+    const;
 template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
-                                    Idealize::no>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>()
+    const;
 
 Result<Operations> SymmetryAnalyzer::cell_operations() const {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {
@@ -184,15 +184,8 @@ Result<kpoint::ReciprocalMesh>
 SymmetryAnalyzer::reciprocal_mesh(kpoint::Mesh mesh,
                                   TimeReversal time_reversal) const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
-  return kpoint::ReciprocalMesh::from_rotations(mesh, ds->operations.rotations(),
-                                                time_reversal);
-}
-
-Result<void> SymmetryAnalyzer::warm_derived() const {
-  BOOST_LEAF_CHECK(primitive_cell());
-  BOOST_LEAF_CHECK(cell_operations());
-  BOOST_LEAF_CHECK(lattice_symmetry());
-  return {};
+  return kpoint::ReciprocalMesh::from_rotations(
+      mesh, ds->operations.rotations(), time_reversal);
 }
 
 } // namespace cppcrystal::analysis

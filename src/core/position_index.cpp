@@ -1,119 +1,75 @@
 #include "core/position_index.hpp"
 
-#include "math/fractional.hpp"
-
 #include <algorithm>
-#include <cmath>
+#include <array>
 #include <limits>
 #include <ranges>
+#include <span>
 
 namespace cppcrystal {
 
-namespace {
-
-// Upper bound on buckets per periodic axis: beyond this a bucket is already
-// far narrower than any coordinate noise, and the key stays well inside int32.
-constexpr double kMaxDivisions = double{1 << 20};
-
-[[nodiscard]] std::int64_t floor_to_int64(double x) noexcept {
-  return static_cast<std::int64_t>(std::floor(x));
-}
-
-} // namespace
+namespace bgi = boost::geometry::index;
 
 bool coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
                 double symprec, CellPeriodicity const &periodicity) noexcept {
   return (lattice * minimal_image(a - b, periodicity)).norm() <= symprec;
 }
 
-BucketGeometry BucketGeometry::of(Matrix3d const &lattice, double symprec,
-                                  CellPeriodicity const &periodicity) noexcept {
-  Matrix3d const inv = lattice.inverse();
-  BucketGeometry g{};
-  for (auto const [axis, kind] : periodicity | std::views::enumerate) {
-    auto const i = static_cast<Index>(axis);
-    // Twice the largest fractional displacement a symprec-sized Cartesian
-    // step can cause along this axis.
-    double const bound = 2.0 * symprec * inv.row(i).norm();
-    if (kind == AxisKind::periodic) {
-      double const wanted = bound > 0.0 ? 1.0 / bound : kMaxDivisions;
-      auto const divisions =
-          static_cast<int>(std::floor(std::clamp(wanted, 1.0, kMaxDivisions)));
-      g.divisions[i] = divisions;
-      g.width[i] = 1.0 / divisions;
-    } else {
-      g.divisions[i] = 0;
-      g.width[i] =
-          bound > 0.0 ? bound : std::numeric_limits<double>::infinity();
-    }
-  }
-  return g;
-}
-
-BucketGeometry::Key
-BucketGeometry::bucket_of(Vector3d const &frac) const noexcept {
-  Key key{};
-  for (Index i = 0; i < 3; ++i) {
-    if (divisions[i] > 0) {
-      auto const raw =
-          floor_to_int64(math::wrap_to_unit_cell(frac[i]) * divisions[i]);
-      // wrap_to_unit_cell lands in [0, 1), but f * div can round up to div.
-      key[static_cast<std::size_t>(i)] =
-          std::min(raw, std::int64_t{divisions[i]} - 1);
-    } else {
-      key[static_cast<std::size_t>(i)] = floor_to_int64(frac[i] / width[i]);
-    }
-  }
-  return key;
-}
-
-PositionIndex::PositionIndex(BucketGeometry geometry, Positions const &positions,
-                             Types const &types, Matrix3d const &lattice,
-                             double symprec, CellPeriodicity const &periodicity)
-    : geometry_(geometry), lattice_(lattice), symprec_(symprec),
+PositionIndex::PositionIndex(Positions const &positions, Types const &types,
+                             Matrix3d const &lattice, double symprec,
+                             CellPeriodicity const &periodicity)
+    : lattice_(lattice), symprec_(symprec),
+      // The sphere test in `coincident` and the box test here round
+      // differently; a few ulps of the coordinate scale keep a match on the
+      // sphere's surface from landing just outside the box.
+      half_width_(symprec + 64 * std::numeric_limits<double>::epsilon() *
+                                (symprec + lattice.cwiseAbs().maxCoeff())),
       periodicity_(periodicity), positions_(&positions), types_(&types) {
-  entries_.reserve(types.size());
+  std::vector<Tree::value_type> values;
+  values.reserve(types.size());
   for (Index i = 0; i < positions.rows(); ++i) {
-    entries_.push_back(
-        {geometry_.bucket_of(positions.row(i).transpose()), static_cast<int>(i)});
+    Vector3d const c = cartesian(positions.row(i).transpose());
+    values.emplace_back(Point(c[0], c[1], c[2]), static_cast<int>(i));
   }
-  std::ranges::sort(entries_);
+  tree_ = Tree(values);
 }
 
 PositionIndex::PositionIndex(Cell const &cell, double symprec)
-    : PositionIndex(BucketGeometry::of(cell.lattice().matrix(), symprec,
-                                       cell.periodicity()),
-                    cell.positions(), cell.types(), cell.lattice().matrix(), symprec,
-                    cell.periodicity()) {}
+    : PositionIndex(cell.positions(), cell.types(), cell.lattice().matrix(),
+                    symprec, cell.periodicity()) {}
 
-PositionIndex::Buckets
-PositionIndex::bucket_ranges(Vector3d const &point) const {
-  auto const centre = geometry_.bucket_of(point);
-  auto const neighbour = [&](std::size_t axis, int offset) {
-    auto const b = centre[axis] + offset;
-    std::int64_t const div = geometry_.divisions[static_cast<Index>(axis)];
-    return div > 0 ? (b + div) % div : b;
+Vector3d PositionIndex::cartesian(Vector3d const &frac) const noexcept {
+  return lattice_ * wrap(frac, periodicity_);
+}
+
+std::vector<int> PositionIndex::candidates(Vector3d const &point) const {
+  static constexpr std::array<int, 3> kImages{-1, 0, 1};
+  static constexpr std::array<int, 1> kNone{0};
+  auto const shifts = [&](std::size_t axis) {
+    return periodicity_[axis] == AxisKind::periodic
+               ? std::span<int const>(kImages)
+               : std::span<int const>(kNone);
   };
 
-  // With one or two divisions on an axis the neighbourhood folds onto itself;
-  // sort + unique visits every bucket exactly once.
-  boost::container::static_vector<BucketGeometry::Key, 27> keys;
-  auto const offsets = std::views::iota(-1, 2);
-  for (auto const [d0, d1, d2] :
-       std::views::cartesian_product(offsets, offsets, offsets)) {
-    keys.push_back({neighbour(0, d0), neighbour(1, d1), neighbour(2, d2)});
-  }
-  std::ranges::sort(keys);
-  auto const [dup, end] = std::ranges::unique(keys);
-  keys.erase(dup, end);
-
-  Buckets out;
-  for (auto const &key : keys) {
-    auto const run = std::ranges::equal_range(entries_, key, {}, &Entry::bucket);
-    if (!run.empty()) {
-      out.push_back(std::span<Entry const>(run.begin(), run.end()));
+  Vector3d const folded = wrap(point, periodicity_);
+  double const h = half_width_;
+  std::vector<int> out;
+  for (auto const [s0, s1, s2] :
+       std::views::cartesian_product(shifts(0), shifts(1), shifts(2))) {
+    Vector3d const c =
+        lattice_ * (folded + Vector3i(s0, s1, s2).cast<double>());
+    Box const box(Point(c[0] - h, c[1] - h, c[2] - h),
+                  Point(c[0] + h, c[1] + h, c[2] + h));
+    for (auto it = tree_.qbegin(bgi::intersects(box)); it != tree_.qend();
+         ++it) {
+      out.push_back(it->second);
     }
   }
+  // A box wider than the cell along an axis sees the same atom from two
+  // images.
+  std::ranges::sort(out);
+  auto const [dup, end] = std::ranges::unique(out);
+  out.erase(dup, end);
   return out;
 }
 

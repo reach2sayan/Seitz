@@ -1,7 +1,7 @@
 #include "data/operation_index.hpp"
 
-#include <cppcrystal/data/detail/lookup.hpp>
 #include "data/spacegroup_operation_tables.hpp"
+#include <cppcrystal/data/detail/lookup.hpp>
 
 #include <cstddef>
 #include <vector>
@@ -13,10 +13,9 @@ RotationMultimap<int> const &operations_by_rotation(HallNumber hall) {
   auto const index_family = [](GroupFamily family, std::size_t size) {
     std::vector<RotationMultimap<int>> table(size);
     for (std::size_t key = 1; key < size; ++key) {
-      table[key] = index_by_rotation(
-          operations_from_database(
-              *HallNumber::of(family, static_cast<int>(key))),
-          &SymmetryOperation::rotation);
+      table[key] = index_by_rotation(operations_from_database(*HallNumber::of(
+                                         family, static_cast<int>(key))),
+                                     &SymmetryOperation::rotation);
     }
     return table;
   };

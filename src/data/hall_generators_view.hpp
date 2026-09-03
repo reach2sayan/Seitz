@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
 #include "data/hall_generators.hpp"
+#include <cppcrystal/core/types.hpp>
 
 #include <cstddef>
 

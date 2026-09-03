@@ -25,7 +25,7 @@ FetchContent_MakeAvailable(Eigen3)
 # release archive. 1.87 is the floor: it is the first release shipping
 # boost::parser (the house parsing library — never Spirit). Only the libraries
 # we actually link are configured.
-set(BOOST_INCLUDE_LIBRARIES container leaf parser preprocessor)
+set(BOOST_INCLUDE_LIBRARIES container flyweight geometry leaf parser preprocessor)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON

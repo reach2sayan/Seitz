@@ -24,8 +24,7 @@ namespace detail {
 // implied by a conventional operation set. Defined in src/core, over the
 // private primitive-cell machinery; declared here so OperationSet::to_primitive
 // can stay inline without the public header naming a pipeline type.
-[[nodiscard]] std::optional<
-    std::pair<std::vector<SymmetryOperation>, Matrix3d>>
+[[nodiscard]] std::optional<std::pair<std::vector<SymmetryOperation>, Matrix3d>>
 primitive_operations(std::span<SymmetryOperation const> operations,
                      Tolerance const &tol);
 
@@ -61,7 +60,9 @@ template <> struct OperationTraits<MagneticSymmetryOperation> {
 
 template <class Op>
 concept Operation = requires(Op const &op) {
-  { OperationTraits<Op>::spatial(op) } -> std::convertible_to<SymmetryOperation>;
+  {
+    OperationTraits<Op>::spatial(op)
+  } -> std::convertible_to<SymmetryOperation>;
   { OperationTraits<Op>::has_time_reversal } -> std::convertible_to<bool>;
 };
 
@@ -127,8 +128,7 @@ public:
     out.reserve(ops_.size());
     for (Op op : ops_) {
       SymmetryOperation &sp = spatial_of(op);
-      sp.rotation =
-          math::round_to_int(t * sp.rotation.cast<double>() * t_inv);
+      sp.rotation = math::round_to_int(t * sp.rotation.cast<double>() * t_inv);
       sp.translation = t * sp.translation;
       out.push_back(op);
     }

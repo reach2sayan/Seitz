@@ -1,12 +1,12 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "refine/refinement.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "core/overlap.hpp"
 #include "core/position_index.hpp"
-#include <cppcrystal/data/spg_database.hpp>
 #include "math/fractional.hpp"
 #include "refine/refinement.hpp"
 #include "refine/site_symmetry.hpp"
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -47,7 +47,8 @@ template <GroupFamily F>
                                           Cell const &primitive,
                                           Lattice const &std_lattice,
                                           CellPeriodicity const &periodicity) {
-  Matrix3d const trans_mat = sg.bravais_lattice.inverse() * primitive.lattice().matrix();
+  Matrix3d const trans_mat =
+      sg.bravais_lattice.inverse() * primitive.lattice().matrix();
   Positions pos(primitive.size(), 3);
   for (Index i = 0; i < primitive.size(); ++i) {
     Vector3d const p = trans_mat * primitive.position(i) + sg.origin_shift;
@@ -82,8 +83,9 @@ struct Bravais {
   pos.reserve(total);
   types.reserve(total);
   mapping.reserve(total);
-  for (auto const &op : conv_sym | std::views::filter(
-                            &SymmetryOperation::is_identity_rotation)) {
+  for (auto const &op :
+       conv_sym |
+           std::views::filter(&SymmetryOperation::is_identity_rotation)) {
     for (auto const &[j, atom] : exact | std::views::enumerate) {
       pos.emplace_back(
           math::wrap_to_unit_cell(Vector3d(atom.position + op.translation)));
@@ -115,9 +117,9 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
                                          PositionIndex const &index,
                                          Operations const &operations) {
   for (auto const &op : operations) {
-    if (auto const j = index.first_match(op.apply(cell.position(i)),
-                                         cell.type(i),
-                                         [&](int k) { return k < i; })) {
+    if (auto const j =
+            index.first_match(op.apply(cell.position(i)), cell.type(i),
+                              [&](int k) { return k < i; })) {
       return *j;
     }
   }
@@ -132,7 +134,8 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
 equivalent_atoms_broken(Cell const &cell, Operations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
   PositionIndex const index(cell, symprec);
-  auto const first_sharing = first_index_of(mapping_table, mapping_table.size());
+  auto const first_sharing =
+      first_index_of(mapping_table, mapping_table.size());
   std::vector<int> equiv;
   equiv.reserve(mapping_table.size());
   for (auto const [i, prim] : mapping_table | std::views::enumerate) {
@@ -159,12 +162,9 @@ crystallographic_orbits(ExactPositions const &exact,
   auto const first_of = first_index_of(mapping_table, exact.size());
   std::vector<int> rep;
   rep.reserve(exact.size());
-  std::ranges::transform(exact, std::back_inserter(rep),
-                         [&](auto const &atom) {
-                           return first_of[static_cast<std::size_t>(
-                                               atom.equivalent_atom)]
-                               .value_or(0);
-                         });
+  std::ranges::transform(exact, std::back_inserter(rep), [&](auto const &atom) {
+    return first_of[static_cast<std::size_t>(atom.equivalent_atom)].value_or(0);
+  });
 
   std::vector<int> orbits;
   orbits.reserve(mapping_table.size());
@@ -193,8 +193,7 @@ Refinement<F>::standardize(Operations const &cell_operations,
   Cell const conv_prim =
       conventional_primitive(sg, primitive, std_lattice, conv_periodicity);
 
-  auto const exact =
-      exact_positions(conv_prim, conv_sym, multi, hall, symprec);
+  auto const exact = exact_positions(conv_prim, conv_sym, multi, hall, symprec);
   if (!exact) {
     return std::nullopt;
   }

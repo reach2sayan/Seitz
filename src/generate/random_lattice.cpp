@@ -88,9 +88,10 @@ Matrix3d random_lattice(CrystalSystem system, double target_volume,
 
 double estimated_cell_volume(std::map<int, int> const &composition,
                              double fallback_volume) {
-  // Representative atomic packing fraction: covalent-radius spheres fill roughly
-  // this fraction of a real cell, so dividing the sphere-sum by it recovers a
-  // realistic cell volume (e.g. rock-salt NaCl lands near its true ~179 A^3).
+  // Representative atomic packing fraction: covalent-radius spheres fill
+  // roughly this fraction of a real cell, so dividing the sphere-sum by it
+  // recovers a realistic cell volume (e.g. rock-salt NaCl lands near its true
+  // ~179 A^3).
   constexpr double kPackingFraction = 0.55;
 
   double const sphere_sum = std::ranges::fold_left(
@@ -109,9 +110,9 @@ Matrix3d random_layer_lattice(std::span<SymmetryOperation const> operations,
   std::uniform_real_distribution<double> len(1.0, 2.0);
   std::uniform_real_distribution<double> ang(70.0, 110.0);
 
-  // A generic positive-definite in-plane metric, then averaged over the in-plane
-  // 2x2 blocks of the operations so it is exactly invariant under the in-plane
-  // point group (whatever crystal system that implies).
+  // A generic positive-definite in-plane metric, then averaged over the
+  // in-plane 2x2 blocks of the operations so it is exactly invariant under the
+  // in-plane point group (whatever crystal system that implies).
   double const a0 = len(rng);
   double const b0 = len(rng);
   double const g0 = ang(rng) * kDeg;

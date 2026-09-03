@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
 #include <cppcrystal/core/fractional.hpp>
+#include <cppcrystal/core/types.hpp>
 
 #include <concepts>
 #include <optional>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -14,9 +14,9 @@ namespace cppcrystal::refine {
 
 // Exact-position / Wyckoff data of one conventional-primitive atom.
 struct ExactPosition {
-  Vector3d position;        // exact (symmetrized) fractional position
-  int wyckoff = 0;          // Wyckoff letter index (0 = a, 1 = b, ...)
-  int equivalent_atom = 0;  // representative atom index
+  Vector3d position;       // exact (symmetrized) fractional position
+  int wyckoff = 0;         // Wyckoff letter index (0 = a, 1 = b, ...)
+  int equivalent_atom = 0; // representative atom index
   std::string_view site_symmetry_symbol{};
 };
 

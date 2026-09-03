@@ -49,8 +49,7 @@ radius_of(int type, DistanceTolerance const &tol) noexcept {
     return false;
   }
 
-  PositionIndex const index(BucketGeometry::of(lattice, cutoff, periodicity),
-                            positions, types, lattice, cutoff, periodicity);
+  PositionIndex const index(positions, types, lattice, cutoff, periodicity);
   auto const row = [&](Index i) { return Vector3d(positions.row(i)); };
   for (Index i = 0; i < positions.rows(); ++i) {
     auto later = index.candidates(row(i)) |

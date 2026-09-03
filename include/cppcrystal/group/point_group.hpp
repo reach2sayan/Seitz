@@ -23,7 +23,6 @@ public:
   // Build by international point-group number (1..32, the spglib pointgroup
   // numbering: 1, -1, 2, m, 2/m, 222, ...).
   [[nodiscard]] static Result<PointGroup> from_number(int number);
-
   [[nodiscard]] std::string_view schoenflies() const noexcept {
     return schoenflies_;
   }
@@ -37,7 +36,6 @@ public:
 
 private:
   PointGroup() = default;
-
   std::string_view schoenflies_;
   int representative_spacegroup_ = 0;
 };

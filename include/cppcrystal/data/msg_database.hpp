@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/magnetic_symmetry_operation.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/core/magnetic_symmetry_operation.hpp>
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/catalog.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp>
@@ -42,7 +42,6 @@ struct MagneticFamily {
   using Row = MagneticSpacegroupType;
   using Key = UniNumber;
   static constexpr std::size_t count = static_cast<std::size_t>(kUniNumbers);
-
   [[nodiscard]] static constexpr int index_of(UniNumber key) noexcept {
     return key.value();
   }
@@ -75,9 +74,8 @@ uni_candidates(HallNumber hall) noexcept {
 // The operations of a UNI number in the given Hall setting (unset = its first
 // setting), materialised once per setting; empty when (uni, hall) is not a
 // valid pairing.
-[[nodiscard]] MagneticOperations const &
-magnetic_operations_from_database(UniNumber uni,
-                                  std::optional<HallNumber> hall = std::nullopt);
+[[nodiscard]] MagneticOperations const &magnetic_operations_from_database(
+    UniNumber uni, std::optional<HallNumber> hall = std::nullopt);
 
 // The alternative standardized-setting transformations of a UNI number in the
 // given Hall setting, identity first; empty when (uni, hall) is not valid.

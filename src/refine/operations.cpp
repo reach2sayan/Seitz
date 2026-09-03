@@ -1,11 +1,11 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "refine/refinement.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
 #include "core/position_index.hpp"
-#include <cppcrystal/data/spg_database.hpp>
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <algorithm>
 #include <ranges>
@@ -21,14 +21,14 @@ namespace {
 [[nodiscard]] Operations with_origin_shift(Operations const &conv_sym,
                                            Vector3d const &shift) {
   return Operations{
-      std::from_range, conv_sym | std::views::transform([&](auto const &op) {
-                         Matrix3d const r_minus_e =
-                             op.rotation.template cast<double>() -
-                             Matrix3d::Identity();
-                         return SymmetryOperation{
-                             op.rotation,
-                             Vector3d(op.translation + r_minus_e * shift)};
-                       })};
+      std::from_range,
+      conv_sym | std::views::transform([&](auto const &op) {
+        Matrix3d const r_minus_e =
+            op.rotation.template cast<double>() - Matrix3d::Identity();
+        return SymmetryOperation{
+            .rotation = op.rotation,
+            .translation = Vector3d(op.translation + r_minus_e * shift)};
+      })};
 }
 
 // Keep the first operation of each distinct rotation and transform it to the
@@ -59,7 +59,8 @@ lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
   for (auto const [i, j, k] : std::views::cartesian_product(
            std::views::iota(0, frame[0]), std::views::iota(0, frame[1]),
            std::views::iota(0, frame[2]))) {
-    out.emplace_back(math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
+    out.emplace_back(
+        math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
   }
 
   return out;
@@ -82,10 +83,11 @@ unique_translations(Matrix3d const &lattice,
 
 // Transform the primitive ops to the input cell (R' = T^-1 R T), keeping only
 // those that map the input lattice exactly.
-[[nodiscard]] Operations
-symmetry_in_original_cell(Matrix3i const &t_mat, Matrix3d const &inv_tmat,
-                          Matrix3d const &lattice,
-                          Operations const &prim_sym, double symprec) {
+[[nodiscard]] Operations symmetry_in_original_cell(Matrix3i const &t_mat,
+                                                   Matrix3d const &inv_tmat,
+                                                   Matrix3d const &lattice,
+                                                   Operations const &prim_sym,
+                                                   double symprec) {
   std::vector<SymmetryOperation> out;
   out.reserve(prim_sym.size());
   for (auto const &op : prim_sym) {
@@ -110,7 +112,8 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
   out.reserve(pure_trans.size() * t_sym.size());
   for (Vector3d const &p : pure_trans) {
     for (auto const &op : t_sym) {
-      out.emplace_back(op.rotation, math::wrap_to_unit_cell(Vector3d(op.translation + p)));
+      out.emplace_back(op.rotation,
+                       math::wrap_to_unit_cell(Vector3d(op.translation + p)));
     }
   }
   out.shrink_to_fit();
@@ -119,9 +122,9 @@ upon_lattice_points(std::vector<Vector3d> const &pure_trans,
 
 // Recover the symmetry operations in the original input cell.
 [[nodiscard]] std::optional<Operations>
-recover_in_original_cell(Operations const &prim_sym,
-                         Matrix3i const &t_mat, Matrix3d const &lattice,
-                         int multiplicity, double symprec) {
+recover_in_original_cell(Operations const &prim_sym, Matrix3i const &t_mat,
+                         Matrix3d const &lattice, int multiplicity,
+                         double symprec) {
   Matrix3d const inv_tmat = t_mat.cast<double>().inverse();
   std::vector<Vector3d> const pure_trans = unique_translations(
       lattice, lattice_translations(surrounding_frame(t_mat), inv_tmat),
@@ -143,8 +146,7 @@ std::optional<Operations> Refinement<F>::operations() const {
   Cell const &primitive = primitive_;
   Cell const &cell = cell_;
   double const symprec = tol_.symprec;
-  Operations const conv_sym =
-      operations_from_database(sg.hall);
+  Operations const conv_sym = operations_from_database(sg.hall);
 
   Matrix3d const inv_prim = primitive.lattice().matrix().inverse();
 

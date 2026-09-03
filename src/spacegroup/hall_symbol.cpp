@@ -3,13 +3,13 @@
 #include "core/centering.hpp"
 #include "core/matrix_order.hpp"
 #include "core/position_index.hpp"
+#include "data/hall_classification.hpp"
+#include "data/hall_generators_view.hpp"
 #include "data/operation_index.hpp"
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
-#include "data/hall_classification.hpp"
-#include "data/hall_generators_view.hpp"
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
@@ -23,8 +23,8 @@
 // Given the symmetry operations of the conventional (bravais) cell and a
 // candidate Hall number, determine whether the operations match that Hall
 // setting and, if so, the origin shift that aligns them with the database
-// operations. The Grosse-Kunstleve (1999) origin-shift formula shift = VSpU . dw
-// is precomputed per setting (the VSpU tables); dw is the per-generator
+// operations. The Grosse-Kunstleve (1999) origin-shift formula shift = VSpU .
+// dw is precomputed per setting (the VSpU tables); dw is the per-generator
 // translation difference vs the database, over every representative of the
 // generator rotation the operations offer.
 namespace cppcrystal::spacegroup {
@@ -33,8 +33,8 @@ using data::Centering;
 
 namespace {
 
-// Centering change-of-basis matrices live in core/centering.hpp (shared with the
-// space-group search and cell standardization).
+// Centering change-of-basis matrices live in core/centering.hpp (shared with
+// the space-group search and cell standardization).
 
 // trans expressed in the primitive setting: M . trans.
 [[nodiscard]] Vector3d transform_translation(Centering c,
@@ -114,14 +114,14 @@ dw_candidates(MatchContext<F> const &s, Centering c, Matrix3i const &rot) {
   auto const [lo, hi] = s.symmetry_by_rotation.equal_range(rot);
   DwCandidates out;
   for (int const index : std::ranges::subrange(lo, hi) | std::views::values) {
-    push_unique(out,
-                s.wrap(transform_translation(
-                           c, s.symmetry[static_cast<std::size_t>(index)]
-                                  .translation) -
-                       reference),
-                [](Vector3d const &a, Vector3d const &b) {
-                  return (a - b).cwiseAbs().maxCoeff() < kZeroPrec;
-                });
+    push_unique(
+        out,
+        s.wrap(transform_translation(
+                   c, s.symmetry[static_cast<std::size_t>(index)].translation) -
+               reference),
+        [](Vector3d const &a, Vector3d const &b) {
+          return (a - b).cwiseAbs().maxCoeff() < kZeroPrec;
+        });
   }
   if (out.empty()) {
     return std::nullopt; // the generator rotation is absent from `symmetry`
@@ -147,9 +147,9 @@ dw_choices(MatchContext<F> const &s, Centering c, Generators const &rot) {
 
 // shift = VSpU . dw for one choice of generator representatives.
 template <GroupFamily F>
-[[nodiscard]] Vector3d origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
-                                    Vector3d const &dw0, Vector3d const &dw1,
-                                    Vector3d const &dw2) {
+[[nodiscard]] Vector3d
+origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
+             Vector3d const &dw0, Vector3d const &dw1, Vector3d const &dw2) {
   data::DwVector dw;
   dw << dw0, dw1, dw2;
   return s.wrap(data::vspu_matrix(vspu) * dw);
@@ -170,9 +170,9 @@ template <GroupFamily F>
     auto const it = std::ranges::find_if(lo, hi, [&](auto const &entry) {
       auto const idx = static_cast<std::size_t>(entry.second);
       return !matched[idx] &&
-             coincident(lhs - transform_translation(c, s.db_ops[idx].translation),
-                        shift_rot, s.primitive_lattice, s.symprec,
-                        s.periodicity());
+             coincident(
+                 lhs - transform_translation(c, s.db_ops[idx].translation),
+                 shift_rot, s.primitive_lattice, s.symprec, s.periodicity());
     });
     if (it == hi) {
       return false;
@@ -188,8 +188,8 @@ template <GroupFamily F>
 // the reference implementation's — the first operation carrying each rotation.
 template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
-hall_symbol_shift(MatchContext<F> const &s, Centering c, data::GeneratorSet const &gens,
-                  data::VSpUSet const &vspu) {
+hall_symbol_shift(MatchContext<F> const &s, Centering c,
+                  data::GeneratorSet const &gens, data::VSpUSet const &vspu) {
   auto const choices = dw_choices(s, c, unpack_generators(gens));
   if (!choices) {
     return std::nullopt;
@@ -284,9 +284,9 @@ template <GroupFamily F>
   // same per-system generator families.
   HallClass const hc = [&] {
     if constexpr (F == GroupFamily::layer) {
-      return HallClass{holohedry_from_pointgroup(
-                           spacegroup_type(s.hall).pointgroup_number),
-                       false, false};
+      return HallClass{
+          holohedry_from_pointgroup(spacegroup_type(s.hall).pointgroup_number),
+          false, false};
     } else {
       return hall_class(s.hall.index());
     }
@@ -313,9 +313,10 @@ template <GroupFamily F>
 } // namespace
 
 template <GroupFamily F>
-std::optional<Vector3d> SpacegroupMatcher<F>::match_hall(
-    Matrix3d const &bravais_lattice, HallNumber hall, Centering centering,
-    Operations const &symmetry, double symprec) {
+std::optional<Vector3d>
+SpacegroupMatcher<F>::match_hall(Matrix3d const &bravais_lattice,
+                                 HallNumber hall, Centering centering,
+                                 Operations const &symmetry, double symprec) {
   Operations const &db_ops = data::operations_from_database(hall);
   if (db_ops.size() != symmetry.size()) {
     return std::nullopt;
@@ -324,12 +325,9 @@ std::optional<Vector3d> SpacegroupMatcher<F>::match_hall(
       bravais_lattice * centering_matrix_inv(centering);
   RotationMultimap<int> const symmetry_by_rotation =
       index_by_rotation(symmetry, &SymmetryOperation::rotation);
-  MatchContext<F> const context{hall,
-                                primitive_lattice,
-                                symmetry,
-                                symmetry_by_rotation,
-                                db_ops,
-                                data::operations_by_rotation(hall),
+  MatchContext<F> const context{hall,     primitive_lattice,
+                                symmetry, symmetry_by_rotation,
+                                db_ops,   data::operations_by_rotation(hall),
                                 symprec};
   // Bring the origin shift back to the bravais setting.
   return dispatch(context, centering).transform([&](Vector3d const &shift) {

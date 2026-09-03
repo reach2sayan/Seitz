@@ -214,12 +214,11 @@ std::vector<TSubgroupEdge> derive_t_subgroup_edges() {
             return sub_pg.contains(op.rotation);
           })};
 
-      std::optional<int> const m = identify(sub_ops, lattice);
-      if (!m || *m == n) {
+      if (std::optional<int> const m = identify(sub_ops, lattice);
+          !m || *m == n) {
         continue; // unidentified, or degenerate self-edge
-      }
-      if (seen.insert({n, *m, index}).second) {
-        out.push_back({n, *m, index});
+      } else if (seen.insert({n, *m, index}).second) {
+        out.push_back(TSubgroupEdge{.super = n, .sub = *m, .index = index});
       }
     }
   }

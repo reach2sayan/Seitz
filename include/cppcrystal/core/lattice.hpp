@@ -19,7 +19,7 @@ namespace cppcrystal {
 class Lattice {
 public:
   Lattice() = default;
-  explicit Lattice(Matrix3d basis) noexcept : basis_(std::move(basis)) {}
+  explicit Lattice(Matrix3d basis) noexcept : basis_{std::move(basis)} {}
 
   // Checked construction: std::nullopt for a (near-)singular basis, whose
   // inverse would otherwise propagate NaN/inf through the whole pipeline.

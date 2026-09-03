@@ -41,8 +41,7 @@ Matrix3d const &centering_matrix_inv(Centering c) {
   static auto const table = [] {
     std::array<Matrix3d, kCenteringCount> t;
     for (std::size_t i = 0; i < kCenteringCount; ++i) {
-      double const den =
-          static_cast<double>(detail::kCenteringMatrixInvDen[i]);
+      double const den = static_cast<double>(detail::kCenteringMatrixInvDen[i]);
       t[i] = materialise<Matrix3d>(
           detail::kCenteringMatrixInvNum[i],
           [den](int v) { return static_cast<double>(v) / den; });

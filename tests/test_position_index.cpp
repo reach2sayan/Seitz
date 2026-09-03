@@ -103,9 +103,7 @@ TEST_CASE("PositionIndex agrees with the brute-force scan", "[position_index]") 
       t = static_cast<int>(rng() % 3);
     }
 
-    PositionIndex const index(
-        BucketGeometry::of(s.lattice, symprec, s.periodicity), pos, types,
-        s.lattice, symprec, s.periodicity);
+    PositionIndex const index(pos, types, s.lattice, symprec, s.periodicity);
 
     auto const brute = [&](Vector3d const &q) {
       std::vector<int> hits;
@@ -155,8 +153,7 @@ TEST_CASE("first_match honours the accept predicate in index order",
   pos.row(1) << 0.25, 0.25, 0.25;
   pos.row(2) << 0.25, 0.25, 0.25;
   Types const types{7, 7, 7};
-  PositionIndex const index(BucketGeometry::of(lattice, 1e-5, all_periodic()),
-                            pos, types, lattice, 1e-5, all_periodic());
+  PositionIndex const index(pos, types, lattice, 1e-5, all_periodic());
   Vector3d const q(0.25, 0.25, 1.25); // one lattice vector away
   CHECK(index.first_match(q, 7) == 0);
   CHECK(index.first_match(q, 7, [](int j) { return j > 0; }) == 1);

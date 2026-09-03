@@ -80,6 +80,7 @@ target_compile_features(cppcrystal PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
         Boost::leaf Threads::Threads)
+target_link_libraries(cppcrystal PRIVATE Boost::flyweight Boost::geometry)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Hardening warning set (Phase 9). The conversion warnings are applied to the

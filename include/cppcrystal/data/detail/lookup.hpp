@@ -18,8 +18,9 @@ namespace cppcrystal::data::detail {
 // key -> the values of the ids with that key, as one contiguous span. Built
 // by bucket_index at compile time; K is the number of keys (0..K-1).
 template <std::size_t N, std::size_t K> struct BucketIndex {
-  std::array<int, N> values{};      // grouped by key, ascending id within
-  std::array<int, K + 1> offsets{}; // bucket k = values[offsets[k], offsets[k+1])
+  std::array<int, N> values{}; // grouped by key, ascending id within
+  std::array<int, K + 1>
+      offsets{}; // bucket k = values[offsets[k], offsets[k+1])
 
   [[nodiscard]] constexpr std::span<int const>
   operator[](int key) const noexcept {
@@ -42,8 +43,7 @@ template <std::size_t N, std::size_t K, class KeyOf,
   for (int id = 1; id <= static_cast<int>(N); ++id) {
     ++out.offsets[static_cast<std::size_t>(key_of(id)) + 1];
   }
-  std::partial_sum(out.offsets.begin(), out.offsets.end(),
-                   out.offsets.begin());
+  std::partial_sum(out.offsets.begin(), out.offsets.end(), out.offsets.begin());
   std::array<int, K> cursor{};
   std::copy_n(out.offsets.begin(), K, cursor.begin());
   for (int id = 1; id <= static_cast<int>(N); ++id) {

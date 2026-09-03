@@ -56,8 +56,8 @@ namespace {
 } // namespace
 
 OverlapChecker::OverlapChecker(Cell const &cell, double symprec)
-    : sorted_(sorted_by_distance(cell)), symprec_(symprec),
-      index_(sorted_, symprec) {}
+    : sorted_{sorted_by_distance(cell)}, symprec_{symprec},
+      index_{sorted_, symprec} {}
 
 bool OverlapChecker::possible_overlap(Positions const &rotated) const {
   Index const probes = std::min<Index>(sorted_.size(), 3);
@@ -81,15 +81,17 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   auto const n = static_cast<std::size_t>(sorted_.size());
   std::vector<boost::container::small_vector<int, 2>> images(n);
   for (Index ir = 0; ir < sorted_.size(); ++ir) {
-    for (int io : index_.matches(rotated.row(ir).transpose(), sorted_.type(ir))) {
+    for (int io :
+         index_.matches(rotated.row(ir).transpose(), sorted_.type(ir))) {
       images[static_cast<std::size_t>(io)].push_back(static_cast<int>(ir));
     }
   }
 
   std::vector<bool> taken(n, false);
   return std::ranges::all_of(images, [&](auto const &candidates) {
-    auto const free = std::ranges::find_if(
-        candidates, [&](int ir) { return !taken[static_cast<std::size_t>(ir)]; });
+    auto const free = std::ranges::find_if(candidates, [&](int ir) {
+      return !taken[static_cast<std::size_t>(ir)];
+    });
     if (free == candidates.end()) {
       return false;
     }

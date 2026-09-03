@@ -11,7 +11,6 @@ Usage: transcribe_hall_generators.py <hall_symbol.c> <out.hpp>
 import re
 import sys
 
-
 def extract_body(text, start_brace):
     depth = 0
     for i in range(start_brace, len(text)):
@@ -22,7 +21,6 @@ def extract_body(text, start_brace):
             if depth == 0:
                 return text[start_brace:i + 1]
     raise ValueError("unbalanced braces")
-
 
 def main():
     src, out = sys.argv[1], sys.argv[2]

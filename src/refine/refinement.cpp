@@ -1,12 +1,12 @@
 #include "refine/refinement.hpp"
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/data/spg_database.hpp>
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "symmetry/pointgroup.hpp"
+#include <cppcrystal/core/lattice.hpp>
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <cmath>
 #include <ranges>
@@ -114,7 +114,8 @@ namespace {
   double const angle =
       std::acos((g(0, 1) / a / b + g(0, 2) / a / c + g(1, 2) / b / c) / 3);
   double const ahex = 2 * (a + b + c) / 3 * std::sin(angle / 2);
-  double const chex = (a + b + c) / 3 * std::sqrt(3 * (1 + 2 * std::cos(angle)));
+  double const chex =
+      (a + b + c) / 3 * std::sqrt(3 * (1 + 2 * std::cos(angle)));
 
   Matrix3d m = Matrix3d::Zero();
   m(0, 0) = ahex / 2;
@@ -170,7 +171,7 @@ Lattice conventional_lattice(SpacegroupMatch const &sg) {
 }
 
 SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
-                                                    double symprec) {
+                                             double symprec) {
   Operations const conv_sym = operations_from_database(sg.hall);
   Matrix3d const std_lattice = conventional_lattice(sg).matrix();
 
@@ -178,7 +179,7 @@ SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
   double min_length = sg.bravais_lattice.norm();
   std::optional<std::size_t> rot_i = std::nullopt;
   Matrix3d rot_lat = sg.bravais_lattice;
-  for (const auto& [i, sym] : conv_sym | std::views::enumerate) {
+  for (const auto &[i, sym] : conv_sym | std::views::enumerate) {
     Matrix3i const &rot = sym.rotation;
     if (rot.determinant() < 0) {
       continue;

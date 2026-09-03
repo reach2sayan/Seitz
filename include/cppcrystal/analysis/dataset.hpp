@@ -33,11 +33,11 @@ struct Setting {
 // The per-atom result of a determination, one Site per input-cell atom. These
 // were five parallel vectors; an atom's five answers now travel together.
 struct Site {
-  int wyckoff = 0;                   // Wyckoff letter index, 0 = 'a'
-  std::string_view site_symmetry;    // tabulated site-symmetry symbol
-  int equivalent_atom = 0;           // symmetrically-equivalent representative
-  int orbit = 0;                     // crystallographic-orbit representative
-  int primitive_atom = 0;            // this atom's primitive-cell atom
+  int wyckoff = 0;                // Wyckoff letter index, 0 = 'a'
+  std::string_view site_symmetry; // tabulated site-symmetry symbol
+  int equivalent_atom = 0;        // symmetrically-equivalent representative
+  int orbit = 0;                  // crystallographic-orbit representative
+  int primitive_atom = 0;         // this atom's primitive-cell atom
 };
 
 // The result of a space-group determination. The group's identity is the Hall

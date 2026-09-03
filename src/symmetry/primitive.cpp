@@ -208,9 +208,8 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   double tol = symprec;
   bool ok = false;
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
-    PositionIndex const index(
-        BucketGeometry::of(trimmed_lattice.matrix(), tol, periodicity), pos,
-        cell.types(), trimmed_lattice.matrix(), tol, periodicity);
+    PositionIndex const index(pos, cell.types(), trimmed_lattice.matrix(),
+                              tol, periodicity);
     for (int i = 0; i < n; ++i) {
       auto const ui = static_cast<std::size_t>(i);
       overlap[ui] = i; // i is a representative until a lower one claims it

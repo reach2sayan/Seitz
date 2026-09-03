@@ -20,8 +20,8 @@ public:
   Cell() = default;
   Cell(Lattice lattice, Positions positions, Types types,
        CellPeriodicity periodicity = all_periodic())
-      : lattice_(std::move(lattice)), positions_(std::move(positions)),
-        types_(std::move(types)), periodicity_(periodicity) {}
+      : lattice_{std::move(lattice)}, positions_{std::move(positions)},
+        types_{std::move(types)}, periodicity_{periodicity} {}
 
   [[nodiscard]] Index size() const noexcept {
     return static_cast<Index>(types_.size());

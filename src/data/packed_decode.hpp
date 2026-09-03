@@ -69,7 +69,8 @@ build_operation_table(std::array<std::array<int, 2>, N> const &index,
     std::vector<SymmetryOperation> v;
     v.reserve(static_cast<std::size_t>(count));
     for (int i = 0; i < count; ++i) {
-      v.push_back(make_operation(decoded[static_cast<std::size_t>(offset + i)]));
+      v.push_back(
+          make_operation(decoded[static_cast<std::size_t>(offset + i)]));
     }
     ops[key] = Operations{std::move(v)};
   }

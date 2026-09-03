@@ -1,23 +1,23 @@
 #include "magnetic/identify.hpp"
 
 #include "core/matrix_order.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/msg_database.hpp>
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "refine/refinement.hpp"
 #include "spacegroup/spacegroup.hpp"
 #include "spin/search.hpp"
 #include "symmetry/primitive.hpp"
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/data/msg_database.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <ranges>
 #include <cstddef>
 #include <iterator>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <utility>
 #include <vector>
@@ -25,8 +25,6 @@
 namespace cppcrystal::magnetic {
 
 namespace {
-
-
 
 constexpr int kMaxDenominator = 100;
 
@@ -45,9 +43,8 @@ enum class SpaceGroupKind { family, maximal };
 // Family / maximal space group of a magnetic symmetry, plus its non-magnetic
 // symmetry operations (in the input setting).
 [[nodiscard]] std::optional<std::pair<Operations, SpacegroupMatch>>
-space_group_of_magnetic_symmetry(
-    MagneticOperations const &magnetic_symmetry, SpaceGroupKind kind,
-    double symprec) {
+space_group_of_magnetic_symmetry(MagneticOperations const &magnetic_symmetry,
+                                 SpaceGroupKind kind, double symprec) {
   bool const ignore_time_reversal = kind == SpaceGroupKind::family;
 
   // Type-II magnetic space groups contain the pure time-reversal (I, 0)1'.
@@ -210,9 +207,10 @@ changed_pure_translations(Matrix3d const &tmat,
 
   std::vector<Vector3d> out;
   if (std::abs(det - 1.0) <= symprec) {
-    std::ranges::transform(
-        pure_trans, std::back_inserter(out),
-        [&](auto const &t) { return math::wrap_to_unit_cell(Vector3d(tmat * t)); });
+    std::ranges::transform(pure_trans, std::back_inserter(out),
+                           [&](auto const &t) {
+                             return math::wrap_to_unit_cell(Vector3d(tmat * t));
+                           });
   } else {
     // det(tmat) need not be integer; find the least common denominator of the
     // matrix entries, then enumerate added lattice points. When no denominator
@@ -238,7 +236,8 @@ changed_pure_translations(Matrix3d const &tmat,
     for (auto const &[n0, n1, n2, t] : std::views::cartesian_product(
              lattice_pts, lattice_pts, lattice_pts, pure_trans)) {
       Vector3d const shifted = t + Vector3d(n0, n1, n2);
-      Vector3d const transformed = math::wrap_to_unit_cell(Vector3d(tmat * shifted));
+      Vector3d const transformed =
+          math::wrap_to_unit_cell(Vector3d(tmat * shifted));
       push_unique(out, transformed, [&](Vector3d const &a, Vector3d const &b) {
         return approx_equal(a, b, symprec);
       });
@@ -314,10 +313,9 @@ changed_pure_translations(Matrix3d const &tmat,
     return std::ranges::any_of(lo, hi, [&](auto const &entry) {
       auto const &ob = b[static_cast<std::size_t>(entry.second)];
       // NB: strictly below symprec, unlike same_operation's <=; kept as is.
-      return approx_equal(
-          math::nearest_offset(
-              Vector3d(oa.spatial.translation - ob.spatial.translation)),
-          Vector3d::Zero(), symprec);
+      return approx_equal(math::nearest_offset(Vector3d(
+                              oa.spatial.translation - ob.spatial.translation)),
+                          Vector3d::Zero(), symprec);
     });
   });
 }
@@ -415,8 +413,7 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
       if (data::magnetic_spacegroup_type(uni).type != type) {
         continue;
       }
-      auto const &msg_uni =
-          data::magnetic_operations_from_database(uni, hall);
+      auto const &msg_uni = data::magnetic_operations_from_database(uni, hall);
       if (msg_uni.size() != reference->changed_symmetry.size()) {
         continue;
       }
@@ -428,8 +425,8 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
         Vector3d const cor_shift = transform.translation;
         auto const symmetry_cor = distinct_changed_magnetic_symmetry(
             cor, cor_shift, reference->changed_symmetry);
-        if (same_magnetic_symmetry(msg_uni,
-                                   MagneticOperations{symmetry_cor}, symprec)) {
+        if (same_magnetic_symmetry(msg_uni, MagneticOperations{symmetry_cor},
+                                   symprec)) {
           return Correction{uni, cor, cor_shift};
         }
       }
@@ -447,7 +444,8 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
   // Compose the correction onto the reference transformation:
   //   (tmat, shift) -> (tmat_cor, shift_cor) (tmat, shift).
   Matrix3d const tmat = correction->tmat * reference->tmat;
-  Vector3d const shift = correction->tmat * reference->shift + correction->shift;
+  Vector3d const shift =
+      correction->tmat * reference->shift + correction->shift;
 
   SpacegroupMatch ref_sg = reference->ref_sg;
   ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
@@ -480,8 +478,9 @@ Result<MagneticCell> MagneticIdentification::transform(
   BOOST_LEAF_AUTO(prim, finder.from_pure_translations(pure_trans));
   Cell const &prim_cell = prim.cell;
   // tmat_prm = tmat . cell.lattice^-1 . primitive.lattice.
-  Matrix3d const tmat_prm =
-      transformation_matrix * cell.lattice().matrix().inverse() * prim_cell.lattice().matrix();
+  Matrix3d const tmat_prm = transformation_matrix *
+                            cell.lattice().matrix().inverse() *
+                            prim_cell.lattice().matrix();
 
   // The cell -> primitive map is many-to-one; pick the first preimage per
   // primitive atom (site tensors are invariant under pure translations).
@@ -526,7 +525,8 @@ Result<MagneticCell> MagneticIdentification::transform(
       auto const uip = static_cast<std::size_t>(ip);
       types[uip] = prim_cell.type(i);
       positions.row(ip) =
-          math::wrap_to_unit_cell(Vector3d(pos_std + (*changed_pure)[p])).transpose();
+          math::wrap_to_unit_cell(Vector3d(pos_std + (*changed_pure)[p]))
+              .transpose();
       if (collinear) {
         scalars[uip] = mcell.scalar(orig);
       } else {

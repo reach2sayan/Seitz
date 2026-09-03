@@ -1,5 +1,5 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "data/rod_database.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "data/rod_group_tables.hpp"
 
@@ -9,7 +9,8 @@ Operations rod_operations_from_database(int rod_number) {
   if (!rod_number_in_range(rod_number)) {
     return {};
   }
-  int const begin = kRodOperationOffset[static_cast<std::size_t>(rod_number - 1)];
+  int const begin =
+      kRodOperationOffset[static_cast<std::size_t>(rod_number - 1)];
   int const end = kRodOperationOffset[static_cast<std::size_t>(rod_number)];
 
   std::vector<SymmetryOperation> ops;

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/analysis/dataset.hpp> // magnetic::MagneticType
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/analysis/dataset.hpp> // magnetic::MagneticType
 
 // Magnetic space-group determination (3D path): given a lattice and a set of
 // magnetic symmetry operations, identify the magnetic space group (UNI number)

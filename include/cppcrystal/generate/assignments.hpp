@@ -82,7 +82,9 @@ template <WyckoffLike W> struct AssignmentContext {
 
   [[nodiscard]] static AssignmentContext of(std::span<W const> positions,
                                             Composition const &comp) {
-    AssignmentContext ctx{.positions = positions,};
+    AssignmentContext ctx{
+        .positions = positions,
+    };
     std::ranges::copy(comp | std::views::filter([](auto const &entry) {
                         return entry.second > 0;
                       }),
@@ -105,8 +107,8 @@ template <WyckoffLike W> struct AssignmentContext {
       auto const mult = static_cast<Index>(wp.multiplicity());
       Index const after_one = wp.degrees_of_freedom() == 0 ? p + 1 : p;
       for (Index r = 0; r <= ctx.max_count; ++r) {
-        table[p, r] = table[p + 1, r] ||
-                      (r >= mult && table[after_one, r - mult]);
+        table[p, r] =
+            table[p + 1, r] || (r >= mult && table[after_one, r - mult]);
       }
     }
     return ctx;
@@ -136,9 +138,9 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
     if (elem + 1 == ctx.elements.size()) {
       co_yield placements;
     } else {
-      co_yield std::ranges::elements_of(
-          walk(ctx, placements, used_special, elem + 1, 0,
-               ctx.elements[elem + 1].second));
+      co_yield std::ranges::elements_of(walk(ctx, placements, used_special,
+                                             elem + 1, 0,
+                                             ctx.elements[elem + 1].second));
     }
     co_return;
   }
@@ -149,8 +151,7 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
   W const &wp = ctx.positions[pos];
   int const mult = wp.multiplicity();
   bool const fixed = wp.degrees_of_freedom() == 0;
-  int const max_copies =
-      fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
+  int const max_copies = fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
 
   for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
        ++copies) {
@@ -181,8 +182,8 @@ enumerate_assignments(std::span<W const> positions, Composition comp) {
     co_return;
   }
   Assignment<W> placements;
-  co_yield std::ranges::elements_of(detail::walk(
-      ctx, placements, {}, 0, 0, ctx.elements.front().second));
+  co_yield std::ranges::elements_of(
+      detail::walk(ctx, placements, {}, 0, 0, ctx.elements.front().second));
 }
 
 // Whether `comp` has at least one assignment on `positions`.

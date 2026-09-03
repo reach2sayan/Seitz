@@ -37,7 +37,6 @@ struct Generated {
 struct SeedBox {
   Vector3d low{Vector3d::Zero()};
   Vector3d high{Vector3d::Ones()};
-
   [[nodiscard]] Vector3d sample(std::mt19937_64 &rng) const;
 };
 
@@ -53,7 +52,8 @@ struct SeedBox {
 template <class G> struct GroupTraits;
 
 template <> struct GroupTraits<group::SpaceGroup> {
-  [[nodiscard]] static std::string_view kind(group::SpaceGroup const &g) noexcept;
+  [[nodiscard]] static std::string_view
+  kind(group::SpaceGroup const &g) noexcept;
   [[nodiscard]] static CellPeriodicity
   periodicity(group::SpaceGroup const &g) noexcept;
   [[nodiscard]] static SeedBox seed_box(group::SpaceGroup const &g) noexcept;
@@ -64,7 +64,8 @@ template <> struct GroupTraits<group::SpaceGroup> {
 };
 
 template <> struct GroupTraits<group::PointGroup> {
-  [[nodiscard]] static std::string_view kind(group::PointGroup const &) noexcept;
+  [[nodiscard]] static std::string_view
+  kind(group::PointGroup const &) noexcept;
   [[nodiscard]] static CellPeriodicity
   periodicity(group::PointGroup const &) noexcept;
   [[nodiscard]] static SeedBox seed_box(group::PointGroup const &) noexcept;
@@ -98,7 +99,7 @@ inline constexpr std::size_t kMaxAssignments = 1000;
 template <class G> class Generator {
 public:
   explicit Generator(G const &group, GenerateOptions options = {}) noexcept
-      : group_(&group), options_(options) {}
+      : group_{&group}, options_{options} {}
 
   // Whether `comp` can be placed on this group at all.
   [[nodiscard]] bool compatible(Composition const &comp) const {

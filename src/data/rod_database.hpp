@@ -1,8 +1,8 @@
 #pragma once
 
+#include "data/rod_group_tables.hpp"
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
-#include "data/rod_group_tables.hpp"
 
 #include <cstddef>
 #include <ranges>

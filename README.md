@@ -155,13 +155,13 @@ pipeline, instantiated as `if constexpr` on a `GroupFamily` template argument
 rather than branching on the sign of a Hall number at each stage; a single
 `dispatch_family()` is the one runtime branch, at the top.
 
-**Thread-safety.** `group::SpaceGroup::of` is a flyweight — one immutable object
-per Hall setting, built on first use under a guard and shared thereafter — and
-the generated tables are read-only after their one-time decode, so concurrent
-reads are race-free. `cppcrystal::warmup()` builds every setting up front (both
-families, in about 30 ms) to move that cost off the query path. Per-instance
-analyzer caches are not shared; build one analyzer per thread, or warm it before
-sharing it read-only.
+**Thread-safety.** Everything is safe to share. `group::SpaceGroup::of` is a
+Boost.Flyweight — one immutable object per Hall setting, built on first use and
+shared thereafter; the generated tables are read-only after their one-time
+decode; and every analyzer memo is race-free, so a const analyzer can be shared
+across threads from the moment it is built (the first caller of each query pays
+for it). `cppcrystal::warmup()` builds every setting up front (both families, in
+about 30 ms) to move that cost off the query path.
 
 ### Source layout
 
@@ -187,11 +187,13 @@ src/                      the implementation, headers beside their .cpp files
   math/                 integer matrices, fractional coordinates
 tools/                    offline data-table generators (Python + one C++ tool)
 tests/                    unit tests and oracle tests against reference spglib
-docs/                     workflow flowchart
+docs/                     workflow flowchart, mathematical background
 ```
 
 See [`docs/WORKFLOW.md`](docs/WORKFLOW.md) for a flowchart of the determination,
-generation, magnetic, and k-point pipelines.
+generation, magnetic, and k-point pipelines, and
+[`docs/MATHEMATICS.md`](docs/MATHEMATICS.md) for the group theory behind them
+(orbits, stabilisers, Wyckoff positions, space-group identification).
 
 ---
 

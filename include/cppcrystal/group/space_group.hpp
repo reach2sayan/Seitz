@@ -22,15 +22,17 @@ namespace cppcrystal::group {
 // arrays of letters / multiplicities / symbols.
 class SpaceGroup : public GroupBase {
 public:
-  // The group of a Hall setting. A Flyweight: one immutable object per setting,
-  // built on first use and shared thereafter, so the Wyckoff construction is
-  // paid once per setting rather than once per query. Total — a HallNumber
-  // cannot name a setting that does not exist. Layer groups come through the
-  // same door, with the family carried by the key.
-  //
-  // Thread-safety: the per-setting cache is guarded, so concurrent first-calls
-  // are safe. warmup() primes it.
+  // The group of a Hall setting. A Flyweight (Boost.Flyweight): one immutable
+  // object per setting, built on first use and shared thereafter, so the
+  // Wyckoff construction is paid once per setting rather than once per query.
+  // Total — a HallNumber cannot name a setting that does not exist. Layer
+  // groups come through the same door, with the family carried by the key.
+  // Race-free; warmup() primes it.
   [[nodiscard]] static SpaceGroup const &of(HallNumber hall);
+
+  // Build a private, unshared instance from its key. The flyweight factory
+  // constructs settings through this; callers want `of`.
+  explicit SpaceGroup(HallNumber hall);
 
   // The group of an international number, in its default (first) Hall setting.
   // Errors if the number is out of range for the family (1..230 for space
@@ -47,8 +49,6 @@ public:
   }
 
 private:
-  explicit SpaceGroup(HallNumber hall);
-
   // Build one Wyckoff position by partitioning the conventional operations into
   // its orbit (coset representatives) and site-symmetry stabilizer. A member so
   // it can reach Wyckoff's private constructor (SpaceGroup is a

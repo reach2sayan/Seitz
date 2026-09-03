@@ -57,7 +57,7 @@ template <int data::TSubgroupRelation::*Endpoint,
   for (auto const &rel : data::kTSubgroupRelations) {
     auto const k = static_cast<std::size_t>(rel.*Endpoint);
     out.edges[static_cast<std::size_t>(cursor[k]++)] =
-        SubgroupRelation{rel.*Other, rel.index};
+        SubgroupRelation{.number = rel.*Other, .index = rel.index};
   }
   return out;
 }

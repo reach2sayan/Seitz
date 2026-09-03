@@ -1,8 +1,8 @@
 #include <cppcrystal/generate/generator.hpp>
 
+#include "generate/random_lattice.hpp"
 #include <cppcrystal/data/element_data.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
-#include "generate/random_lattice.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -27,8 +27,8 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                       GenerateOptions const &options) {
   return std::ranges::fold_left(comp, 0.0, [&](double sum, auto const &entry) {
     auto const &[type, count] = entry;
-    double const r = data::covalent_radius(type).value_or(
-        options.distance.fallback_radius);
+    double const r =
+        data::covalent_radius(type).value_or(options.distance.fallback_radius);
     return sum + static_cast<double>(count) * 2.0 * r;
   });
 }
@@ -75,9 +75,10 @@ Vector3d SeedBox::sample(std::mt19937_64 &rng) const {
   return low + (high - low).cwiseProduct(u);
 }
 
-std::string_view GroupTraits<group::SpaceGroup>::kind(
-    group::SpaceGroup const &g) noexcept {
-  return g.hall().family() == GroupFamily::layer ? "layer group" : "space group";
+std::string_view
+GroupTraits<group::SpaceGroup>::kind(group::SpaceGroup const &g) noexcept {
+  return g.hall().family() == GroupFamily::layer ? "layer group"
+                                                 : "space group";
 }
 
 CellPeriodicity GroupTraits<group::SpaceGroup>::periodicity(
@@ -119,14 +120,15 @@ GroupTraits<group::PointGroup>::kind(group::PointGroup const &) noexcept {
   return "point group";
 }
 
-CellPeriodicity
-GroupTraits<group::PointGroup>::periodicity(group::PointGroup const &) noexcept {
+CellPeriodicity GroupTraits<group::PointGroup>::periodicity(
+    group::PointGroup const &) noexcept {
   return none_periodic();
 }
 
 SeedBox
 GroupTraits<group::PointGroup>::seed_box(group::PointGroup const &) noexcept {
-  return box_for(none_periodic(), 0.5); // the whole metric, centred on the origin
+  return box_for(none_periodic(),
+                 0.5); // the whole metric, centred on the origin
 }
 
 Matrix3d GroupTraits<group::PointGroup>::lattice(group::PointGroup const &g,

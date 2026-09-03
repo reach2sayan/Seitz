@@ -2,7 +2,9 @@
 
 #include <cppcrystal/core/error.hpp>
 
+#include <atomic>
 #include <concepts>
+#include <mutex>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -13,27 +15,47 @@ namespace detail {
 
 // A memoized Result-producing computation: `get(compute)` runs `compute` on
 // the first call, caches the success value, and hands back a pointer into the
-// cache (so projections copy out only the field they need). On error nothing
-// is cached and the next call re-runs — boost::leaf::result is move-only, so
-// the cache stores the success value, never the Result.
+// cache. On error nothing is cached and the next call re-runs —
+// boost::leaf::result is move-only, so the cache stores the success value,
+// never the Result.
 //
-// Not race-free: concurrent first-calls race on the internal optional. The
-// analyzers' warm() contract (fill every cache once, then share the const
-// instance read-only) is what makes that safe.
+// Race-free: a populated cache is read lock-free through the acquire flag;
+// first calls serialise on the mutex, so concurrent callers of a shared const
+// analyzer see exactly one computation. Moving a Lazy moves the value and
+// starts a fresh guard (moving while another thread reads is a caller bug,
+// as for any object).
 template <class T> class Lazy {
 public:
+  Lazy() = default;
+  Lazy(Lazy &&other) noexcept
+      : value_(std::move(other.value_)), ready_(value_.has_value()) {}
+  Lazy &operator=(Lazy &&other) noexcept {
+    value_ = std::move(other.value_);
+    ready_.store(value_.has_value(), std::memory_order_release);
+    return *this;
+  }
+  Lazy(Lazy const &) = delete;
+  Lazy &operator=(Lazy const &) = delete;
+
   template <class F>
     requires std::same_as<std::invoke_result_t<F &>, Result<T>>
   [[nodiscard]] Result<T const *> get(F &&compute) const {
+    if (ready_.load(std::memory_order_acquire)) {
+      return &*value_;
+    }
+    std::lock_guard const lock(mutex_);
     if (!value_) {
       BOOST_LEAF_AUTO(v, compute());
       value_ = std::move(v);
+      ready_.store(true, std::memory_order_release);
     }
     return &*value_;
   }
 
 private:
   mutable std::optional<T> value_;
+  mutable std::atomic<bool> ready_{false};
+  mutable std::mutex mutex_;
 };
 
 } // namespace detail
@@ -41,16 +63,14 @@ private:
 // A persistent, stateful view over a cell + tolerances that lazily computes
 // and memoizes its determination. Facade over the pipeline, Template Method
 // over the determination: this owns the inputs, the cache and the projection
-// machinery; `Derived` supplies only `determine()` (the actual pipeline) and
-// `warm_derived()` (its own extra caches, if any).
+// machinery; `Derived` supplies only `determine()` (the actual pipeline).
 //
 // Static polymorphism only — Derived is a concrete type, there is no runtime
 // hierarchy and no virtual dispatch.
 //
-// Thread-safety: the per-instance caches are NOT race-free. To share one
-// instance read-only across threads, call warm() once on a single thread
-// first; afterwards every getter is served from a populated cache and does no
-// writing. (The shared global tables are primed by cppcrystal::warmup().)
+// Thread-safety: every memo is race-free (detail::Lazy), so a const analyzer
+// may be shared across threads from the moment it is built; the first caller
+// of each query pays for it, the rest read the cache.
 template <class Derived, class Traits> class Analyzer {
 public:
   using CellType = typename Traits::CellType;
@@ -58,9 +78,7 @@ public:
   using ToleranceType = typename Traits::ToleranceType;
 
   [[nodiscard]] CellType const &cell() const noexcept { return cell_; }
-  [[nodiscard]] ToleranceType const &tolerance() const noexcept {
-    return tol_;
-  }
+  [[nodiscard]] ToleranceType const &tolerance() const noexcept { return tol_; }
 
   // The full determination of the input cell (memoized). A reference into the
   // memo: every projection below is a view onto this one computation, and a
@@ -74,14 +92,6 @@ public:
     return *ds;
   }
   Result<DatasetType const &> dataset() const && = delete;
-
-  // Force every lazy cache. Returns the first error encountered, or success
-  // once all caches are populated; afterwards this const instance may be
-  // shared read-only across threads.
-  Result<void> warm() const {
-    BOOST_LEAF_CHECK(cached_dataset());
-    return derived().warm_derived();
-  }
 
 protected:
   Analyzer(CellType cell, ToleranceType tol)
@@ -103,9 +113,6 @@ protected:
     BOOST_LEAF_AUTO(ds, cached_dataset());
     return ds->*Member;
   }
-
-  // Nothing extra to warm unless Derived says otherwise.
-  [[nodiscard]] Result<void> warm_derived() const { return {}; }
 
   CellType cell_;
   ToleranceType tol_;

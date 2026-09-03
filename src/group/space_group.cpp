@@ -8,12 +8,13 @@
 
 #include <Eigen/Dense>
 
+#include <boost/flyweight.hpp>
+#include <boost/flyweight/key_value.hpp>
+#include <boost/flyweight/no_tracking.hpp>
+#include <boost/flyweight/set_factory.hpp>
+
 #include <algorithm>
-#include <array>
 #include <iterator>
-#include <memory>
-#include <mutex>
-#include <shared_mutex>
 #include <span>
 #include <string>
 #include <utility>
@@ -101,37 +102,18 @@ SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
                          });
 }
 
-// The Flyweight store: one slot per setting per family, filled on first use.
-// A shared_mutex keeps the common case (an already-built setting) to a shared
-// lock, which matters because SpaceGroup::of sits under every generation call.
+// The Flyweight (Boost.Flyweight): one immutable SpaceGroup per HallNumber,
+// built from the key on first use and shared thereafter. `set_factory` keys on
+// HallNumber's ordering (no hash needed) and keeps addresses stable;
+// `no_tracking` pins every built setting for the program's lifetime, which is
+// what lets `of` hand out plain references; the default locking policy makes
+// concurrent first-calls safe. warmup() primes it.
 SpaceGroup const &SpaceGroup::of(HallNumber hall) {
-  struct Store {
-    std::shared_mutex mutex;
-    std::array<std::unique_ptr<SpaceGroup>, kSpaceHallSettings> space;
-    std::array<std::unique_ptr<SpaceGroup>, kLayerHallSettings> layer;
-
-    [[nodiscard]] std::unique_ptr<SpaceGroup> &slot(HallNumber h) noexcept {
-      auto const i = static_cast<std::size_t>(h.index()) - 1;
-      return h.family() == GroupFamily::layer ? layer[i] : space[i];
-    }
-  };
-  static Store store;
-
-  {
-    std::shared_lock const read(store.mutex);
-    if (auto const &built = store.slot(hall)) {
-      return *built;
-    }
-  }
-  // Build outside the lock: construction is independent per setting, and a
-  // duplicate build is cheaper than serialising every miss.
-  auto fresh = std::unique_ptr<SpaceGroup>(new SpaceGroup(hall));
-  std::unique_lock const write(store.mutex);
-  auto &slot = store.slot(hall);
-  if (!slot) {
-    slot = std::move(fresh);
-  }
-  return *slot;
+  using Shared =
+      boost::flyweight<boost::flyweights::key_value<HallNumber, SpaceGroup>,
+                       boost::flyweights::set_factory<>,
+                       boost::flyweights::no_tracking>;
+  return Shared(hall).get();
 }
 
 Result<SpaceGroup const *> SpaceGroup::from_number(GroupFamily family,

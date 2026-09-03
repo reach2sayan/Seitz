@@ -21,6 +21,7 @@ add_executable(cppcrystal_tests
         test_standardize.cpp)
 target_link_libraries(cppcrystal_tests PRIVATE
         cppcrystal::cppcrystal
+        Boost::geometry
         Catch2::Catch2WithMain)
 # The granular unit tests validate each pipeline stage, so they see the private
 # headers under src/ (which are not part of the installed interface).
@@ -54,6 +55,7 @@ if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
             test_robustness.cpp)
     target_link_libraries(cppcrystal_oracle_tests PRIVATE
             cppcrystal::cppcrystal
+            Boost::geometry
             Spglib::symspg
             Catch2::Catch2WithMain)
     target_include_directories(cppcrystal_oracle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

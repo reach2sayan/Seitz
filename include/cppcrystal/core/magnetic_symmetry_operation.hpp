@@ -15,7 +15,6 @@ namespace cppcrystal {
 struct MagneticSymmetryOperation {
   SymmetryOperation spatial{};
   bool time_reversal = false;
-
   [[nodiscard]] friend bool
   operator==(MagneticSymmetryOperation const &,
              MagneticSymmetryOperation const &) = default;

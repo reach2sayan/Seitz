@@ -28,7 +28,6 @@ public:
 
 private:
   RodGroup() = default;
-
   int periodic_axis_ = 2;
 };
 

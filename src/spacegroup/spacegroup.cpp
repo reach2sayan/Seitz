@@ -2,14 +2,14 @@
 
 #include "core/centering.hpp"
 #include "core/matrix_order.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/tolerance.hpp>
 #include "data/hall_classification.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
-#include "symmetry/search.hpp"
 #include "symmetry/pointgroup.hpp"
+#include "symmetry/search.hpp"
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,10 +21,10 @@
 #include <vector>
 
 // Given a primitive cell's symmetry operations, find the Hall number,
-// conventional/bravais lattice and origin shift: identify the point group, clean
-// up the triclinic/monoclinic basis, determine the centering, build the
-// conventional symmetry, then loop candidate Hall numbers permuting axis/setting
-// choices and matching against the Hall database.
+// conventional/bravais lattice and origin shift: identify the point group,
+// clean up the triclinic/monoclinic basis, determine the centering, build the
+// conventional symmetry, then loop candidate Hall numbers permuting
+// axis/setting choices and matching against the Hall database.
 namespace cppcrystal {
 
 data::SpacegroupType const &SpacegroupMatch::type() const noexcept {
@@ -169,19 +169,18 @@ make_axis_choices(double const (&bases)[N][3][3],
 // Number of orthorhombic layer-group axis choices, indexed by (layer-group
 // number - 19); the 30 orthorhombic layer groups are numbers 19..48.
 [[nodiscard]] constexpr int layer_num_axis_choices_ortho(int lg_number) {
-  constexpr std::array<int, 30> t = {
-      2, 1,                         // 19-20
-      2, 2, 2, 1, 2, 2, 1, 1, 1, 1, // 21-30
-      1, 1, 1, 1, 1, 1, 2, 1, 2, 1, // 31-40
-      1, 1, 1, 2, 1, 2, 2, 2};      // 41-48
+  constexpr std::array<int, 30> t = {2, 1,                         // 19-20
+                                     2, 2, 2, 1, 2, 2, 1, 1, 1, 1, // 21-30
+                                     1, 1, 1, 1, 1, 1, 2, 1, 2, 1, // 31-40
+                                     1, 1, 1, 2, 1, 2, 2, 2};      // 41-48
   return t[static_cast<std::size_t>(lg_number - 19)];
 }
 
 // The 59 orthorhombic space groups are 16..74 and the 30 orthorhombic layer
 // groups are 19..48; the tables are indexed off those origins, so their sizes
 // are the ranges themselves.
-static_assert(num_axis_choices_ortho(16) == 6);  // P222
-static_assert(num_axis_choices_ortho(74) == 2);  // Imma
+static_assert(num_axis_choices_ortho(16) == 6); // P222
+static_assert(num_axis_choices_ortho(74) == 2); // Imma
 static_assert(layer_num_axis_choices_ortho(19) == 2);
 static_assert(layer_num_axis_choices_ortho(48) == 2);
 
@@ -474,7 +473,8 @@ change_basis_monocli(Matrix3d const &conv_lattice,
                      Matrix3d const &primitive_lattice, double symprec,
                      std::optional<int> aperiodic_axis_conv) {
   int const keep_axis = aperiodic_axis_conv.value_or(1);
-  auto const smallest = Lattice{conv_lattice}.delaunay_in_plane(keep_axis, symprec);
+  auto const smallest =
+      Lattice{conv_lattice}.delaunay_in_plane(keep_axis, symprec);
   if (!smallest) {
     return std::nullopt;
   }
@@ -496,9 +496,8 @@ template <GroupFamily F>
 [[nodiscard]] std::optional<MatchResult>
 try_hall(Matrix3d const &conv_lattice, HallNumber hall, Centering centering,
          Operations const &symmetry, double symprec) {
-  auto const shift = SpacegroupMatcher<F>::match_hall(conv_lattice, hall,
-                                                      centering,
-                                       symmetry, symprec);
+  auto const shift = SpacegroupMatcher<F>::match_hall(
+      conv_lattice, hall, centering, symmetry, symprec);
   if (!shift) {
     return std::nullopt;
   }
@@ -534,26 +533,25 @@ template <GroupFamily F>
 [[nodiscard]] std::optional<MatchResult> match_db_change_of_basis_loop(
     Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
     std::span<Matrix3d const> change_of_basis, HallNumber hall,
-    Centering centering, Operations const &conv_symmetry,
-    double symprec) {
+    Centering centering, Operations const &conv_symmetry, double symprec) {
   Centering const centering_for_symmetry = (centering == Centering::r_center)
                                                ? Centering::r_center
                                                : Centering::primitive;
 
-  return first_match(
-      change_of_basis, orig_lattice, symprec,
-      [&](Matrix3d const &cob,
-          Matrix3d const *orig) -> std::optional<MatchResult> {
-        Matrix3d const changed_lattice = conv_lattice * cob;
-        if (orig &&
-            !is_equivalent_lattice(0, changed_lattice, *orig, symprec)) {
-          return std::nullopt;
-        }
-        Operations const changed_symmetry = get_conventional_symmetry(
-            cob, centering_for_symmetry, conv_symmetry);
-        return try_hall<F>(changed_lattice, hall, centering,
-                        changed_symmetry, symprec);
-      });
+  return first_match(change_of_basis, orig_lattice, symprec,
+                     [&](Matrix3d const &cob,
+                         Matrix3d const *orig) -> std::optional<MatchResult> {
+                       Matrix3d const changed_lattice = conv_lattice * cob;
+                       if (orig && !is_equivalent_lattice(0, changed_lattice,
+                                                          *orig, symprec)) {
+                         return std::nullopt;
+                       }
+                       Operations const changed_symmetry =
+                           get_conventional_symmetry(
+                               cob, centering_for_symmetry, conv_symmetry);
+                       return try_hall<F>(changed_lattice, hall, centering,
+                                          changed_symmetry, symprec);
+                     });
 }
 
 template <GroupFamily F>
@@ -578,25 +576,25 @@ match_db_others(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                 HallNumber hall, Centering centering, Holohedry holohedry,
                 Operations const &conv_symmetry, double symprec) {
   if (holohedry == Holohedry::triclinic) {
-    return try_hall<F>(conv_lattice, hall, centering, conv_symmetry,
-                    symprec);
+    return try_hall<F>(conv_lattice, hall, centering, conv_symmetry, symprec);
   }
   if (holohedry == Holohedry::tetragonal) {
     return match_db_change_of_basis_loop<F>(conv_lattice, orig_lattice,
-                                         change_of_basis_C4(), hall,
-                                         centering, conv_symmetry, symprec);
+                                            change_of_basis_C4(), hall,
+                                            centering, conv_symmetry, symprec);
   }
   // hexagonal / trigonal (non-rhombohedral)
   return match_db_change_of_basis_loop<F>(conv_lattice, orig_lattice,
-                                       change_of_basis_C6(), hall,
-                                       centering, conv_symmetry, symprec);
+                                          change_of_basis_C6(), hall, centering,
+                                          conv_symmetry, symprec);
 }
 
 template <GroupFamily F>
-[[nodiscard]] std::optional<MatchResult> match_db_cubic_in_loop(
-    Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
-    Matrix3d const &change, HallNumber hall, Centering centering,
-    Operations const &conv_symmetry, double symprec) {
+[[nodiscard]] std::optional<MatchResult>
+match_db_cubic_in_loop(Matrix3d const &conv_lattice,
+                       Matrix3d const *orig_lattice, Matrix3d const &change,
+                       HallNumber hall, Centering centering,
+                       Operations const &conv_symmetry, double symprec) {
   Matrix3d change_of_basis = change;
   Matrix3d changed_lattice = conv_lattice * change_of_basis;
 
@@ -613,7 +611,7 @@ template <GroupFamily F>
   Operations const changed_symmetry = get_conventional_symmetry(
       change_of_basis, Centering::primitive, conv_symmetry);
   return try_hall<F>(changed_lattice, hall, centering, changed_symmetry,
-                  symprec);
+                     symprec);
 }
 
 template <GroupFamily F>
@@ -624,8 +622,8 @@ match_db_cubic(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   return first_match(ortho_axis_choices(), orig_lattice, symprec,
                      [&](AxisChoice const &choice, Matrix3d const *orig) {
                        return match_db_cubic_in_loop<F>(
-                           conv_lattice, orig, choice.basis, hall,
-                           centering, conv_symmetry, symprec);
+                           conv_lattice, orig, choice.basis, hall, centering,
+                           conv_symmetry, symprec);
                      });
 }
 
@@ -679,25 +677,24 @@ template <GroupFamily F>
 
   Operations const changed_symmetry = get_conventional_symmetry(
       change_of_basis, Centering::primitive, symmetry);
-  return try_hall<F>(changed_lattice, hall, changed_centering,
-                  changed_symmetry, symprec);
+  return try_hall<F>(changed_lattice, hall, changed_centering, changed_symmetry,
+                     symprec);
 }
 
 template <GroupFamily F>
 [[nodiscard]] std::optional<MatchResult>
 match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
-               HallNumber hall, Centering centering,
-               Operations const &symmetry, int num_free_axes,
-               double symprec) {
+               HallNumber hall, Centering centering, Operations const &symmetry,
+               int num_free_axes, double symprec) {
   // 3D tries all six axis permutations {abc, bca, cab, ba-c, a-cb, -cba}; a
   // layer group tries only abc and ba-c (stride 3), the two that keep the
   // aperiodic axis at c.
   constexpr int step = F == GroupFamily::layer ? 3 : 1;
-  auto const choices = std::views::iota(0, 6) | std::views::stride(step) |
-                       std::views::transform([](int i) -> AxisChoice const & {
-                         return ortho_axis_choices()[
-                             static_cast<std::size_t>(i)];
-                       });
+  auto const choices =
+      std::views::iota(0, 6) | std::views::stride(step) |
+      std::views::transform([](int i) -> AxisChoice const & {
+        return ortho_axis_choices()[static_cast<std::size_t>(i)];
+      });
   return first_match(choices, orig_lattice, symprec,
                      [&](AxisChoice const &choice, Matrix3d const *orig) {
                        return match_db_ortho_in_loop<F>(
@@ -722,8 +719,7 @@ template <GroupFamily F>
 match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
                          Matrix3d const *orig_lattice, bool check_norms,
                          HallNumber hall, Centering centering,
-                         Operations const &conv_symmetry,
-                         double symprec) {
+                         Operations const &conv_symmetry, double symprec) {
   Centering const changed_centering =
       (centering == Centering::c_face) ? choice.centering : centering;
 
@@ -786,12 +782,12 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                            group_number == 11;
 
   std::array<MonocliCandidate, 36> found;
-  std::ranges::transform(monocli_axis_choices(), found.begin(),
-                         [&](AxisChoice const &choice) {
-                           return match_db_monocli_in_loop<F>(
-                               conv_lattice, choice, orig_lattice, check_norms,
-                               hall, centering, conv_symmetry, symprec);
-                         });
+  std::ranges::transform(
+      monocli_axis_choices(), found.begin(), [&](AxisChoice const &choice) {
+        return match_db_monocli_in_loop<F>(conv_lattice, choice, orig_lattice,
+                                           check_norms, hall, centering,
+                                           conv_symmetry, symprec);
+      });
 
   auto is_found = [](MonocliCandidate const &c) {
     return c.status != MonocliMatch::none;
@@ -809,11 +805,10 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   // Among the near-shortest matches, prefer a basis that matches the input;
   // max_element keeps the first of equal status, matching the historical
   // first-candidate preference.
-  auto near_shortest =
-      found | std::views::filter(is_found) |
-      std::views::filter([&](MonocliCandidate const &c) {
-        return std::abs(c.norm_sum - shortest) < symprec;
-      });
+  auto near_shortest = found | std::views::filter(is_found) |
+                       std::views::filter([&](MonocliCandidate const &c) {
+                         return std::abs(c.norm_sum - shortest) < symprec;
+                       });
   auto const chosen =
       std::ranges::max_element(near_shortest, {}, &MonocliCandidate::status);
   return MatchResult{chosen->origin_shift, chosen->conv_lattice};
@@ -834,7 +829,7 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
   switch (holohedry) {
   case Holohedry::monoclinic:
     return match_db_monocli<F>(conv_lattice, orig_lattice, hall, sg.number,
-                            centering, symmetry, symprec);
+                               centering, symmetry, symprec);
 
   case Holohedry::orthorhombic: {
     int const num_free_axes = num_axis_choices_ortho_for<F>(sg.number);
@@ -854,8 +849,8 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
         Matrix3d const tmat = conv_lattice.inverse() * changed_lattice;
         Operations const changed_symmetry =
             get_conventional_symmetry(tmat, Centering::primitive, symmetry);
-        return match_db_ortho<F>(changed_lattice, orig_lattice, hall,
-                                 centering, changed_symmetry, 2, symprec);
+        return match_db_ortho<F>(changed_lattice, orig_lattice, hall, centering,
+                                 changed_symmetry, 2, symprec);
       }
     }
     return match_db_ortho<F>(conv_lattice, orig_lattice, hall, centering,
@@ -864,19 +859,19 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
 
   case Holohedry::cubic:
     return match_db_cubic<F>(conv_lattice, orig_lattice, hall, centering,
-                          symmetry, symprec);
+                             symmetry, symprec);
 
   case Holohedry::trigonal:
     // Rhombohedral subset (R-centered) uses the a=b=c / hP machinery.
     if (centering == Centering::r_center &&
         data::is_rhombohedral_hall(hall.index())) {
       return match_db_rhombo<F>(conv_lattice, orig_lattice, hall, symmetry,
-                             symprec);
+                                symprec);
     }
     [[fallthrough]]; // other trigonal cases: shared change-of-basis loop
   default:           // hexagonal, tetragonal, triclinic, rest of trigonal
     return match_db_others<F>(conv_lattice, orig_lattice, hall, centering,
-                           holohedry, symmetry, symprec);
+                              holohedry, symmetry, symprec);
   }
 }
 
@@ -894,8 +889,9 @@ struct SearchResult {
 // point group (space groups for a 3D cell, layer groups for a layer cell).
 template <GroupFamily F>
 [[nodiscard]] std::optional<SearchResult>
-search_hall_number(std::optional<HallNumber> forced_hall, Primitive const &primitive,
-                   Operations const &symmetry, double symprec) {
+search_hall_number(std::optional<HallNumber> forced_hall,
+                   Primitive const &primitive, Operations const &symmetry,
+                   double symprec) {
   std::vector<Matrix3i> const rotations = symmetry.rotations();
   // A layer cell's aperiodic axis is still data: any of the three may be the
   // aperiodic one in the input basis. F decides whether to look at all.
@@ -967,8 +963,7 @@ search_hall_number(std::optional<HallNumber> forced_hall, Primitive const &primi
         ptg->pointgroup.holohedry, centering->centering, conv_symmetry,
         symprec);
     if (match) {
-      return SearchResult{hall, match->conv_lattice,
-                          match->origin_shift};
+      return SearchResult{hall, match->conv_lattice, match->origin_shift};
     }
   }
   return std::nullopt;
@@ -980,8 +975,7 @@ template <GroupFamily F>
 [[nodiscard]] std::optional<SearchResult>
 iterative_search_hall_number(std::optional<HallNumber> forced_hall,
                              Primitive const &primitive,
-                             Operations const &symmetry,
-                             Tolerance const &tol) {
+                             Operations const &symmetry, Tolerance const &tol) {
   if (auto r = search_hall_number<F>(forced_hall, primitive, symmetry,
                                      tol.symprec)) {
     return r;
@@ -1024,8 +1018,9 @@ match_primitive(std::optional<HallNumber> forced_hall,
     return leaf::new_error(e_spacegroup_search_failed{});
   }
 
-  return SpacegroupMatch{found->hall, found->conv_lattice,
-                         found->origin_shift};
+  return SpacegroupMatch{.hall = found->hall,
+                         .bravais_lattice = found->conv_lattice,
+                         .origin_shift = found->origin_shift};
 }
 
 } // namespace
@@ -1051,16 +1046,18 @@ search_spacegroup_with_symmetry(Operations const &operations,
   Positions pos(1, 3);
   pos.setZero();
   symmetry::Primitive const primitive{
-      Cell(Lattice{prim_lattice}, pos, Types{1}), std::vector<int>{0},
-      prim_lattice, {symprec, std::nullopt}};
-  return match_primitive<GroupFamily::space>(std::nullopt, primitive,
-                                             operations,
-                                             {symprec, std::nullopt});
+      .cell = Cell(Lattice{prim_lattice}, pos, Types{1}),
+      .mapping_table = std::vector<int>{0},
+      .orig_lattice = prim_lattice,
+      .tolerance = {.symprec = symprec, .angle_tolerance = std::nullopt}};
+  return match_primitive<GroupFamily::space>(
+      std::nullopt, primitive, operations,
+      {.symprec = symprec, .angle_tolerance = std::nullopt});
 }
 
 // The body behind OperationSet::spacegroup; nothing else calls it.
 template <LatticeSetting Setting>
-[[nodiscard]] Result<SpacegroupMatch>
+[[nodiscard]] static Result<SpacegroupMatch>
 spacegroup_type_from_symmetry(Operations const &operations,
                               Matrix3d const &lattice, double symprec) {
   auto const prim = operations.to_primitive({symprec, std::nullopt});
@@ -1078,16 +1075,15 @@ spacegroup_type_from_symmetry(Operations const &operations,
   }
 
   // Niggli-reduce the primitive cell (required by the Hall-symbol matcher),
-  // then bring the operations into that reduced basis (the rotations are already
-  // distinct, so it is just the change of basis).
+  // then bring the operations into that reduced basis (the rotations are
+  // already distinct, so it is just the change of basis).
   BOOST_LEAF_AUTO(red, Lattice{prim_lat}.niggli(symprec));
   Matrix3d const &red_lat = red.matrix();
   Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
   Matrix3d const inv2 = t_mat2.inverse();
   return search_spacegroup_with_symmetry(prim_sym.conjugated_by(t_mat2, inv2),
-                                        red_lat, symprec);
+                                         red_lat, symprec);
 }
-
 
 } // namespace cppcrystal::spacegroup
 
@@ -1099,8 +1095,8 @@ Result<SpacegroupMatch>
 spacegroup_of_operations(std::span<SymmetryOperation const> operations,
                          Matrix3d const &lattice, LatticeSetting setting,
                          Tolerance const &tol) {
-  Operations const ops{std::vector<SymmetryOperation>(operations.begin(),
-                                                      operations.end())};
+  Operations const ops{
+      std::vector<SymmetryOperation>(operations.begin(), operations.end())};
   return setting == LatticeSetting::primitive
              ? spacegroup::spacegroup_type_from_symmetry<
                    LatticeSetting::primitive>(ops, lattice, tol.symprec)

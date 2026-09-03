@@ -28,8 +28,8 @@ namespace cppcrystal::refine {
 // Rotate the bravais lattice — and correspondingly the origin shift — to the
 // proper-rotation setting whose basis vectors are closest (Frobenius) to the
 // idealized conventional lattice.
-[[nodiscard]] SpacegroupMatch
-find_similar_bravais_lattice(SpacegroupMatch sg, double symprec);
+[[nodiscard]] SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
+                                                           double symprec);
 
 // Turns a matched space group plus the cell it was matched from into the
 // standardized result. The family is a compile-time parameter: only the layer
@@ -38,8 +38,8 @@ find_similar_bravais_lattice(SpacegroupMatch sg, double symprec);
 // Non-owning: `primitive` and `cell` must outlive the refinement.
 template <GroupFamily F> class Refinement {
 public:
-  Refinement(SpacegroupMatch matched, Cell const &primitive,
-             Cell const &cell, Tolerance const &tol)
+  Refinement(SpacegroupMatch matched, Cell const &primitive, Cell const &cell,
+             Tolerance const &tol)
       : matched_(std::move(matched)), primitive_(primitive), cell_(cell),
         tol_(tol) {}
 
@@ -51,9 +51,9 @@ public:
   // The same refinement with the bravais lattice and origin shift rotated to
   // the setting closest to the idealized conventional one.
   [[nodiscard]] Refinement similar_bravais() && {
-    return Refinement{find_similar_bravais_lattice(std::move(matched_),
-                                                   tol_.symprec),
-                      primitive_, cell_, tol_};
+    return Refinement{
+        find_similar_bravais_lattice(std::move(matched_), tol_.symprec),
+        primitive_, cell_, tol_};
   }
 
   [[nodiscard]] SpacegroupMatch const &matched() const noexcept {

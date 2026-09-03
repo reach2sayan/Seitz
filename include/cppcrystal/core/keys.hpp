@@ -49,7 +49,7 @@ public:
 
 private:
   constexpr HallNumber(GroupFamily family, int index) noexcept
-      : family_(family), index_(index) {}
+      : family_{family}, index_{index} {}
 
   GroupFamily family_;
   int index_;
@@ -77,8 +77,7 @@ public:
   operator<=>(UniNumber, UniNumber) = default;
 
 private:
-  explicit constexpr UniNumber(int value) noexcept : value_(value) {}
-
+  explicit constexpr UniNumber(int value) noexcept : value_{value} {}
   int value_;
 };
 

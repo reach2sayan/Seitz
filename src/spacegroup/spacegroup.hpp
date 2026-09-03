@@ -28,7 +28,7 @@ public:
   // found at.
   SpacegroupMatcher(symmetry::Primitive const &primitive,
                     std::optional<HallNumber> setting) noexcept
-      : primitive_(primitive), setting_(setting) {}
+      : primitive_{primitive}, setting_{setting} {}
 
   // The matched setting. Errors with e_spacegroup_search_failed.
   [[nodiscard]] Result<SpacegroupMatch> search() const;
