@@ -5,9 +5,11 @@
 #include <cppcrystal/core/overlap.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/hall_classification.hpp>
 #include <cppcrystal/data/hall_generators_view.hpp>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
 
 #include <array>
@@ -21,7 +23,8 @@
 // setting and, if so, the origin shift that aligns them with the database
 // operations. The Grosse-Kunstleve (1999) origin-shift formula shift = VSpU . dw
 // is precomputed per setting (the VSpU tables); dw is the per-generator
-// translation difference vs the database.
+// translation difference vs the database, over every representative of the
+// generator rotation the operations offer.
 namespace cppcrystal::spacegroup {
 
 using data::Centering;
@@ -68,61 +71,77 @@ struct Setting {
 };
 
 using Generators = std::array<Matrix3i, 3>;
-using Translations = std::array<Vector3d, 3>;
+
+// The dw values one generator rotation admits, in operation order, and the
+// three of them a generator set needs.
+using DwCandidates = boost::container::small_vector<Vector3d, 2>;
+using DwChoices = std::array<DwCandidates, 3>;
 
 [[nodiscard]] Generators unpack_generators(data::GeneratorSet const &g) {
   return {data::generator_matrix(g, 0), data::generator_matrix(g, 1),
           data::generator_matrix(g, 2)};
 }
 
-// The translation of the first operation carrying each non-zero generator
-// rotation; nullopt if a generator rotation is absent from the operations.
-[[nodiscard]] std::optional<Translations>
-generator_translations(Setting const &s, Generators const &rot) {
-  Translations trans{Vector3d::Zero(), Vector3d::Zero(), Vector3d::Zero()};
-  for (auto [t, r] : std::views::zip(trans, rot)) {
-    if (r.isZero()) {
-      continue;
-    }
-    auto const it = s.symmetry_by_rotation.find(r);
-    if (it == s.symmetry_by_rotation.end()) {
-      return std::nullopt;
-    }
-    t = s.symmetry[static_cast<std::size_t>(it->second)].translation;
+// Every distinct dw a generator rotation admits: the folded translation
+// difference (primitive setting) between an operation carrying that rotation
+// and the first database operation with it. Two operations of one rotation
+// differ by a lattice translation, integral in the primitive setting, so a
+// centering the database declares folds them onto a single value. The
+// B-centered monoclinic and orthorhombic Hall settings (13, 15, 34, ... 333)
+// are declared PRIMITIVE while their operations still carry the B translation,
+// so there each representative gives its own dw and only trying all of them
+// makes the match independent of the order of the input operations. A zero
+// generator contributes the single zero block.
+[[nodiscard]] std::optional<DwCandidates>
+dw_candidates(Setting const &s, Centering c, Matrix3i const &rot) {
+  if (rot.determinant() == 0) {
+    return DwCandidates{Vector3d::Zero()};
   }
-  return trans;
-}
-
-// dw for one generator: translation difference (primitive setting) vs the
-// first database operation with that rotation.
-[[nodiscard]] std::optional<Vector3d> dw_of(Setting const &s, Centering c,
-                                            Matrix3i const &rot,
-                                            Vector3d const &trans) {
-  auto const it = s.db_by_rotation.find(rot);
-  if (it == s.db_by_rotation.end()) {
+  auto const db = s.db_by_rotation.find(rot);
+  if (db == s.db_by_rotation.end()) {
     return std::nullopt;
   }
-  auto const &db = s.db_ops[static_cast<std::size_t>(it->second)];
-  return Vector3d(transform_translation(c, trans) -
-                  transform_translation(c, db.translation));
+  Vector3d const reference = transform_translation(
+      c, s.db_ops[static_cast<std::size_t>(db->second)].translation);
+  auto const [lo, hi] = s.symmetry_by_rotation.equal_range(rot);
+  DwCandidates out;
+  for (int const index : std::ranges::subrange(lo, hi) | std::views::values) {
+    push_unique(out,
+                s.wrap(transform_translation(
+                           c, s.symmetry[static_cast<std::size_t>(index)]
+                                  .translation) -
+                       reference),
+                [](Vector3d const &a, Vector3d const &b) {
+                  return (a - b).cwiseAbs().maxCoeff() < kZeroPrec;
+                });
+  }
+  if (out.empty()) {
+    return std::nullopt; // the generator rotation is absent from `symmetry`
+  }
+  return out;
 }
 
-// shift = VSpU . dw, with dw assembled per generator (a zero generator
-// contributes a zero block).
-[[nodiscard]] std::optional<Vector3d>
-origin_shift(Setting const &s, Centering c, Generators const &rot,
-             Translations const &trans, data::VSpUSet const &vspu) {
-  data::DwVector dw = data::DwVector::Zero();
-  for (auto const [i, r, t] : std::views::zip(std::views::iota(0, 3), rot, trans)) {
-    if (r.determinant() == 0) {
-      continue;
-    }
-    auto const d = dw_of(s, c, r, t);
-    if (!d) {
+// The per-generator dw candidates; nullopt if any generator rotation is
+// missing from either operation list.
+[[nodiscard]] std::optional<DwChoices>
+dw_choices(Setting const &s, Centering c, Generators const &rot) {
+  DwChoices choices;
+  for (auto [out, r] : std::views::zip(choices, rot)) {
+    auto candidates = dw_candidates(s, c, r);
+    if (!candidates) {
       return std::nullopt;
     }
-    dw.segment<3>(static_cast<Index>(3 * i)) = s.wrap(*d);
+    out = std::move(*candidates);
   }
+  return choices;
+}
+
+// shift = VSpU . dw for one choice of generator representatives.
+[[nodiscard]] Vector3d origin_shift(Setting const &s, data::VSpUSet const &vspu,
+                                    Vector3d const &dw0, Vector3d const &dw1,
+                                    Vector3d const &dw2) {
+  data::DwVector dw;
+  dw << dw0, dw1, dw2;
   return s.wrap(data::vspu_matrix(vspu) * dw);
 }
 
@@ -152,20 +171,25 @@ origin_shift(Setting const &s, Centering c, Generators const &rot,
   return true;
 }
 
-// One (generators, VSpU) candidate: the origin shift if the operations match
-// the setting through it.
+// One (generators, VSpU) candidate: the origin shift if some choice of
+// generator representatives makes the operations match the setting. The
+// product varies the last generator fastest, so the first combination tried is
+// the reference implementation's — the first operation carrying each rotation.
 [[nodiscard]] std::optional<Vector3d>
 hall_symbol_shift(Setting const &s, Centering c, data::GeneratorSet const &gens,
                   data::VSpUSet const &vspu) {
-  Generators const rot = unpack_generators(gens);
-  return generator_translations(s, rot)
-      .and_then([&](Translations const &trans) {
-        return origin_shift(s, c, rot, trans, vspu);
-      })
-      .and_then([&](Vector3d const &shift) {
-        return matches_database(s, c, shift) ? std::optional<Vector3d>(shift)
-                                             : std::nullopt;
-      });
+  auto const choices = dw_choices(s, c, unpack_generators(gens));
+  if (!choices) {
+    return std::nullopt;
+  }
+  for (auto const &[dw0, dw1, dw2] : std::views::cartesian_product(
+           (*choices)[0], (*choices)[1], (*choices)[2])) {
+    Vector3d const shift = origin_shift(s, vspu, dw0, dw1, dw2);
+    if (matches_database(s, c, shift)) {
+      return shift;
+    }
+  }
+  return std::nullopt;
 }
 
 // The first candidate of a family that matches.

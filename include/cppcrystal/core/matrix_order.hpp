@@ -146,9 +146,9 @@ template <std::ranges::random_access_range R>
 // Append `value` unless an element equivalent under `equiv` is already
 // present; returns whether it was appended. The tolerance-aware analogue of
 // ranges::unique for an unsorted container — first occurrence wins.
-template <class T, class Equiv>
-bool push_unique(std::vector<T> &out, T value, Equiv &&equiv) {
-  if (std::ranges::any_of(out, [&](T const &e) { return equiv(e, value); })) {
+template <std::ranges::forward_range C, class Equiv>
+bool push_unique(C &out, std::ranges::range_value_t<C> value, Equiv &&equiv) {
+  if (std::ranges::any_of(out, [&](auto const &e) { return equiv(e, value); })) {
     return false;
   }
   out.push_back(std::move(value));
