@@ -7,6 +7,8 @@
 #include <map>
 #include <span>
 
+// The random metrics the generators draw their cells from. Private: a caller
+// asks a Generator for a structure, not for a lattice.
 namespace cppcrystal::generate {
 
 enum class CrystalSystem {

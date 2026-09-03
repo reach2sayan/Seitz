@@ -6,7 +6,7 @@
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/data/subgroup_relations.hpp>
-#include <cppcrystal/generate/random_lattice.hpp>
+#include "generate/random_lattice.hpp"
 #include "spacegroup/spacegroup.hpp"
 
 #include <boost/leaf.hpp>

@@ -28,16 +28,10 @@ minimum_image_distance(Vector3d const &a, Vector3d const &b,
                        bool include_origin = true) noexcept;
 
 // True iff every pair of atoms in `cell` (including each atom against its own
-// periodic images) is at least its type-pair minimum distance apart, under
-// the cell's own periodicity.
+// periodic images) is at least its type-pair minimum distance apart, under the
+// cell's own periodicity. One function for every family: a cluster is a cell
+// with no periodic axis, where this is the plain Euclidean all-pairs check.
 [[nodiscard]] bool distances_valid(Cell const &cell,
                                    DistanceTolerance tol = {}) noexcept;
-
-// True iff every pair of atoms in a non-periodic cluster is at least its
-// type-pair minimum distance apart. `coordinates` are Cartesian (row i = atom
-// i), `types[i]` the type of atom i — used by generate::random_cluster.
-[[nodiscard]] bool cluster_distances_valid(Positions const &coordinates,
-                                           Types const &types,
-                                           DistanceTolerance tol = {}) noexcept;
 
 } // namespace cppcrystal::generate

@@ -22,9 +22,7 @@
 #include <cppcrystal/core/version.hpp>
 #include <cppcrystal/data/msg_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/generate/crystal_builder.hpp>
-#include <cppcrystal/generate/random_lattice.hpp>
-#include <cppcrystal/generate/wyckoff_combinations.hpp>
+#include <cppcrystal/generate/generator.hpp>
 #include <cppcrystal/group/space_group.hpp>
 #include <cppcrystal/group/wyckoff.hpp>
 #include <cppcrystal/kpoint/mesh.hpp>

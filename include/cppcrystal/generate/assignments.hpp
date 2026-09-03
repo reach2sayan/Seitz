@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/mdspan.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
 
@@ -8,22 +7,18 @@
 #include <bitset>
 #include <concepts>
 #include <cstdint>
-#include <format>
 #include <generator>
 #include <iterator>
 #include <map>
 #include <optional>
-#include <random>
 #include <ranges>
 #include <span>
-#include <string_view>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
-// The shared vocabulary of the random-structure generators (3D, layer, rod,
-// cluster): Wyckoff assignments of a composition, their enumeration, and the
-// shuffled assignment/attempt search driver.
+// The shared vocabulary of random-structure generation (3D, layer, rod,
+// cluster): Wyckoff assignments of a composition and their enumeration. The
+// search over them is generate::Generator.
 namespace cppcrystal::generate {
 
 // Atom type -> atom count.
@@ -38,37 +33,33 @@ concept WyckoffLike = requires(W const &w) {
 
 // An atom type placed on a chosen Wyckoff position (non-owning pointer into
 // the group, which must outlive it).
-template <WyckoffLike W> struct Placement {
+template <WyckoffLike W> struct Placed {
   int type;
   W const *position{};
 };
 
 // One complete Wyckoff assignment of a composition.
-template <WyckoffLike W> using Assignment = std::vector<Placement<W>>;
+template <WyckoffLike W> using Assignment = std::vector<Placed<W>>;
 
-// The candidate type a `realize` callback yields: it returns
-// std::optional<R>, and this is that R.
-template <typename Realize, WyckoffLike W>
-using Realized = std::invoke_result_t<Realize &, Assignment<W> const &, int,
-                                      std::mt19937_64 &>::value_type;
+// Which Wyckoff positions a structure may be built on. `general_only` keeps
+// generic coordinates only, so the exact target group is realized without the
+// accidental extra symmetry a special (fixed/high-symmetry) site can introduce
+// — notably for layer groups, where atoms confined to a special site in one
+// plane gain a horizontal mirror. It requires the total atom count to be a
+// multiple of the general-position multiplicity.
+enum class Placement { any, general_only };
 
-// Options shared by every random-structure generator.
+// What a Generator may vary while searching for a structure.
 struct GenerateOptions {
   // Multiplies the element-aware size estimate (cell volume, cluster metric,
-  // or rod repeat length — per generator).
+  // or rod repeat length — whichever the family uses).
   double scale = 1.0;
   std::optional<std::uint64_t> seed = std::nullopt;
   // Free-coordinate / lattice resampling attempts per Wyckoff assignment.
   int attempts_per_combination = 50;
   // Minimum-distance acceptance criterion for a generated structure.
   DistanceTolerance distance = {};
-  // Restrict placement to the general position (generic coordinates only).
-  // Useful when the exact target group must be realized without the accidental
-  // extra symmetry that special (fixed/high-symmetry) sites can introduce —
-  // notably for layer groups, where atoms confined to a special site in one
-  // plane gain a horizontal mirror. Requires the total atom count to be a
-  // multiple of the general-position multiplicity.
-  bool general_position_only = false;
+  Placement placement = Placement::any;
 };
 
 namespace detail {
@@ -164,7 +155,7 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
   for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
        ++copies) {
     placements.insert(placements.end(), static_cast<std::size_t>(copies),
-                      Placement<W>{ctx.elements[elem].first, &wp});
+                      Placed<W>{ctx.elements[elem].first, &wp});
     UsedSpecial used = used_special;
     if (fixed && copies == 1) {
       used.set(pos);
@@ -201,80 +192,5 @@ template <WyckoffLike W>
   auto assignments = enumerate_assignments(positions, comp);
   return assignments.begin() != assignments.end();
 }
-
-// Drop every assignment that uses anything but the general position (the last
-// position of the group), for general-position-only generation.
-template <WyckoffLike W>
-void restrict_to_general_position(std::vector<Assignment<W>> &assignments,
-                                  std::span<W const> positions) {
-  W const *general = &positions.back();
-  std::erase_if(assignments, [&](Assignment<W> const &assignment) {
-    return std::ranges::any_of(assignment, [&](Placement<W> const &p) {
-      return p.position != general;
-    });
-  });
-}
-
-namespace detail {
-
-// Assignments considered per search: enough for any real composition, a
-// bound for pathological ones.
-constexpr std::size_t kMaxAssignments = 1000;
-
-// The generator pipeline shared by every random-structure entry point:
-// enumerate -> optionally restrict to the general position -> shuffle -> for
-// each assignment and attempt, ask `realize` for a candidate. `realize` is
-// (Assignment<W> const&, int attempt, std::mt19937_64&) -> std::optional<R>;
-// the first engaged result wins. `who` names the entry point in errors and
-// `group_kind` the group family ("space group", "rod group", ...).
-template <WyckoffLike W, class Realize>
-  requires std::invocable<Realize &, Assignment<W> const &, int,
-                          std::mt19937_64 &>
-[[nodiscard]] auto
-search_assignments(std::span<W const> positions, Composition const &comp,
-                   GenerateOptions const &options, std::string_view who,
-                   std::string_view group_kind, Realize &&realize)
-    -> Result<Realized<Realize, W>> {
-  auto assignments = std::ranges::to<std::vector<Assignment<W>>>(
-      enumerate_assignments(positions, comp) |
-      std::views::take(kMaxAssignments));
-  if (assignments.empty()) {
-    return leaf::new_error(e_message{std::format(
-        "{}: composition is not compatible with the Wyckoff positions of the "
-        "requested {}",
-        who, group_kind)});
-  }
-
-  if (options.general_position_only) {
-    restrict_to_general_position(assignments, positions);
-    if (assignments.empty()) {
-      return leaf::new_error(e_message{std::format(
-          "{}: general_position_only requires the atom count to be a multiple "
-          "of the general-position multiplicity",
-          who)});
-    }
-  }
-
-  std::mt19937_64 rng(options.seed.value_or(0));
-  // Strategic sampling: try the compatible assignments in a random order
-  // rather than always the first/one blindly-indexed combination.
-  std::ranges::shuffle(assignments, rng);
-
-  for (auto const &assignment : assignments) {
-    for (int attempt = 0; attempt < options.attempts_per_combination;
-         ++attempt) {
-      if (auto candidate = realize(assignment, attempt, rng)) {
-        return std::move(*candidate);
-      }
-    }
-  }
-
-  return leaf::new_error(e_message{std::format(
-      "{}: no distance-valid structure found within the attempt budget for "
-      "any compatible Wyckoff assignment",
-      who)});
-}
-
-} // namespace detail
 
 } // namespace cppcrystal::generate

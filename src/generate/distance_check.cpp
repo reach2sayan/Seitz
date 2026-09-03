@@ -103,12 +103,4 @@ bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
                                cell.periodicity(), tol);
 }
 
-bool cluster_distances_valid(Positions const &coordinates, Types const &types,
-                             DistanceTolerance tol) noexcept {
-  constexpr CellPeriodicity kNonPeriodic = {
-      AxisKind::aperiodic, AxisKind::aperiodic, AxisKind::aperiodic};
-  return pairwise_distances_ok(coordinates, types, Matrix3d::Identity(),
-                               kNonPeriodic, tol);
-}
-
 } // namespace cppcrystal::generate

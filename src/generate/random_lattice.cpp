@@ -1,4 +1,4 @@
-#include <cppcrystal/generate/random_lattice.hpp>
+#include "generate/random_lattice.hpp"
 
 #include <cppcrystal/data/element_data.hpp>
 

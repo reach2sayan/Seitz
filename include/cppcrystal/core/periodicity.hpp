@@ -41,6 +41,19 @@ family_of(CellPeriodicity const &p) noexcept {
   return p;
 }
 
+// The cluster descriptor: no periodic axis at all (a 0D point set).
+[[nodiscard]] constexpr CellPeriodicity none_periodic() noexcept {
+  return {AxisKind::aperiodic, AxisKind::aperiodic, AxisKind::aperiodic};
+}
+
+// The rod descriptor: periodic along `axis` only, the two remaining axes being
+// the vacuum-padded cross-section. The dual of aperiodic_along().
+[[nodiscard]] constexpr CellPeriodicity periodic_along(int axis) noexcept {
+  CellPeriodicity p = none_periodic();
+  p[static_cast<std::size_t>(axis)] = AxisKind::periodic;
+  return p;
+}
+
 // The single aperiodic axis if there is exactly one — a layer group's c. The
 // layer path needs the axis index itself (to pick the in-plane pair, to reject
 // the cubic point groups, ...); this is the one place that search lives.

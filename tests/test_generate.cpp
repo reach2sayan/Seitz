@@ -6,7 +6,7 @@
 #include <cppcrystal/data/element_data.hpp>
 #include <cppcrystal/generate/assignments.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
-#include <cppcrystal/generate/wyckoff_combinations.hpp>
+#include <cppcrystal/generate/generator.hpp>
 #include <cppcrystal/group/space_group.hpp>
 
 #include "helpers.hpp"
@@ -29,7 +29,7 @@ using cppcrystal::test::must;
 // An assignment as a comparable value: sorted (type, position index) pairs.
 using Canonical = std::vector<std::pair<int, int>>;
 
-Canonical canonical(generate::WyckoffCombination const &assignment,
+Canonical canonical(generate::Assignment<group::Wyckoff> const &assignment,
                     std::span<group::Wyckoff const> positions) {
   Canonical out;
   for (auto const &p : assignment) {
@@ -45,7 +45,7 @@ struct Reference {
   std::span<group::Wyckoff const> positions;
   std::vector<std::pair<int, int>> elements;
   std::vector<bool> used_special = std::vector<bool>(positions.size(), false);
-  generate::WyckoffCombination placements;
+  generate::Assignment<group::Wyckoff> placements;
   std::set<Canonical> out;
 
   void recurse(std::size_t elem, std::size_t pos, int remaining) {
@@ -151,15 +151,16 @@ TEST_CASE("enumerate_assignments equals the backtracking reference as sets",
     auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
     auto const expected = reference_assignments(*sg, c.comp);
     CHECK(enumerated_assignments(*sg, c.comp) == expected);
-    CHECK(generate::check_compatible(*sg, c.comp) == !expected.empty());
+    CHECK(generate::Generator{*sg}.compatible(c.comp) == !expected.empty());
   }
 }
 
 TEST_CASE("a bounded enumeration stops early", "[generate]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 1));
   generate::Composition const comp{{6, 4}, {8, 4}};
-  CHECK(generate::list_wyckoff_combinations(*sg, comp, 1).size() == 1);
-  CHECK(generate::list_wyckoff_combinations(*sg, comp, 0).empty());
+  generate::Generator const gen{*sg};
+  CHECK(gen.assignments(comp, 1).size() == 1);
+  CHECK(gen.assignments(comp, 0).empty());
 }
 
 TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
@@ -168,8 +169,6 @@ TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
   std::uniform_real_distribution<double> wide(-4.0, 4.0);
   constexpr CellPeriodicity layer{AxisKind::periodic, AxisKind::periodic,
                                   AxisKind::aperiodic};
-  constexpr CellPeriodicity cluster{AxisKind::aperiodic, AxisKind::aperiodic,
-                                    AxisKind::aperiodic};
   int agreements = 0;
   for (int trial = 0; trial < 60; ++trial) {
     // A lattice from 3 to 12 angstrom on a side, mildly skewed, and enough
@@ -178,7 +177,8 @@ TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
     lattice(0, 1) = 2.0 * unit(rng);
     lattice(1, 2) = 1.5 * unit(rng);
     CellPeriodicity const periodicity =
-        trial % 3 == 0 ? all_periodic() : trial % 3 == 1 ? layer : cluster;
+        trial % 3 == 0 ? all_periodic() : trial % 3 == 1 ? layer
+                                                        : none_periodic();
     Index const n = 4 + static_cast<Index>(rng() % 20);
     Positions pos(n, 3);
     Types types;

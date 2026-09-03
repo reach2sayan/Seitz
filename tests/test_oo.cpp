@@ -6,9 +6,8 @@
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include "core/overlap.hpp"
 #include "data/rod_database.hpp"
-#include <cppcrystal/generate/crystal_builder.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
-#include <cppcrystal/generate/rod_crystal.hpp>
+#include <cppcrystal/generate/generator.hpp>
 #include <cppcrystal/group/point_group.hpp>
 #include <cppcrystal/group/rod_group.hpp>
 #include <cppcrystal/group/space_group.hpp>
@@ -85,9 +84,9 @@ TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
   // NaCl: Na (type 11) and Cl (type 17), four of each (the 4a / 4b orbits).
   generate::Composition const comp{{11, 4}, {17, 4}};
-  REQUIRE(generate::check_compatible(*sg, comp));
+  REQUIRE(generate::Generator{*sg}.compatible(comp));
 
-  auto gen = must(generate::random_crystal(*sg, comp, {.seed = 42u}));
+  auto gen = must(generate::Generator{*sg, {.seed = 42u}}(comp));
   REQUIRE(gen.cell.size() == 8);
   std::set<int> kinds(gen.cell.types().begin(), gen.cell.types().end());
   REQUIRE(kinds == std::set<int>{11, 17});
@@ -111,7 +110,7 @@ TEST_CASE("generated structures recover their target space group", "[generate]")
   };
   for (auto const &c : cases) {
     auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
-    auto gen = must(generate::random_crystal(*sg, c.comp, {.seed = 7u}));
+    auto gen = must(generate::Generator{*sg, {.seed = 7u}}(c.comp));
     auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
     REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == c.number);
   }
@@ -120,7 +119,7 @@ TEST_CASE("generated structures recover their target space group", "[generate]")
 TEST_CASE("generated structures are free of interatomic clashes", "[generate]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
-  auto gen = must(generate::random_crystal(*sg, comp, {.seed = 99u}));
+  auto gen = must(generate::Generator{*sg, {.seed = 99u}}(comp));
   // The builder only returns distance-valid cells; confirm independently.
   REQUIRE(generate::distances_valid(gen.cell));
 }
@@ -128,8 +127,9 @@ TEST_CASE("generated structures are free of interatomic clashes", "[generate]") 
 TEST_CASE("generation is deterministic in the seed", "[generate]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
-  auto a = must(generate::random_crystal(*sg, comp, {.seed = 123u}));
-  auto b = must(generate::random_crystal(*sg, comp, {.seed = 123u}));
+  generate::Generator const gen{*sg, {.seed = 123u}};
+  auto a = must(gen(comp));
+  auto b = must(gen(comp));
   REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
   REQUIRE(a.cell.lattice().matrix().isApprox(b.cell.lattice().matrix()));
 }
@@ -137,7 +137,7 @@ TEST_CASE("generation is deterministic in the seed", "[generate]") {
 TEST_CASE("incompatible composition is rejected", "[generate]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m, smallest mult 4
   // Three atoms cannot fill any combination of multiplicity-4-or-more orbits.
-  REQUIRE_FALSE(generate::check_compatible(*sg, generate::Composition{{1, 3}}));
+  REQUIRE_FALSE(generate::Generator{*sg}.compatible(generate::Composition{{1, 3}}));
 }
 
 TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
@@ -168,8 +168,14 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_layer_crystal(*lg, comp,
-        {.scale = 4.0, .seed = 13u, .general_position_only = true}));
+    // p4/mmm (61) puts 32 atoms in a thin slab, close enough to its packing
+    // limit that a 50-attempt budget clears it only about three times in four;
+    // the budget, not the metric, is what this test needs raised.
+    auto gen = must(generate::Generator{
+        *lg, {.scale = 4.0,
+              .seed = 13u,
+              .attempts_per_combination = 400,
+              .placement = generate::Placement::general_only}}(comp));
     REQUIRE(aperiodic_axis(gen.cell.periodicity()) == 2);
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
@@ -192,8 +198,11 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_layer_crystal(*lg, comp,
-        {.scale = 4.0, .seed = 13u, .general_position_only = true}));
+    auto gen = must(generate::Generator{
+        *lg, {.scale = 4.0,
+              .seed = 13u,
+              .attempts_per_combination = 400,
+              .placement = generate::Placement::general_only}}(comp));
     auto ds = must(test::dataset_of(gen.cell.with_periodicity(aperiodic_along(2)),
                                {1e-4}));
     REQUIRE(data::spacegroup_type(ds.hall).number == number); // exact layer-group recovery
@@ -297,24 +306,26 @@ TEST_CASE("SymmetryAnalyzer memoizes a consistent dataset", "[analysis]") {
 }
 
 namespace {
-// A generated cluster carries the full point-group symmetry iff, in Cartesian
-// space, every operation R_cart = basis . R . basis^-1 maps the atom set onto
-// itself (each atom onto an atom of the same type).
-bool cluster_is_invariant(generate::GeneratedCluster const &gen,
-                          group::PointGroup const &pg, double tol = 1e-6) {
-  Matrix3d const inv = gen.basis.inverse();
-  Index const n = static_cast<Index>(gen.types.size());
-  for (auto const &op : pg.operations()) {
-    Matrix3d const rc = gen.basis * op.rotation.cast<double>() * inv;
+// A generated structure carries its group's full symmetry iff every operation
+// maps the atom set onto itself, each atom onto an atom of the same type,
+// compared under the cell's OWN periodicity: a flip along an aperiodic axis
+// must land at the image (-a), never at the wrapped 1 - a. That one rule covers
+// the cluster (nothing folded — the integer operation acts on fractional
+// coordinates in the metric the point group is isometric in, which in Cartesian
+// terms is basis . R . basis^-1) and the rod (only its periodic axis folded).
+bool is_invariant(Cell const &cell, std::span<SymmetryOperation const> ops,
+                  double tol = 1e-4) {
+  Index const n = cell.size();
+  for (auto const &op : ops) {
     for (Index i = 0; i < n; ++i) {
-      Vector3d const image = rc * gen.coordinates.row(i).transpose();
+      Vector3d const image = op.apply(cell.position(i));
       bool matched = false;
       for (Index j = 0; j < n && !matched; ++j) {
-        if (gen.types[static_cast<std::size_t>(i)] ==
-                gen.types[static_cast<std::size_t>(j)] &&
-            (image - gen.coordinates.row(j).transpose()).norm() < tol) {
-          matched = true;
-        }
+        matched = cell.type(i) == cell.type(j) &&
+                  minimal_image(Vector3d(image - cell.position(j)),
+                                cell.periodicity())
+                          .cwiseAbs()
+                          .maxCoeff() < tol;
       }
       if (!matched) {
         return false;
@@ -380,63 +391,33 @@ TEST_CASE("generated clusters carry their full point-group symmetry",
     int const m = pg.wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_cluster(
-        pg, comp,
-        {.scale = 3.0, .seed = 17u, .general_position_only = true}));
-    REQUIRE(gen.types.size() == static_cast<std::size_t>(2 * m));
-    REQUIRE(generate::cluster_distances_valid(gen.coordinates, gen.types));
-    REQUIRE(cluster_is_invariant(gen, pg));
+    auto gen = must(generate::Generator{
+        pg, {.scale = 3.0,
+             .seed = 17u,
+             .placement = generate::Placement::general_only}}(comp));
+    REQUIRE(gen.cell.periodicity() == none_periodic());
+    REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
+    REQUIRE(generate::distances_valid(gen.cell));
+    REQUIRE(is_invariant(gen.cell, pg.operations(), 1e-6));
   }
 }
 
 TEST_CASE("cluster generation is deterministic in the seed", "[cluster]") {
   auto pg = must(group::PointGroup::from_number(32)); // m-3m
   generate::Composition const comp{{6, 48}};
-  auto a = must(generate::random_cluster(pg, comp, {.seed = 123u}));
-  auto b = must(generate::random_cluster(pg, comp, {.seed = 123u}));
-  REQUIRE(a.coordinates.isApprox(b.coordinates));
-  REQUIRE(a.types == b.types);
+  generate::Generator const gen{pg, {.seed = 123u}};
+  auto a = must(gen(comp));
+  auto b = must(gen(comp));
+  REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
+  REQUIRE(a.cell.types() == b.cell.types());
 }
 
 TEST_CASE("incompatible cluster composition is rejected", "[cluster]") {
   auto pg = must(group::PointGroup::from_number(32)); // m-3m, order 48
   // 5 atoms cannot tile the available multiplicities (1, ..., 48) of m-3m.
   generate::Composition const comp{{6, 5}};
-  REQUIRE(errored([&] { return generate::random_cluster(pg, comp); }));
+  REQUIRE(errored([&] { return generate::Generator{pg}(comp); }));
 }
-
-namespace {
-// A generated rod carries the full rod-group symmetry iff every operation maps
-// the fractional atom set onto itself, folding ONLY the periodic axis (the two
-// aperiodic axes are compared raw — a flip a -> -a must land at the Cartesian
-// image, not the wrapped 1 - a).
-bool rod_is_invariant(generate::GeneratedRodCrystal const &gen,
-                      group::RodGroup const &rg, double tol = 1e-4) {
-  int const axis = rg.periodic_axis();
-  Cell const &cell = gen.cell;
-  Index const n = cell.size();
-  for (auto const &op : rg.operations()) {
-    for (Index i = 0; i < n; ++i) {
-      Vector3d const image = op.apply(cell.position(i));
-      bool matched = false;
-      for (Index j = 0; j < n && !matched; ++j) {
-        if (cell.type(i) != cell.type(j)) {
-          continue;
-        }
-        Vector3d d = image - cell.position(j);
-        d[axis] -= std::round(d[axis]); // fold only the periodic axis
-        if (d.cwiseAbs().maxCoeff() < tol) {
-          matched = true;
-        }
-      }
-      if (!matched) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-} // namespace
 
 TEST_CASE("orbit-stabilizer invariant holds for all 75 rod groups", "[rod]") {
   REQUIRE(data::num_rod_groups() == 75);
@@ -472,14 +453,13 @@ TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
     int const m = rg.wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_rod_crystal(
-        rg, comp,
-        {.scale = 2.0, .seed = 31u, .general_position_only = true}));
-    REQUIRE(gen.cell.periodicity() == CellPeriodicity{AxisKind::aperiodic,
-                                                      AxisKind::aperiodic,
-                                                      AxisKind::periodic});
+    auto gen = must(generate::Generator{
+        rg, {.scale = 2.0,
+             .seed = 31u,
+             .placement = generate::Placement::general_only}}(comp));
+    REQUIRE(gen.cell.periodicity() == periodic_along(2));
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
-    REQUIRE(rod_is_invariant(gen, rg));
+    REQUIRE(is_invariant(gen.cell, rg.operations()));
   }
 }
 
@@ -498,9 +478,8 @@ TEST_CASE("rod special positions are derived and generate invariant structures",
     REQUIRE(special.multiplicity() < rg.order()); // genuinely special
 
     generate::Composition const comp{{6, special.multiplicity()}};
-    auto gen = must(generate::random_rod_crystal(
-        rg, comp, {.scale = 2.0, .seed = 5u}));
-    REQUIRE(rod_is_invariant(gen, rg));
+    auto gen = must(generate::Generator{rg, {.scale = 2.0, .seed = 5u}}(comp));
+    REQUIRE(is_invariant(gen.cell, rg.operations()));
   }
 }
 
@@ -508,8 +487,9 @@ TEST_CASE("rod generation is deterministic in the seed", "[rod]") {
   auto rg = must(group::RodGroup::from_number(23)); // p4
   int const m = rg.wyckoffs().back().multiplicity();
   generate::Composition const comp{{6, m}};
-  auto a = must(generate::random_rod_crystal(rg, comp, {.seed = 7u}));
-  auto b = must(generate::random_rod_crystal(rg, comp, {.seed = 7u}));
+  generate::Generator const gen{rg, {.seed = 7u}};
+  auto a = must(gen(comp));
+  auto b = must(gen(comp));
   REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
   REQUIRE(a.cell.types() == b.cell.types());
 }
