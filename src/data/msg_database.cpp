@@ -79,17 +79,11 @@ make_magnetic(DecodedMagneticOp const &d) noexcept {
 // Offset from a UNI number's smallest Hall setting to `hall_number`; the
 // default (hall_number == 0) is offset 0. std::nullopt if the UNI number, the
 // Hall number or the resulting offset is out of range.
-[[nodiscard]] std::optional<int> hall_number_offset(int uni_number,
-                                                    int hall_number) noexcept {
-  if (uni_number < 1 || uni_number > kNumUniNumbers) {
-    return std::nullopt;
-  }
-  if (hall_number != 0 && (hall_number < 1 || hall_number > kNumHallNumbers)) {
-    return std::nullopt;
-  }
+[[nodiscard]] std::optional<int>
+hall_number_offset(UniNumber uni, std::optional<HallNumber> hall) noexcept {
   const auto [num_halls, first_hall_number] =
-      kMagneticUniMapping[static_cast<std::size_t>(uni_number)];
-  int const offset = hall_number == 0 ? 0 : hall_number - first_hall_number;
+      kMagneticUniMapping[static_cast<std::size_t>(uni.value())];
+  int const offset = hall ? hall->index() - first_hall_number : 0;
   if (offset < 0 || offset >= num_halls) {
     return std::nullopt;
   }
@@ -150,19 +144,20 @@ template <class T, class Build>
 } // namespace
 
 MagneticOperations const &
-magnetic_operations_from_database(int uni_number, int hall_number) {
+magnetic_operations_from_database(UniNumber uni,
+                                  std::optional<HallNumber> hall) {
   static auto const table =
       build_setting_table<MagneticOperations>(build_operations);
-  auto const offset = hall_number_offset(uni_number, hall_number);
-  return table[offset ? setting_slot(uni_number, *offset) : 0];
+  auto const offset = hall_number_offset(uni, hall);
+  return table[offset ? setting_slot(uni.value(), *offset) : 0];
 }
 
-Operations const &magnetic_std_transformations(int uni_number,
-                                                       int hall_number) {
+Operations const &
+magnetic_std_transformations(UniNumber uni, std::optional<HallNumber> hall) {
   static auto const table =
       build_setting_table<Operations>(build_transformations);
-  auto const offset = hall_number_offset(uni_number, hall_number);
-  return table[offset ? setting_slot(uni_number, *offset) : 0];
+  auto const offset = hall_number_offset(uni, hall);
+  return table[offset ? setting_slot(uni.value(), *offset) : 0];
 }
 
 } // namespace cppcrystal::data

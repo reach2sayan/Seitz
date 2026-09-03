@@ -86,7 +86,7 @@ target_include_directories(cppcrystal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(cppcrystal PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
-        Boost::graph Boost::leaf Threads::Threads)
+        Boost::leaf Threads::Threads)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Hardening warning set (Phase 9). The conversion warnings are applied to the

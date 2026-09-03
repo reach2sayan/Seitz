@@ -25,7 +25,7 @@ constexpr double kReduceRateOuter = 0.9; // tolerance shrink factor per attempt
 template <GroupFamily F>
 [[nodiscard]] Result<Dataset> run_pipeline(Cell const &cell,
                                            Tolerance const &tol,
-                                           int hall_number) {
+                                           std::optional<HallNumber> setting) {
   Tolerance attempt_tol = tol;
   for (int attempt = 0; attempt < kNumAttemptOuter;
        ++attempt, attempt_tol.symprec *= kReduceRateOuter) {
@@ -35,8 +35,8 @@ template <GroupFamily F>
       continue;
     }
     Tolerance const &found = primitive->tolerance;
-    spacegroup::SpacegroupMatcher<F> const matcher(*primitive, hall_number);
-    auto const sg = matcher.search(found);
+    spacegroup::SpacegroupMatcher<F> const matcher(*primitive, setting);
+    auto const sg = matcher.search();
     if (!sg) {
       continue;
     }
@@ -46,7 +46,7 @@ template <GroupFamily F>
     refine::Refinement<F> const refinement =
         refine::Refinement<F>{*sg, primitive->cell, cell, found}
             .similar_bravais();
-    spacegroup::Spacegroup const &sg2 = refinement.matched();
+    SpacegroupMatch const &sg2 = refinement.matched();
 
     auto const operations = refinement.operations();
     if (!operations) {
@@ -59,11 +59,11 @@ template <GroupFamily F>
       continue;
     }
 
-    data::SpacegroupType const &t = sg2.type;
+    data::SpacegroupType const &t = sg2.type();
     Matrix3d const std_lattice = std->bravais.lattice().matrix();
     return Dataset{
         .spacegroup_number = t.number,
-        .hall_number = t.hall_number,
+        .hall = sg2.hall,
         .international_symbol = t.international_short,
         .hall_symbol = t.hall_symbol,
         .choice = t.choice,
@@ -99,13 +99,13 @@ template <GroupFamily F>
 } // namespace
 
 Result<Dataset> get_dataset(Cell const &cell, Tolerance const &tol,
-                            int hall_number) {
+                            std::optional<HallNumber> setting) {
   if (auto valid = validate_cell(cell); !valid) {
     return valid.error();
   }
   // The one runtime branch on the family; the pipeline below it is templated.
   return dispatch_family(cell.periodicity(), [&]<GroupFamily F>() {
-    return run_pipeline<F>(cell, tol, hall_number);
+    return run_pipeline<F>(cell, tol, setting);
   });
 }
 

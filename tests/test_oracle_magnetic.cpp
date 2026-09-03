@@ -99,7 +99,7 @@ void check(MagneticCell const &mcell, bool with_time_reversal, bool is_axial,
   auto const [ref_uni, ref_type] =
       reference_uni(ops, mcell.cell().lattice().matrix(), symprec);
   REQUIRE(ref_uni != 0);
-  REQUIRE(got->uni_number == ref_uni);
+  REQUIRE(got->uni.value() == ref_uni);
   REQUIRE(static_cast<int>(got->msg_type) == ref_type);
 }
 

@@ -139,12 +139,14 @@ Result<PointGroup> PointGroup::from_number(int number) {
 
   auto const meta = symmetry::pointgroup_by_number(number);
   int const rep = kRepresentativeSpacegroup[static_cast<std::size_t>(number)];
-  std::span<int const> const halls = data::halls_with_number(rep);
+  std::span<int const> const halls =
+      data::halls_with_number<GroupFamily::space>(rep);
   if (halls.empty()) {
     return leaf::new_error(e_message{
         "PointGroup::from_number: representative space group not found"});
   }
-  Operations const conv = data::operations_from_database(halls.front());
+  Operations const conv = data::operations_from_database(
+      *HallNumber::of(GroupFamily::space, halls.front()));
 
   PointGroup pg;
   pg.number_ = number;

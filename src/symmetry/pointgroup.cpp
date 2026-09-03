@@ -24,178 +24,6 @@ namespace cppcrystal::symmetry {
 
 namespace {
 
-struct PgEntry {
-  std::array<int, 10> table;
-  std::string_view symbol;
-  std::string_view schoenflies;
-  Holohedry holohedry;
-  Laue laue;
-};
-
-constexpr std::array<PgEntry, 33> kPointgroupData = {{
-    {{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, "", "", Holohedry::none, Laue::none},
-    {{0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
-     "1",
-     "C1",
-     Holohedry::triclinic,
-     Laue::laue_1},
-    {{0, 0, 0, 0, 1, 1, 0, 0, 0, 0},
-     "-1",
-     "Ci",
-     Holohedry::triclinic,
-     Laue::laue_1},
-    {{0, 0, 0, 0, 0, 1, 1, 0, 0, 0},
-     "2",
-     "C2",
-     Holohedry::monoclinic,
-     Laue::laue_2m},
-    {{0, 0, 0, 1, 0, 1, 0, 0, 0, 0},
-     "m",
-     "Cs",
-     Holohedry::monoclinic,
-     Laue::laue_2m},
-    {{0, 0, 0, 1, 1, 1, 1, 0, 0, 0},
-     "2/m",
-     "C2h",
-     Holohedry::monoclinic,
-     Laue::laue_2m},
-    {{0, 0, 0, 0, 0, 1, 3, 0, 0, 0},
-     "222",
-     "D2",
-     Holohedry::orthorhombic,
-     Laue::laue_mmm},
-    {{0, 0, 0, 2, 0, 1, 1, 0, 0, 0},
-     "mm2",
-     "C2v",
-     Holohedry::orthorhombic,
-     Laue::laue_mmm},
-    {{0, 0, 0, 3, 1, 1, 3, 0, 0, 0},
-     "mmm",
-     "D2h",
-     Holohedry::orthorhombic,
-     Laue::laue_mmm},
-    {{0, 0, 0, 0, 0, 1, 1, 0, 2, 0},
-     "4",
-     "C4",
-     Holohedry::tetragonal,
-     Laue::laue_4m},
-    {{0, 2, 0, 0, 0, 1, 1, 0, 0, 0},
-     "-4",
-     "S4",
-     Holohedry::tetragonal,
-     Laue::laue_4m},
-    {{0, 2, 0, 1, 1, 1, 1, 0, 2, 0},
-     "4/m",
-     "C4h",
-     Holohedry::tetragonal,
-     Laue::laue_4m},
-    {{0, 0, 0, 0, 0, 1, 5, 0, 2, 0},
-     "422",
-     "D4",
-     Holohedry::tetragonal,
-     Laue::laue_4mmm},
-    {{0, 0, 0, 4, 0, 1, 1, 0, 2, 0},
-     "4mm",
-     "C4v",
-     Holohedry::tetragonal,
-     Laue::laue_4mmm},
-    {{0, 2, 0, 2, 0, 1, 3, 0, 0, 0},
-     "-42m",
-     "D2d",
-     Holohedry::tetragonal,
-     Laue::laue_4mmm},
-    {{0, 2, 0, 5, 1, 1, 5, 0, 2, 0},
-     "4/mmm",
-     "D4h",
-     Holohedry::tetragonal,
-     Laue::laue_4mmm},
-    {{0, 0, 0, 0, 0, 1, 0, 2, 0, 0},
-     "3",
-     "C3",
-     Holohedry::trigonal,
-     Laue::laue_3},
-    {{0, 0, 2, 0, 1, 1, 0, 2, 0, 0},
-     "-3",
-     "C3i",
-     Holohedry::trigonal,
-     Laue::laue_3},
-    {{0, 0, 0, 0, 0, 1, 3, 2, 0, 0},
-     "32",
-     "D3",
-     Holohedry::trigonal,
-     Laue::laue_3m},
-    {{0, 0, 0, 3, 0, 1, 0, 2, 0, 0},
-     "3m",
-     "C3v",
-     Holohedry::trigonal,
-     Laue::laue_3m},
-    {{0, 0, 2, 3, 1, 1, 3, 2, 0, 0},
-     "-3m",
-     "D3d",
-     Holohedry::trigonal,
-     Laue::laue_3m},
-    {{0, 0, 0, 0, 0, 1, 1, 2, 0, 2},
-     "6",
-     "C6",
-     Holohedry::hexagonal,
-     Laue::laue_6m},
-    {{2, 0, 0, 1, 0, 1, 0, 2, 0, 0},
-     "-6",
-     "C3h",
-     Holohedry::hexagonal,
-     Laue::laue_6m},
-    {{2, 0, 2, 1, 1, 1, 1, 2, 0, 2},
-     "6/m",
-     "C6h",
-     Holohedry::hexagonal,
-     Laue::laue_6m},
-    {{0, 0, 0, 0, 0, 1, 7, 2, 0, 2},
-     "622",
-     "D6",
-     Holohedry::hexagonal,
-     Laue::laue_6mmm},
-    {{0, 0, 0, 6, 0, 1, 1, 2, 0, 2},
-     "6mm",
-     "C6v",
-     Holohedry::hexagonal,
-     Laue::laue_6mmm},
-    {{2, 0, 0, 4, 0, 1, 3, 2, 0, 0},
-     "-6m2",
-     "D3h",
-     Holohedry::hexagonal,
-     Laue::laue_6mmm},
-    {{2, 0, 2, 7, 1, 1, 7, 2, 0, 2},
-     "6/mmm",
-     "D6h",
-     Holohedry::hexagonal,
-     Laue::laue_6mmm},
-    {{0, 0, 0, 0, 0, 1, 3, 8, 0, 0},
-     "23",
-     "T",
-     Holohedry::cubic,
-     Laue::laue_m3},
-    {{0, 0, 8, 3, 1, 1, 3, 8, 0, 0},
-     "m-3",
-     "Th",
-     Holohedry::cubic,
-     Laue::laue_m3},
-    {{0, 0, 0, 0, 0, 1, 9, 8, 6, 0},
-     "432",
-     "O",
-     Holohedry::cubic,
-     Laue::laue_m3m},
-    {{0, 6, 0, 6, 0, 1, 3, 8, 0, 0},
-     "-43m",
-     "Td",
-     Holohedry::cubic,
-     Laue::laue_m3m},
-    {{0, 6, 8, 9, 1, 1, 9, 8, 6, 0},
-     "m-3m",
-     "Oh",
-     Holohedry::cubic,
-     Laue::laue_m3m},
-}};
-
 constexpr int kNumRotAxes = 73;
 constexpr int kRotAxes[kNumRotAxes][3] = {
     {1, 0, 0},   {0, 1, 0},   {0, 0, 1},   {0, 1, 1},   {1, 0, 1},
@@ -240,42 +68,49 @@ enum class RotationType {
   rotation_6,      //  6
 };
 
+// A crystallographic rotation is fixed by its determinant (+-1) and its trace
+// (-3..3), so the classification is a 2 x 7 lookup rather than a pair of
+// switches. Built once at compile time; unset cells are non-crystallographic.
+inline constexpr auto kTypeByDetTrace = [] {
+  std::array<std::array<std::optional<RotationType>, 7>, 2> t{};
+  auto at = [&t](int det, int trace) -> std::optional<RotationType> & {
+    return t[det == -1 ? 0 : 1][static_cast<std::size_t>(trace + 3)];
+  };
+  at(-1, -2) = RotationType::rotoinversion_6;
+  at(-1, -1) = RotationType::rotoinversion_4;
+  at(-1, 0) = RotationType::rotoinversion_3;
+  at(-1, 1) = RotationType::mirror;
+  at(-1, -3) = RotationType::inversion;
+  at(1, 3) = RotationType::identity;
+  at(1, -1) = RotationType::rotation_2;
+  at(1, 0) = RotationType::rotation_3;
+  at(1, 1) = RotationType::rotation_4;
+  at(1, 2) = RotationType::rotation_6;
+  return t;
+}();
+
 // Classify a single integer rotation by determinant and trace; std::nullopt if
 // it is not a crystallographic rotation.
-[[nodiscard]] std::optional<RotationType> rotation_type(Matrix3i const &rot) noexcept {
-  int const det = rot.determinant();
-  int const tr = rot.trace();
-  if (det == -1) {
-    switch (tr) {
-    case -2:
-      return RotationType::rotoinversion_6;
-    case -1:
-      return RotationType::rotoinversion_4;
-    case 0:
-      return RotationType::rotoinversion_3;
-    case 1:
-      return RotationType::mirror;
-    case -3:
-      return RotationType::inversion;
-    default:
-      return std::nullopt;
-    }
-  }
-  switch (tr) {
-  case 3:
-    return RotationType::identity;
-  case -1:
-    return RotationType::rotation_2;
-  case 0:
-    return RotationType::rotation_3;
-  case 1:
-    return RotationType::rotation_4;
-  case 2:
-    return RotationType::rotation_6;
-  default:
+[[nodiscard]] constexpr std::optional<RotationType>
+rotation_type(int det, int trace) noexcept {
+  if ((det != 1 && det != -1) || trace < -3 || trace > 3) {
     return std::nullopt;
   }
+  return kTypeByDetTrace[det == -1 ? 0 : 1][static_cast<std::size_t>(trace + 3)];
 }
+
+[[nodiscard]] std::optional<RotationType>
+rotation_type(Matrix3i const &rot) noexcept {
+  return rotation_type(rot.determinant(), rot.trace());
+}
+
+// The ten crystallographic types are exactly the reachable (det, trace) cells.
+static_assert(rotation_type(1, 3) == RotationType::identity);
+static_assert(rotation_type(-1, -3) == RotationType::inversion);
+static_assert(rotation_type(-1, 1) == RotationType::mirror);
+static_assert(!rotation_type(1, -2).has_value());  // no proper 6-bar
+static_assert(!rotation_type(0, 0).has_value());   // singular
+static_assert(!rotation_type(2, 3).has_value());   // not unimodular
 
 
 // De-duplicate rotations by value; distinct rotations beyond the capacity of
@@ -665,15 +500,6 @@ get_axes(Laue laue, PointSymmetry const &ps,
 
 } // namespace
 
-PointGroup pointgroup_by_number(int number) noexcept {
-  if (number < 1 || number > 32) {
-    return {};
-  }
-  PgEntry const &e = kPointgroupData[static_cast<std::size_t>(number)];
-  // CrystalClass enumerators are aligned to the point-group numbering (1..32).
-  return {number, e.symbol, e.schoenflies, e.holohedry, e.laue,
-          static_cast<CrystalClass>(number)};
-}
 
 template <GroupFamily F>
 Result<PointgroupTransform>

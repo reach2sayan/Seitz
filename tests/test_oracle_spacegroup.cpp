@@ -9,6 +9,8 @@
 #include "symmetry/search.hpp"
 #include "symmetry/primitive.hpp"
 
+#include "helpers.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -16,6 +18,7 @@
 #include <vector>
 
 using namespace cppcrystal;
+using cppcrystal::test::space_hall;
 
 namespace {
 
@@ -243,11 +246,11 @@ TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
     REQUIRE(ours);
 
     INFO("ours: SG " << ours->spacegroup_number << " hall "
-                     << ours->hall_number << " (" << ours->international_symbol
+                     << ours->hall.index() << " (" << ours->international_symbol
                      << "); ref: SG " << ref.number << " hall "
                      << ref.hall_number << " (" << ref.international << ")");
     CHECK(ours->spacegroup_number == ref.number);
-    CHECK(ours->hall_number == ref.hall_number);
+    CHECK(ours->hall == space_hall(ref.hall_number));
     CHECK(std::string(ours->international_symbol) == ref.international);
     CHECK(std::string(ours->hall_symbol) == ref.hall_symbol);
     CHECK(std::string(ours->choice) == ref.choice);
@@ -265,8 +268,9 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
     auto const prim =
         symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim, 0);
-    auto const sg = matcher.search(prim->tolerance);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim,
+                                                                 std::nullopt);
+    auto const sg = matcher.search();
     REQUIRE(sg);
 
     auto const sg2 =
@@ -323,7 +327,7 @@ TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
 
     // Identity + transformation/standardization matrices.
     CHECK(d->spacegroup_number == ref.number);
-    CHECK(d->hall_number == ref.hall_number);
+    CHECK(d->hall == space_hall(ref.hall_number));
     CHECK((d->transformation_matrix - ref.transformation_matrix)
               .cwiseAbs()
               .maxCoeff() < 1e-4);
@@ -357,8 +361,9 @@ TEST_CASE("standardized cell + Wyckoffs + equivalent atoms match the oracle",
     auto const prim =
         symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim, 0);
-    auto const sg = matcher.search(prim->tolerance);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim,
+                                                                 std::nullopt);
+    auto const sg = matcher.search();
     REQUIRE(sg);
     auto const ops = symmetry::SymmetrySearch<GroupFamily::space>{
         cell, prim->tolerance}.operations();

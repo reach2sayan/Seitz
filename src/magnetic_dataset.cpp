@@ -35,9 +35,9 @@ Result<MagneticDataset> get_magnetic_dataset(MagneticCell const &cell,
   BOOST_LEAF_AUTO(std_cell, identification.transform(exact, ident));
 
   MagneticDataset const dataset{
-      .uni_number = ident.uni_number,
+      .uni = ident.uni,
       .msg_type = ident.msg_type,
-      .hall_number = ident.hall_number,
+      .hall = ident.hall,
       .tensor_rank = cell.rank(),
 
       .operations = search.operations,

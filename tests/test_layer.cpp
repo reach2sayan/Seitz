@@ -19,6 +19,8 @@
 using namespace cppcrystal;
 
 namespace {
+using cppcrystal::test::layer_hall;
+using cppcrystal::test::space_hall;
 using cppcrystal::test::must;
 
 // A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along c,
@@ -34,14 +36,14 @@ Matrix3d hexagonal_layer(double a, double c) {
 
 TEST_CASE("layer database: negative-hall metadata + ops", "[layer][database]") {
   // constexpr metadata works at compile time for layer settings.
-  STATIC_REQUIRE(data::spacegroup_type(-1).number == 1);
-  STATIC_REQUIRE(data::spacegroup_type(-116).number == 80);
-  STATIC_REQUIRE(data::spacegroup_type(-116).pointgroup_number == 27);
-  STATIC_REQUIRE(data::spacegroup_type(1).number == 1); // 3D path intact
+  STATIC_REQUIRE(data::spacegroup_type(layer_hall(1)).number == 1);
+  STATIC_REQUIRE(data::spacegroup_type(layer_hall(116)).number == 80);
+  STATIC_REQUIRE(data::spacegroup_type(layer_hall(116)).pointgroup_number == 27);
+  STATIC_REQUIRE(data::spacegroup_type(space_hall(1)).number == 1); // 3D path intact
 
   // Layer operations are capped at 24 (vs 48 for 3D point groups).
-  REQUIRE(data::operations_from_database(-116).size() == 24); // p6/mmm layer
-  REQUIRE(data::operations_from_database(-1).size() == 1);     // p1 layer
+  REQUIRE(data::operations_from_database(layer_hall(116)).size() == 24); // p6/mmm layer
+  REQUIRE(data::operations_from_database(layer_hall(1)).size() == 1);     // p1 layer
 }
 
 TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
@@ -53,7 +55,7 @@ TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
 
   auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
   REQUIRE(ds.spacegroup_number == 80);  // layer-group number
-  REQUIRE(ds.hall_number == -116);      // negative-hall convention
+  REQUIRE(ds.hall == layer_hall(116));      // negative-hall convention
   REQUIRE(ds.international_symbol == "p6/mmm");
   REQUIRE(ds.aperiodic_axis == 2);
   REQUIRE(ds.operations.size() == 24);
@@ -106,7 +108,7 @@ TEST_CASE("SymmetryAnalyzer auto-routes layer cells", "[layer][analysis]") {
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(
       cell.with_periodicity(aperiodic_along(2)), {1e-4});
   REQUIRE(must(analyzer.spacegroup_number()) == 80);
-  REQUIRE(must(analyzer.hall_number()) == -116);
+  REQUIRE(must(analyzer.hall()) == layer_hall(116));
 }
 
 TEST_CASE("a 3D cell is unaffected by the layer code paths", "[layer]") {

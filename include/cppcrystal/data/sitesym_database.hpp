@@ -1,12 +1,13 @@
 #pragma once
 
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/types.hpp>
 
 #include <string_view>
 #include <vector>
 
 // Decoder for the site-symmetry / Wyckoff database (generated tables in
-// data/sitesym_tables.hpp). 3D space-group path only (Hall numbers 1..530). The
+// data/sitesym_tables.hpp). The
 // encoded tables and the compile-time decode are an implementation detail of
 // sitesym_database.cpp; this header exposes only the decoded, Eigen-valued API.
 namespace cppcrystal::data {
@@ -29,7 +30,7 @@ struct WyckoffRange {
   int count;
 };
 
-[[nodiscard]] WyckoffRange wyckoff_indices(int hall_number);
+[[nodiscard]] WyckoffRange wyckoff_indices(HallNumber hall);
 
 // Site-symmetry symbol of a Wyckoff position. The trailing space padding is
 // removed at generation time, so the view points straight into static storage.
@@ -45,11 +46,11 @@ struct WyckoffEntry {
   int letter; // 0 = 'a'
 };
 
-// The Wyckoff positions of a Hall number (1..530), ordered by ascending letter
+// The Wyckoff positions of a Hall setting, ordered by ascending letter
 // (a, b, c, ...). Bundles index + letter so callers iterate one list of objects
-// rather than re-deriving the letter offset from a WyckoffRange. Empty out of
-// range. The letter convention (count - offset - 1) matches the one used when
-// assigning Dataset::wyckoffs in refine/site_symmetry.cpp.
-[[nodiscard]] std::vector<WyckoffEntry> wyckoff_entries(int hall_number);
+// rather than re-deriving the letter offset from a WyckoffRange. The letter
+// convention (count - offset - 1) matches the one used when assigning
+// Dataset::wyckoffs in refine/site_symmetry.cpp.
+[[nodiscard]] std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall);
 
 } // namespace cppcrystal::data

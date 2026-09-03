@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -29,6 +30,6 @@ using ExactPositions = std::vector<ExactPosition>;
 // could not be resolved at any of the attempted tolerances.
 [[nodiscard]] std::optional<ExactPositions>
 exact_positions(Cell const &conv_prim, Operations const &conv_sym,
-                int num_pure_trans, int hall_number, double symprec);
+                int num_pure_trans, HallNumber hall, double symprec);
 
 } // namespace cppcrystal::refine

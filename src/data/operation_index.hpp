@@ -8,9 +8,9 @@
 // Hall-symbol matcher needs it, and RotationMultimap is an internal container.
 namespace cppcrystal::data {
 
-// rotation -> indices into operations_from_database(hall_number), built once
-// per setting. Empty for an out-of-range Hall number.
+// rotation -> indices into operations_from_database(hall), built once per
+// setting.
 [[nodiscard]] RotationMultimap<int> const &
-operations_by_rotation(int hall_number);
+operations_by_rotation(HallNumber hall);
 
 } // namespace cppcrystal::data

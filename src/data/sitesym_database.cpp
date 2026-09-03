@@ -94,16 +94,19 @@ WyckoffCoordinate wyckoff_coordinate(int index) {
   return {rot, trans, d.multiplicity};
 }
 
-WyckoffRange wyckoff_indices(int hall_number) {
-  return detail::hall_indexed(kWyckoffRanges, kLayerWyckoffRanges, hall_number);
+WyckoffRange wyckoff_indices(HallNumber hall) {
+  // The generated range tables keep their 1-based layout.
+  auto const i = static_cast<std::size_t>(hall.index());
+  return hall.family() == GroupFamily::layer ? kLayerWyckoffRanges[i]
+                                             : kWyckoffRanges[i];
 }
 
 std::string_view site_symmetry_symbol(int index) {
   return kSiteSymmetrySymbols[static_cast<std::size_t>(index)];
 }
 
-std::vector<WyckoffEntry> wyckoff_entries(int hall_number) {
-  WyckoffRange const range = wyckoff_indices(hall_number);
+std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall) {
+  WyckoffRange const range = wyckoff_indices(hall);
   std::vector<WyckoffEntry> entries;
   entries.reserve(static_cast<std::size_t>(range.count));
   // The database lists positions general-first; the letter is the reverse

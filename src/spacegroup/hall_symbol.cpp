@@ -1,4 +1,4 @@
-#include "spacegroup/hall_symbol.hpp"
+#include "spacegroup/spacegroup.hpp"
 
 #include "core/centering.hpp"
 #include "core/matrix_order.hpp"
@@ -49,11 +49,12 @@ namespace {
          centering_matrix_inv(c);
 }
 
-// Everything fixed for one (Hall number, operation set) match: both operation
+// Everything fixed for one (Hall setting, operation set) match: both operation
 // lists with their rotation indices, so every "the operation with rotation R"
-// question below is a logarithmic lookup.
-struct Setting {
-  int hall_number;
+// question below is a logarithmic lookup. The family is a template parameter,
+// so the layer path's aperiodic c axis is an `if constexpr` branch.
+template <GroupFamily F> struct MatchContext {
+  HallNumber hall;
   Matrix3d const &primitive_lattice;
   Operations const &symmetry;
   RotationMultimap<int> const &symmetry_by_rotation;
@@ -61,11 +62,15 @@ struct Setting {
   RotationMultimap<int> const &db_by_rotation;
   double symprec;
 
-  // For a layer setting (hall_number < 0) the conventional c axis (index 2)
-  // is aperiodic: the overlap test must not fold it, and a shift along it
-  // stays raw — that is what re-centers a layer onto the database convention.
-  [[nodiscard]] CellPeriodicity periodicity() const noexcept {
-    return hall_number < 0 ? aperiodic_along(2) : all_periodic();
+  // For a layer setting the conventional c axis (index 2) is aperiodic: the
+  // overlap test must not fold it, and a shift along it stays raw — that is
+  // what re-centers a layer onto the database convention.
+  [[nodiscard]] static constexpr CellPeriodicity periodicity() noexcept {
+    if constexpr (F == GroupFamily::layer) {
+      return aperiodic_along(2);
+    } else {
+      return all_periodic();
+    }
   }
   [[nodiscard]] Vector3d wrap(Vector3d const &v) const noexcept {
     return cppcrystal::wrap(v, periodicity());
@@ -94,8 +99,9 @@ using DwChoices = std::array<DwCandidates, 3>;
 // so there each representative gives its own dw and only trying all of them
 // makes the match independent of the order of the input operations. A zero
 // generator contributes the single zero block.
+template <GroupFamily F>
 [[nodiscard]] std::optional<DwCandidates>
-dw_candidates(Setting const &s, Centering c, Matrix3i const &rot) {
+dw_candidates(MatchContext<F> const &s, Centering c, Matrix3i const &rot) {
   if (rot.determinant() == 0) {
     return DwCandidates{Vector3d::Zero()};
   }
@@ -125,8 +131,9 @@ dw_candidates(Setting const &s, Centering c, Matrix3i const &rot) {
 
 // The per-generator dw candidates; nullopt if any generator rotation is
 // missing from either operation list.
+template <GroupFamily F>
 [[nodiscard]] std::optional<DwChoices>
-dw_choices(Setting const &s, Centering c, Generators const &rot) {
+dw_choices(MatchContext<F> const &s, Centering c, Generators const &rot) {
   DwChoices choices;
   for (auto [out, r] : std::views::zip(choices, rot)) {
     auto candidates = dw_candidates(s, c, r);
@@ -139,7 +146,8 @@ dw_choices(Setting const &s, Centering c, Generators const &rot) {
 }
 
 // shift = VSpU . dw for one choice of generator representatives.
-[[nodiscard]] Vector3d origin_shift(Setting const &s, data::VSpUSet const &vspu,
+template <GroupFamily F>
+[[nodiscard]] Vector3d origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
                                     Vector3d const &dw0, Vector3d const &dw1,
                                     Vector3d const &dw2) {
   data::DwVector dw;
@@ -151,7 +159,8 @@ dw_choices(Setting const &s, Centering c, Generators const &rot) {
 // origin shift is applied: same rotation, translations agreeing within
 // symprec. Operations are matched in order, each to the first still-unmatched
 // database operation carrying its rotation.
-[[nodiscard]] bool matches_database(Setting const &s, Centering c,
+template <GroupFamily F>
+[[nodiscard]] bool matches_database(MatchContext<F> const &s, Centering c,
                                     Vector3d const &shift) {
   boost::container::static_vector<bool, 192> matched(s.db_ops.size(), false);
   for (auto const &op : s.symmetry) {
@@ -177,8 +186,9 @@ dw_choices(Setting const &s, Centering c, Generators const &rot) {
 // generator representatives makes the operations match the setting. The
 // product varies the last generator fastest, so the first combination tried is
 // the reference implementation's — the first operation carrying each rotation.
+template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
-hall_symbol_shift(Setting const &s, Centering c, data::GeneratorSet const &gens,
+hall_symbol_shift(MatchContext<F> const &s, Centering c, data::GeneratorSet const &gens,
                   data::VSpUSet const &vspu) {
   auto const choices = dw_choices(s, c, unpack_generators(gens));
   if (!choices) {
@@ -195,8 +205,9 @@ hall_symbol_shift(Setting const &s, Centering c, data::GeneratorSet const &gens,
 }
 
 // The first candidate of a family that matches.
+template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
-first_shift(Setting const &s, Centering c,
+first_shift(MatchContext<F> const &s, Centering c,
             std::span<data::GeneratorSet const> gens,
             std::span<data::VSpUSet const> vspu) {
   for (auto const &[gen, vsp] : std::views::zip(gens, vspu)) {
@@ -262,19 +273,24 @@ constexpr auto kFamilies = [] {
   return t;
 }();
 
-[[nodiscard]] std::optional<Vector3d> dispatch(Setting const &s, Centering c) {
+template <GroupFamily F>
+[[nodiscard]] std::optional<Vector3d> dispatch(MatchContext<F> const &s,
+                                               Centering c) {
   using namespace data;
   // Crystal system and the rhombohedral subsets are pure functions of the Hall
   // number, precomputed once in data::kHallClass. Layer groups (negative hall
   // numbers) carry no 3D hall-range bucket, so their crystal system is derived
   // from the point-group number; they are never rhombohedral and reuse the
   // same per-system generator families.
-  HallClass const hc =
-      s.hall_number < 0
-          ? HallClass{holohedry_from_pointgroup(
-                          spacegroup_type(s.hall_number).pointgroup_number),
-                      false, false}
-          : hall_class(s.hall_number);
+  HallClass const hc = [&] {
+    if constexpr (F == GroupFamily::layer) {
+      return HallClass{holohedry_from_pointgroup(
+                           spacegroup_type(s.hall).pointgroup_number),
+                       false, false};
+    } else {
+      return hall_class(s.hall.index());
+    }
+  }();
 
   // The one choice not keyed on (system, centering): rhombohedral settings
   // split on the hexagonal-vs-primitive axes choice of the Hall symbol.
@@ -296,11 +312,11 @@ constexpr auto kFamilies = [] {
 
 } // namespace
 
-std::optional<Vector3d> match_hall_symbol(Matrix3d const &bravais_lattice,
-                                          int hall_number, Centering centering,
-                                          Operations const &symmetry,
-                                          double symprec) {
-  Operations const &db_ops = data::operations_from_database(hall_number);
+template <GroupFamily F>
+std::optional<Vector3d> SpacegroupMatcher<F>::match_hall(
+    Matrix3d const &bravais_lattice, HallNumber hall, Centering centering,
+    Operations const &symmetry, double symprec) {
+  Operations const &db_ops = data::operations_from_database(hall);
   if (db_ops.size() != symmetry.size()) {
     return std::nullopt;
   }
@@ -308,17 +324,26 @@ std::optional<Vector3d> match_hall_symbol(Matrix3d const &bravais_lattice,
       bravais_lattice * centering_matrix_inv(centering);
   RotationMultimap<int> const symmetry_by_rotation =
       index_by_rotation(symmetry, &SymmetryOperation::rotation);
-  Setting const setting{hall_number,
-                        primitive_lattice,
-                        symmetry,
-                        symmetry_by_rotation,
-                        db_ops,
-                        data::operations_by_rotation(hall_number),
-                        symprec};
+  MatchContext<F> const context{hall,
+                                primitive_lattice,
+                                symmetry,
+                                symmetry_by_rotation,
+                                db_ops,
+                                data::operations_by_rotation(hall),
+                                symprec};
   // Bring the origin shift back to the bravais setting.
-  return dispatch(setting, centering).transform([&](Vector3d const &shift) {
+  return dispatch(context, centering).transform([&](Vector3d const &shift) {
     return Vector3d(centering_matrix_inv(centering) * shift);
   });
 }
+
+template std::optional<Vector3d>
+SpacegroupMatcher<GroupFamily::space>::match_hall(Matrix3d const &, HallNumber,
+                                                  Centering, Operations const &,
+                                                  double);
+template std::optional<Vector3d>
+SpacegroupMatcher<GroupFamily::layer>::match_hall(Matrix3d const &, HallNumber,
+                                                  Centering, Operations const &,
+                                                  double);
 
 } // namespace cppcrystal::spacegroup

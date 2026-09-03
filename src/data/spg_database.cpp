@@ -23,14 +23,15 @@ constexpr auto kDecodedOps = [] {
 
 } // namespace
 
-Operations const &operations_from_database(int hall_number) {
-  // Materialised once per family, indexed by Hall number (layer settings by
-  // -hall); entry 0 is the empty fallback for out-of-range queries.
+Operations const &operations_from_database(HallNumber hall) {
+  // Materialised once per family. The generated index tables keep their 1-based
+  // layout, so a HallNumber's index addresses them directly.
   static auto const ops =
       detail::build_operation_table(kSymmetryOperationIndex, kDecodedOps);
   static auto const layer_ops =
       detail::build_operation_table(kLayerSymmetryOperationIndex, kDecodedOps);
-  return detail::hall_indexed(ops, layer_ops, hall_number);
+  auto const i = static_cast<std::size_t>(hall.index());
+  return hall.family() == GroupFamily::layer ? layer_ops[i] : ops[i];
 }
 
 } // namespace cppcrystal::data

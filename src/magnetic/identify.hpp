@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
@@ -18,9 +19,10 @@ namespace cppcrystal::magnetic {
 // input setting to the standardized one; `std_rotation_matrix` is the rigid
 // rotation to the idealized standardized lattice.
 struct MagneticTypeIdentification {
-  int uni_number = 0; // 1..1651
+  UniNumber uni;
   MagneticType msg_type = MagneticType::type_i;
-  int hall_number = 0; // family (types I–III) or maximal (type IV) space group
+  // Family (types I-III) or maximal (type IV) space group.
+  HallNumber hall;
 
   Matrix3d transformation_matrix{Matrix3d::Identity()};
   Vector3d origin_shift{Vector3d::Zero()};

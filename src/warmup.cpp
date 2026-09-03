@@ -1,7 +1,6 @@
 #include <cppcrystal/warmup.hpp>
 
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/group/subgroup_graph.hpp>
 
 #include <future>
 #include <vector>
@@ -17,15 +16,17 @@ void prime(WarmupOptions opts) {
   std::vector<std::future<void>> primers;
   if (opts.space_group_operations) {
     primers.push_back(std::async(
-        std::launch::async, [] { (void)data::operations_from_database(1); }));
+        std::launch::async, [] {
+          (void)data::operations_from_database(
+              *HallNumber::of(GroupFamily::space, 1));
+        }));
   }
   if (opts.layer_group_operations) {
     primers.push_back(std::async(
-        std::launch::async, [] { (void)data::operations_from_database(-1); }));
-  }
-  if (opts.subgroup_graph) {
-    primers.push_back(std::async(
-        std::launch::async, [] { (void)group::SubgroupGraph::instance(); }));
+        std::launch::async, [] {
+          (void)data::operations_from_database(
+              *HallNumber::of(GroupFamily::layer, 1));
+        }));
   }
   for (auto &f : primers) {
     f.get();

@@ -139,12 +139,12 @@ recover_in_original_cell(Operations const &prim_sym,
 
 template <GroupFamily F>
 std::optional<Operations> Refinement<F>::operations() const {
-  spacegroup::Spacegroup const &sg = matched_;
+  SpacegroupMatch const &sg = matched_;
   Cell const &primitive = primitive_;
   Cell const &cell = cell_;
   double const symprec = tol_.symprec;
   Operations const conv_sym =
-      operations_from_database(sg.type.hall_number);
+      operations_from_database(sg.hall);
 
   Matrix3d const inv_prim = primitive.lattice().matrix().inverse();
 

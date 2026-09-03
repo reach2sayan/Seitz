@@ -26,7 +26,7 @@ namespace cppcrystal::magnetic {
 
 namespace {
 
-using spacegroup::Spacegroup;
+
 
 constexpr int kMaxDenominator = 100;
 
@@ -44,7 +44,7 @@ enum class SpaceGroupKind { family, maximal };
 
 // Family / maximal space group of a magnetic symmetry, plus its non-magnetic
 // symmetry operations (in the input setting).
-[[nodiscard]] std::optional<std::pair<Operations, Spacegroup>>
+[[nodiscard]] std::optional<std::pair<Operations, SpacegroupMatch>>
 space_group_of_magnetic_symmetry(
     MagneticOperations const &magnetic_symmetry, SpaceGroupKind kind,
     double symprec) {
@@ -79,12 +79,15 @@ space_group_of_magnetic_symmetry(
   Operations const &prim_sym = prim->first;
   Matrix3d const &t_mat = prim->second;
 
+  // NOT spacegroup_type_from_symmetry: that Niggli-reduces the primitive
+  // lattice before matching, which this path must not do, and it discards the
+  // t_mat the change of basis below needs. The overlap is superficial.
   auto sg = spacegroup::search_spacegroup_with_symmetry(
       prim_sym, Matrix3d::Identity(), symprec);
   if (!sg) {
     return std::nullopt;
   }
-  Spacegroup spacegroup =
+  SpacegroupMatch spacegroup =
       refine::find_similar_bravais_lattice(sg.value(), symprec);
   // Change basis from primitive to original: (a_std,b_std,c_std) = (a,b,c) .
   // t_mat^-1 . P.
@@ -325,7 +328,7 @@ changed_pure_translations(Matrix3d const &tmat,
 // verbatim so the (later) std_rotation oracle matches spglib v2.7.0 exactly.
 [[nodiscard]] Matrix3d rigid_rotation(Matrix3d const &lattice,
                                       Matrix3d const &tmat,
-                                      Spacegroup const &ref_sg) {
+                                      SpacegroupMatch const &ref_sg) {
   Lattice const ideal_latt = refine::conventional_lattice(ref_sg);
   static_cast<void>(ideal_latt); // unused in the product (see note above)
   return lattice * tmat.inverse() * tmat * lattice.inverse();
@@ -333,7 +336,7 @@ changed_pure_translations(Matrix3d const &tmat,
 
 struct ReferenceSpaceGroup {
   MagneticType type;
-  Spacegroup ref_sg;
+  SpacegroupMatch ref_sg;
   MagOps changed_symmetry;
   Matrix3d tmat;
   Vector3d shift;
@@ -364,7 +367,7 @@ get_reference_space_group(Matrix3d const &lattice,
   MagneticType const type = type_rep->first;
   MagOps const &representatives = type_rep->second;
 
-  Spacegroup ref_sg =
+  SpacegroupMatch ref_sg =
       (type == MagneticType::type_iv) ? xsg->second : fsg->second;
   Matrix3d const lattice_inv = lattice.inverse();
   ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
@@ -394,35 +397,32 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
   if (!reference) {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
-  int const hall_number = reference->ref_sg.hall_number();
+  HallNumber const hall = reference->ref_sg.hall;
   int const type = static_cast<int>(reference->type);
-
-  auto const range = data::uni_candidates(hall_number);
-  if (!range) {
-    return leaf::new_error(e_magnetic_symmetry_search_failed{});
-  }
+  auto const [first_uni, last_uni] = data::uni_candidates(hall);
 
   // The first UNI candidate whose tabulated operations match the changed
   // symmetry, with the correction transformation x_uni = (tmat, shift)
   // x_changed that made them match.
   struct Correction {
-    int uni;
+    UniNumber uni;
     Matrix3d tmat;
     Vector3d shift;
   };
   auto const find_correction = [&]() -> std::optional<Correction> {
-    for (int uni = (*range).first; uni <= (*range).second; ++uni) {
+    for (int u = first_uni.value(); u <= last_uni.value(); ++u) {
+      UniNumber const uni = *UniNumber::of(u);
       if (data::magnetic_spacegroup_type(uni).type != type) {
         continue;
       }
       auto const &msg_uni =
-          data::magnetic_operations_from_database(uni, hall_number);
+          data::magnetic_operations_from_database(uni, hall);
       if (msg_uni.size() != reference->changed_symmetry.size()) {
         continue;
       }
 
       auto const &transformations =
-          data::magnetic_std_transformations(uni, hall_number);
+          data::magnetic_std_transformations(uni, hall);
       for (auto const &transform : transformations) {
         Matrix3d const cor = transform.rotation.cast<double>();
         Vector3d const cor_shift = transform.translation;
@@ -449,13 +449,13 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
   Matrix3d const tmat = correction->tmat * reference->tmat;
   Vector3d const shift = correction->tmat * reference->shift + correction->shift;
 
-  Spacegroup ref_sg = reference->ref_sg;
+  SpacegroupMatch ref_sg = reference->ref_sg;
   ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
   Matrix3d const rigid_rot = rigid_rotation(lattice, tmat, ref_sg);
 
-  return MagneticTypeIdentification{msgtype.uni_number,
+  return MagneticTypeIdentification{correction->uni,
                                     static_cast<MagneticType>(msgtype.type),
-                                    hall_number,
+                                    hall,
                                     tmat,
                                     shift,
                                     rigid_rot};

@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
@@ -23,10 +24,10 @@ namespace cppcrystal {
 // magnetic space-group identity, the magnetic operations of the input cell, the
 // standardized cell (with site tensors), and the per-atom equivalence data.
 struct MagneticDataset {
-  int uni_number = 0; // 1..1651
+  UniNumber uni;
   magnetic::MagneticType msg_type = magnetic::MagneticType::type_i;
   // Hall number of the family (types I–III) or maximal (type IV) space group.
-  int hall_number = 0;
+  HallNumber hall;
   SiteTensor tensor_rank = SiteTensor::collinear;
 
   // Magnetic operations of the input cell.

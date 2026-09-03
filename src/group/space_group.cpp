@@ -9,7 +9,11 @@
 #include <Eigen/Dense>
 
 #include <algorithm>
+#include <array>
 #include <iterator>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <span>
 #include <string>
 #include <utility>
@@ -58,69 +62,63 @@ WyckoffPosition SpaceGroup::build_position(data::WyckoffEntry const &entry,
                          std::move(partition.site_symmetry)};
 }
 
-Result<SpaceGroup> SpaceGroup::from_hall_number(int hall_number) {
-  data::SpacegroupType const type = data::spacegroup_type(hall_number);
-  if (type.number == 0) {
-    return leaf::new_error(
-        e_message{"SpaceGroup::from_hall_number: Hall number out of range "
-                  "(expected 1..530)"});
-  }
-
-  SpaceGroup sg;
-  sg.type_ = type;
-  sg.operations_ = data::operations_from_database(hall_number);
-
-  std::vector<data::WyckoffEntry> const entries =
-      data::wyckoff_entries(hall_number);
-  sg.positions_.reserve(entries.size());
-  std::ranges::transform(entries, std::back_inserter(sg.positions_),
+SpaceGroup::SpaceGroup(HallNumber hall)
+    : hall_(hall), operations_(data::operations_from_database(hall)) {
+  std::vector<data::WyckoffEntry> const entries = data::wyckoff_entries(hall);
+  positions_.reserve(entries.size());
+  std::ranges::transform(entries, std::back_inserter(positions_),
                          [&](data::WyckoffEntry const &entry) {
-                           return build_position(entry, sg.operations_);
+                           return build_position(entry, operations_);
                          });
-  return sg;
 }
 
-Result<SpaceGroup> SpaceGroup::from_layer_hall(int hall_number) {
-  data::SpacegroupType const type = data::spacegroup_type(hall_number);
-  if (hall_number >= 0 || type.number == 0) {
+// The Flyweight store: one slot per setting per family, filled on first use.
+// A shared_mutex keeps the common case (an already-built setting) to a shared
+// lock, which matters because SpaceGroup::of sits under every generation call.
+SpaceGroup const &SpaceGroup::of(HallNumber hall) {
+  struct Store {
+    std::shared_mutex mutex;
+    std::array<std::unique_ptr<SpaceGroup>, kSpaceHallSettings> space;
+    std::array<std::unique_ptr<SpaceGroup>, kLayerHallSettings> layer;
+
+    [[nodiscard]] std::unique_ptr<SpaceGroup> &slot(HallNumber h) noexcept {
+      auto const i = static_cast<std::size_t>(h.index()) - 1;
+      return h.family() == GroupFamily::layer ? layer[i] : space[i];
+    }
+  };
+  static Store store;
+
+  {
+    std::shared_lock const read(store.mutex);
+    if (auto const &built = store.slot(hall)) {
+      return *built;
+    }
+  }
+  // Build outside the lock: construction is independent per setting, and a
+  // duplicate build is cheaper than serialising every miss.
+  auto fresh = std::unique_ptr<SpaceGroup>(new SpaceGroup(hall));
+  std::unique_lock const write(store.mutex);
+  auto &slot = store.slot(hall);
+  if (!slot) {
+    slot = std::move(fresh);
+  }
+  return *slot;
+}
+
+Result<SpaceGroup const *> SpaceGroup::from_number(GroupFamily family,
+                                                   int number) {
+  auto const hall = family == GroupFamily::layer
+                        ? data::default_hall<GroupFamily::layer>(number)
+                        : data::default_hall<GroupFamily::space>(number);
+  if (!hall) {
     return leaf::new_error(e_message{
-        "SpaceGroup::from_layer_hall: layer hall number out of range "
-        "(expected -1..-116)"});
+        family == GroupFamily::layer
+            ? "SpaceGroup::from_number: layer-group number out of range "
+              "(expected 1..80)"
+            : "SpaceGroup::from_number: international number out of range "
+              "(expected 1..230)"});
   }
-
-  SpaceGroup lg;
-  lg.type_ = type;
-  lg.operations_ = data::operations_from_database(hall_number);
-
-  std::vector<data::WyckoffEntry> const entries =
-      data::wyckoff_entries(hall_number);
-  lg.positions_.reserve(entries.size());
-  std::ranges::transform(
-      entries, std::back_inserter(lg.positions_),
-      [&](const auto &entry) { return build_position(entry, lg.operations_); });
-  return lg;
-}
-
-Result<SpaceGroup> SpaceGroup::from_layer_number(int layer_number) {
-  // The layer-group number -> default-Hall map is resolved at compile time.
-  int const hall = data::layer_default_hall(layer_number);
-  if (hall == 0) {
-    return leaf::new_error(e_message{
-        "SpaceGroup::from_layer_number: layer-group number out of range "
-        "(expected 1..80)"});
-  }
-  return from_layer_hall(hall);
-}
-
-Result<SpaceGroup> SpaceGroup::from_number(int spacegroup_number) {
-  std::span<int const> const halls =
-      data::halls_with_number(spacegroup_number);
-  if (halls.empty()) {
-    return leaf::new_error(
-        e_message{"SpaceGroup::from_number: international number out of range "
-                  "(expected 1..230)"});
-  }
-  return from_hall_number(halls.front());
+  return &of(*hall);
 }
 
 Result<WyckoffPosition const *> SpaceGroup::wyckoff(char letter) const {

@@ -4,6 +4,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/point_group.hpp>
@@ -31,10 +32,11 @@ namespace cppcrystal::analysis {
 // separately by cppcrystal::warmup().)
 class SymmetryAnalyzer {
 public:
-  // Named factory (no overloaded constructors). `hall_number == 0` searches all
-  // 230 space groups; a non-zero value fixes the Hall setting.
+  // Named factory (no overloaded constructors). An unset `setting` searches
+  // every Hall setting of the cell's family; a set one fixes it.
   [[nodiscard]] static SymmetryAnalyzer
-  from_cell(Cell cell, Tolerance tol = {}, int hall_number = 0);
+  from_cell(Cell cell, Tolerance tol = {},
+            std::optional<HallNumber> setting = std::nullopt);
 
   [[nodiscard]] Cell const &cell() const noexcept { return cell_; }
   [[nodiscard]] double symprec() const noexcept { return tol_.symprec; }
@@ -56,8 +58,8 @@ public:
   [[nodiscard]] Result<int> spacegroup_number() const {
     return project<&Dataset::spacegroup_number>();
   }
-  [[nodiscard]] Result<int> hall_number() const {
-    return project<&Dataset::hall_number>();
+  [[nodiscard]] Result<HallNumber> hall() const {
+    return project<&Dataset::hall>();
   }
   [[nodiscard]] Result<std::vector<int>> wyckoffs() const {
     return project<&Dataset::wyckoffs>();
@@ -67,8 +69,8 @@ public:
     return project<&Dataset::site_symmetry_symbols>();
   }
   [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const {
-    BOOST_LEAF_AUTO(hall, hall_number());
-    return data::spacegroup_type(hall);
+    BOOST_LEAF_AUTO(setting, hall());
+    return data::spacegroup_type(setting);
   }
 
   // All space-group operations of the input cell exactly as given, including
@@ -105,8 +107,8 @@ public:
   Result<void> warm() const;
 
 private:
-  SymmetryAnalyzer(Cell cell, Tolerance tol, int hall_number)
-      : cell_(std::move(cell)), tol_(tol), hall_number_(hall_number) {}
+  SymmetryAnalyzer(Cell cell, Tolerance tol, std::optional<HallNumber> setting)
+      : cell_(std::move(cell)), tol_(tol), setting_(setting) {}
 
   [[nodiscard]] Result<Dataset const *> cached_dataset() const;
 
@@ -120,7 +122,7 @@ private:
 
   Cell cell_;
   Tolerance tol_;
-  int hall_number_ = 0;
+  std::optional<HallNumber> setting_;
 
   detail::Lazy<Dataset> dataset_;
   detail::Lazy<Cell> primitive_cell_;

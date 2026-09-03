@@ -28,6 +28,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::test::layer_hall;
 using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
@@ -108,7 +109,7 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
 
   // Layer-group identity.
   CHECK(got.spacegroup_number == ref.number);
-  CHECK(got.hall_number == ref.hall_number);
+  CHECK(got.hall == layer_hall(-ref.hall_number));
   CHECK(std::string(got.international_symbol) == ref.international);
   CHECK(std::string(got.hall_symbol) == ref.hall_symbol);
   CHECK(std::string(got.pointgroup_symbol) == ref.pointgroup);

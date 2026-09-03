@@ -8,11 +8,14 @@
 #include <cppcrystal/data/spacegroup_operation_tables.hpp> // raw ops (old indexing)
 #include <cppcrystal/data/spg_database.hpp>                // accessors (new indexing)
 
+#include "helpers.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string_view>
 
 using namespace cppcrystal;
+using cppcrystal::test::space_hall;
 
 namespace {
 // Reference unpack of one packed operation (spgdb_decode_symmetry: rotation
@@ -55,9 +58,10 @@ TEST_CASE("new map access matches old array indexing for all 530 Hall numbers",
           "[database]") {
   int op_mismatches = 0;
   int type_mismatches = 0;
-  for (int hall = 1; hall <= data::kNumHallNumbers; ++hall) {
+  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+    HallNumber const hall = space_hall(index);
     // --- operations: offset-decoded vs lazily-built cache ---
-    auto const old_ops = operations_by_offset(hall);
+    auto const old_ops = operations_by_offset(index);
     auto const &new_ops = data::operations_from_database(hall);
     bool ops_ok = old_ops.size() == new_ops.size();
     for (std::size_t s = 0; ops_ok && s < old_ops.size(); ++s)
@@ -66,10 +70,10 @@ TEST_CASE("new map access matches old array indexing for all 530 Hall numbers",
     op_mismatches += ops_ok ? 0 : 1;
 
     // --- metadata: raw array entry vs constexpr catalog ---
-    auto const &raw = data::kSpacegroupTypes[static_cast<std::size_t>(hall)];
-    auto const t = data::spacegroup_type(hall);
+    auto const &raw = data::kSpacegroupTypes[static_cast<std::size_t>(index)];
+    auto const &t = data::spacegroup_type(hall);
     bool const type_ok =
-        t.hall_number == hall && t.number == raw.number &&
+        t.number == raw.number &&
         t.schoenflies == std::string_view(raw.schoenflies) &&
         t.hall_symbol == std::string_view(raw.hall_symbol) &&
         t.international == std::string_view(raw.international) &&
@@ -90,12 +94,12 @@ TEST_CASE("the by-number catalog index enumerates every Hall setting",
   // space group 3 (P2) has three Hall settings (b, c, a unique-axis choices).
   std::size_t total = 0;
   for (int n = 1; n <= 230; ++n) {
-    total += data::halls_with_number(n).size();
+    total += data::halls_with_number<GroupFamily::space>(n).size();
   }
   CHECK(total == static_cast<std::size_t>(data::kNumHallNumbers));
-  CHECK(data::halls_with_number(3).size() == 3);
+  CHECK(data::halls_with_number<GroupFamily::space>(3).size() == 3);
 
   // The catalog is a genuine constant expression.
-  static_assert(data::spacegroup_type(1).number == 1);
-  static_assert(data::halls_with_number(3).size() == 3);
+  static_assert(data::spacegroup_type(space_hall(1)).number == 1);
+  static_assert(data::halls_with_number<GroupFamily::space>(3).size() == 3);
 }

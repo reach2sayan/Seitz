@@ -10,12 +10,12 @@
 namespace cppcrystal::analysis {
 
 SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, Tolerance tol,
-                                             int hall_number) {
-  return SymmetryAnalyzer{std::move(cell), tol, hall_number};
+                                             std::optional<HallNumber> setting) {
+  return SymmetryAnalyzer{std::move(cell), tol, setting};
 }
 
 Result<Dataset const *> SymmetryAnalyzer::cached_dataset() const {
-  return dataset_.get([&] { return get_dataset(cell_, tol_, hall_number_); });
+  return dataset_.get([&] { return get_dataset(cell_, tol_, setting_); });
 }
 
 Result<Operations> SymmetryAnalyzer::cell_operations() const {

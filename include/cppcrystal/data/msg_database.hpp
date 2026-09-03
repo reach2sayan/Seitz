@@ -3,6 +3,8 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
+#include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/data/catalog.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp>
 #include <cppcrystal/data/spg_database.hpp> // kNumHallNumbers
@@ -35,49 +37,52 @@ struct MagneticSpacegroupType {
   int type = 0;                // construction type 1..4 (type-I..IV)
 };
 
-struct MagneticSpacegroupCatalog {
-  std::array<MagneticSpacegroupType, kNumUniNumbers + 1> by_uni{};
+// The magnetic family policy: 1651 UNI numbers, keyed by UniNumber.
+struct MagneticFamily {
+  using Row = MagneticSpacegroupType;
+  using Key = UniNumber;
+  static constexpr std::size_t count = static_cast<std::size_t>(kUniNumbers);
 
-  [[nodiscard]] constexpr MagneticSpacegroupType const &
-  at(int uni) const noexcept {
-    return detail::at_or_sentinel(by_uni, uni);
+  [[nodiscard]] static constexpr int index_of(UniNumber key) noexcept {
+    return key.value();
+  }
+
+  // The generated table is 1-based with a dummy row 0; the catalog is not.
+  [[nodiscard]] static constexpr Catalog<MagneticFamily> decode() {
+    Catalog<MagneticFamily> c{};
+    for (std::size_t i = 0; i < count; ++i) {
+      auto const &r = kMagneticSpacegroupTypes[i + 1];
+      c.rows[i] =
+          MagneticSpacegroupType{r.uni_number, r.litvin_number, r.bns_number,
+                                 r.og_number,  r.number,        r.type};
+    }
+    return c;
   }
 };
 
-inline constexpr MagneticSpacegroupCatalog kMagneticCatalog = [] {
-  MagneticSpacegroupCatalog c{};
-  for (std::size_t u = 0; u < kMagneticSpacegroupTypes.size(); ++u) {
-    auto const &r = kMagneticSpacegroupTypes[u];
-    c.by_uni[u] =
-        MagneticSpacegroupType{r.uni_number, r.litvin_number, r.bns_number,
-                               r.og_number,  r.number,        r.type};
-  }
-  return c;
-}();
-
-[[nodiscard]] constexpr MagneticSpacegroupType
-magnetic_spacegroup_type(int uni_number) noexcept {
-  return kMagneticCatalog.at(uni_number);
+[[nodiscard]] constexpr MagneticSpacegroupType const &
+magnetic_spacegroup_type(UniNumber uni) noexcept {
+  return kCatalog<MagneticFamily>[uni];
 }
 
-[[nodiscard]] constexpr std::optional<std::pair<int, int>>
-uni_candidates(int hall_number) noexcept {
-  if (hall_number < 1 || hall_number > kNumHallNumbers) {
-    return std::nullopt;
-  }
-  auto const &m = kMagneticHallMapping[static_cast<std::size_t>(hall_number)];
-  return std::pair<int, int>{m[0], m[1]};
+// The [first, last] UNI numbers a 3D Hall setting can carry.
+[[nodiscard]] constexpr std::pair<UniNumber, UniNumber>
+uni_candidates(HallNumber hall) noexcept {
+  auto const &m = kMagneticHallMapping[static_cast<std::size_t>(hall.index())];
+  return {*UniNumber::of(m[0]), *UniNumber::of(m[1])};
 }
 
-// The operations of a UNI number in the given Hall setting (0 = its first
+// The operations of a UNI number in the given Hall setting (unset = its first
 // setting), materialised once per setting; empty when (uni, hall) is not a
 // valid pairing.
 [[nodiscard]] MagneticOperations const &
-magnetic_operations_from_database(int uni_number, int hall_number = 0);
+magnetic_operations_from_database(UniNumber uni,
+                                  std::optional<HallNumber> hall = std::nullopt);
 
 // The alternative standardized-setting transformations of a UNI number in the
 // given Hall setting, identity first; empty when (uni, hall) is not valid.
 [[nodiscard]] Operations const &
-magnetic_std_transformations(int uni_number, int hall_number = 0);
+magnetic_std_transformations(UniNumber uni,
+                             std::optional<HallNumber> hall = std::nullopt);
 
 } // namespace cppcrystal::data

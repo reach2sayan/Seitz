@@ -6,6 +6,7 @@
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
+#include <cppcrystal/spacegroup_match.hpp>
 
 #include <concepts>
 #include <cstddef>
@@ -27,6 +28,13 @@ namespace detail {
     std::pair<std::vector<SymmetryOperation>, Matrix3d>>
 primitive_operations(std::span<SymmetryOperation const> operations,
                      Tolerance const &tol);
+
+// The space group these operations imply in `lattice`. Same arrangement: the
+// matcher itself is private to src/spacegroup.
+[[nodiscard]] Result<SpacegroupMatch>
+spacegroup_of_operations(std::span<SymmetryOperation const> operations,
+                         Matrix3d const &lattice, LatticeSetting setting,
+                         Tolerance const &tol);
 
 } // namespace detail
 
@@ -142,6 +150,19 @@ public:
   // translations define the primitive lattice in "translation space"; the
   // distinct rotations, transformed to that setting, are the primitive
   // operations. std::nullopt if the set is inconsistent.
+  // The space group these operations imply, with no atomic positions: build
+  // the primitive symmetry, Niggli-reduce the implied primitive lattice, and
+  // match it against the Hall database. `S` says whether `lattice` is the
+  // conventional cell or already a primitive one. Errors with
+  // e_spacegroup_search_failed.
+  template <LatticeSetting S = LatticeSetting::conventional>
+  [[nodiscard]] Result<SpacegroupMatch> spacegroup(Matrix3d const &lattice,
+                                                   Tolerance const &tol) const
+    requires(!Traits::has_time_reversal)
+  {
+    return detail::spacegroup_of_operations(span(), lattice, S, tol);
+  }
+
   [[nodiscard]] std::optional<std::pair<OperationSet, Matrix3d>>
   to_primitive(Tolerance const &tol) const
     requires(!Traits::has_time_reversal)

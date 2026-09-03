@@ -104,7 +104,7 @@ struct WyckoffLabel {
 [[nodiscard]] std::optional<WyckoffLabel>
 get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
-                     int hall_number, double symprec,
+                     HallNumber hall, double symprec,
                      CellPeriodicity const &periodicity) {
   std::vector<Vector3d> orbit;
   orbit.reserve(conv_sym.size());
@@ -124,7 +124,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
   }
 
   auto const group_order = static_cast<int>(conv_sym.size());
-  data::WyckoffRange const range = data::wyckoff_indices(hall_number);
+  data::WyckoffRange const range = data::wyckoff_indices(hall);
   for (int wi = 0; wi < range.count; ++wi) {
     data::WyckoffCoordinate const wc =
         data::wyckoff_coordinate(range.start + wi);
@@ -160,7 +160,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
 [[nodiscard]] bool set_wyckoff_labels(ExactPositions &atoms,
                                       Cell const &conv_prim,
                                       Operations const &conv_sym,
-                                      int num_pure_trans, int hall_number,
+                                      int num_pure_trans, HallNumber hall,
                                       double symprec) {
   CellPeriodicity const &periodicity = conv_prim.periodicity();
 
@@ -176,7 +176,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
     auto const label = get_wyckoff_notation(
         atom.position, conv_sym,
         nums_equiv[static_cast<std::size_t>(i)] * num_pure_trans,
-        conv_prim.lattice().matrix(), hall_number, symprec, periodicity);
+        conv_prim.lattice().matrix(), hall, symprec, periodicity);
     if (!label) {
       return false;
     }
@@ -198,12 +198,12 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
 
 std::optional<ExactPositions>
 exact_positions(Cell const &conv_prim, Operations const &conv_sym,
-                int num_pure_trans, int hall_number, double symprec) {
+                int num_pure_trans, HallNumber hall, double symprec) {
   double tolerance = symprec;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     ExactPositions exact = get_exact_positions(conv_prim, conv_sym, tolerance);
     if (set_wyckoff_labels(exact, conv_prim, conv_sym, num_pure_trans,
-                           hall_number, symprec)) {
+                           hall, symprec)) {
       return exact;
     }
     tolerance *= kIncreaseRate;

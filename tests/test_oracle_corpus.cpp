@@ -5,6 +5,7 @@
 // number embedded in each YAML.
 
 #include "corpus.hpp"
+#include "helpers.hpp"
 #include "oracle.hpp"
 
 #include <cppcrystal/dataset.hpp>
@@ -12,6 +13,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+
+using cppcrystal::test::space_hall;
 
 TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
           "[oracle][corpus]") {
@@ -32,7 +35,7 @@ TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
 
     CHECK(got->spacegroup_number == ref.number);
     CHECK(got->spacegroup_number == entry.space_group_number);
-    CHECK(got->hall_number == ref.hall_number);
+    CHECK(got->hall == space_hall(ref.hall_number));
     CHECK(got->international_symbol == std::string_view(ref.international));
     CHECK(static_cast<int>(got->operations.size()) == ref.n_operations);
     CHECK(static_cast<int>(got->std_types.size()) == ref.n_std_atoms);

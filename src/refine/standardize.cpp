@@ -43,7 +43,7 @@ template <GroupFamily F>
 
 // Primitive atoms expressed wrt the (idealized) conventional lattice, shifted
 // by the origin shift and folded into the cell.
-[[nodiscard]] Cell conventional_primitive(spacegroup::Spacegroup const &sg,
+[[nodiscard]] Cell conventional_primitive(SpacegroupMatch const &sg,
                                           Cell const &primitive,
                                           Lattice const &std_lattice,
                                           CellPeriodicity const &periodicity) {
@@ -180,11 +180,11 @@ template <GroupFamily F>
 std::optional<Standardized>
 Refinement<F>::standardize(Operations const &cell_operations,
                            std::vector<int> const &mapping_table) const {
-  spacegroup::Spacegroup const &sg = matched_;
+  SpacegroupMatch const &sg = matched_;
   Cell const &primitive = primitive_;
   Cell const &cell = cell_;
   double const symprec = tol_.symprec;
-  int const hall = sg.type.hall_number;
+  HallNumber const hall = sg.hall;
   Operations const conv_sym = operations_from_database(hall);
   int const multi = num_pure_translations(conv_sym);
   constexpr CellPeriodicity conv_periodicity = conventional_periodicity<F>();

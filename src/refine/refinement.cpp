@@ -140,23 +140,23 @@ namespace {
 
 } // namespace
 
-Lattice conventional_lattice(spacegroup::Spacegroup const &sg) {
+Lattice conventional_lattice(SpacegroupMatch const &sg) {
   Matrix3d const g = Lattice{sg.bravais_lattice}.metric();
   Holohedry const holohedry =
-      symmetry::pointgroup_by_number(sg.type.pointgroup_number).holohedry;
+      symmetry::pointgroup_by_number(sg.type().pointgroup_number).holohedry;
 
   return Lattice{[&]() -> Matrix3d {
     switch (holohedry) {
     case Holohedry::triclinic:
       return set_tricli(g);
     case Holohedry::monoclinic:
-      return set_monocli(g, sg.type.choice);
+      return set_monocli(g, sg.type().choice);
     case Holohedry::orthorhombic:
       return set_ortho(g);
     case Holohedry::tetragonal:
       return set_tetra(g);
     case Holohedry::trigonal:
-      return (!sg.type.choice.empty() && sg.type.choice[0] == 'R')
+      return (!sg.type().choice.empty() && sg.type().choice[0] == 'R')
                  ? set_rhomb(g)
                  : set_trigo(g);
     case Holohedry::hexagonal:
@@ -169,9 +169,9 @@ Lattice conventional_lattice(spacegroup::Spacegroup const &sg) {
   }()};
 }
 
-spacegroup::Spacegroup find_similar_bravais_lattice(spacegroup::Spacegroup sg,
+SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
                                                     double symprec) {
-  Operations const conv_sym = operations_from_database(sg.type.hall_number);
+  Operations const conv_sym = operations_from_database(sg.hall);
   Matrix3d const std_lattice = conventional_lattice(sg).matrix();
 
   // Find the proper-rotation setting closest (Frobenius) to the idealized one.

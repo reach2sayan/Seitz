@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
@@ -22,31 +23,32 @@ namespace cppcrystal::group {
 // arrays of letters / multiplicities / symbols.
 class SpaceGroup {
 public:
-  // Named factories.
-  [[nodiscard]] static Result<SpaceGroup> from_hall_number(int hall_number);
-  // Build from an international number (1..230), choosing the default (first)
-  // Hall setting for that number.
-  [[nodiscard]] static Result<SpaceGroup> from_number(int spacegroup_number);
+  // The group of a Hall setting. A Flyweight: one immutable object per setting,
+  // built on first use and shared thereafter, so the Wyckoff construction is
+  // paid once per setting rather than once per query. Total — a HallNumber
+  // cannot name a setting that does not exist. Layer groups come through the
+  // same door, with the family carried by the key.
+  //
+  // Thread-safety: the per-setting cache is guarded, so concurrent first-calls
+  // are safe. warmup() primes it.
+  [[nodiscard]] static SpaceGroup const &of(HallNumber hall);
 
-  // Build a *layer group* (2D-periodic) as a structure-free object. Layer
-  // groups use a negative-Hall-number convention (settings -1..-116 for the 80
-  // layer groups), so `number()` then returns the layer-group number (1..80)
-  // and `hall_number()` the negative setting. `from_layer_hall` takes a
-  // negative hall (-1..-116); `from_layer_number` takes a layer-group number
-  // (1..80) and picks its first setting.
-  [[nodiscard]] static Result<SpaceGroup> from_layer_hall(int hall_number);
-  [[nodiscard]] static Result<SpaceGroup> from_layer_number(int layer_number);
+  // The group of an international number, in its default (first) Hall setting.
+  // Errors if the number is out of range for the family (1..230 for space
+  // groups, 1..80 for layer groups).
+  [[nodiscard]] static Result<SpaceGroup const *> from_number(GroupFamily family,
+                                                              int number);
 
-  [[nodiscard]] int hall_number() const noexcept { return type_.hall_number; }
-  [[nodiscard]] int number() const noexcept { return type_.number; }
+  [[nodiscard]] HallNumber hall() const noexcept { return hall_; }
+  [[nodiscard]] int number() const noexcept { return type().number; }
   [[nodiscard]] data::SpacegroupType const &type() const noexcept {
-    return type_;
+    return data::spacegroup_type(hall_);
   }
   [[nodiscard]] std::string_view international_symbol() const noexcept {
-    return type_.international_short;
+    return type().international_short;
   }
   [[nodiscard]] data::Centering centering() const noexcept {
-    return type_.centering;
+    return type().centering;
   }
 
   // The conventional symmetry operations of the setting.
@@ -65,7 +67,7 @@ public:
   [[nodiscard]] Result<WyckoffPosition const *> wyckoff(char letter) const;
 
 private:
-  SpaceGroup() = default;
+  explicit SpaceGroup(HallNumber hall);
 
   // Build one Wyckoff position by partitioning the conventional operations into
   // its orbit (coset representatives) and site-symmetry stabilizer. A member so
@@ -75,7 +77,7 @@ private:
   build_position(data::WyckoffEntry const &entry,
                  Operations const &conv_ops);
 
-  data::SpacegroupType type_;
+  HallNumber hall_;
   Operations operations_;
   std::vector<WyckoffPosition> positions_;
 };

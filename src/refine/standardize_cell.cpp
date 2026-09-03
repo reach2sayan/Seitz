@@ -83,7 +83,7 @@ using data::Centering;
 Result<Cell> standardize_cell(Cell const &cell, CellSetting setting,
                               Idealize idealize, Tolerance const &tol) {
   BOOST_LEAF_AUTO(ds, get_dataset(cell, tol));
-  Centering const centering = data::spacegroup_type(ds.hall_number).centering;
+  Centering const centering = data::spacegroup_type(ds.hall).centering;
   double const symprec = tol.symprec;
 
   if (idealize == Idealize::yes) {

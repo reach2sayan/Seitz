@@ -37,17 +37,17 @@ TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
           "[group]") {
   int checked = 0;
   for (int number = 1; number <= 230; ++number) {
-    auto sg = must(group::SpaceGroup::from_number(number));
-    auto const nops = static_cast<int>(sg.operations().size());
+    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, number));
+    auto const nops = static_cast<int>(sg->operations().size());
     REQUIRE(nops > 0);
-    for (auto const &wp : sg.wyckoffs()) {
+    for (auto const &wp : sg->wyckoffs()) {
       auto const order = static_cast<int>(wp.operations().size());
       // multiplicity * |site-symmetry group| == |conventional operations|
       REQUIRE(wp.multiplicity() * order == nops);
       ++checked;
     }
     // The general position is last, fully free, with trivial site symmetry.
-    auto const &general = sg.wyckoffs().back();
+    auto const &general = sg->wyckoffs().back();
     REQUIRE(general.degrees_of_freedom() == 3);
     REQUIRE(general.operations().size() == 1);
   }
@@ -55,11 +55,11 @@ TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
 }
 
 TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
-  auto sg = must(group::SpaceGroup::from_number(221));
-  REQUIRE(sg.number() == 221);
-  REQUIRE(sg.operations().size() == 48);
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 221));
+  REQUIRE(sg->number() == 221);
+  REQUIRE(sg->operations().size() == 48);
 
-  auto a = must(sg.wyckoff('a'));
+  auto a = must(sg->wyckoff('a'));
   REQUIRE(a->multiplicity() == 1);
   REQUIRE(a->degrees_of_freedom() == 0);
   REQUIRE(a->site_symmetry() == "m-3m");
@@ -68,27 +68,27 @@ TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
   Positions const orbit = a->get_all_positions(Vector3d{0.3, 0.4, 0.5});
   REQUIRE(orbit.rows() == 1);
 
-  REQUIRE(sg.wyckoffs().back().multiplicity() == 48);
+  REQUIRE(sg->wyckoffs().back().multiplicity() == 48);
 }
 
 TEST_CASE("WyckoffPosition orbit expansion respects multiplicity", "[group]") {
-  auto sg = must(group::SpaceGroup::from_number(225)); // Fm-3m
-  auto const &general = sg.wyckoffs().back();
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
+  auto const &general = sg->wyckoffs().back();
   Positions const orbit = general.get_all_positions(Vector3d{0.11, 0.23, 0.37});
   REQUIRE(orbit.rows() == general.multiplicity());
 }
 
 TEST_CASE("from_number rejects out-of-range numbers", "[group]") {
-  REQUIRE(errored([] { return group::SpaceGroup::from_number(231); }));
+  REQUIRE(errored([] { return group::SpaceGroup::from_number(GroupFamily::space, 231); }));
 }
 
 TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
-  auto sg = must(group::SpaceGroup::from_number(225)); // Fm-3m
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
   // NaCl: Na (type 11) and Cl (type 17), four of each (the 4a / 4b orbits).
   generate::Composition const comp{{11, 4}, {17, 4}};
-  REQUIRE(generate::check_compatible(sg, comp));
+  REQUIRE(generate::check_compatible(*sg, comp));
 
-  auto gen = must(generate::random_crystal(sg, comp, {.seed = 42u}));
+  auto gen = must(generate::random_crystal(*sg, comp, {.seed = 42u}));
   REQUIRE(gen.cell.size() == 8);
   std::set<int> kinds(gen.cell.types().begin(), gen.cell.types().end());
   REQUIRE(kinds == std::set<int>{11, 17});
@@ -111,45 +111,45 @@ TEST_CASE("generated structures recover their target space group", "[generate]")
       Case{225, {{11, 4}, {17, 4}}} // Fm-3m (NaCl)
   };
   for (auto const &c : cases) {
-    auto sg = must(group::SpaceGroup::from_number(c.number));
-    auto gen = must(generate::random_crystal(sg, c.comp, {.seed = 7u}));
+    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+    auto gen = must(generate::random_crystal(*sg, c.comp, {.seed = 7u}));
     auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
     REQUIRE(must(analyzer.spacegroup_number()) == c.number);
   }
 }
 
 TEST_CASE("generated structures are free of interatomic clashes", "[generate]") {
-  auto sg = must(group::SpaceGroup::from_number(225));
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
-  auto gen = must(generate::random_crystal(sg, comp, {.seed = 99u}));
+  auto gen = must(generate::random_crystal(*sg, comp, {.seed = 99u}));
   // The builder only returns distance-valid cells; confirm independently.
   REQUIRE(generate::distances_valid(gen.cell));
 }
 
 TEST_CASE("generation is deterministic in the seed", "[generate]") {
-  auto sg = must(group::SpaceGroup::from_number(225));
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
-  auto a = must(generate::random_crystal(sg, comp, {.seed = 123u}));
-  auto b = must(generate::random_crystal(sg, comp, {.seed = 123u}));
+  auto a = must(generate::random_crystal(*sg, comp, {.seed = 123u}));
+  auto b = must(generate::random_crystal(*sg, comp, {.seed = 123u}));
   REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
   REQUIRE(a.cell.lattice().matrix().isApprox(b.cell.lattice().matrix()));
 }
 
 TEST_CASE("incompatible composition is rejected", "[generate]") {
-  auto sg = must(group::SpaceGroup::from_number(225)); // Fm-3m, smallest mult 4
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m, smallest mult 4
   // Three atoms cannot fill any combination of multiplicity-4-or-more orbits.
-  REQUIRE_FALSE(generate::check_compatible(sg, generate::Composition{{1, 3}}));
+  REQUIRE_FALSE(generate::check_compatible(*sg, generate::Composition{{1, 3}}));
 }
 
 TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
           "[layergen]") {
   for (int number = 1; number <= 80; ++number) {
-    auto lg = must(group::SpaceGroup::from_layer_number(number));
-    REQUIRE(lg.number() == number);
-    REQUIRE(lg.hall_number() < 0); // negative-Hall (layer) convention
-    auto const nops = static_cast<int>(lg.operations().size());
+    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    REQUIRE(lg->number() == number);
+    REQUIRE(lg->hall().family() == GroupFamily::layer);
+    auto const nops = static_cast<int>(lg->operations().size());
     REQUIRE(nops > 0);
-    for (auto const &wp : lg.wyckoffs()) {
+    for (auto const &wp : lg->wyckoffs()) {
       REQUIRE(wp.multiplicity() * static_cast<int>(wp.operations().size()) ==
               nops);
     }
@@ -165,19 +165,18 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
   // without folding the non-periodic axis.
   for (int number : {1, 2, 19, 49, 61, 65}) {
     INFO("layer group " << number);
-    auto lg = must(group::SpaceGroup::from_layer_number(number));
-    int const m = lg.wyckoffs().back().multiplicity();
+    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_layer_crystal(
-        lg, comp,
+    auto gen = must(generate::random_layer_crystal(*lg, comp,
         {.scale = 4.0, .seed = 13u, .general_position_only = true}));
     REQUIRE(aperiodic_axis(gen.cell.periodicity()) == 2);
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
 
     OverlapChecker checker(gen.cell, 1e-3);
-    for (auto const &op : lg.operations()) {
+    for (auto const &op : lg->operations()) {
       REQUIRE(checker.check_total_overlap(op.translation, op.rotation));
     }
   }
@@ -190,12 +189,11 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
   // the direct op-invariance test above rather than a determination round-trip.
   for (int number : {1, 49, 55, 65}) {
     INFO("layer group " << number);
-    auto lg = must(group::SpaceGroup::from_layer_number(number));
-    int const m = lg.wyckoffs().back().multiplicity();
+    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
-    auto gen = must(generate::random_layer_crystal(
-        lg, comp,
+    auto gen = must(generate::random_layer_crystal(*lg, comp,
         {.scale = 4.0, .seed = 13u, .general_position_only = true}));
     auto ds = must(get_dataset(gen.cell.with_periodicity(aperiodic_along(2)),
                                {1e-4}));
@@ -206,9 +204,9 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
 namespace {
 // Point-group order of a space group: distinct rotation parts of its operations.
 int pg_order(int number) {
-  auto sg = must(group::SpaceGroup::from_number(number));
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, number));
   std::vector<Matrix3i> rots;
-  for (auto const &op : sg.operations()) {
+  for (auto const &op : sg->operations()) {
     if (std::ranges::none_of(
             rots, [&](Matrix3i const &r) { return r == op.rotation; })) {
       rots.push_back(op.rotation);
@@ -217,7 +215,7 @@ int pg_order(int number) {
   return static_cast<int>(rots.size());
 }
 
-bool has_relation(std::vector<group::SubgroupRelation> const &rels, int number,
+bool has_relation(std::span<group::SubgroupRelation const> rels, int number,
                   int index) {
   return std::ranges::any_of(rels, [&](group::SubgroupRelation const &r) {
     return r.number == number && r.index == index;
@@ -227,8 +225,7 @@ bool has_relation(std::vector<group::SubgroupRelation> const &rels, int number,
 
 TEST_CASE("Pm-3m maximal t-subgroups match the textbook relations",
           "[subgroup]") {
-  auto const &graph = group::SubgroupGraph::instance();
-  auto const subs = graph.maximal_subgroups(221); // Oh
+  auto const subs = group::SubgroupGraph::maximal_subgroups(221); // Oh
   // The five maximal translationengleiche subgroups of Pm-3m (ITA): Pm-3 (200,
   // Th), P432 (207, O), P-43m (215, Td) at index 2; P4/mmm (123, D4h) at index
   // 3; R-3m (166, D3d, along a body diagonal) at index 4 — maximal subgroups of
@@ -242,20 +239,18 @@ TEST_CASE("Pm-3m maximal t-subgroups match the textbook relations",
 }
 
 TEST_CASE("P-1 has the single maximal t-subgroup P1", "[subgroup]") {
-  auto const &graph = group::SubgroupGraph::instance();
-  auto const subs = graph.maximal_subgroups(2);
+  auto const subs = group::SubgroupGraph::maximal_subgroups(2);
   REQUIRE(subs.size() == 1);
   REQUIRE(subs.front().number == 1);
   REQUIRE(subs.front().index == 2);
   // P1 itself has no proper subgroup.
-  REQUIRE(graph.maximal_subgroups(1).empty());
+  REQUIRE(group::SubgroupGraph::maximal_subgroups(1).empty());
 }
 
 TEST_CASE("every t-subgroup edge is order-consistent", "[subgroup]") {
-  auto const &graph = group::SubgroupGraph::instance();
   int edges = 0;
   for (int n = 1; n <= 230; ++n) {
-    for (auto const &rel : graph.maximal_subgroups(n)) {
+    for (auto const &rel : group::SubgroupGraph::maximal_subgroups(n)) {
       REQUIRE(rel.index >= 2);
       REQUIRE(rel.number != n);
       // A translationengleiche subgroup keeps the lattice, so the index equals
@@ -268,18 +263,17 @@ TEST_CASE("every t-subgroup edge is order-consistent", "[subgroup]") {
 }
 
 TEST_CASE("reachability and symmetry-breaking paths", "[subgroup]") {
-  auto const &graph = group::SubgroupGraph::instance();
-  REQUIRE(graph.is_subgroup(221, 221)); // reflexive
-  REQUIRE(graph.is_subgroup(1, 221));   // P1 is a t-subgroup of Pm-3m
-  REQUIRE_FALSE(graph.is_subgroup(221, 1));
+  REQUIRE(group::SubgroupGraph::is_subgroup(221, 221)); // reflexive
+  REQUIRE(group::SubgroupGraph::is_subgroup(1, 221));   // P1 is a t-subgroup of Pm-3m
+  REQUIRE_FALSE(group::SubgroupGraph::is_subgroup(221, 1));
 
-  auto chain = graph.path(221, 1);
+  auto chain = group::SubgroupGraph::path(221, 1);
   REQUIRE(chain.has_value());
   REQUIRE(chain->front() == 221);
   REQUIRE(chain->back() == 1);
   // Each step descends along a real maximal-subgroup edge (any index).
   for (std::size_t i = 0; i + 1 < chain->size(); ++i) {
-    auto const subs = graph.maximal_subgroups((*chain)[i]);
+    auto const subs = group::SubgroupGraph::maximal_subgroups((*chain)[i]);
     REQUIRE(std::ranges::any_of(subs, [&](group::SubgroupRelation const &r) {
       return r.number == (*chain)[i + 1];
     }));

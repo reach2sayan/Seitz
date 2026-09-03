@@ -1,5 +1,5 @@
 // Oracle test for the symmetry -> space-group pipeline (the foundation the
-// magnetic determination builds on): spacegroup::spacegroup_type_from_symmetry
+// magnetic determination builds on): OperationSet::spacegroup
 // (= prm_get_primitive_symmetry + spa_search_spacegroup_with_symmetry) must
 // reproduce spg_get_spacegroup_type_from_symmetry. The same operation set is fed
 // to both sides, so this tests the pipeline, not the symmetry search.
@@ -68,14 +68,14 @@ void to_c_operations(std::vector<int> &rot, std::vector<double> &trans,
   }
 }
 
-// Compare port spacegroup_type_from_symmetry<conventional> against the reference
+// Compare port OperationSet::spacegroup<conventional> against the reference
 // spg_get_spacegroup_type_from_symmetry, both fed the same operation set.
 void check_conventional(Cell const &cell, double symprec) {
   auto const ops = reference_symmetry(cell, symprec);
   REQUIRE(!ops.empty());
 
   auto const got =
-      cppcrystal::spacegroup::spacegroup_type_from_symmetry(ops, cell.lattice().matrix(), symprec);
+      ops.spacegroup(cell.lattice().matrix(), {symprec});
   REQUIRE(got);
 
   std::vector<int> rot;
@@ -90,13 +90,14 @@ void check_conventional(Cell const &cell, double symprec) {
 
   REQUIRE(ref.number != 0);
   REQUIRE(got->number() == ref.number);
-  REQUIRE(got->hall_number() == ref.hall_number);
-  REQUIRE(got->type.international_short == std::string(ref.international_short));
+  REQUIRE(got->hall.index() == ref.hall_number);
+  REQUIRE(got->type().international_short ==
+          std::string(ref.international_short));
 }
 
 } // namespace
 
-TEST_CASE("spacegroup_type_from_symmetry matches reference (conventional)",
+TEST_CASE("OperationSet::spacegroup matches reference (conventional)",
           "[oracle][spacegroup][from_symmetry]") {
   double const s = 1e-5;
   SECTION("Pm-3m (primitive cubic)") {
@@ -135,7 +136,7 @@ TEST_CASE("spacegroup_type_from_symmetry matches reference (conventional)",
 
 // Exercises the LatticeSetting::primitive branch (identity primitive lattice),
 // mirroring spg_get_hall_number_from_symmetry.
-TEST_CASE("spacegroup_type_from_symmetry matches reference (primitive)",
+TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
           "[oracle][spacegroup][from_symmetry]") {
   double const s = 1e-5;
   Cell const cell =
@@ -152,12 +153,11 @@ TEST_CASE("spacegroup_type_from_symmetry matches reference (primitive)",
       static_cast<int>(ops.size()), s);
 
   auto const got =
-      cppcrystal::spacegroup::spacegroup_type_from_symmetry<
-          cppcrystal::spacegroup::LatticeSetting::primitive>(
-          ops, Matrix3d::Identity(), s);
+      ops.spacegroup<cppcrystal::LatticeSetting::primitive>(
+          Matrix3d::Identity(), {s});
 
   REQUIRE((ref_hall == 0) == (!got.has_value()));
   if (got) {
-    REQUIRE(got->hall_number() == ref_hall);
+    REQUIRE(got->hall.index() == ref_hall);
   }
 }

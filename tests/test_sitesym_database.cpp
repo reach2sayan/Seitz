@@ -1,10 +1,13 @@
 #include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/data/sitesym_tables.hpp>
 
+#include "helpers.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 using namespace cppcrystal;
 using namespace cppcrystal::data;
+using cppcrystal::test::space_hall;
 
 TEST_CASE("wyckoff_coordinate decodes the documented entries", "[sitesym]") {
   // Index 1 (P1 general position): identity rotation, zero translation.
@@ -48,20 +51,20 @@ TEST_CASE("wyckoff_coordinate rotation/translation stay in encodable ranges",
 
 TEST_CASE("wyckoff_indices match the documented Wyckoff counts", "[sitesym]") {
   // P1 (Hall 1): 1 Wyckoff position starting at global index 1.
-  auto const r1 = wyckoff_indices(1);
+  auto const r1 = wyckoff_indices(space_hall(1));
   CHECK(r1.start == 1);
   CHECK(r1.count == 1);
 
   // P-1 (Hall 2): 9 Wyckoff positions.
-  auto const r2 = wyckoff_indices(2);
+  auto const r2 = wyckoff_indices(space_hall(2));
   CHECK(r2.start == 2);
   CHECK(r2.count == 9);
 
   // Every Hall number's range is non-negative, ordered and within the table.
   int const table_size = static_cast<int>(kCoordinatesFirst.size());
-  for (int hall = 1; hall <= 530; ++hall) {
-    auto const r = wyckoff_indices(hall);
-    INFO("hall " << hall);
+  for (int index = 1; index <= 530; ++index) {
+    auto const r = wyckoff_indices(space_hall(index));
+    INFO("hall " << index);
     CHECK(r.count > 0);
     CHECK(r.start >= 1);
     CHECK(r.start + r.count <= table_size);

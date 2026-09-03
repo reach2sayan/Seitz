@@ -9,18 +9,12 @@
 #include <cppcrystal/generate/random_lattice.hpp>
 #include "spacegroup/spacegroup.hpp"
 
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/breadth_first_search.hpp>
-#include <boost/graph/transitive_closure.hpp>
-#include <boost/graph/visitors.hpp>
 #include <boost/leaf.hpp>
-#include <boost/property_map/property_map.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <iterator>
-#include <numeric>
 #include <optional>
 #include <ranges>
 #include <set>
@@ -30,8 +24,6 @@
 namespace cppcrystal::group {
 
 namespace {
-
-constexpr int kNumSpaceGroups = 230;
 
 // Sets of rotations (point groups and their subgroups) are the library-wide
 // RotationSet; a set of those needs an order over sets.
@@ -141,9 +133,7 @@ maximal_point_subgroups(std::vector<Matrix3i> const &pg) {
                                           Matrix3d const &lattice) {
   return boost::leaf::try_handle_all(
       [&]() -> Result<std::optional<int>> {
-        auto r = spacegroup::spacegroup_type_from_symmetry<
-            spacegroup::LatticeSetting::conventional>(ops, lattice,
-                                                      kDefaultSymprec);
+        auto r = ops.spacegroup(lattice, Tolerance{});
         if (!r) {
           return r.error();
         }
@@ -156,50 +146,42 @@ maximal_point_subgroups(std::vector<Matrix3i> const &pg) {
 
 } // namespace
 
-struct SubgroupGraph::Impl {
-  struct EdgeIndex {
-    int index = 0;
-  };
-  using Graph =
-      boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-                            boost::no_property, EdgeIndex>;
-  // The reachability (transitive-closure) graph carries no edge data — it just
-  // records the (super -> sub) pairs of the partial order.
-  using Reachability =
-      boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS>;
-
-  using Vertex = boost::graph_traits<Graph>::vertex_descriptor;
-
-  Graph graph{static_cast<std::size_t>(kNumSpaceGroups + 1)}; // 0 unused
-  Reachability reachability;
-  // Maps a vertex of `graph` to the corresponding vertex of `reachability`
-  // (the customization point transitive_closure fills in).
-  std::vector<Vertex> to_reachability;
-};
-
-SubgroupGraph::SubgroupGraph() : impl_(std::make_unique<Impl>()) {
-  // Load the baked table (derive_t_subgroup_edges() is the slow offline path
-  // that produced it). Cheap — no determination at runtime.
-  for (auto const &rel : data::kTSubgroupRelations) {
-    boost::add_edge(static_cast<std::size_t>(rel.super),
-                    static_cast<std::size_t>(rel.sub),
-                    Impl::EdgeIndex{rel.index}, impl_->graph);
+// Breadth-first search over the compile-time adjacency: the only part of the
+// graph that still needs a runtime walk, since a path is per-query.
+std::optional<std::vector<int>> SubgroupGraph::path(int super, int sub) {
+  if (!is_subgroup(sub, super)) {
+    return std::nullopt;
+  }
+  if (super == sub) {
+    return std::vector<int>{super};
   }
 
-  // Precompute the full subgroup partial order once with the specialized
-  // transitive_closure algorithm, so is_subgroup() is a direct edge query.
-  // The graph->closure vertex correspondence is captured through the g_to_tc
-  // property map (a customization point of the algorithm).
-  impl_->to_reachability.resize(boost::num_vertices(impl_->graph));
-  boost::transitive_closure(
-      impl_->graph, impl_->reachability,
-      boost::make_iterator_property_map(
-          impl_->to_reachability.begin(),
-          boost::get(boost::vertex_index, impl_->graph)),
-      boost::get(boost::vertex_index, impl_->graph));
+  // predecessor[v] == 0 marks "not yet reached"; space-group numbers start at 1.
+  std::array<int, kNumSpaceGroups + 1> predecessor{};
+  std::vector<int> queue{super};
+  queue.reserve(kNumSpaceGroups);
+  for (std::size_t head = 0; head < queue.size(); ++head) {
+    int const current = queue[head];
+    for (SubgroupRelation const &rel : maximal_subgroups(current)) {
+      auto &parent = predecessor[static_cast<std::size_t>(rel.number)];
+      if (parent != 0 || rel.number == super) {
+        continue;
+      }
+      parent = current;
+      if (rel.number == sub) {
+        std::vector<int> chain;
+        for (int v = sub; v != super; v = predecessor[static_cast<std::size_t>(v)]) {
+          chain.push_back(v);
+        }
+        chain.push_back(super);
+        std::ranges::reverse(chain);
+        return chain;
+      }
+      queue.push_back(rel.number);
+    }
+  }
+  return std::nullopt; // unreachable: is_subgroup already said yes
 }
-
-SubgroupGraph::~SubgroupGraph() = default;
 
 std::vector<TSubgroupEdge> derive_t_subgroup_edges() {
   // For each space group, enumerate the maximal subgroups of its point group;
@@ -212,11 +194,11 @@ std::vector<TSubgroupEdge> derive_t_subgroup_edges() {
   std::vector<TSubgroupEdge> out;
 
   for (int const n : std::views::iota(1, kNumSpaceGroups + 1)) {
-    int const hall = data::default_hall(n);
-    if (hall == 0) {
+    auto const hall = data::default_hall<GroupFamily::space>(n);
+    if (!hall) {
       continue;
     }
-    Operations const &ops = data::operations_from_database(hall);
+    Operations const &ops = data::operations_from_database(*hall);
     std::vector<Matrix3i> const pg = point_group_rotations(ops);
     Matrix3d const lattice = generate::random_lattice(
         generate::crystal_system(n), 100.0, static_cast<std::uint64_t>(n));
@@ -242,97 +224,6 @@ std::vector<TSubgroupEdge> derive_t_subgroup_edges() {
     }
   }
   return out;
-}
-
-SubgroupGraph const &SubgroupGraph::instance() {
-  static SubgroupGraph const graph;
-  return graph;
-}
-
-std::vector<SubgroupRelation>
-SubgroupGraph::maximal_subgroups(int number) const {
-  std::vector<SubgroupRelation> out;
-  if (number < 1 || number > kNumSpaceGroups) {
-    return out;
-  }
-  auto const &g = impl_->graph;
-  // Read the edge index through its bundled-property map rather than g[e].
-  auto const index = boost::get(&Impl::EdgeIndex::index, g);
-  for (auto [it, end] = boost::out_edges(static_cast<std::size_t>(number), g);
-       it != end; ++it) {
-    out.push_back({static_cast<int>(boost::target(*it, g)), index[*it]});
-  }
-  return out;
-}
-
-std::vector<SubgroupRelation>
-SubgroupGraph::minimal_supergroups(int number) const {
-  std::vector<SubgroupRelation> out;
-  if (number < 1 || number > kNumSpaceGroups) {
-    return out;
-  }
-  auto const &g = impl_->graph;
-  auto const index = boost::get(&Impl::EdgeIndex::index, g);
-  for (auto [it, end] = boost::in_edges(static_cast<std::size_t>(number), g);
-       it != end; ++it) {
-    out.push_back({static_cast<int>(boost::source(*it, g)), index[*it]});
-  }
-  return out;
-}
-
-std::optional<std::vector<int>> SubgroupGraph::path(int super, int sub) const {
-  if (super < 1 || super > kNumSpaceGroups || sub < 1 ||
-      sub > kNumSpaceGroups) {
-    return std::nullopt;
-  }
-  if (super == sub) {
-    return std::vector<int>{super};
-  }
-
-  auto const &g = impl_->graph;
-  using Vertex = boost::graph_traits<Impl::Graph>::vertex_descriptor;
-
-  // breadth_first_search records each vertex's BFS parent into a predecessor
-  // property map (a record_predecessors visitor over an iterator property map
-  // keyed by the vertex index). A vertex left pointing at itself was unreached.
-  std::vector<Vertex> predecessor(boost::num_vertices(g));
-  std::iota(predecessor.begin(), predecessor.end(), Vertex{0});
-  auto predecessor_map = boost::make_iterator_property_map(
-      predecessor.begin(), boost::get(boost::vertex_index, g));
-
-  boost::breadth_first_search(
-      g, static_cast<Vertex>(super),
-      boost::visitor(boost::make_bfs_visitor(
-          boost::record_predecessors(predecessor_map, boost::on_tree_edge()))));
-
-  auto const target = static_cast<Vertex>(sub);
-  if (predecessor[target] == target) {
-    return std::nullopt; // sub is not reachable from super
-  }
-
-  std::vector<int> chain;
-  for (Vertex v = target;; v = predecessor[v]) {
-    chain.push_back(static_cast<int>(v));
-    if (v == static_cast<Vertex>(super)) {
-      break;
-    }
-  }
-  std::ranges::reverse(chain);
-  return chain;
-}
-
-bool SubgroupGraph::is_subgroup(int sub, int super) const {
-  if (super < 1 || super > kNumSpaceGroups || sub < 1 ||
-      sub > kNumSpaceGroups) {
-    return false;
-  }
-  if (sub == super) {
-    return true;
-  }
-  // A direct lookup in the precomputed transitive closure (no per-call search).
-  auto const s = impl_->to_reachability[static_cast<std::size_t>(super)];
-  auto const t = impl_->to_reachability[static_cast<std::size_t>(sub)];
-  return boost::edge(s, t, impl_->reachability).second;
 }
 
 } // namespace cppcrystal::group

@@ -3,6 +3,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -18,8 +19,8 @@ namespace cppcrystal {
 // space-group identity, the operations of the input cell, the standardized
 // conventional cell, and the per-atom Wyckoff / equivalence data.
 struct Dataset {
-  int spacegroup_number = 0; // international number, 1..230
-  int hall_number = 0;       // 1..530
+  int spacegroup_number = 0; // international / layer-group number
+  HallNumber hall;           // the matched Hall setting
 
   std::string_view international_symbol; // Hermann-Mauguin (short)
   std::string_view hall_symbol;
@@ -68,15 +69,15 @@ struct Dataset {
 
 // Determine the space group of `cell` and standardize it (3D space-group path):
 // find_primitive -> search_spacegroup -> refinement (standardized cell + Wyckoff
-// data). `hall_number == 0` searches all 230 space groups.
+// data). An unset `setting` searches every Hall setting of the cell's family.
 //
 // Errors with e_spacegroup_search_failed / e_cell_standardization_failed when
 // determination fails at every attempted tolerance.
 //
 // For the object-oriented entry point that owns the cell and memoizes this and
 // every derived query, prefer cppcrystal::analysis::SymmetryAnalyzer::dataset().
-[[nodiscard]] Result<Dataset> get_dataset(Cell const &cell,
-                                          Tolerance const &tol = {},
-                                          int hall_number = 0);
+[[nodiscard]] Result<Dataset>
+get_dataset(Cell const &cell, Tolerance const &tol = {},
+            std::optional<HallNumber> setting = std::nullopt);
 
 } // namespace cppcrystal

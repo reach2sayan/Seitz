@@ -87,9 +87,9 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   REQUIRE(ref != nullptr);
 
   // Magnetic space-group identity.
-  CHECK(got->uni_number == ref->uni_number);
+  CHECK(got->uni.value() == ref->uni_number);
   CHECK(static_cast<int>(got->msg_type) == ref->msg_type);
-  CHECK(got->hall_number == ref->hall_number);
+  CHECK(got->hall.index() == ref->hall_number);
   CHECK(static_cast<int>(got->std_types.size()) == ref->n_std_atoms);
 
   // Transformation to the standardized setting.

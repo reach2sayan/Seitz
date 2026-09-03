@@ -148,18 +148,18 @@ TEST_CASE("enumerate_assignments equals the backtracking reference as sets",
   };
   for (auto const &c : cases) {
     INFO("space group " << c.number);
-    auto const sg = must(group::SpaceGroup::from_number(c.number));
-    auto const expected = reference_assignments(sg, c.comp);
-    CHECK(enumerated_assignments(sg, c.comp) == expected);
-    CHECK(generate::check_compatible(sg, c.comp) == !expected.empty());
+    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+    auto const expected = reference_assignments(*sg, c.comp);
+    CHECK(enumerated_assignments(*sg, c.comp) == expected);
+    CHECK(generate::check_compatible(*sg, c.comp) == !expected.empty());
   }
 }
 
 TEST_CASE("a bounded enumeration stops early", "[generate]") {
-  auto const sg = must(group::SpaceGroup::from_number(1));
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 1));
   generate::Composition const comp{{6, 4}, {8, 4}};
-  CHECK(generate::list_wyckoff_combinations(sg, comp, 1).size() == 1);
-  CHECK(generate::list_wyckoff_combinations(sg, comp, 0).empty());
+  CHECK(generate::list_wyckoff_combinations(*sg, comp, 1).size() == 1);
+  CHECK(generate::list_wyckoff_combinations(*sg, comp, 0).empty());
 }
 
 TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {

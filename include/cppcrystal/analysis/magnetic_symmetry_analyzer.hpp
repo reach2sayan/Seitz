@@ -44,18 +44,18 @@ public:
   [[nodiscard]] Result<MagneticOperations> operations() const {
     return project<&MagneticDataset::operations>();
   }
-  [[nodiscard]] Result<int> uni_number() const {
-    return project<&MagneticDataset::uni_number>();
+  [[nodiscard]] Result<UniNumber> uni() const {
+    return project<&MagneticDataset::uni>();
   }
-  [[nodiscard]] Result<int> hall_number() const {
-    return project<&MagneticDataset::hall_number>();
+  [[nodiscard]] Result<HallNumber> hall() const {
+    return project<&MagneticDataset::hall>();
   }
   [[nodiscard]] Result<std::vector<int>> equivalent_atoms() const {
     return project<&MagneticDataset::equivalent_atoms>();
   }
   [[nodiscard]] Result<data::MagneticSpacegroupType> spacegroup_type() const {
-    BOOST_LEAF_AUTO(uni, uni_number());
-    return data::magnetic_spacegroup_type(uni);
+    BOOST_LEAF_AUTO(number, uni());
+    return data::magnetic_spacegroup_type(number);
   }
 
   // Standardized magnetic cell assembled from the dataset's std_* fields
