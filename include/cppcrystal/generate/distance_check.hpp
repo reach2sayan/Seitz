@@ -17,15 +17,15 @@ struct DistanceTolerance {
 // image even for skewed lattices); each aperiodic component keeps its raw
 // difference with no neighbour search. This covers every family with one
 // function — 3D (all periodic), layer (one aperiodic), rod (one periodic) and
-// cluster (none periodic — a plain Euclidean distance). When `include_origin`
-// is false the zero offset is skipped — use that for an atom against its own
-// images (a == b), so the result is the nearest non-trivial self-image rather
-// than 0 (infinite when no axis is periodic).
-[[nodiscard]] double
-minimum_image_distance(Vector3d const &a, Vector3d const &b,
-                       Matrix3d const &lattice,
-                       CellPeriodicity const &periodicity,
-                       bool include_origin = true) noexcept;
+// cluster (none periodic — a plain Euclidean distance). `Images::nontrivial`
+// skips the zero offset — use it for an atom against its own images (a == b),
+// so the result is the nearest non-trivial self-image rather than 0 (infinite
+// when no axis is periodic).
+enum class Images { all, nontrivial };
+
+[[nodiscard]] double minimum_image_distance(
+    Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
+    CellPeriodicity const &periodicity, Images images = Images::all) noexcept;
 
 // True iff every pair of atoms in `cell` (including each atom against its own
 // periodic images) is at least its type-pair minimum distance apart, under the

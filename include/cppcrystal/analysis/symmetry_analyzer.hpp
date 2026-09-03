@@ -53,7 +53,7 @@ public:
     return project<&Dataset::sites>();
   }
   Result<std::vector<Site> const &> sites() const && = delete;
-  [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const {
+  [[nodiscard]] Result<data::SpacegroupType const &> spacegroup_type() const {
     BOOST_LEAF_AUTO(setting, hall());
     return data::spacegroup_type(setting);
   }
@@ -94,8 +94,7 @@ public:
 
 private:
   friend Analyzer;
-  SymmetryAnalyzer(Cell cell, Tolerance tol,
-                   std::optional<HallNumber> setting)
+  SymmetryAnalyzer(Cell cell, Tolerance tol, std::optional<HallNumber> setting)
       : Analyzer(std::move(cell), tol), setting_(setting) {}
 
   // The pipeline itself: find primitive -> match Hall setting -> refine, at
@@ -113,16 +112,16 @@ private:
 };
 
 extern template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
-                                    Idealize::yes>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::yes>()
+    const;
 extern template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
-                                    Idealize::no>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::no>()
+    const;
 extern template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
-                                    Idealize::yes>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::yes>()
+    const;
 extern template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
-                                    Idealize::no>() const;
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>()
+    const;
 
 } // namespace cppcrystal::analysis

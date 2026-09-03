@@ -54,8 +54,6 @@ struct SpacegroupType {
   int pointgroup_number = 0; // 1..32
 };
 
-inline constexpr int kNumHallNumbers = kSpaceHallSettings;
-inline constexpr int kNumLayerHallNumbers = kLayerHallSettings;
 inline constexpr int kNumSpacegroups = 230;
 inline constexpr int kNumLayerGroups = 80;
 inline constexpr int kNumPointgroups = 32;
@@ -230,13 +228,13 @@ static_assert(default_hall<GroupFamily::layer>(1)->index() == 1);
 static_assert(default_hall<GroupFamily::layer>(80).has_value());
 static_assert(!default_hall<GroupFamily::layer>(81).has_value());
 static_assert(!HallNumber::of(GroupFamily::space, 0).has_value());
-static_assert(!HallNumber::of(GroupFamily::space, kNumHallNumbers + 1).has_value());
-static_assert(!HallNumber::of(GroupFamily::layer, kNumLayerHallNumbers + 1)
+static_assert(!HallNumber::of(GroupFamily::space, kSpaceHallSettings + 1).has_value());
+static_assert(!HallNumber::of(GroupFamily::layer, kLayerHallSettings + 1)
                    .has_value());
 static_assert(spacegroup_type(*HallNumber::of(GroupFamily::layer, 1)).number ==
               1);
 static_assert(
-    spacegroup_type(*HallNumber::of(GroupFamily::layer, kNumLayerHallNumbers))
+    spacegroup_type(*HallNumber::of(GroupFamily::layer, kLayerHallSettings))
         .number == kNumLayerGroups);
 
 // ---- operations ------------------------------------------------------------

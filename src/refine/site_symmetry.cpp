@@ -3,7 +3,7 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include "core/position_index.hpp"
-#include <cppcrystal/data/sitesym_database.hpp>
+#include "data/sitesym_database.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 

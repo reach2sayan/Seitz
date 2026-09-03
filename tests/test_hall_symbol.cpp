@@ -27,7 +27,7 @@ TEST_CASE(
   int not_matched = 0;
   int nonzero_shift = 0;
   int first_unmatched = 0;
-  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= kSpaceHallSettings; ++index) {
     HallNumber const hall = space_hall(index);
     auto const &ops = data::operations_from_database(hall);
     auto const centering = data::spacegroup_type(hall).centering;
@@ -78,7 +78,7 @@ TEST_CASE("matching is independent of operation order", "[hall]") {
   Matrix3d const bravais = Matrix3d::Identity() * 3.0;
   std::mt19937 rng(99);
   std::vector<int> failures;
-  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= kSpaceHallSettings; ++index) {
     HallNumber const hall = space_hall(index);
     Operations const db = data::operations_from_database(hall);
     std::vector<SymmetryOperation> shuffled(db.begin(), db.end());

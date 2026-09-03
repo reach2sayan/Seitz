@@ -32,7 +32,6 @@
 // The catalogs: the databases as queryable objects, structure-free.
 #include <cppcrystal/data/element_data.hpp>
 #include <cppcrystal/data/msg_database.hpp>
-#include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/group/point_group.hpp>
 #include <cppcrystal/group/rod_group.hpp>

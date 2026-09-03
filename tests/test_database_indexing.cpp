@@ -58,7 +58,7 @@ TEST_CASE("new map access matches old array indexing for all 530 Hall numbers",
           "[database]") {
   int op_mismatches = 0;
   int type_mismatches = 0;
-  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= kSpaceHallSettings; ++index) {
     HallNumber const hall = space_hall(index);
     // --- operations: offset-decoded vs lazily-built cache ---
     auto const old_ops = operations_by_offset(index);
@@ -96,7 +96,7 @@ TEST_CASE("the by-number catalog index enumerates every Hall setting",
   for (int n = 1; n <= 230; ++n) {
     total += data::halls_with_number<GroupFamily::space>(n).size();
   }
-  CHECK(total == static_cast<std::size_t>(data::kNumHallNumbers));
+  CHECK(total == static_cast<std::size_t>(kSpaceHallSettings));
   CHECK(data::halls_with_number<GroupFamily::space>(3).size() == 3);
 
   // The catalog is a genuine constant expression.

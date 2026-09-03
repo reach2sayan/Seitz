@@ -52,7 +52,8 @@ public:
     return project<&MagneticDataset::standardized>();
   }
   Result<MagneticCell const &> standardized_cell() const && = delete;
-  [[nodiscard]] Result<data::MagneticSpacegroupType> spacegroup_type() const {
+  [[nodiscard]] Result<data::MagneticSpacegroupType const &>
+  spacegroup_type() const {
     BOOST_LEAF_AUTO(number, uni());
     return data::magnetic_spacegroup_type(number);
   }

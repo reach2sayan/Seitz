@@ -1,10 +1,9 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/group/wyckoff.hpp>
 
@@ -36,8 +35,8 @@ public:
   // The group of an international number, in its default (first) Hall setting.
   // Errors if the number is out of range for the family (1..230 for space
   // groups, 1..80 for layer groups).
-  [[nodiscard]] static Result<SpaceGroup const *> from_number(GroupFamily family,
-                                                              int number);
+  [[nodiscard]] static Result<SpaceGroup const *>
+  from_number(GroupFamily family, int number);
 
   [[nodiscard]] HallNumber hall() const noexcept { return hall_; }
   [[nodiscard]] data::SpacegroupType const &type() const noexcept {
@@ -54,9 +53,8 @@ private:
   // its orbit (coset representatives) and site-symmetry stabilizer. A member so
   // it can reach Wyckoff's private constructor (SpaceGroup is a
   // friend).
-  [[nodiscard]] static Wyckoff
-  build_position(data::WyckoffEntry const &entry,
-                 Operations const &conv_ops);
+  [[nodiscard]] static Wyckoff build_position(int global_index, int letter,
+                                              Operations const &conv_ops);
 
   HallNumber hall_;
 };

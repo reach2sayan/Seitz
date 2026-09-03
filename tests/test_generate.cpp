@@ -63,7 +63,8 @@ struct Reference {
     auto const &wp = positions[pos];
     int const mult = wp.multiplicity();
     bool const fixed = wp.degrees_of_freedom() == 0;
-    int const max_copies = fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
+    int const max_copies =
+        fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
     for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
          ++copies) {
       for (int k = 0; k < copies; ++k) {
@@ -117,7 +118,8 @@ bool reference_distances_valid(Cell const &cell,
     for (Index j = i; j < cell.size(); ++j) {
       double const d = generate::minimum_image_distance(
           cell.position(i), cell.position(j), cell.lattice().matrix(),
-          cell.periodicity(), i != j);
+          cell.periodicity(),
+          i == j ? generate::Images::nontrivial : generate::Images::all);
       if (d < tol.scale * (radius(i) + radius(j))) {
         return false;
       }
@@ -135,20 +137,21 @@ TEST_CASE("enumerate_assignments equals the backtracking reference as sets",
     generate::Composition comp;
   };
   std::vector<Case> const cases{
-      {225, {{11, 4}, {17, 4}}},          // NaCl on Fm-3m
-      {221, {{55, 1}, {22, 1}, {8, 3}}},  // perovskite on Pm-3m
-      {194, {{30, 2}, {16, 2}}},          // wurtzite-like on P6_3/mmm
-      {62, {{26, 4}, {16, 8}}},           // Pnma
-      {2, {{6, 6}}},                      // P-1, general position only
+      {225, {{11, 4}, {17, 4}}},         // NaCl on Fm-3m
+      {221, {{55, 1}, {22, 1}, {8, 3}}}, // perovskite on Pm-3m
+      {194, {{30, 2}, {16, 2}}},         // wurtzite-like on P6_3/mmm
+      {62, {{26, 4}, {16, 8}}},          // Pnma
+      {2, {{6, 6}}},                     // P-1, general position only
       {1, {{6, 3}, {8, 2}}},
-      {227, {{14, 8}}},                   // diamond on Fd-3m
-      {136, {{22, 2}, {8, 4}}},           // rutile
-      {225, {{11, 3}}},                   // incompatible: 3 on an fcc lattice
-      {230, {{6, 1}}},                    // incompatible
+      {227, {{14, 8}}},         // diamond on Fd-3m
+      {136, {{22, 2}, {8, 4}}}, // rutile
+      {225, {{11, 3}}},         // incompatible: 3 on an fcc lattice
+      {230, {{6, 1}}},          // incompatible
   };
   for (auto const &c : cases) {
     INFO("space group " << c.number);
-    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+    auto const *sg =
+        must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
     auto const expected = reference_assignments(*sg, c.comp);
     CHECK(enumerated_assignments(*sg, c.comp) == expected);
     CHECK(generate::Generator{*sg}.compatible(c.comp) == !expected.empty());
@@ -176,17 +179,18 @@ TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
     Matrix3d lattice = Matrix3d::Identity() * (3.0 + 9.0 * unit(rng));
     lattice(0, 1) = 2.0 * unit(rng);
     lattice(1, 2) = 1.5 * unit(rng);
-    CellPeriodicity const periodicity =
-        trial % 3 == 0 ? all_periodic() : trial % 3 == 1 ? layer
-                                                        : none_periodic();
+    CellPeriodicity const periodicity = trial % 3 == 0   ? all_periodic()
+                                        : trial % 3 == 1 ? layer
+                                                         : none_periodic();
     Index const n = 4 + static_cast<Index>(rng() % 20);
     Positions pos(n, 3);
     Types types;
     for (Index i = 0; i < n; ++i) {
       for (Index k = 0; k < 3; ++k) {
-        pos(i, k) = periodicity[static_cast<std::size_t>(k)] == AxisKind::periodic
-                        ? unit(rng)
-                        : wide(rng);
+        pos(i, k) =
+            periodicity[static_cast<std::size_t>(k)] == AxisKind::periodic
+                ? unit(rng)
+                : wide(rng);
       }
       types.push_back(std::array{1, 6, 8, 26, 55}[rng() % 5]);
     }

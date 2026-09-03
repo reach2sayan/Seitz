@@ -97,7 +97,7 @@ TEST_CASE("magnetic operations match reference (default Hall setting)",
 
 TEST_CASE("magnetic operations match reference across all Hall settings",
           "[oracle][msg_database]") {
-  for (int index = 1; index <= cppcrystal::data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= cppcrystal::kSpaceHallSettings; ++index) {
     auto const [first, last] =
         cppcrystal::data::uni_candidates(space_hall(index));
     for (int uni = first.value(); uni <= last.value(); ++uni) {

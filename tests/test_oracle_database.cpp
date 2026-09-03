@@ -12,7 +12,7 @@ TEST_CASE("db ops match spg_get_symmetry_from_database for all 530 Hall numbers"
           "[oracle][database]") {
   int mismatches = 0;
   int first_bad = 0;
-  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= kSpaceHallSettings; ++index) {
     auto const &ours = data::operations_from_database(space_hall(index));
     auto const ref = oracle::reference_database_operations(index);
     bool ok = ours.size() == ref.size();
@@ -32,7 +32,7 @@ TEST_CASE("db spg types match spg_get_spacegroup_type for all 530 Hall numbers",
           "[oracle][database]") {
   int mismatches = 0;
   int first_bad = 0;
-  for (int index = 1; index <= data::kNumHallNumbers; ++index) {
+  for (int index = 1; index <= kSpaceHallSettings; ++index) {
     auto const &ours = data::spacegroup_type(space_hall(index));
     auto const ref = oracle::reference_spacegroup_type(index);
     bool const ok =

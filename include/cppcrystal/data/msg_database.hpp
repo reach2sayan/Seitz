@@ -7,7 +7,7 @@
 #include <cppcrystal/data/catalog.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp>
-#include <cppcrystal/data/spg_database.hpp> // kNumHallNumbers
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <array>
 #include <cstddef>

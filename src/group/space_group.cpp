@@ -1,10 +1,10 @@
 #include <cppcrystal/group/space_group.hpp>
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/sitesym_database.hpp>
+#include "data/sitesym_database.hpp"
 #include "group/locus_arrangement.hpp"
 #include "math/fractional.hpp"
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 
 #include <Eigen/Dense>
 
@@ -54,10 +54,9 @@ struct Locus {
 
 } // namespace
 
-Wyckoff SpaceGroup::build_position(data::WyckoffEntry const &entry,
-                                           Operations const &conv_ops) {
-  data::WyckoffCoordinate const wc =
-      data::wyckoff_coordinate(entry.global_index);
+Wyckoff SpaceGroup::build_position(int global_index, int letter,
+                                   Operations const &conv_ops) {
+  data::WyckoffCoordinate const wc = data::wyckoff_coordinate(global_index);
 
   // A generic seed, projected onto the position, lands at a generic point whose
   // stabilizer is exactly the site-symmetry group (for a 0-DOF position the
@@ -68,7 +67,8 @@ Wyckoff SpaceGroup::build_position(data::WyckoffEntry const &entry,
       wc.rotation.cast<double>() * seed + wc.translation);
 
   auto partition = detail::partition_orbit(
-      conv_ops, p0, [](Vector3d const &p) { return math::wrap_to_unit_cell(p); },
+      conv_ops, p0,
+      [](Vector3d const &p) { return math::wrap_to_unit_cell(p); },
       [](Vector3d const &a, Vector3d const &b) {
         return math::same_point(a, b, kDefaultSymprec);
       });
@@ -76,8 +76,8 @@ Wyckoff SpaceGroup::build_position(data::WyckoffEntry const &entry,
   Locus const locus = locus_of(wc.rotation);
   return Wyckoff{wc.multiplicity,
                  locus.dof,
-                 letter_of(entry.letter),
-                 data::site_symmetry_symbol(entry.global_index),
+                 letter_of(letter),
+                 data::site_symmetry_symbol(global_index),
                  wc.translation,
                  locus.basis,
                  wc.rotation.cast<double>(),
@@ -96,7 +96,8 @@ SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
   positions_.reserve(entries.size());
   std::ranges::transform(entries, std::back_inserter(positions_),
                          [&](data::WyckoffEntry const &entry) {
-                           return build_position(entry, operations_);
+                           return build_position(entry.global_index,
+                                                 entry.letter, operations_);
                          });
 }
 

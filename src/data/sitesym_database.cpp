@@ -1,4 +1,4 @@
-#include <cppcrystal/data/sitesym_database.hpp>
+#include "data/sitesym_database.hpp"
 
 #include <cppcrystal/data/detail/lookup.hpp>
 #include "data/sitesym_tables.hpp"

@@ -1,8 +1,8 @@
 #include <cppcrystal/generate/distance_check.hpp>
 
 #include "core/position_index.hpp"
-#include <cppcrystal/data/element_data.hpp>
 #include "math/integer_matrix.hpp"
+#include <cppcrystal/data/element_data.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -16,8 +16,8 @@ namespace {
 // Covalent radius of an atom type, falling back to tol.fallback_radius for an
 // untabulated element so the check stays well-defined. constexpr — a pure
 // lookup over the compile-time covalent-radius table.
-[[nodiscard]] constexpr double radius_of(int type,
-                                         DistanceTolerance const &tol) noexcept {
+[[nodiscard]] constexpr double
+radius_of(int type, DistanceTolerance const &tol) noexcept {
   return data::covalent_radius(type).value_or(tol.fallback_radius);
 }
 
@@ -41,12 +41,11 @@ namespace {
 
   // Self-images: the nearest non-trivial image of any point is the same
   // lattice vector for every atom (infinite with no periodic axis).
-  double const self_image = minimum_image_distance(
-      Vector3d::Zero(), Vector3d::Zero(), lattice, periodicity,
-      /*include_origin=*/false);
-  if (std::ranges::any_of(radius, [&](double r) {
-        return self_image < 2.0 * tol.scale * r;
-      })) {
+  double const self_image =
+      minimum_image_distance(Vector3d::Zero(), Vector3d::Zero(), lattice,
+                             periodicity, Images::nontrivial);
+  if (std::ranges::any_of(
+          radius, [&](double r) { return self_image < 2.0 * tol.scale * r; })) {
     return false;
   }
 
@@ -57,8 +56,7 @@ namespace {
     auto later = index.candidates(row(i)) |
                  std::views::filter([i](int j) { return j > i; });
     for (int const j : later) {
-      double const min_dist =
-          tol.scale * (radius[i] + radius[j]);
+      double const min_dist = tol.scale * (radius[i] + radius[j]);
       if (minimum_image_distance(row(i), row(j), lattice, periodicity) <
           min_dist) {
         return false;
@@ -73,7 +71,7 @@ namespace {
 double minimum_image_distance(Vector3d const &a, Vector3d const &b,
                               Matrix3d const &lattice,
                               CellPeriodicity const &periodicity,
-                              bool include_origin) noexcept {
+                              Images images) noexcept {
   // Fold each periodic component into [-0.5, 0.5]; keep aperiodic components
   // raw (no images along them).
   Vector3d const base = minimal_image(a - b, periodicity);
@@ -90,7 +88,7 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
     Vector3d const off =
         base + Vector3d(static_cast<double>(n0), static_cast<double>(n1),
                         static_cast<double>(n2));
-    if (!include_origin && off.squaredNorm() < 1e-20) {
+    if (images == Images::nontrivial && off.squaredNorm() < 1e-20) {
       continue; // the home image of an atom against itself
     }
     best = std::min(best, (lattice * off).squaredNorm());
@@ -99,8 +97,9 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
 }
 
 bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
-  return pairwise_distances_ok(cell.positions(), cell.types(), cell.lattice().matrix(),
-                               cell.periodicity(), tol);
+  return pairwise_distances_ok(cell.positions(), cell.types(),
+                               cell.lattice().matrix(), cell.periodicity(),
+                               tol);
 }
 
 } // namespace cppcrystal::generate
