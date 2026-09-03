@@ -4,6 +4,9 @@ add_executable(cppcrystal_tests
         test_cell.cpp
         test_symmetry_operation.cpp
         test_overlap.cpp
+        test_position_index.cpp
+        test_mdspan.cpp
+        test_generate.cpp
         test_reduce.cpp
         test_find_symmetry.cpp
         test_primitive.cpp

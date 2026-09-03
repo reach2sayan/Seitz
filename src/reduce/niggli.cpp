@@ -1,7 +1,9 @@
 #include <cppcrystal/reduce/niggli.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 
 // Krivy-Gruber Niggli reduction (space-group path). The cell is represented by
 // the six metric parameters
@@ -73,77 +75,61 @@ bool step3(State &p) {
   return false;
 }
 
+// Step 4 sign choice: flip every axis whose angle type is positive; if that
+// leaves an odd number of flips, also flip the last axis whose type is zero.
+[[nodiscard]] std::array<int, 3> step4_signs(std::array<int, 3> const &types) {
+  std::array<int, 3> signs{};
+  std::ranges::transform(types, signs.begin(),
+                         [](int t) { return t == 1 ? -1 : 1; });
+  if (signs[0] * signs[1] * signs[2] == -1) {
+    if (auto const free = std::ranges::find_last(types, 0); !free.empty()) {
+      signs[static_cast<std::size_t>(free.begin() - types.begin())] = -1;
+    }
+  }
+  return signs;
+}
+
 bool step4(State &p) {
   if (p.l == -1 && p.m == -1 && p.n == -1) {
     return false;
   }
   if (p.l * p.m * p.n == 0 || p.l * p.m * p.n == -1) {
-    int i = 1, j = 1, k = 1, r = -1; // r: which of i/j/k is the "free" axis
-    // clang-format off
-    if (p.l == 1) { i = -1; }
-    if (p.l == 0) { r = 0;  }
-    if (p.m == 1) { j = -1; }
-    if (p.m == 0) { r = 1;  }
-    if (p.n == 1) { k = -1; }
-    if (p.n == 0) { r = 2;  }
-    if (i * j * k == -1) {
-      if (r == 0) { i = -1; }
-      if (r == 1) { j = -1; }
-      if (r == 2) { k = -1; }
-    }
-    // clang-format on
+    auto const [i, j, k] = step4_signs({p.l, p.m, p.n});
     p.tmat << i, 0, 0, 0, j, 0, 0, 0, k;
     return true;
   }
   return false;
 }
 
-bool step5(State &p) {
-  if (std::fabs(p.xi) > p.B + p.eps ||
-      (!(std::fabs(p.B - p.xi) > p.eps) && 2 * p.eta < p.zeta - p.eps) ||
-      (!(std::fabs(p.B + p.xi) > p.eps) && p.zeta < -p.eps)) {
-    p.tmat << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-    if (p.xi > 0) {
-      p.tmat(1, 2) = -1;
-    }
-    if (p.xi < 0) {
-      p.tmat(1, 2) = 1;
-    }
+// Steps 5-7 share one shape: a doubled off-diagonal metric term too large
+// against a diagonal one (or equal to it, with an ordering tie-break on the
+// other two terms) shears the lattice by one unit in cell (row, col) against
+// the sign of the term.
+using Term = double State::*;
+bool shear_step(State &p, Term term, Term diag, Term first, Term second,
+                Index row, Index col) {
+  double const t = p.*term;
+  double const d = p.*diag;
+  if (std::fabs(t) > d + p.eps ||
+      (!(std::fabs(d - t) > p.eps) && 2 * p.*first < p.*second - p.eps) ||
+      (!(std::fabs(d + t) > p.eps) && p.*second < -p.eps)) {
+    p.tmat = Matrix3d::Identity();
+    p.tmat(row, col) = t > 0 ? -1.0 : (t < 0 ? 1.0 : 0.0);
     return true;
   }
   return false;
+}
+
+bool step5(State &p) {
+  return shear_step(p, &State::xi, &State::B, &State::eta, &State::zeta, 1, 2);
 }
 
 bool step6(State &p) {
-  if (std::fabs(p.eta) > p.A + p.eps ||
-      (!(std::fabs(p.A - p.eta) > p.eps) && 2 * p.xi < p.zeta - p.eps) ||
-      (!(std::fabs(p.A + p.eta) > p.eps) && p.zeta < -p.eps)) {
-    p.tmat << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-    if (p.eta > 0) {
-      p.tmat(0, 2) = -1;
-    }
-    if (p.eta < 0) {
-      p.tmat(0, 2) = 1;
-    }
-    return true;
-  }
-  return false;
+  return shear_step(p, &State::eta, &State::A, &State::xi, &State::zeta, 0, 2);
 }
 
 bool step7(State &p) {
-  if (std::fabs(p.zeta) > p.A + p.eps ||
-      (!(std::fabs(p.A - p.zeta) > p.eps) && 2 * p.xi < p.eta - p.eps) ||
-      (!(std::fabs(p.A + p.zeta) > p.eps) && p.eta < -p.eps)) {
-    p.tmat << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-    if (p.zeta > 0) {
-      p.tmat(0, 1) = -1;
-    }
-    if (p.zeta < 0) {
-      p.tmat(0, 1) = 1;
-    }
-    return true;
-  }
-  return false;
+  return shear_step(p, &State::zeta, &State::A, &State::xi, &State::eta, 0, 1);
 }
 
 bool step8(State &p) {

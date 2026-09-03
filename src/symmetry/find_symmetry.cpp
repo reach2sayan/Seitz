@@ -1,5 +1,6 @@
 #include <cppcrystal/symmetry/find_symmetry.hpp>
 
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/overlap.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/validation.hpp>
@@ -7,10 +8,11 @@
 #include <cppcrystal/math/integer_matrix.hpp>
 #include <cppcrystal/reduce/delaunay.hpp>
 
+#include <boost/container/flat_map.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <map>
 #include <numbers>
 #include <optional>
 #include <ranges>
@@ -158,31 +160,26 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
 }
 
 // First-occurrence index of the least-frequent atom type, or nullopt for an
-// empty cell.
+// empty cell. Among equally rare types the smallest index wins.
 [[nodiscard]] std::optional<int> index_with_least_atoms(Cell const &cell) {
-  int const n = static_cast<int>(cell.size());
-  if (n == 0)
+  boost::container::flat_map<int, int> frequency;
+  for (int const type : cell.types()) {
+    ++frequency[type];
+  }
+  if (frequency.empty()) {
     return std::nullopt;
-
-  // How many atoms share each type.
-  std::map<int, int> frequency;
-  for (int i = 0; i < n; ++i)
-    ++frequency[cell.type(i)];
-
-  // Return the first atom whose type is the rarest. Scanning in index order
-  // gives the tie-break: among equally-rare types, smallest index.
-  int const min_frequency = std::ranges::min(frequency | std::views::values);
-  for (int i = 0; i < n; ++i)
-    if (frequency.at(cell.type(i)) == min_frequency)
-      return i;
-
-  return std::nullopt; // unreachable: min_frequency came from the cell itself
+  }
+  int const rarest = std::ranges::min(frequency | std::views::values);
+  auto const first = std::ranges::find_if(cell.types(), [&](int type) {
+    return frequency.at(type) == rarest;
+  });
+  return static_cast<int>(first - cell.types().begin());
 }
 
 // Translations t such that x -> rot . x + t maps the cell onto itself.
 [[nodiscard]] std::vector<Vector3d>
 translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
-                          Matrix3i const &rot, int min_index, double symprec,
+                          Matrix3i const &rot, int min_index,
                           std::optional<int> aperiodic_axis) {
   Vector3d const origin = rot.cast<double>() * cell.position(min_index);
   std::vector<Vector3d> result;
@@ -192,7 +189,7 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
       continue;
     }
     Vector3d const trans = cell.position(i) - origin;
-    if (checker.check_total_overlap(trans, rot, symprec)) {
+    if (checker.check_total_overlap(trans, rot)) {
       // Layer translations live in the periodic plane; the aperiodic component
       // is kept raw rather than folded into [0, 1).
       result.push_back(wrap_periodic(trans, aperiodic_axis));
@@ -244,12 +241,12 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
   if (!min_index)
     return leaf::new_error(e_empty_cell{});
 
-  OverlapChecker const checker(cell);
+  OverlapChecker const checker(cell, symprec);
   std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
   SymmetryOperations ops;
   for (Matrix3i const &rot : lat_sym)
     for (Vector3d const &t : translations_for_rotation(
-             cell, checker, rot, *min_index, symprec, aperiodic_axis))
+             cell, checker, rot, *min_index, aperiodic_axis))
       ops.push_back({rot, t});
 
   return ops;
@@ -263,11 +260,11 @@ SymmetryOperations reduce_symmetry(Cell const &cell,
   if (!lat_sym) {
     return {};
   }
-  OverlapChecker const checker(cell);
+  OverlapChecker const checker(cell, symprec);
+  RotationSet const lattice_rotations = rotation_set(*lat_sym);
   auto survives = [&](SymmetryOperation const &op) {
-    return std::ranges::any_of(
-               *lat_sym, [&](Matrix3i const &r) { return r == op.rotation; }) &&
-           checker.check_total_overlap(op.translation, op.rotation, symprec);
+    return lattice_rotations.contains(op.rotation) &&
+           checker.check_total_overlap(op.translation, op.rotation);
   };
   auto kept = operations | std::views::filter(survives);
   return {kept.begin(), kept.end()};
@@ -277,9 +274,9 @@ std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
   std::optional<int> const min_index = index_with_least_atoms(cell);
   if (!min_index)
     return {};
-  OverlapChecker const checker(cell);
+  OverlapChecker const checker(cell, symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
-                                   *min_index, symprec, cell.aperiodic_axis());
+                                   *min_index, cell.aperiodic_axis());
 }
 
 } // namespace cppcrystal::symmetry

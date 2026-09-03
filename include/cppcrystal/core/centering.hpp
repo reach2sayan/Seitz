@@ -3,7 +3,7 @@
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/data/spg_database.hpp> // data::Centering
 
-#include <vector>
+#include <span>
 
 // Centering change-of-basis data, the single source of truth shared by the
 // space-group search (spacegroup.cpp / hall_symbol.cpp) and cell
@@ -19,6 +19,6 @@ namespace cppcrystal {
 
 [[nodiscard]] Matrix3i const &centering_matrix(data::Centering c);
 [[nodiscard]] Matrix3d const &centering_matrix_inv(data::Centering c);
-[[nodiscard]] std::vector<Vector3d> centering_shifts(data::Centering c);
+[[nodiscard]] std::span<Vector3d const> centering_shifts(data::Centering c);
 
 } // namespace cppcrystal

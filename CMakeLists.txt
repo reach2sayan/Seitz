@@ -50,6 +50,7 @@ target_sources(cppcrystal PRIVATE
         src/group/rod_group.cpp
         src/generate/rod_crystal.cpp
         src/core/overlap.cpp
+        src/core/position_index.cpp
         src/core/centering.cpp
         src/reduce/delaunay.cpp
         src/reduce/niggli.cpp
@@ -59,7 +60,6 @@ target_sources(cppcrystal PRIVATE
         src/data/spg_database.cpp
         src/data/sitesym_database.cpp
         src/data/msg_database.cpp
-        src/data/element_data.cpp
         src/spin/spin.cpp
         src/magnetic/magnetic_spacegroup.cpp
         src/magnetic_dataset.cpp
@@ -80,15 +80,18 @@ target_include_directories(cppcrystal PUBLIC
 target_compile_features(cppcrystal PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
-        Boost::graph Boost::bimap Boost::leaf Threads::Threads)
+        Boost::graph Boost::leaf Threads::Threads)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Hardening warning set (Phase 9). The conversion warnings are applied to the
     # library only — the oracle tests bridge to the reference C API
     # (reinterpret_cast, size_t<->int), which would drown them in noise.
+    # -Wnull-dereference is deliberately absent: it is a middle-end warning that
+    # GCC reports at the inlined callee, so SYSTEM include marking cannot keep
+    # Eigen's evaluators and libstdc++'s <generator> out of it at -O2.
     target_compile_options(cppcrystal PRIVATE
             -Wall -Wextra -Wpedantic
-            -Wshadow -Wcast-align -Wdouble-promotion -Wnull-dereference
+            -Wshadow -Wcast-align -Wdouble-promotion
             -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
 endif ()
 

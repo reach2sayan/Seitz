@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
@@ -41,6 +42,20 @@ constexpr double kTrimIncreaseRate = 2.0;
   return p.row(i).transpose();
 }
 
+// Atom positions re-expressed through `to_new` and folded into [0, 1) on the
+// periodic axes (the aperiodic axis of a layer cell is left raw).
+[[nodiscard]] Positions transformed_positions(Matrix3d const &to_new,
+                                              Cell const &cell,
+                                              std::optional<int> aperiodic_axis) {
+  Positions pos(cell.size(), 3);
+  for (Index i = 0; i < cell.size(); ++i) {
+    pos.row(i) =
+        wrap_periodic(Vector3d(to_new * cell.position(i)), aperiodic_axis)
+            .transpose();
+  }
+  return pos;
+}
+
 // The Delaunay reduction appropriate to the cell: 2D (periodic plane only) for
 // a layer cell, full 3D otherwise.
 [[nodiscard]] Result<Matrix3d>
@@ -60,13 +75,8 @@ smallest_lattice_cell(Cell const &cell, std::optional<int> aperiodic_axis,
     return std::nullopt;
   }
   Matrix3d const trans = min_lat->inverse() * cell.lattice();
-  Positions pos(cell.size(), 3);
-  for (Index i = 0; i < cell.size(); ++i) {
-    pos.row(i) =
-        wrap_periodic(Vector3d(trans * cell.position(i)), aperiodic_axis)
-            .transpose();
-  }
-  return Cell(*min_lat, pos, cell.types(), aperiodic_axis);
+  return Cell(*min_lat, transformed_positions(trans, cell, aperiodic_axis),
+              cell.types(), aperiodic_axis);
 }
 
 // Clean a candidate relative lattice (whose |det| should equal `multi`) via its
@@ -109,21 +119,23 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
       }
     }
     std::array<int, 2> const periodic{ap == 0 ? 1 : 0, ap == 2 ? 1 : 2};
-    std::size_t const n = cand.size();
-    for (std::size_t i = 0; i < n; ++i) {
-      for (std::size_t j = i + 1; j < n; ++j) {
-        Matrix3d relative;
-        relative.col(ap) = Vector3d::Unit(ap);
-        relative.col(periodic[0]) = cand[i];
-        relative.col(periodic[1]) = cand[j];
-        double const volume =
-            std::abs((cell.lattice() * relative).determinant());
-        if (volume <= symprec || math::nint(init_volume / volume) != multi) {
-          continue;
-        }
-        return finish_primitive_lattice(relative, cell.lattice(), multi,
-                                        aperiodic_axis, symprec);
+    auto const ids = std::views::iota(std::size_t{0}, cand.size());
+    // The first pair (in lexicographic order) spanning a cell of the right
+    // volume.
+    for (auto const [i, j] : std::views::cartesian_product(ids, ids) |
+                                 std::views::filter([](auto const &ij) {
+                                   return std::get<0>(ij) < std::get<1>(ij);
+                                 })) {
+      Matrix3d relative;
+      relative.col(ap) = Vector3d::Unit(ap);
+      relative.col(periodic[0]) = cand[i];
+      relative.col(periodic[1]) = cand[j];
+      double const volume = std::abs((cell.lattice() * relative).determinant());
+      if (volume <= symprec || math::nint(init_volume / volume) != multi) {
+        continue;
       }
+      return finish_primitive_lattice(relative, cell.lattice(), multi,
+                                      aperiodic_axis, symprec);
     }
     return std::nullopt;
   }
@@ -132,28 +144,26 @@ primitive_lattice(Cell const &cell, std::vector<Vector3d> const &pure_trans,
   cand.push_back(Vector3d::UnitX());
   cand.push_back(Vector3d::UnitY());
   cand.push_back(Vector3d::UnitZ());
-  std::size_t const n = cand.size();
-
-  for (std::size_t i = 0; i < n; ++i)
-    for (std::size_t j = i + 1; j < n; ++j)
-      for (std::size_t k = j + 1; k < n; ++k) {
-        Matrix3d tmp;
-        tmp.col(0) = cell.lattice() * cand[i];
-        tmp.col(1) = cell.lattice() * cand[j];
-        tmp.col(2) = cell.lattice() * cand[k];
-        double const volume = std::abs(tmp.determinant());
-        if (volume <= symprec || math::nint(init_volume / volume) != multi) {
-          continue;
-        }
-
-        Matrix3d relative;
-        relative.col(0) = cand[i];
-        relative.col(1) = cand[j];
-        relative.col(2) = cand[k];
-        // first valid triple only
-        return finish_primitive_lattice(relative, cell.lattice(), multi,
-                                        std::nullopt, symprec);
-      }
+  auto const ids = std::views::iota(std::size_t{0}, cand.size());
+  // The first triple (in lexicographic order) spanning a cell of the right
+  // volume.
+  for (auto const [i, j, k] :
+       std::views::cartesian_product(ids, ids, ids) |
+           std::views::filter([](auto const &ijk) {
+             return std::get<0>(ijk) < std::get<1>(ijk) &&
+                    std::get<1>(ijk) < std::get<2>(ijk);
+           })) {
+    Matrix3d relative;
+    relative.col(0) = cand[i];
+    relative.col(1) = cand[j];
+    relative.col(2) = cand[k];
+    double const volume = std::abs((cell.lattice() * relative).determinant());
+    if (volume <= symprec || math::nint(init_volume / volume) != multi) {
+      continue;
+    }
+    return finish_primitive_lattice(relative, cell.lattice(), multi,
+                                    std::nullopt, symprec);
+  }
   return std::nullopt;
 }
 
@@ -177,30 +187,33 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
 
   // Atom positions expressed in the trimmed basis, folded into [0, 1) on the
   // periodic axes (the aperiodic axis is left raw for a layer cell).
-  Positions pos(n, 3);
-  for (int i = 0; i < n; ++i) {
-    pos.row(i) = wrap_periodic(Vector3d(tmat.cast<double>() * cell.position(i)),
-                               aperiodic_axis)
-                     .transpose();
-  }
+  Positions const pos =
+      transformed_positions(tmat.cast<double>(), cell, aperiodic_axis);
+  CellPeriodicity const periodicity =
+      periodicity_from_aperiodic_axis(aperiodic_axis);
 
-  // Overlap table with tolerance adjustment until each class has `ratio` atoms.
+  // Representative table with tolerance adjustment until each class has
+  // `ratio` atoms: overlap[i] is the lowest-index class representative (an
+  // atom that is its own representative) of i's type coinciding with i, or i
+  // itself, which then starts a class.
   std::vector<int> overlap(static_cast<std::size_t>(n));
   double tol = symprec;
   bool ok = false;
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
-
+    PositionIndex const index(
+        BucketGeometry::of(trimmed_lattice, tol, periodicity), pos,
+        cell.types(), trimmed_lattice, tol, periodicity);
     for (int i = 0; i < n; ++i) {
-      overlap[static_cast<std::size_t>(i)] = i;
-      for (int j = 0; j < n; ++j) {
-        if (cell.type(i) == cell.type(j) &&
-            overlap[static_cast<std::size_t>(j)] == j &&
-            is_overlap(row(pos, i), row(pos, j), trimmed_lattice, tol,
-                       aperiodic_axis)) {
-          overlap[static_cast<std::size_t>(i)] = j;
-          break;
-        }
-      }
+      auto const ui = static_cast<std::size_t>(i);
+      overlap[ui] = i; // i is a representative until a lower one claims it
+      overlap[ui] = index
+                        .first_match(row(pos, i), cell.type(i),
+                                     [&](int j) {
+                                       return j <= i &&
+                                              overlap[static_cast<std::size_t>(
+                                                  j)] == j;
+                                     })
+                        .value_or(i);
     }
 
     // Class sizes in one pass: every overlap entry names its representative,
@@ -221,20 +234,21 @@ trim_cell(Matrix3d const &trimmed_lattice, Cell const &cell,
   if (!ok)
     return std::nullopt;
 
-  // Build the mapping (input atom -> trimmed atom) and the trimmed types.
+  // Build the mapping (input atom -> trimmed atom) and the trimmed types:
+  // each representative becomes the next trimmed atom, every other atom maps
+  // where its representative went.
   std::vector<int> mapping(static_cast<std::size_t>(n));
   std::vector<int> trimmed_types;
-  int index_atom = 0;
-  for (int i = 0; i < n; ++i) {
+  for (auto const [i, rep] : overlap | std::views::enumerate) {
     auto const ui = static_cast<std::size_t>(i);
-    if (overlap[ui] == i) {
-      mapping[ui] = index_atom++;
+    if (rep == i) {
+      mapping[ui] = static_cast<int>(trimmed_types.size());
       trimmed_types.push_back(cell.type(i));
     } else {
-      mapping[ui] = mapping[static_cast<std::size_t>(overlap[ui])];
+      mapping[ui] = mapping[static_cast<std::size_t>(rep)];
     }
   }
-  int const tn = index_atom;
+  int const tn = static_cast<int>(trimmed_types.size());
 
   // Average the positions of overlapping atoms (with periodic-boundary care):
   // a component more than half a cell from its representative is shifted one

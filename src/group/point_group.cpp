@@ -36,19 +36,19 @@ constexpr std::array<int, 33> kRepresentativeSpacegroup = {
 [[nodiscard]] SymmetryOperations
 coset_representatives(std::span<SymmetryOperation const> ops,
                       SymmetryOperations const &stab) {
+  RotationMultimap<int> const by_rotation =
+      index_by_rotation(ops, &SymmetryOperation::rotation);
   std::vector<bool> covered(ops.size(), false);
   SymmetryOperations reps;
-  for (std::size_t i = 0; i < ops.size(); ++i) {
-    if (covered[i]) {
+  for (auto const [i, g] : ops | std::views::enumerate) {
+    if (covered[static_cast<std::size_t>(i)]) {
       continue;
     }
-    reps.push_back(ops[i]);
+    reps.push_back(g);
     for (auto const &h : stab) {
-      Matrix3i const product = ops[i].rotation * h.rotation;
-      for (std::size_t j = 0; j < ops.size(); ++j) {
-        if (ops[j].rotation == product) {
-          covered[j] = true;
-        }
+      auto const [lo, hi] = by_rotation.equal_range(g.rotation * h.rotation);
+      for (auto const &entry : std::ranges::subrange(lo, hi)) {
+        covered[static_cast<std::size_t>(entry.second)] = true;
       }
     }
   }
@@ -139,7 +139,7 @@ Result<PointGroup> PointGroup::from_number(int number) {
 
   auto const meta = symmetry::pointgroup_by_number(number);
   int const rep = kRepresentativeSpacegroup[static_cast<std::size_t>(number)];
-  std::span<int const> const halls = data::kCatalog.with_number(rep);
+  std::span<int const> const halls = data::halls_with_number(rep);
   if (halls.empty()) {
     return leaf::new_error(e_message{
         "PointGroup::from_number: representative space group not found"});

@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/math/fractional.hpp>
+#include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
 #include <array>
@@ -56,6 +57,20 @@ single_aperiodic_axis(CellPeriodicity const &p) noexcept {
   }
 
   return found;
+}
+
+// Minimal-image fractional offset of `diff`: every periodic component is
+// folded to its nearest-lattice-point residue, every aperiodic component is
+// left as the raw difference (no images along it).
+[[nodiscard]] inline Vector3d
+minimal_image(Vector3d const &diff, CellPeriodicity const &p) noexcept {
+  Vector3d out = math::nearest_offset(diff);
+  for (auto const [axis, kind] : p | std::views::enumerate) {
+    if (kind == AxisKind::aperiodic) {
+      out[axis] = diff[axis];
+    }
+  }
+  return out;
 }
 
 // Fold a fractional coordinate into the cell [0, 1), but leave the aperiodic

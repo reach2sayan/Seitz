@@ -68,10 +68,15 @@ uni_candidates(int hall_number) noexcept {
   return std::pair<int, int>{m[0], m[1]};
 }
 
-[[nodiscard]] MagneticSymmetryOperations
+// The operations of a UNI number in the given Hall setting (0 = its first
+// setting), materialised once per setting; empty when (uni, hall) is not a
+// valid pairing.
+[[nodiscard]] MagneticSymmetryOperations const &
 magnetic_operations_from_database(int uni_number, int hall_number = 0);
 
-[[nodiscard]] SymmetryOperations
+// The alternative standardized-setting transformations of a UNI number in the
+// given Hall setting, identity first; empty when (uni, hall) is not valid.
+[[nodiscard]] SymmetryOperations const &
 magnetic_std_transformations(int uni_number, int hall_number = 0);
 
 } // namespace cppcrystal::data

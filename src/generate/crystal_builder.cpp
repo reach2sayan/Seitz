@@ -24,7 +24,7 @@ void expand_layer_orbit(Placement<group::WyckoffPosition> const &placement,
   Vector3d const canonical = placement.position->canonical_coordinate(xyz);
   for (auto const &op : placement.position->orbit_operations()) {
     Vector3d image = op.apply(canonical);
-    for (int axis = 0; axis < 3; ++axis) {
+    for (int axis : {0,1,2}) {
       if (axis != aperiodic_axis) {
         image[axis] = math::wrap_to_unit_cell(image[axis]);
       }

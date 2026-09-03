@@ -1,12 +1,15 @@
 #pragma once
 
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/mdspan.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
 
 #include <algorithm>
+#include <bitset>
 #include <concepts>
 #include <cstdint>
 #include <format>
+#include <generator>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -45,7 +48,7 @@ template <WyckoffLike W> using Assignment = std::vector<Placement<W>>;
 
 // The candidate type a `realize` callback yields: it returns
 // std::optional<R>, and this is that R.
-template <class Realize, WyckoffLike W>
+template <typename Realize, WyckoffLike W>
 using Realized = std::invoke_result_t<Realize &, Assignment<W> const &, int,
                                       std::mt19937_64 &>::value_type;
 
@@ -70,93 +73,133 @@ struct GenerateOptions {
 
 namespace detail {
 
-// Depth-first enumerator of Wyckoff assignments. It walks the elements in
-// order; for each element it chooses how many copies of each position to use
-// (0 or 1 for a fixed/no-DOF position, any number for a position with free
-// coordinates), so the chosen multiplicities sum to the element's count.
-// `used_special` enforces the "a no-DOF position is one fixed orbit, usable at
-// most once across the whole structure" rule.
-template <WyckoffLike W> struct AssignmentEnumerator {
+// A structure never has more Wyckoff positions than this (27 in 3D, fewer
+// for layer and rod groups); the once-only bookkeeping of fixed positions is a
+// bitset of that width, passed by value down the search.
+constexpr std::size_t kMaxPositions = 64;
+using UsedSpecial = std::bitset<kMaxPositions>;
+
+// The fixed data of one enumeration: the elements to place and, per (position,
+// remainder), whether the positions from there on can supply exactly that many
+// atoms. The table ignores the once-only rule on fixed positions, so it
+// over-approximates and is therefore a valid prune of the search.
+template <WyckoffLike W> struct AssignmentContext {
   std::span<W const> positions;
-  std::vector<std::pair<int, int>> elements; // (type, count)
-  std::size_t max_combinations;
+  std::vector<std::pair<int, int>> elements{}; // (type, count), count > 0
+  std::vector<std::uint8_t> reachable_{};      // (positions + 1) x (max + 1)
+  int max_count = 0;
 
-  std::vector<bool> used_special = std::vector<bool>(positions.size(), false);
-  Assignment<W> placements{};
-  std::vector<Assignment<W>> out{};
-
-  [[nodiscard]] bool full() const { return out.size() >= max_combinations; }
-
-  // Choose copies of positions[pos] onward to make `remaining` atoms of the
-  // current element, then move on to the next element.
-  void recurse(std::size_t elem, std::size_t pos, int remaining) {
-    if (full()) {
-      return;
+  [[nodiscard]] static AssignmentContext of(std::span<W const> positions,
+                                            Composition const &comp) {
+    AssignmentContext ctx{.positions = positions,};
+    std::ranges::copy(comp | std::views::filter([](auto const &entry) {
+                        return entry.second > 0;
+                      }),
+                      std::back_inserter(ctx.elements));
+    if (ctx.elements.empty()) {
+      return ctx;
     }
-    if (remaining == 0) {
-      if (elem + 1 == elements.size()) {
-        out.push_back(placements);
-      } else {
-        recurse(elem + 1, 0, elements[elem + 1].second);
-      }
-      return;
-    }
-    if (pos >= positions.size()) {
-      return; // ran out of positions before filling the element
-    }
-
-    W const &wp = positions[pos];
-    int const mult = wp.multiplicity();
-    bool const fixed = wp.degrees_of_freedom() == 0;
-    int const max_copies =
-        fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
-
-    for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
-         ++copies) {
-      if (full()) {
-        return;
-      }
-      for (int k = 0; k < copies; ++k) {
-        placements.push_back({elements[elem].first, &wp});
-      }
-      if (fixed && copies == 1) {
-        used_special[pos] = true;
-      }
-
-      recurse(elem, pos + 1, remaining - copies * mult);
-
-      if (fixed && copies == 1) {
-        used_special[pos] = false;
-      }
-      for (int k = 0; k < copies; ++k) {
-        placements.pop_back();
+    ctx.max_count = std::ranges::max(ctx.elements | std::views::values);
+    auto const rows = positions.size() + 1;
+    auto const cols = static_cast<std::size_t>(ctx.max_count) + 1;
+    ctx.reachable_.assign(rows * cols, 0);
+    md::matrix_view<std::uint8_t> table(ctx.reachable_.data(),
+                                        static_cast<Index>(rows),
+                                        static_cast<Index>(cols));
+    table[static_cast<Index>(positions.size()), 0] = 1;
+    // Backwards over the positions: take zero copies of p, or one copy and
+    // stay on p (free coordinates) / move past it (fixed position).
+    for (auto p = static_cast<Index>(positions.size()); p-- > 0;) {
+      auto const &wp = positions[static_cast<std::size_t>(p)];
+      auto const mult = static_cast<Index>(wp.multiplicity());
+      Index const after_one = wp.degrees_of_freedom() == 0 ? p + 1 : p;
+      for (Index r = 0; r <= ctx.max_count; ++r) {
+        table[p, r] = table[p + 1, r] ||
+                      (r >= mult && table[after_one, r - mult]);
       }
     }
+    return ctx;
+  }
+
+  [[nodiscard]] bool reachable(std::size_t pos, int remaining) const noexcept {
+    md::matrix_view<std::uint8_t const> const table(
+        reachable_.data(), static_cast<Index>(positions.size() + 1),
+        static_cast<Index>(max_count) + 1);
+    return table[static_cast<Index>(pos), remaining] != 0;
   }
 };
 
+// Depth-first walk of the assignments. Element by element, choose how many
+// copies of each position to use (0 or 1 for a fixed/no-DOF position, any
+// number for a position with free coordinates) so the chosen multiplicities
+// sum to the element's count. `used_special` enforces the "a no-DOF position
+// is one fixed orbit, usable at most once across the whole structure" rule.
+// Yields a reference to the shared `placements` buffer for each complete
+// assignment.
+template <WyckoffLike W>
+std::generator<Assignment<W> const &>
+walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
+     UsedSpecial used_special, std::size_t elem, std::size_t pos,
+     int remaining) {
+  if (remaining == 0) {
+    if (elem + 1 == ctx.elements.size()) {
+      co_yield placements;
+    } else {
+      co_yield std::ranges::elements_of(
+          walk(ctx, placements, used_special, elem + 1, 0,
+               ctx.elements[elem + 1].second));
+    }
+    co_return;
+  }
+  if (pos >= ctx.positions.size() || !ctx.reachable(pos, remaining)) {
+    co_return; // the remaining positions cannot fill the element
+  }
+
+  W const &wp = ctx.positions[pos];
+  int const mult = wp.multiplicity();
+  bool const fixed = wp.degrees_of_freedom() == 0;
+  int const max_copies =
+      fixed ? (used_special[pos] ? 0 : 1) : remaining / mult;
+
+  for (int copies = 0; copies <= max_copies && copies * mult <= remaining;
+       ++copies) {
+    placements.insert(placements.end(), static_cast<std::size_t>(copies),
+                      Placement<W>{ctx.elements[elem].first, &wp});
+    UsedSpecial used = used_special;
+    if (fixed && copies == 1) {
+      used.set(pos);
+    }
+    co_yield std::ranges::elements_of(
+        walk(ctx, placements, used, elem, pos + 1, remaining - copies * mult));
+    placements.erase(placements.end() - copies, placements.end());
+  }
+}
+
 } // namespace detail
 
-// All valid Wyckoff assignments for `comp` on `positions`. `max_combinations`
-// caps the result to keep enumeration bounded; when the cap is hit, fewer than
-// the full set are returned (detectable by size == max_combinations).
+// Every valid Wyckoff assignment of `comp` on `positions`, lazily and in
+// depth-first order. Each yielded reference points at a buffer reused for
+// the next assignment: copy what you keep. Compose with views::take for a
+// bounded enumeration; a composition with no assignment yields nothing
+// (usually without walking the tree, thanks to the reachability prune).
 template <WyckoffLike W>
-[[nodiscard]] std::vector<Assignment<W>>
-enumerate_assignments(std::span<W const> positions, Composition const &comp,
-                      std::size_t max_combinations = 1000) {
-  std::vector<std::pair<int, int>> elements;
-  elements.reserve(comp.size());
-  std::ranges::copy(comp | std::views::filter([](auto const &entry) {
-                      return entry.second > 0;
-                    }),
-                    std::back_inserter(elements));
-  if (elements.empty() || max_combinations == 0) {
-    return {};
+[[nodiscard]] std::generator<Assignment<W> const &>
+enumerate_assignments(std::span<W const> positions, Composition comp) {
+  auto const ctx = detail::AssignmentContext<W>::of(positions, comp);
+  if (ctx.elements.empty() || positions.size() > detail::kMaxPositions) {
+    co_return;
   }
-  detail::AssignmentEnumerator<W> e{positions, std::move(elements),
-                                    max_combinations};
-  e.recurse(0, 0, e.elements.front().second);
-  return std::move(e.out);
+  Assignment<W> placements;
+  co_yield std::ranges::elements_of(detail::walk(
+      ctx, placements, {}, 0, 0, ctx.elements.front().second));
+}
+
+// Whether `comp` has at least one assignment on `positions`.
+template <WyckoffLike W>
+[[nodiscard]] bool assignable(std::span<W const> positions,
+                              Composition const &comp) {
+  auto assignments = enumerate_assignments(positions, comp);
+  return assignments.begin() != assignments.end();
 }
 
 // Drop every assignment that uses anything but the general position (the last
@@ -174,6 +217,10 @@ void restrict_to_general_position(std::vector<Assignment<W>> &assignments,
 
 namespace detail {
 
+// Assignments considered per search: enough for any real composition, a
+// bound for pathological ones.
+constexpr std::size_t kMaxAssignments = 1000;
+
 // The generator pipeline shared by every random-structure entry point:
 // enumerate -> optionally restrict to the general position -> shuffle -> for
 // each assignment and attempt, ask `realize` for a candidate. `realize` is
@@ -188,7 +235,9 @@ search_assignments(std::span<W const> positions, Composition const &comp,
                    GenerateOptions const &options, std::string_view who,
                    std::string_view group_kind, Realize &&realize)
     -> Result<Realized<Realize, W>> {
-  auto assignments = enumerate_assignments(positions, comp);
+  auto assignments = std::ranges::to<std::vector<Assignment<W>>>(
+      enumerate_assignments(positions, comp) |
+      std::views::take(kMaxAssignments));
   if (assignments.empty()) {
     return leaf::new_error(e_message{std::format(
         "{}: composition is not compatible with the Wyckoff positions of the "

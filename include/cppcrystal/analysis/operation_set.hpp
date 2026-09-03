@@ -40,8 +40,9 @@ protected:
 // (projections are cheap, an OperationSet is usually transient).
 class OperationSet : public OperationSetBase<OperationSet, SymmetryOperations> {
 public:
-  // The rotation parts of the operations, de-duplicated by value internally
-  // (symmetry::rotations_of).
+  // The rotation parts of the operations, one per operation, in order
+  // (symmetry::rotations_of; de-duplication happens in the point-group
+  // identification).
   [[nodiscard]] std::vector<Matrix3i> rotations() const;
 
   // The primitive operations together with the primitive->conventional

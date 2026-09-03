@@ -32,8 +32,8 @@ struct PointgroupTransform {
 get_pointgroup(std::span<Matrix3i const> rotations,
                std::optional<int> aperiodic_axis = std::nullopt);
 
-// Convenience: extract the (de-duplicated by value is done internally) rotation
-// parts of a set of symmetry operations. For the object-oriented form, prefer
+// Convenience: the rotation parts of a set of symmetry operations, one per
+// operation in order (de-duplication happens in get_pointgroup). For the object-oriented form, prefer
 // cppcrystal::analysis::OperationSet::rotations().
 [[nodiscard]] std::vector<Matrix3i> rotations_of(SymmetryOperations const &ops);
 

@@ -46,27 +46,26 @@ using data::Centering;
   Matrix3d const conv_lattice =
       primitive.lattice() * centering_matrix(centering).cast<double>();
   Matrix3d const to_conv = centering_matrix_inv(centering);
-  std::vector<Vector3d> const shifts = centering_shifts(centering);
+  auto const shifts = centering_shifts(centering);
   Index const np = primitive.size();
   auto const multi = static_cast<Index>(shifts.size() + 1);
 
-  Positions pos(np * multi, 3);
-  Types types(static_cast<std::size_t>(np * multi));
-  Index row = 0;
+  std::vector<Vector3d> pos;
+  Types types;
+  pos.reserve(static_cast<std::size_t>(np * multi));
+  types.reserve(static_cast<std::size_t>(np * multi));
   for (Index i = 0; i < np; ++i) {
     Vector3d const base = math::wrap_to_unit_cell(
         Vector3d(to_conv * primitive.position(i)));
-    pos.row(row) = base.transpose();
-    types[static_cast<std::size_t>(row)] = primitive.type(i);
-    ++row;
+    pos.push_back(base);
     for (Vector3d const &shift : shifts) {
-      pos.row(row) = math::wrap_to_unit_cell(Vector3d(base + shift)).transpose();
-      types[static_cast<std::size_t>(row)] = primitive.type(i);
-      ++row;
+      pos.push_back(math::wrap_to_unit_cell(Vector3d(base + shift)));
     }
+    types.insert(types.end(), static_cast<std::size_t>(multi),
+                 primitive.type(i));
   }
 
-  Cell const expanded(conv_lattice, std::move(pos), std::move(types));
+  Cell const expanded(conv_lattice, to_positions(pos), std::move(types));
   // Fold/normalize the expanded cell.
   auto trimmed = symmetry::trim_to_lattice(conv_lattice, expanded, symprec);
   if (!trimmed) {

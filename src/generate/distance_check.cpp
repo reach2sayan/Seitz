@@ -1,12 +1,13 @@
 #include <cppcrystal/generate/distance_check.hpp>
 
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/data/element_data.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <ranges>
-#include <vector>
 
 namespace cppcrystal::generate {
 
@@ -20,24 +21,46 @@ namespace {
   return data::covalent_radius(type).value_or(tol.fallback_radius);
 }
 
-// The shared pair loop of the validity checks: j == i covers an atom against
-// its own periodic images (cell-too-small); j > i covers distinct pairs and
-// their images. `distance(i, j)` is the family's metric.
-template <class Metric>
-[[nodiscard]] bool pairwise_distances_ok(Types const &types,
-                                         DistanceTolerance tol,
-                                         Metric &&distance) noexcept {
-  Index const n = static_cast<Index>(types.size());
-  std::vector<double> radius(types.size());
-  std::ranges::transform(types, radius.begin(),
-                         [&](int type) { return radius_of(type, tol); });
+// The shared check of the validity tests: every pair of distinct atoms must be
+// at least scale * (r_i + r_j) apart under the family's metric, and every atom
+// at least 2 * scale * r_i from its own periodic images. No threshold exceeds
+// the cutoff 2 * scale * max radius, so a bucket grid with that edge yields
+// every pair that could possibly be too close and nothing else is measured.
+[[nodiscard]] bool pairwise_distances_ok(Positions const &positions,
+                                         Types const &types,
+                                         Matrix3d const &lattice,
+                                         CellPeriodicity const &periodicity,
+                                         DistanceTolerance tol) noexcept {
+  if (types.empty()) {
+    return true;
+  }
+  auto const radius = types | std::views::transform([&](int type) {
+                        return radius_of(type, tol);
+                      });
+  double const cutoff = 2.0 * tol.scale * std::ranges::max(radius);
 
-  for (Index i = 0; i < n; ++i) {
-    double const ri = radius[static_cast<std::size_t>(i)];
-    for (Index j = i; j < n; ++j) {
+  // Self-images: the nearest non-trivial image of any point is the same
+  // lattice vector for every atom (infinite with no periodic axis).
+  double const self_image = minimum_image_distance(
+      Vector3d::Zero(), Vector3d::Zero(), lattice, periodicity,
+      /*include_origin=*/false);
+  if (std::ranges::any_of(radius, [&](double r) {
+        return self_image < 2.0 * tol.scale * r;
+      })) {
+    return false;
+  }
+
+  PositionIndex const index(BucketGeometry::of(lattice, cutoff, periodicity),
+                            positions, types, lattice, cutoff, periodicity);
+  auto const row = [&](Index i) { return Vector3d(positions.row(i)); };
+  for (Index i = 0; i < positions.rows(); ++i) {
+    auto later = index.candidates(row(i)) |
+                 std::views::filter([i](int j) { return j > i; });
+    for (int const j : later) {
       double const min_dist =
-          tol.scale * (ri + radius[static_cast<std::size_t>(j)]);
-      if (distance(i, j) < min_dist) {
+          tol.scale * (radius[i] + radius[j]);
+      if (minimum_image_distance(row(i), row(j), lattice, periodicity) <
+          min_dist) {
         return false;
       }
     }
@@ -53,13 +76,7 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
                               bool include_origin) noexcept {
   // Fold each periodic component into [-0.5, 0.5]; keep aperiodic components
   // raw (no images along them).
-  Vector3d const diff = a - b;
-  Vector3d base = diff;
-  for (auto const [axis, kind] : periodicity | std::views::enumerate) {
-    if (kind == AxisKind::periodic) {
-      base[axis] = diff[axis] - math::nint(diff[axis]);
-    }
-  }
+  Vector3d const base = minimal_image(a - b, periodicity);
 
   // Search the adjacent cells along the periodic axes only: for skewed
   // lattices the true nearest image can sit one cell over.
@@ -82,23 +99,16 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
 }
 
 bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
-  return pairwise_distances_ok(cell.types(), tol, [&](Index i, Index j) {
-    return minimum_image_distance(cell.position(i), cell.position(j),
-                                  cell.lattice(), cell.periodicity(),
-                                  /*include_origin=*/i != j);
-  });
+  return pairwise_distances_ok(cell.positions(), cell.types(), cell.lattice(),
+                               cell.periodicity(), tol);
 }
 
 bool cluster_distances_valid(Positions const &coordinates, Types const &types,
                              DistanceTolerance tol) noexcept {
   constexpr CellPeriodicity kNonPeriodic = {
       AxisKind::aperiodic, AxisKind::aperiodic, AxisKind::aperiodic};
-  return pairwise_distances_ok(types, tol, [&](Index i, Index j) {
-    return minimum_image_distance(coordinates.row(i).transpose(),
-                                  coordinates.row(j).transpose(),
-                                  Matrix3d::Identity(), kNonPeriodic,
-                                  /*include_origin=*/i != j);
-  });
+  return pairwise_distances_ok(coordinates, types, Matrix3d::Identity(),
+                               kNonPeriodic, tol);
 }
 
 } // namespace cppcrystal::generate

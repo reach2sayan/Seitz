@@ -113,7 +113,7 @@ Result<SpaceGroup> SpaceGroup::from_layer_number(int layer_number) {
 
 Result<SpaceGroup> SpaceGroup::from_number(int spacegroup_number) {
   std::span<int const> const halls =
-      data::kCatalog.with_number(spacegroup_number);
+      data::halls_with_number(spacegroup_number);
   if (halls.empty()) {
     return leaf::new_error(
         e_message{"SpaceGroup::from_number: international number out of range "
@@ -123,10 +123,10 @@ Result<SpaceGroup> SpaceGroup::from_number(int spacegroup_number) {
 }
 
 Result<WyckoffPosition const *> SpaceGroup::wyckoff(char letter) const {
-  for (auto const &wp : positions_) {
-    if (wp.letter() == letter) {
-      return &wp;
-    }
+  if (auto const it = std::ranges::find(positions_, letter,
+                                        &WyckoffPosition::letter);
+      it != positions_.end()) {
+    return &*it;
   }
   return leaf::new_error(
       e_message{std::string("SpaceGroup::wyckoff: no Wyckoff position '") +

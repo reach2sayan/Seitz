@@ -164,15 +164,19 @@ ir_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
   }
 
   std::vector<std::size_t> mapping(n);
-  for (std::size_t i = 0; i < n; ++i) {
-    Vector3i const address_double =
-        address_double_mesh(grid_address[i], mesh, is_shift);
-    mapping[i] = normal ? normal_representative(address_double, mesh, i,
-                                                rot_reciprocal)
-                        : distortion_representative(address_double, mesh,
-                                                    is_shift, i, divisor,
-                                                    rot_reciprocal);
-  }
+  std::ranges::transform(
+      grid_address | std::views::enumerate, mapping.begin(),
+      [&](auto const &entry) {
+        auto const &[index, address] = entry;
+        auto const i = static_cast<std::size_t>(index);
+        Vector3i const address_double =
+            address_double_mesh(address, mesh, is_shift);
+        return normal ? normal_representative(address_double, mesh, i,
+                                              rot_reciprocal)
+                      : distortion_representative(address_double, mesh,
+                                                  is_shift, i, divisor,
+                                                  rot_reciprocal);
+      });
 
   auto const num_ir = static_cast<std::size_t>(std::ranges::count_if(
       std::views::iota(std::size_t{0}, n),

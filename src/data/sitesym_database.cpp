@@ -36,7 +36,7 @@ constexpr auto kWyckoffDecoded = [] {
     // Rotation: base-45 row codes, each digit base-9/3 decoded to
     // {-2..2}/{-1..1}.
     int const rot_enc = code % kRotEncMod;
-    std::array<int, 3> const rows = {
+    std::array const rows = {
         rot_enc / kRow2, (rot_enc % kRow2) / kRowBase, rot_enc % kRowBase};
     for (std::size_t i = 0; i < 3; ++i) {
       out[k].rot[i * 3 + 0] = static_cast<std::int8_t>(rows[i] / 9 - 2);

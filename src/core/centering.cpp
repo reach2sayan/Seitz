@@ -1,6 +1,7 @@
 #include <cppcrystal/core/centering.hpp>
 
 #include <array>
+#include <span>
 #include <cstddef>
 
 namespace cppcrystal {
@@ -48,20 +49,28 @@ Matrix3d const &centering_matrix_inv(Centering c) {
   return table[static_cast<std::size_t>(c)];
 }
 
-std::vector<Vector3d> centering_shifts(Centering centering) {
+std::span<Vector3d const> centering_shifts(Centering centering) {
+  static std::array<Vector3d, 1> const a{{{0.0, 0.5, 0.5}}};
+  static std::array<Vector3d, 1> const b{{{0.5, 0.0, 0.5}}};
+  static std::array<Vector3d, 1> const c{{{0.5, 0.5, 0.0}}};
+  static std::array<Vector3d, 1> const body{{{0.5, 0.5, 0.5}}};
+  static std::array<Vector3d, 2> const rhombohedral{
+      {{2. / 3, 1. / 3, 1. / 3}, {1. / 3, 2. / 3, 2. / 3}}};
+  static std::array<Vector3d, 3> const face{
+      {{0.0, 0.5, 0.5}, {0.5, 0.0, 0.5}, {0.5, 0.5, 0.0}}};
   switch (centering) {
   case Centering::a_face:
-    return {{0.0, 0.5, 0.5}};
+    return a;
   case Centering::b_face:
-    return {{0.5, 0.0, 0.5}};
+    return b;
   case Centering::c_face:
-    return {{0.5, 0.5, 0.0}};
+    return c;
   case Centering::body:
-    return {{0.5, 0.5, 0.5}};
+    return body;
   case Centering::r_center:
-    return {{2. / 3, 1. / 3, 1. / 3}, {1. / 3, 2. / 3, 2. / 3}};
+    return rhombohedral;
   case Centering::face:
-    return {{0.0, 0.5, 0.5}, {0.5, 0.0, 0.5}, {0.5, 0.5, 0.0}};
+    return face;
   default:
     return {};
   }

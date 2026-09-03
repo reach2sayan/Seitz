@@ -5,7 +5,7 @@ Unlike the spglib database transcribers, the source here is CppCrystal's own
 curated table (tools/element_data.csv: atomic number, symbol, single-bond
 covalent radius from Cordero et al. 2008), not a spglib C array. The output
 mirrors the same convention: `inline constexpr std::array`s, with the
-decoder/accessors hand-written in src/data/element_data.cpp.
+accessors hand-written (constexpr) in include/cppcrystal/data/element_data.hpp.
 
 Only the covalent radius is tabulated; the atomic volume used to size a
 generated cell is derived from it ((4/3) * pi * r^3) at the accessor layer.

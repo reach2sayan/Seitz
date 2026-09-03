@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/data/detail/lookup.hpp>
@@ -52,38 +53,19 @@ struct SpacegroupType {
 
 inline constexpr int kNumHallNumbers = 530;
 
-// A compile-time, multi-keyed catalog of the 530 Hall settings. Lookup by Hall
-// number is a direct index (Hall numbers are the contiguous range 1..530);
-// lookup by international number uses a sorted index permutation with an
-// equal_range-style query. Index 0 is a zero-valued sentinel returned for
-// out-of-range Hall numbers.
+inline constexpr int kNumSpacegroups = 230;
+inline constexpr int kNumPointgroups = 32;
+
+// The 530 Hall settings by Hall number (a direct index: Hall numbers are the
+// contiguous range 1..530). Index 0 is a zero-valued sentinel returned for
+// out-of-range Hall numbers. The inverted indices by international number and
+// by point group follow as separate compile-time tables.
 struct SpacegroupCatalog {
   std::array<SpacegroupType, kNumHallNumbers + 1> by_hall{};
-  // Hall numbers 1..530 permuted so that by_hall[halls_by_number[i]].number is
-  // non-decreasing (ties ordered by Hall number).
-  std::array<int, kNumHallNumbers> halls_by_number{};
 
   // The setting for a Hall number (1..530); the sentinel (number 0) otherwise.
   [[nodiscard]] constexpr SpacegroupType const &at(int hall) const noexcept {
     return detail::at_or_sentinel(by_hall, hall);
-  }
-
-  // Every Hall setting of a given international number, as a span of Hall
-  // numbers (empty if none).
-  [[nodiscard]] constexpr std::span<int const>
-  with_number(int number) const noexcept {
-    auto const less_n = [this](int hall, int n) {
-      return by_hall[static_cast<std::size_t>(hall)].number < n;
-    };
-    auto const n_less = [this](int n, int hall) {
-      return n < by_hall[static_cast<std::size_t>(hall)].number;
-    };
-    auto const first = std::lower_bound(halls_by_number.begin(),
-                                        halls_by_number.end(), number, less_n);
-    auto const last = std::upper_bound(halls_by_number.begin(),
-                                       halls_by_number.end(), number, n_less);
-    return {halls_by_number.data() + (first - halls_by_number.begin()),
-            static_cast<std::size_t>(last - first)};
   }
 };
 
@@ -103,17 +85,44 @@ inline constexpr SpacegroupCatalog kCatalog = [] {
                                   static_cast<Centering>(r.centering),
                                   r.pointgroup_number};
   }
-  for (int i = 0; i < kNumHallNumbers; ++i) {
-    c.halls_by_number[static_cast<std::size_t>(i)] = i + 1;
-  }
-  std::sort(c.halls_by_number.begin(), c.halls_by_number.end(),
-            [&c](int a, int b) {
-              auto const &ta = c.by_hall[static_cast<std::size_t>(a)];
-              auto const &tb = c.by_hall[static_cast<std::size_t>(b)];
-              return ta.number != tb.number ? ta.number < tb.number : a < b;
-            });
   return c;
 }();
+
+// international number -> its Hall settings, ascending by Hall number (so the
+// first is the default setting).
+inline constexpr auto kHallsByNumber =
+    detail::bucket_index<kNumHallNumbers, kNumSpacegroups + 1>(
+        [](int hall) { return kCatalog.at(hall).number; });
+
+// Every Hall setting of an international number (1..230), as a span of Hall
+// numbers; empty if out of range.
+[[nodiscard]] constexpr std::span<int const>
+halls_with_number(int number) noexcept {
+  return kHallsByNumber[number];
+}
+
+// The default (first) Hall setting of an international number; 0 if out of
+// range.
+[[nodiscard]] constexpr int default_hall(int number) noexcept {
+  auto const halls = halls_with_number(number);
+  return halls.empty() ? 0 : halls.front();
+}
+
+// point-group number -> the default Hall setting of every space group with
+// that point group, ascending by space-group number. The candidate list of
+// the space-group search: a found point group narrows 230 candidates to
+// these.
+inline constexpr auto kDefaultHallsByPointgroup =
+    detail::bucket_index<kNumSpacegroups, kNumPointgroups + 1>(
+        [](int number) {
+          return kCatalog.at(default_hall(number)).pointgroup_number;
+        },
+        default_hall);
+
+[[nodiscard]] constexpr std::span<int const>
+default_halls_with_pointgroup(int pointgroup_number) noexcept {
+  return kDefaultHallsByPointgroup[pointgroup_number];
+}
 
 // Number of layer-group Hall settings (80 layer groups, 116 settings). Layer
 // groups use a negative-hall-number convention (settings -1..-116), so they
@@ -200,6 +209,51 @@ inline constexpr auto kLayerDefaultHall = [] {
              : 0;
 }
 
+// point-group number -> the default Hall setting of every layer group with
+// that point group, ascending by layer-group number (the layer candidate
+// list of the space-group search).
+inline constexpr auto kLayerDefaultHallsByPointgroup =
+    detail::bucket_index<kNumLayerGroups, kNumPointgroups + 1>(
+        [](int number) {
+          return kLayerCatalog.at(layer_default_hall(number)).pointgroup_number;
+        },
+        layer_default_hall);
+
+[[nodiscard]] constexpr std::span<int const>
+layer_default_halls_with_pointgroup(int pointgroup_number) noexcept {
+  return kLayerDefaultHallsByPointgroup[pointgroup_number];
+}
+
+// Compile-time integrity guards on the inverted indices: every space group
+// and layer group lands in exactly one point-group bucket, under its own
+// point-group number.
+namespace detail {
+template <std::size_t N, std::size_t K, class TypeOf>
+constexpr bool pointgroup_index_well_formed(BucketIndex<N, K> const &index,
+                                            TypeOf type_of) {
+  std::size_t total = 0;
+  for (int pg = 0; pg < static_cast<int>(K); ++pg) {
+    for (int hall : index[pg]) {
+      if (type_of(hall).pointgroup_number != pg) {
+        return false;
+      }
+      ++total;
+    }
+  }
+  return total == N;
+}
+} // namespace detail
+
+static_assert(detail::pointgroup_index_well_formed(
+    kDefaultHallsByPointgroup, [](int hall) { return kCatalog.at(hall); }));
+static_assert(detail::pointgroup_index_well_formed(
+    kLayerDefaultHallsByPointgroup,
+    [](int hall) { return kLayerCatalog.at(hall); }));
+static_assert(default_halls_with_pointgroup(0).empty());
+static_assert(default_halls_with_pointgroup(32).size() == 10); // m-3m: 221..230
+static_assert(halls_with_number(3).size() == 3); // P2: unique axis b, c, a
+static_assert(default_hall(1) == 1 && default_hall(231) == 0);
+
 // Compile-time integrity guards on the layer catalog: the settings must cover
 // the layer-group numbers 1..80 in ascending blocks, with every number resolving
 // to a default Hall setting. These break the build if the generated layer tables
@@ -241,5 +295,10 @@ static_assert(spacegroup_type(-117).number == 0); // out of range
 
 [[nodiscard]] SymmetryOperations const &
 operations_from_database(int hall_number);
+
+// rotation -> indices into operations_from_database(hall_number), built once
+// per setting. Empty for an out-of-range Hall number.
+[[nodiscard]] RotationMultimap<int> const &
+operations_by_rotation(int hall_number);
 
 } // namespace cppcrystal::data

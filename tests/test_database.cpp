@@ -1,3 +1,5 @@
+#include <cppcrystal/data/element_data.hpp>
+#include <cppcrystal/data/msg_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -36,4 +38,26 @@ TEST_CASE("out-of-range hall numbers are handled", "[database]") {
   CHECK(data::operations_from_database(0).empty());
   CHECK(data::operations_from_database(531).empty());
   CHECK(data::spacegroup_type(0).number == 0);
+}
+
+TEST_CASE("atomic_number inverts element_symbol for every element",
+          "[database]") {
+  for (int z = 1; z <= data::kNumElements; ++z) {
+    CHECK(data::atomic_number(*data::element_symbol(z)) == z);
+  }
+  CHECK_FALSE(data::atomic_number("Xx"));
+  CHECK_FALSE(data::atomic_number(""));
+}
+
+TEST_CASE("a (uni, hall) pairing outside the uni's settings yields nothing",
+          "[database]") {
+  // UNI 1 (P1) has a single Hall setting (1); any other Hall number is not
+  // one of its settings, and the query must not read past that row.
+  CHECK_FALSE(data::magnetic_operations_from_database(1, 1).empty());
+  CHECK(data::magnetic_operations_from_database(1, 2).empty());
+  CHECK(data::magnetic_operations_from_database(1, 530).empty());
+  CHECK(data::magnetic_operations_from_database(1, -1).empty());
+  CHECK(data::magnetic_std_transformations(1, 2).empty());
+  CHECK(data::magnetic_operations_from_database(0, 0).empty());
+  CHECK(data::magnetic_operations_from_database(1653, 0).empty());
 }

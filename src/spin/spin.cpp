@@ -1,8 +1,7 @@
 #include <cppcrystal/spin/spin.hpp>
 
-#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/math/fractional.hpp> // math::nearest_offset
-#include <cppcrystal/symmetry/find_symmetry.hpp> // is_overlap_same_type
 #include <cppcrystal/symmetry/primitive.hpp>
 
 #include <algorithm>
@@ -140,6 +139,7 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
   auto const rot_cart = cartesian_rotations(cell.lattice(), sym_nonspin);
+  PositionIndex const index(cell, symprec);
 
   MagneticSymmetryOperations out;
   out.reserve(2 * sym_nonspin.size()); // upper bound: 1–2 ops emitted per spatial op
@@ -149,18 +149,14 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
     int sign = 0;
 
     for (Index j = 0; j < n; ++j) {
-      Vector3d const pos = op.apply(cell.position(j));
-      auto const image = std::views::iota(Index{0}, n);
-      auto const k_it = std::ranges::find_if(image, [&](Index k) {
-        return is_overlap_same_type(cell.position(k), pos, cell.type(k),
-                                    cell.type(j), cell.lattice(), symprec);
-      });
-      if (k_it == image.end()) {
+      auto const image =
+          index.first_match(op.apply(cell.position(j)), cell.type(j));
+      if (!image) {
         // Rare: failure to overlap (e.g. too loose symprec); skip the op.
         found = false;
         break;
       }
-      Index const k = *k_it;
+      Index const k = *image;
 
       // Sites whose relevant moments are all (near) zero say nothing about the
       // magnetic symmetry. m and -m coincide within mag_symprec when
@@ -216,6 +212,7 @@ get_permutations(MagneticSymmetryOperations const &operations,
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
   auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
+  PositionIndex const index(cell, symprec);
 
   std::vector<int> perm;
   perm.reserve(operations.size() * static_cast<std::size_t>(n));
@@ -227,36 +224,31 @@ get_permutations(MagneticSymmetryOperations const &operations,
                                   op.time_reversal, with_time_reversal,
                                   is_axial);
 
-      auto const image = std::views::iota(Index{0}, n);
-      auto const j_it = std::ranges::find_if(image, [&](Index j) {
-        return is_overlap_same_type(pos, cell.position(j), cell.type(i),
-                                    cell.type(j), cell.lattice(), symprec) &&
-               MomentOps<M>::close(MomentOps<M>::moment(mcell, j), moment,
+      auto const j = index.first_match(pos, cell.type(i), [&](int k) {
+        return MomentOps<M>::close(MomentOps<M>::moment(mcell, k), moment,
                                    mag_symprec);
       });
-      if (j_it == image.end()) {
+      if (!j) {
         return std::nullopt;
       }
-      perm.push_back(static_cast<int>(*j_it));
+      perm.push_back(*j);
     }
   }
   return perm;
 }
 
-// equivalent_atoms[i] = representative of i's orbit under the permutations.
-[[nodiscard]] std::vector<int>
-get_orbits(std::vector<int> const &permutations, std::size_t num_sym,
-           Index num_atoms) {
-  auto const n = static_cast<std::size_t>(num_atoms);
+// equivalent_atoms[i] = representative of i's orbit under the permutations
+// (perm[p, i] = image of atom i under operation p).
+[[nodiscard]] std::vector<int> get_orbits(md::matrix_view<int const> perm) {
+  auto const n = static_cast<std::size_t>(perm.extent(1));
   std::vector<std::optional<int>> equivalent(n);
-  for (std::size_t i = 0; i < n; ++i) {
-    if (equivalent[i]) {
+  for (Index i = 0; i < perm.extent(1); ++i) {
+    if (equivalent[static_cast<std::size_t>(i)]) {
       continue;
     }
-    equivalent[i] = static_cast<int>(i);
-    for (std::size_t s = 0; s < num_sym; ++s) {
-      auto const image = static_cast<std::size_t>(permutations[s * n + i]);
-      equivalent[image] = static_cast<int>(i);
+    equivalent[static_cast<std::size_t>(i)] = static_cast<int>(i);
+    for (Index p = 0; p < perm.extent(0); ++p) {
+      equivalent[static_cast<std::size_t>(perm[p, i])] = static_cast<int>(i);
     }
   }
   std::vector<int> out;
@@ -276,15 +268,15 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
   auto const &operations = search.operations;
   auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
 
-  // inv_perm[p][i] = the atom that operation p maps onto atom i.
-  std::vector<std::vector<int>> inv_perm;
-  inv_perm.reserve(operations.size());
-  for (auto const row : search.permutation_rows()) {
-    std::vector<int> inv(static_cast<std::size_t>(n));
-    for (auto const [j, image] : row | std::views::enumerate) {
-      inv[static_cast<std::size_t>(image)] = static_cast<int>(j);
+  // inverse[p, i] = the atom that operation p maps onto atom i.
+  auto const perm = search.permutations();
+  std::vector<int> inverse_buffer(perm.size());
+  md::matrix_view<int> const inverse(inverse_buffer.data(), perm.extent(0),
+                                     perm.extent(1));
+  for (Index p = 0; p < perm.extent(0); ++p) {
+    for (Index j = 0; j < perm.extent(1); ++j) {
+      inverse[p, perm[p, j]] = static_cast<int>(j);
     }
-    inv_perm.push_back(std::move(inv));
   }
 
   Positions positions(n, 3);
@@ -294,9 +286,10 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
   for (Index i = 0; i < n; ++i) {
     Vector3d pos_res = Vector3d::Zero();
     M moment_res = MomentOps<M>::zero();
-    for (auto const &[op, rc, inv_row] :
-         std::views::zip(operations, rot_cart, inv_perm)) {
-      Index const j = inv_row[static_cast<std::size_t>(i)];
+    for (auto const &[p, op, rc] :
+         std::views::zip(std::views::iota(Index{0}, perm.extent(0)),
+                         operations, rot_cart)) {
+      Index const j = inverse[p, i];
       Vector3d const pos_tmp = op.spatial().apply(cell.position(j));
       // Subtract the input position so the accumulated residual stays small;
       // the per-component nint removes the lattice translation.
@@ -359,8 +352,9 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
   if (!permutations) {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
-  std::vector<int> equivalent_atoms =
-      get_orbits(*permutations, operations.size(), mcell.size());
+  std::vector<int> equivalent_atoms = get_orbits(md::matrix_view<int const>(
+      permutations->data(), static_cast<Index>(operations.size()),
+      mcell.size()));
 
   std::vector<Vector3d> const pure_trans = collect_pure_translations(operations);
   auto prim_lattice = symmetry::primitive_lattice_vectors(mcell.cell(),

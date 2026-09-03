@@ -67,13 +67,13 @@ struct RodGeometry {
   fixed_loci(SymmetryOperation const &op) const {
     Matrix3d const m = op.rotation.cast<double>() - Matrix3d::Identity();
     Eigen::MatrixXd const ker = math::null_space(m, kTol); // 3 x k
-    Eigen::ColPivHouseholderQR<Matrix3d> const qr(m);
+    Eigen::FullPivLU<Matrix3d> const lu(m);
 
     std::vector<Locus> loci;
     for (int n = -1; n <= 2; ++n) {
       Vector3d const rhs =
           -op.translation + static_cast<double>(n) * unit_axis(axis);
-      Vector3d const particular = qr.solve(rhs);
+      Vector3d const particular = lu.solve(rhs);
       if ((m * particular - rhs).cwiseAbs().maxCoeff() < kTol) {
         loci.push_back(Locus{reduce(particular), ker});
       }

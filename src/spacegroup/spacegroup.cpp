@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <iterator>
 #include <optional>
 #include <ranges>
@@ -42,12 +43,12 @@ constexpr double kIntPrec = 0.1;
 template <std::size_t N, std::size_t Rows = N>
 [[nodiscard]] std::array<Matrix3d, N>
 make_matrices(double const (&data)[Rows][3][3]) {
+  using RowMajor3 = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>;
   std::array<Matrix3d, N> out;
-  for (std::size_t i = 0; i < N; ++i) {
-    out[i] << data[i][0][0], data[i][0][1], data[i][0][2], data[i][1][0],
-        data[i][1][1], data[i][1][2], data[i][2][0], data[i][2][1],
-        data[i][2][2];
-  }
+  std::ranges::transform(
+      std::views::iota(std::size_t{0}, N), out.begin(), [&](std::size_t i) {
+        return Matrix3d(Eigen::Map<RowMajor3 const>(&data[i][0][0]));
+      });
   return out;
 }
 
@@ -263,42 +264,6 @@ make_axis_choices(double const (&bases)[N][3][3],
                              -1. / 3, -1. / 3, 1. / 3, 1. / 3, 1. / 3)
                                 .finished();
   return m;
-}
-
-// spacegroup_to_hall_number[230]: first Hall number of each space group.
-[[nodiscard]] std::span<int const> spacegroup_to_hall_number() {
-  static constexpr std::array<int, 230> t = {
-      1,   2,   3,   6,   9,   18,  21,  30,  39,  57,  60,  63,  72,  81,  90,
-      108, 109, 112, 115, 116, 119, 122, 123, 124, 125, 128, 134, 137, 143, 149,
-      155, 161, 164, 170, 173, 176, 182, 185, 191, 197, 203, 209, 212, 215, 218,
-      221, 227, 228, 230, 233, 239, 245, 251, 257, 263, 266, 269, 275, 278, 284,
-      290, 292, 298, 304, 310, 313, 316, 322, 334, 335, 337, 338, 341, 343, 349,
-      350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 361, 363, 364, 366, 367,
-      368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382,
-      383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397,
-      398, 399, 400, 401, 402, 404, 406, 407, 408, 410, 412, 413, 414, 416, 418,
-      419, 420, 422, 424, 425, 426, 428, 430, 431, 432, 433, 435, 436, 438, 439,
-      440, 441, 442, 443, 444, 446, 447, 448, 449, 450, 452, 454, 455, 456, 457,
-      458, 460, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474,
-      475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489,
-      490, 491, 492, 493, 494, 495, 497, 498, 500, 501, 502, 503, 504, 505, 506,
-      507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 520, 521, 523,
-      524, 525, 527, 529, 530};
-  return t;
-}
-
-// layer_group_to_hall_number[116]: the (negative) layer Hall settings searched
-// for a layer cell, one representative per setting.
-[[nodiscard]] std::span<int const> layer_group_to_hall_number() {
-  static constexpr std::array<int, 80> t = {
-      -1,   -2,   -3,   -4,   -5,   -8,   -9,   -12,  -14,  -16,  -18,  -20,
-      -22,  -24,  -26,  -28,  -30,  -32,  -34,  -35,  -37,  -38,  -39,  -40,
-      -42,  -43,  -44,  -46,  -48,  -50,  -52,  -54,  -56,  -58,  -60,  -62,
-      -64,  -65,  -67,  -68,  -70,  -72,  -74,  -76,  -77,  -79,  -80,  -81,
-      -82,  -83,  -84,  -85,  -87,  -88,  -89,  -90,  -91,  -92,  -93,  -94,
-      -95,  -96,  -98,  -99,  -101, -102, -103, -104, -105, -106, -107, -108,
-      -109, -110, -111, -112, -113, -114, -115, -116};
-  return t;
 }
 
 // ---- small matrix predicates -----------------------------------------------
@@ -723,13 +688,15 @@ match_db_ortho(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                      });
 }
 
-// One change-of-basis attempt for monoclinic. Status: 0 not found, 1 found, 2
-// found and the basis matches the input lattice's (a,b,c) choice.
+// One change-of-basis attempt for monoclinic. Ordered: a basis matching the
+// input lattice's (a,b,c) choice beats a plain match.
+enum class MonocliMatch { none, found, basis_kept };
+
 struct MonocliCandidate {
-  int status = 0;
+  MonocliMatch status = MonocliMatch::none;
   Vector3d origin_shift{Vector3d::Zero()};
   Matrix3d conv_lattice{Matrix3d::Identity()};
-  std::array<double, 2> norms_squared{0.0, 0.0};
+  double norm_sum = 0.0; // |a'| + |b'| of the two non-unique axes
 };
 
 [[nodiscard]] MonocliCandidate
@@ -747,12 +714,10 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
 
   // The two non-unique axes and their squared norms.
   std::array<Vector3d, 2> vec;
-  std::array<double, 2> norms_squared;
-  for (int l = 0; int const j : non_unique_axes(unique_axis)) {
-    vec[static_cast<std::size_t>(l)] = conv_lattice.col(j);
-    norms_squared[static_cast<std::size_t>(l)] = vec[static_cast<std::size_t>(l)].squaredNorm();
-    ++l;
-  }
+  std::ranges::transform(non_unique_axes(unique_axis), vec.begin(),
+                         [&](int j) { return Vector3d(conv_lattice.col(j)); });
+  std::array<double, 2> const norms_squared{vec[0].squaredNorm(),
+                                            vec[1].squaredNorm()};
 
   // Discard if the principal angle is acute.
   if (vec[0].dot(vec[1]) > kZeroPrec) {
@@ -763,7 +728,7 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
     return {};
   }
 
-  int status = 1;
+  MonocliMatch status = MonocliMatch::found;
   if (orig_lattice && orig_lattice->determinant() > symprec) {
     // mode-1 equivalence effectively checks the C2 rotation about the unique
     // axis; only accept flips that keep the unique axis fixed.
@@ -774,7 +739,7 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
       if ((*tmat)(u1, u1) * (*tmat)(u2, u2) > kZeroPrec) {
         conv_lattice = conv_lattice * *tmat;
         change_of_basis = change_of_basis * *tmat;
-        status = 2;
+        status = MonocliMatch::basis_kept;
       }
     }
   }
@@ -786,7 +751,8 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
   if (!shift) {
     return {};
   }
-  return {status, *shift, conv_lattice, norms_squared};
+  return {status, *shift, conv_lattice,
+          std::sqrt(norms_squared[0]) + std::sqrt(norms_squared[1])};
 }
 
 [[nodiscard]] std::optional<MatchResult>
@@ -807,27 +773,26 @@ match_db_monocli(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
                                hall_number, centering, conv_symmetry, symprec);
                          });
 
-  auto is_found = [](MonocliCandidate const &c) { return c.status != 0; };
+  auto is_found = [](MonocliCandidate const &c) {
+    return c.status != MonocliMatch::none;
+  };
   if (std::ranges::none_of(found, is_found)) {
     return std::nullopt;
   }
 
-  auto norm_sum = [](MonocliCandidate const &c) {
-    return std::sqrt(c.norms_squared[0]) + std::sqrt(c.norms_squared[1]);
-  };
-
   // Shortest pair of non-unique axes among the matches (at least one exists,
   // per the none_of guard above).
-  double const shortest = std::ranges::min(
-      found | std::views::filter(is_found) | std::views::transform(norm_sum));
+  double const shortest =
+      std::ranges::min(found | std::views::filter(is_found) |
+                       std::views::transform(&MonocliCandidate::norm_sum));
 
-  // Among the near-shortest matches, prefer a basis that matches the input
-  // (status == 2); max_element keeps the first of equal status, matching the
-  // historical first-candidate preference.
+  // Among the near-shortest matches, prefer a basis that matches the input;
+  // max_element keeps the first of equal status, matching the historical
+  // first-candidate preference.
   auto near_shortest =
       found | std::views::filter(is_found) |
       std::views::filter([&](MonocliCandidate const &c) {
-        return std::abs(norm_sum(c) - shortest) < symprec;
+        return std::abs(c.norm_sum - shortest) < symprec;
       });
   auto const chosen =
       std::ranges::max_element(near_shortest, {}, &MonocliCandidate::status);
@@ -857,10 +822,9 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
     // representative-Hall two-step is a 3D-only refinement; layer groups match
     // directly with the c-preserving axis choices.
     if (hall_number > 0 && num_free_axes == 2) {
-      auto const rep = match_db_ortho(
-          conv_lattice, orig_lattice,
-          spacegroup_to_hall_number()[static_cast<std::size_t>(sg.number - 1)],
-          centering, symmetry, 0, symprec);
+      auto const rep =
+          match_db_ortho(conv_lattice, orig_lattice, data::default_hall(sg.number),
+                         centering, symmetry, 0, symprec);
       if (!rep) {
         return std::nullopt;
       }
@@ -902,9 +866,11 @@ struct SearchResult {
 };
 
 // For the given operations, find the conventional setting and the first
-// matching Hall number among the candidates.
+// matching Hall number. A forced Hall number is the only candidate; otherwise
+// the candidates are the default settings of every group sharing the found
+// point group (space groups for a 3D cell, layer groups for a layer cell).
 [[nodiscard]] std::optional<SearchResult>
-search_hall_number(std::span<int const> candidates, Primitive const &primitive,
+search_hall_number(std::optional<int> forced_hall, Primitive const &primitive,
                    SymmetryOperations const &symmetry, double symprec) {
   std::vector<Matrix3i> const rotations = symmetry::rotations_of(symmetry);
   auto const ptg =
@@ -955,6 +921,12 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
   SymmetryOperations const conv_symmetry =
       get_initial_conventional_symmetry(centering->centering, tmat, symmetry);
 
+  std::span<int const> const candidates =
+      forced_hall ? std::span<int const>(&*forced_hall, 1)
+      : primitive.cell.aperiodic_axis()
+          ? data::layer_default_halls_with_pointgroup(ptg->pointgroup.number)
+          : data::default_halls_with_pointgroup(ptg->pointgroup.number);
+
   Matrix3d const &orig_lattice = primitive.orig_lattice;
   for (int const hall_number : candidates) {
     auto const match =
@@ -972,11 +944,11 @@ search_hall_number(std::span<int const> candidates, Primitive const &primitive,
 // Try once, then progressively tighten the operation set (reduce_symmetry)
 // until a Hall number is found.
 [[nodiscard]] std::optional<SearchResult>
-iterative_search_hall_number(std::span<int const> candidates,
+iterative_search_hall_number(std::optional<int> forced_hall,
                              Primitive const &primitive,
                              SymmetryOperations const &symmetry, double symprec,
                              AngleTolerance angle_tolerance) {
-  if (auto r = search_hall_number(candidates, primitive, symmetry, symprec)) {
+  if (auto r = search_hall_number(forced_hall, primitive, symmetry, symprec)) {
     return r;
   }
 
@@ -988,7 +960,7 @@ iterative_search_hall_number(std::span<int const> candidates,
     if (reduced.empty()) {
       continue;
     }
-    if (auto r = search_hall_number(candidates, primitive, reduced, symprec)) {
+    if (auto r = search_hall_number(forced_hall, primitive, reduced, symprec)) {
       return r;
     }
   }
@@ -998,12 +970,11 @@ iterative_search_hall_number(std::span<int const> candidates,
 // Sanity check: in a primitive cell every operation must carry a distinct
 // rotation.
 [[nodiscard]] bool point_symmetry_intact(SymmetryOperations const &symmetry) {
-  return unique_by_rotation(symmetry, &SymmetryOperation::rotation).size() ==
-         symmetry.size();
+  return !has_duplicate_rotation(symmetry, &SymmetryOperation::rotation);
 }
 
 [[nodiscard]] Result<Spacegroup> search_spacegroup_with_symmetry(
-    std::span<int const> candidates, Primitive const &primitive,
+    std::optional<int> forced_hall, Primitive const &primitive,
     SymmetryOperations const &symmetry, double symprec,
     AngleTolerance angle_tolerance) {
   if (!point_symmetry_intact(symmetry)) {
@@ -1011,7 +982,7 @@ iterative_search_hall_number(std::span<int const> candidates,
   }
 
   auto const found = iterative_search_hall_number(
-      candidates, primitive, symmetry, symprec, angle_tolerance);
+      forced_hall, primitive, symmetry, symprec, angle_tolerance);
   if (!found) {
     return leaf::new_error(e_spacegroup_search_failed{});
   }
@@ -1028,17 +999,9 @@ Result<Spacegroup> search_spacegroup(Primitive const &primitive,
   BOOST_LEAF_AUTO(symmetry, symmetry::find_symmetry(primitive.cell, symprec,
                                                     angle_tolerance));
 
-  if (hall_number != 0) {
-    std::array<int, 1> const candidate = {hall_number};
-    return search_spacegroup_with_symmetry(candidate, primitive, symmetry,
-                                           symprec, angle_tolerance);
-  }
-  // A layer cell (aperiodic axis set) searches the 80 layer-group settings;
-  // a 3D cell searches the 230 space groups.
-  std::span<int const> const candidates =
-      primitive.cell.aperiodic_axis() ? layer_group_to_hall_number()
-                                      : spacegroup_to_hall_number();
-  return search_spacegroup_with_symmetry(candidates, primitive, symmetry,
+  std::optional<int> const forced_hall =
+      hall_number != 0 ? std::optional<int>(hall_number) : std::nullopt;
+  return search_spacegroup_with_symmetry(forced_hall, primitive, symmetry,
                                          symprec, angle_tolerance);
 }
 
@@ -1051,8 +1014,8 @@ search_spacegroup_with_symmetry(SymmetryOperations const &operations,
   symmetry::Primitive const primitive{Cell(prim_lattice, pos, Types{1}),
                                       std::vector<int>{0}, prim_lattice,
                                       symprec, std::nullopt};
-  return search_spacegroup_with_symmetry(spacegroup_to_hall_number(), primitive,
-                                         operations, symprec, std::nullopt);
+  return search_spacegroup_with_symmetry(std::nullopt, primitive, operations,
+                                         symprec, std::nullopt);
 }
 
 template <LatticeSetting Setting>

@@ -2,9 +2,12 @@
 
 #include <cppcrystal/data/element_tables.hpp>
 
+#include <algorithm>
+#include <array>
 #include <numbers>
 #include <optional>
 #include <string_view>
+#include <utility>
 
 namespace cppcrystal::data {
 
@@ -40,6 +43,35 @@ element_symbol(int z) noexcept {
   return kElementSymbols[static_cast<std::size_t>(z - 1)];
 }
 
-[[nodiscard]] std::optional<int> atomic_number(std::string_view symbol);
+namespace detail {
+// (symbol, atomic number) sorted by symbol, for a binary search at compile
+// time or run time.
+using SymbolEntry = std::pair<std::string_view, int>;
+inline constexpr auto kSymbolsByName = [] {
+  std::array<SymbolEntry, kNumElements> t{};
+  for (int z = 1; z <= kNumElements; ++z) {
+    t[static_cast<std::size_t>(z - 1)] = {
+        kElementSymbols[static_cast<std::size_t>(z - 1)], z};
+  }
+  std::ranges::sort(t, {}, &SymbolEntry::first);
+  return t;
+}();
+} // namespace detail
+
+// Atomic number of a chemical symbol (case-sensitive); std::nullopt for an
+// unknown symbol.
+[[nodiscard]] constexpr std::optional<int>
+atomic_number(std::string_view symbol) noexcept {
+  auto const it = std::ranges::lower_bound(detail::kSymbolsByName, symbol, {},
+                                           &detail::SymbolEntry::first);
+  if (it == detail::kSymbolsByName.end() || it->first != symbol) {
+    return std::nullopt;
+  }
+  return it->second;
+}
+
+static_assert(atomic_number("H") == 1);
+static_assert(atomic_number(*element_symbol(kNumElements)) == kNumElements);
+static_assert(!atomic_number("Xx"));
 
 } // namespace cppcrystal::data

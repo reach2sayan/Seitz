@@ -11,6 +11,7 @@
       "displayName": "Debug",
       "binaryDir": "${sourceDir}/cmake-build-debug",
       "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++-15",
         "CMAKE_BUILD_TYPE": "Debug",
         "CPPCRYSTAL_BUILD_TESTS": "ON"
       }
@@ -20,6 +21,7 @@
       "displayName": "Release",
       "binaryDir": "${sourceDir}/cmake-build-release",
       "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++-15",
         "CMAKE_BUILD_TYPE": "Release",
         "CPPCRYSTAL_BUILD_TESTS": "ON",
         "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"

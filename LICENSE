@@ -121,3 +121,22 @@ include/cppcrystal/data/element_tables.hpp) is taken from:
 
 Scientific data values are not subject to copyright; the citation is provided
 for attribution.
+
+--------------------------------------------------------------------------------
+4. kokkos/mdspan — https://github.com/kokkos/mdspan  (Apache-2.0 WITH LLVM-exception)
+--------------------------------------------------------------------------------
+
+include/cppcrystal/third_party/mdspan.hpp is the single-header reference
+implementation of std::mdspan (P0009 and follow-ups) from the kokkos/mdspan
+project, vendored verbatim at the commit recorded in
+tools/mdspan_vendor_diff.py. It is bound into this library only through
+include/cppcrystal/core/mdspan.hpp. It is governed by the Apache License,
+Version 2.0, with LLVM exceptions:
+
+    Copyright (2022) National Technology & Engineering Solutions of Sandia,
+    LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the
+    U.S. Government retains certain rights in this software.
+
+    Part of Kokkos, under the Apache License v2.0 with LLVM Exceptions.
+    See https://kokkos.org/LICENSE for license information.
+    SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception

@@ -72,39 +72,43 @@ BzGrid relocate_BZ_grid_address(std::vector<Vector3i> const &grid_address,
   // original index); boundary duplicates are appended afterwards.
   out.bz_grid_address.resize(total);
 
-  for (std::size_t i = 0; i < total; ++i) {
+  auto const mesh_d = mesh.cast<double>().array();
+  auto const shift_d = 0.5 * is_shift.cast<double>().array();
+  for (auto const [index, address] : grid_address | std::views::enumerate) {
+    auto const i = static_cast<std::size_t>(index);
     // Squared distance to the origin of each candidate image.
     std::array<double, kBzSearchSpace.size()> distance{};
-    for (std::size_t j = 0; j < kBzSearchSpace.size(); ++j) {
-      Vector3i const offset = bz_offset(j);
-      const auto mesh_d = mesh.cast<double>().array();
-
-      Vector3d q = (grid_address[i].cast<double>().array() +
-                    offset.cast<double>().array() * mesh_d +
-                    0.5 * is_shift.cast<double>().array()) /
-                   mesh_d;
-      distance[j] = (rec_lattice * q).squaredNorm();
-    }
+    std::ranges::transform(
+        std::views::iota(std::size_t{0}, kBzSearchSpace.size()),
+        distance.begin(), [&](std::size_t j) {
+          Vector3d const q = (address.cast<double>().array() +
+                              bz_offset(j).cast<double>().array() * mesh_d +
+                              shift_d) /
+                             mesh_d;
+          return (rec_lattice * q).squaredNorm();
+        });
 
     auto const min_it = std::ranges::min_element(distance);
     double const min_distance = *min_it;
     auto const min_index = static_cast<std::size_t>(min_it - distance.begin());
 
-    for (std::size_t j = 0; j < kBzSearchSpace.size(); ++j) {
-      if (distance[j] >= min_distance + tolerance) {
+    // Every image within tolerance of the closest is a BZ point: the closest
+    // keeps the input index, the ties are appended.
+    for (auto const [offset, d] : distance | std::views::enumerate) {
+      if (d >= min_distance + tolerance) {
         continue;
       }
-      const Vector3i bz_address =
-          grid_address[i] + bz_offset(j).cwiseProduct(mesh);
-      std::size_t gp = 0;
+      auto const j = static_cast<std::size_t>(offset);
+      Vector3i const bz_address = address + bz_offset(j).cwiseProduct(mesh);
+      std::size_t gp = i;
       if (j == min_index) {
-        gp = i;
         out.bz_grid_address[i] = bz_address;
       } else {
         gp = out.bz_grid_address.size();
         out.bz_grid_address.push_back(bz_address);
       }
-      Vector3i const bz_address_double = bz_address.array() * 2 + is_shift.array();
+      Vector3i const bz_address_double =
+          bz_address.array() * 2 + is_shift.array();
       out.bz_map[grid_point_double_mesh(bz_address_double, bzmesh)] = gp;
     }
   }

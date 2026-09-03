@@ -89,12 +89,12 @@ TEST_CASE("the by-number catalog index enumerates every Hall setting",
   // space group 3 (P2) has three Hall settings (b, c, a unique-axis choices).
   std::size_t total = 0;
   for (int n = 1; n <= 230; ++n) {
-    total += data::kCatalog.with_number(n).size();
+    total += data::halls_with_number(n).size();
   }
   CHECK(total == static_cast<std::size_t>(data::kNumHallNumbers));
-  CHECK(data::kCatalog.with_number(3).size() == 3);
+  CHECK(data::halls_with_number(3).size() == 3);
 
   // The catalog is a genuine constant expression.
   static_assert(data::spacegroup_type(1).number == 1);
-  static_assert(data::kCatalog.with_number(3).size() == 3);
+  static_assert(data::halls_with_number(3).size() == 3);
 }

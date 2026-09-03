@@ -7,16 +7,20 @@ namespace cppcrystal::analysis {
 SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, double symprec,
                                              AngleTolerance angle_tolerance,
                                              int hall_number) {
-  return SymmetryAnalyzer{std::move(cell), Tolerance{symprec, angle_tolerance},
-                          hall_number};
+  return SymmetryAnalyzer{
+      std::move(cell),
+      Tolerance{.symprec = symprec, .angle_tolerance = angle_tolerance},
+      hall_number};
 }
 
-SymmetryAnalyzer SymmetryAnalyzer::from_layer_cell(
-    Cell cell, int aperiodic_axis, double symprec,
-    AngleTolerance angle_tolerance) {
+SymmetryAnalyzer
+SymmetryAnalyzer::from_layer_cell(Cell cell, int aperiodic_axis, double symprec,
+                                  AngleTolerance angle_tolerance) {
   cell.set_aperiodic_axis(aperiodic_axis);
-  return SymmetryAnalyzer{std::move(cell), Tolerance{symprec, angle_tolerance},
-                          /*hall_number=*/0};
+  return SymmetryAnalyzer{
+      std::move(cell),
+      Tolerance{.symprec = symprec, .angle_tolerance = angle_tolerance},
+      /*hall_number=*/0};
 }
 
 Result<symmetry::Primitive const *> SymmetryAnalyzer::cached_primitive() const {

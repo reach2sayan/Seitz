@@ -23,7 +23,7 @@ SymmetryOperations rod_operations_from_database(int rod_number) {
         Eigen::Map<Eigen::Vector3i const>(raw.translation.data())
             .cast<double>() /
         static_cast<double>(kRodTranslationDenominator);
-    ops.push_back(SymmetryOperation{rotation, translation});
+    ops.push_back({.rotation = rotation, .translation = translation});
   }
   return ops;
 }

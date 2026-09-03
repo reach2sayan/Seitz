@@ -1,14 +1,17 @@
 #include <cppcrystal/refine/standardize.hpp>
 
 #include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/refine/refinement.hpp>
 #include <cppcrystal/refine/site_symmetry.hpp>
 
 #include <algorithm>
+#include <iterator>
 #include <optional>
 #include <ranges>
+#include <vector>
 
 // Wyckoff-position assembly (3D path):
 //   conventional primitive cell -> exact Wyckoff positions -> expansion across
@@ -87,22 +90,30 @@ struct Bravais {
       std::move(mapping)};
 }
 
+// first_index_of(values, size)[v] = the first position holding value v (for
+// v in [0, size)); nullopt for values that never occur.
+[[nodiscard]] std::vector<std::optional<int>>
+first_index_of(std::vector<int> const &values, std::size_t size) {
+  std::vector<std::optional<int>> first(size);
+  for (auto const [i, v] : values | std::views::enumerate) {
+    auto &slot = first[static_cast<std::size_t>(v)];
+    if (!slot) {
+      slot = static_cast<int>(i);
+    }
+  }
+  return first;
+}
+
 // First atom (per operation, lowest index first) that an operation maps `i`
 // onto among the atoms before it; `i` itself when none is found.
 [[nodiscard]] int search_equivalent_atom(int i, Cell const &cell,
-                                         SymmetryOperations const &operations,
-                                         double symprec) {
-  std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
-  auto const earlier = std::views::iota(0, i);
+                                         PositionIndex const &index,
+                                         SymmetryOperations const &operations) {
   for (auto const &op : operations) {
-    Vector3d const pos = op.apply(cell.position(i));
-    auto const it = std::ranges::find_if(earlier, [&](int j) {
-      return is_overlap_same_type(cell.position(j), pos, cell.type(j),
-                                  cell.type(i), cell.lattice(), symprec,
-                                  aperiodic_axis);
-    });
-    if (it != earlier.end()) {
-      return *it;
+    if (auto const j = index.first_match(op.apply(cell.position(i)),
+                                         cell.type(i),
+                                         [&](int k) { return k < i; })) {
+      return *j;
     }
   }
   return i;
@@ -115,21 +126,21 @@ struct Bravais {
 [[nodiscard]] std::vector<int>
 equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
-  int const n = static_cast<int>(cell.size());
+  PositionIndex const index(cell, symprec);
+  auto const first_sharing = first_index_of(mapping_table, mapping_table.size());
   std::vector<int> equiv;
-  equiv.reserve(static_cast<std::size_t>(n));
-  for (int i = 0; i < n; ++i) {
+  equiv.reserve(mapping_table.size());
+  for (auto const [i, prim] : mapping_table | std::views::enumerate) {
     // First atom sharing i's primitive atom; i itself when i is the first.
-    auto const first = static_cast<int>(std::distance(
-        mapping_table.begin(),
-        std::ranges::find(mapping_table,
-                          mapping_table[static_cast<std::size_t>(i)])));
+    int const first = *first_sharing[static_cast<std::size_t>(prim)];
     if (first != i) {
       equiv.push_back(equiv[static_cast<std::size_t>(first)]);
       continue;
     }
-    int const found = search_equivalent_atom(i, cell, operations, symprec);
-    equiv.push_back(found == i ? i : equiv[static_cast<std::size_t>(found)]);
+    int const found =
+        search_equivalent_atom(static_cast<int>(i), cell, index, operations);
+    equiv.push_back(found == i ? static_cast<int>(i)
+                               : equiv[static_cast<std::size_t>(found)]);
   }
   return equiv;
 }
@@ -140,15 +151,15 @@ equivalent_atoms_broken(Cell const &cell, SymmetryOperations const &operations,
 crystallographic_orbits(ExactPositions const &exact,
                         std::vector<int> const &mapping_table) {
   // For each primitive atom, the first input-cell atom in its orbit.
+  auto const first_of = first_index_of(mapping_table, exact.size());
   std::vector<int> rep;
   rep.reserve(exact.size());
-  for (auto const &atom : exact) {
-    auto const it = std::ranges::find(mapping_table, atom.equivalent_atom);
-    rep.push_back(it != mapping_table.end()
-                      ? static_cast<int>(
-                            std::distance(mapping_table.begin(), it))
-                      : 0);
-  }
+  std::ranges::transform(exact, std::back_inserter(rep),
+                         [&](auto const &atom) {
+                           return first_of[static_cast<std::size_t>(
+                                               atom.equivalent_atom)]
+                               .value_or(0);
+                         });
 
   std::vector<int> orbits;
   orbits.reserve(mapping_table.size());

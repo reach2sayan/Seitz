@@ -298,19 +298,21 @@ changed_magnetic_symmetry(Matrix3d const &tmat, Vector3d const &shift,
 }
 
 // Whether two magnetic symmetries are equal as sets (rotation, translation
-// mod 1, time reversal).
+// mod 1, time reversal). Rotation and time reversal select a bucket of b
+// exactly; only the translations inside it are compared with tolerance.
 [[nodiscard]] bool same_magnetic_symmetry(MagneticSymmetryOperations const &a,
                                           MagneticSymmetryOperations const &b,
                                           double symprec) {
   if (a.size() != b.size()) {
     return false;
   }
+  OperationMultimap const b_index = index_by_operation_key(b);
   return std::ranges::all_of(a, [&](MagneticSymmetryOperation const &oa) {
-    return std::ranges::any_of(b, [&](MagneticSymmetryOperation const &ob) {
+    auto const [lo, hi] = b_index.equal_range({oa.rotation, oa.time_reversal});
+    return std::ranges::any_of(lo, hi, [&](auto const &entry) {
+      auto const &ob = b[static_cast<std::size_t>(entry.second)];
       // NB: strictly below symprec, unlike same_operation's <=; kept as is.
-      return oa.rotation == ob.rotation &&
-             oa.time_reversal == ob.time_reversal &&
-             approx_equal(math::nearest_offset(
+      return approx_equal(math::nearest_offset(
                               Vector3d(oa.translation - ob.translation)),
                           Vector3d::Zero(), symprec);
     });
@@ -412,13 +414,13 @@ Result<MagneticTypeIdentification> identify_magnetic_spacegroup_type(
       if (data::magnetic_spacegroup_type(uni).type != type) {
         continue;
       }
-      auto const msg_uni =
+      auto const &msg_uni =
           data::magnetic_operations_from_database(uni, hall_number);
       if (msg_uni.size() != reference->changed_symmetry.size()) {
         continue;
       }
 
-      auto const transformations =
+      auto const &transformations =
           data::magnetic_std_transformations(uni, hall_number);
       for (auto const &transform : transformations) {
         Matrix3d const cor = transform.rotation.cast<double>();

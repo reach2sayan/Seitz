@@ -18,7 +18,7 @@ struct MagneticSymmetryOperation {
 
   // The underlying space-group operation, dropping the time-reversal flag.
   [[nodiscard]] SymmetryOperation spatial() const noexcept {
-    return {rotation, translation};
+    return {.rotation = rotation, .translation = translation};
   }
 };
 

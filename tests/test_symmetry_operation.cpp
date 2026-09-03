@@ -1,7 +1,10 @@
+#include <cppcrystal/core/matrix_order.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <iterator>
 
 using namespace cppcrystal;
 using Catch::Approx;
@@ -46,4 +49,26 @@ TEST_CASE("same_operation respects symprec on translations", "[symop]") {
   CHECK(same_operation(a, b, 1e-5));
   b.translation = a.translation + Vector3d(0.01, 0.0, 0.0);
   CHECK_FALSE(same_operation(a, b, 1e-5));
+}
+
+TEST_CASE("index_by_rotation keeps original order within a rotation",
+          "[symop][matrix_order]") {
+  SymmetryOperation const id{Matrix3i::Identity(), Vector3d::Zero()};
+  SymmetryOperation const id_shifted{Matrix3i::Identity(),
+                                     Vector3d(0.5, 0.5, 0.5)};
+  SymmetryOperations const ops{rot_z_90(), id, id_shifted};
+
+  auto const by_rot = index_by_rotation(ops, &SymmetryOperation::rotation);
+  REQUIRE(by_rot.size() == 3);
+  CHECK(by_rot.find(rot_z_90().rotation)->second == 0);
+  auto const [lo, hi] = by_rot.equal_range(Matrix3i::Identity());
+  REQUIRE(std::distance(lo, hi) == 2);
+  CHECK(lo->second == 1);
+  CHECK(std::next(lo)->second == 2);
+  CHECK(by_rot.find(-Matrix3i::Identity()) == by_rot.end());
+
+  CHECK(has_duplicate_rotation(ops, &SymmetryOperation::rotation));
+  CHECK_FALSE(has_duplicate_rotation(SymmetryOperations{rot_z_90(), id},
+                                     &SymmetryOperation::rotation));
+  CHECK(rotation_set(ops, &SymmetryOperation::rotation).size() == 2);
 }

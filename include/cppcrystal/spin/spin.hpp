@@ -3,13 +3,13 @@
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
+#include <cppcrystal/core/mdspan.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
 
 #include <cstddef>
 #include <optional>
-#include <ranges>
 #include <utility>
 #include <vector>
 
@@ -35,13 +35,12 @@ public:
         primitive_lattice(std::move(prim_lattice)),
         permutations_(std::move(permutations)) {}
 
-  // permutation_rows()[p][i] = image of atom i under operation p. A range of
-  // per-operation rows over the (private) flat buffer — iterate it, never
-  // compute flat indices.
-  [[nodiscard]] auto permutation_rows() const {
-    return permutations_ |
-           std::views::chunk(
-               static_cast<std::ptrdiff_t>(equivalent_atoms.size()));
+  // permutations()[p, i] = image of atom i under operation p: a
+  // (#operations x #atoms) view over the private flat buffer.
+  [[nodiscard]] md::matrix_view<int const> permutations() const noexcept {
+    return md::matrix_view<int const>(
+        permutations_.data(), static_cast<Index>(operations.size()),
+        static_cast<Index>(equivalent_atoms.size()));
   }
 
 private:

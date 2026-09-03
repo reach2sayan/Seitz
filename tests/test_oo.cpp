@@ -187,9 +187,9 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
 
-    OverlapChecker checker(gen.cell);
+    OverlapChecker checker(gen.cell, 1e-3);
     for (auto const &op : lg.operations()) {
-      REQUIRE(checker.check_total_overlap(op.translation, op.rotation, 1e-3));
+      REQUIRE(checker.check_total_overlap(op.translation, op.rotation));
     }
   }
 }

@@ -2,7 +2,7 @@
 # Single-bond covalent radii (angstrom) from Cordero et al.,
 # "Covalent radii revisited", Dalton Trans., 2008, 2832-2838.
 # Atomic volume is NOT tabulated here: it is derived from the covalent radius
-# as the volume of a sphere ((4/3) * pi * r^3) by data/element_data.cpp, the
+# as the volume of a sphere ((4/3) * pi * r^3) by data/element_data.hpp, the
 # same radius-based estimate PyXtal uses to size a generated cell.
 # Columns: atomic_number,symbol,covalent_radius
 1,H,0.31

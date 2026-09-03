@@ -15,8 +15,9 @@ using WyckoffCombination = Assignment<group::WyckoffPosition>;
 [[nodiscard]] bool check_compatible(group::SpaceGroup const &sg,
                                     Composition const &comp);
 
-// All valid Wyckoff assignments for `comp` on `sg` (see
-// generate::enumerate_assignments for the rules and the cap semantics).
+// The first `max_combinations` valid Wyckoff assignments for `comp` on `sg`
+// (see generate::enumerate_assignments for the rules); fewer when there are
+// fewer, exactly `max_combinations` when the enumeration was cut short.
 [[nodiscard]] std::vector<WyckoffCombination>
 list_wyckoff_combinations(group::SpaceGroup const &sg, Composition const &comp,
                           std::size_t max_combinations = 1000);

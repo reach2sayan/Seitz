@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/periodicity.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/core/types.hpp>
 
 #include <optional>
-#include <vector>
 
 namespace cppcrystal {
 
@@ -12,11 +13,14 @@ namespace cppcrystal {
 // by Cartesian minimal-image distance <= symprec. With `aperiodic_axis` set
 // (layer groups), that axis is NOT periodic: only the two periodic components
 // are folded to the minimal image; the aperiodic component keeps its raw
-// difference.
-[[nodiscard]] bool
+// difference. The single-aperiodic-axis spelling of `coincident`.
+[[nodiscard]] inline bool
 is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
            double symprec,
-           std::optional<int> aperiodic_axis = std::nullopt) noexcept;
+           std::optional<int> aperiodic_axis = std::nullopt) noexcept {
+  return coincident(a, b, lattice, symprec,
+                    periodicity_from_aperiodic_axis(aperiodic_axis));
+}
 
 [[nodiscard]] inline bool is_overlap_same_type(
     Vector3d const &a, Vector3d const &b, int type_a, int type_b,
@@ -25,31 +29,26 @@ is_overlap(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
   return type_a == type_b && is_overlap(a, b, lattice, symprec, aperiodic_axis);
 }
 
-// Precomputes a distance-sorted copy of a cell so that many candidate symmetry
-// operations can be tested efficiently against it. Space groups only (no
-// layer-group path).
+// Tests candidate symmetry operations against a cell. Built once per cell and
+// tolerance: the atoms are re-ordered by (type, distance to the nearest
+// lattice point) so that the cheap rejection probes the most discriminating
+// atoms first, and a PositionIndex over them makes the full check
+// O(n log n) per operation instead of O(n^2).
 class OverlapChecker {
 public:
-  explicit OverlapChecker(Cell const &cell);
+  OverlapChecker(Cell const &cell, double symprec);
 
   // True iff x -> rot . x + trans maps the cell onto itself within symprec.
-  // (The identity-rotation fast path is detected internally.)
   [[nodiscard]] bool check_total_overlap(Vector3d const &trans,
-                                         Matrix3i const &rot,
-                                         double symprec) const;
+                                         Matrix3i const &rot) const;
 
 private:
-  // Cheap rejection: confirm a few atoms map onto some atom before the full
-  // check.
-  [[nodiscard]] bool possible_overlap(Vector3d const &trans,
-                                      Matrix3i const &rot,
-                                      double symprec) const;
+  // Cheap rejection: a few atoms must map onto some atom of their type.
+  [[nodiscard]] bool possible_overlap(Positions const &rotated) const;
 
-  Matrix3d lattice_;
-  Positions pos_sorted_; // sorted by distance to nearest lattice point
-  std::vector<int> types_sorted_;
-  int size_;
-  std::optional<int> aperiodic_axis_; // set for layer cells; nullopt for 3D
+  Cell sorted_; // the input cell with atoms sorted as described above
+  double symprec_;
+  PositionIndex index_; // over sorted_; ties the checker to its address
 };
 
 } // namespace cppcrystal
