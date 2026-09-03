@@ -1,5 +1,5 @@
 // Tests for the object-oriented layer: the analysis facades (SymmetryAnalyzer),
-// the standalone group objects (SpaceGroup / WyckoffPosition), and crystal
+// the standalone group objects (SpaceGroup / Wyckoff), and crystal
 // generation. The group tests assert the orbit-stabilizer invariant across all
 // 230 space groups; the generation test round-trips a generated cell back
 // through the analyzer.
@@ -65,16 +65,16 @@ TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
   REQUIRE(a->site_symmetry() == "m-3m");
 
   // 1a has no free coordinate: its orbit is the single fixed point.
-  Positions const orbit = a->get_all_positions(Vector3d{0.3, 0.4, 0.5});
+  Positions const orbit = a->orbit(Vector3d{0.3, 0.4, 0.5});
   REQUIRE(orbit.rows() == 1);
 
   REQUIRE(sg->wyckoffs().back().multiplicity() == 48);
 }
 
-TEST_CASE("WyckoffPosition orbit expansion respects multiplicity", "[group]") {
+TEST_CASE("Wyckoff orbit expansion respects multiplicity", "[group]") {
   auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
   auto const &general = sg->wyckoffs().back();
-  Positions const orbit = general.get_all_positions(Vector3d{0.11, 0.23, 0.37});
+  Positions const orbit = general.orbit(Vector3d{0.11, 0.23, 0.37});
   REQUIRE(orbit.rows() == general.multiplicity());
 }
 

@@ -21,7 +21,6 @@ struct SpacegroupMatch {
   Vector3d origin_shift{Vector3d::Zero()};
 
   [[nodiscard]] data::SpacegroupType const &type() const noexcept;
-  [[nodiscard]] int number() const noexcept;
 };
 
 // Whether the lattice handed to OperationSet::spacegroup is the conventional

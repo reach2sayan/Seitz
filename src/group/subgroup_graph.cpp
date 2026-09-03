@@ -137,7 +137,7 @@ maximal_point_subgroups(std::vector<Matrix3i> const &pg) {
         if (!r) {
           return r.error();
         }
-        return std::optional<int>(r->number());
+        return std::optional<int>(r->type().number);
       },
       [](boost::leaf::error_info const &) -> std::optional<int> {
         return std::nullopt;

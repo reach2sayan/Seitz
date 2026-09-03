@@ -30,7 +30,7 @@ using cppcrystal::test::must;
 using Canonical = std::vector<std::pair<int, int>>;
 
 Canonical canonical(generate::WyckoffCombination const &assignment,
-                    std::span<group::WyckoffPosition const> positions) {
+                    std::span<group::Wyckoff const> positions) {
   Canonical out;
   for (auto const &p : assignment) {
     out.emplace_back(p.type, static_cast<int>(p.position - positions.data()));
@@ -42,7 +42,7 @@ Canonical canonical(generate::WyckoffCombination const &assignment,
 // The plain depth-first backtracker the generator replaced, kept as the
 // reference: no pruning, explicit undo.
 struct Reference {
-  std::span<group::WyckoffPosition const> positions;
+  std::span<group::Wyckoff const> positions;
   std::vector<std::pair<int, int>> elements;
   std::vector<bool> used_special = std::vector<bool>(positions.size(), false);
   generate::WyckoffCombination placements;

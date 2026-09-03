@@ -2,14 +2,14 @@
 
 #include <cppcrystal/generate/assignments.hpp>
 #include <cppcrystal/group/space_group.hpp>
-#include <cppcrystal/group/wyckoff_position.hpp>
+#include <cppcrystal/group/wyckoff.hpp>
 
 #include <vector>
 
 namespace cppcrystal::generate {
 
 // One complete Wyckoff assignment on a space (or layer) group.
-using WyckoffCombination = Assignment<group::WyckoffPosition>;
+using WyckoffCombination = Assignment<group::Wyckoff>;
 
 // Whether `comp` can be placed on `sg` at all.
 [[nodiscard]] bool check_compatible(group::SpaceGroup const &sg,

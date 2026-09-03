@@ -89,7 +89,7 @@ void check_conventional(Cell const &cell, double symprec) {
       static_cast<int>(ops.size()), lat, symprec);
 
   REQUIRE(ref.number != 0);
-  REQUIRE(got->number() == ref.number);
+  REQUIRE(got->type().number == ref.number);
   REQUIRE(got->hall.index() == ref.hall_number);
   REQUIRE(got->type().international_short ==
           std::string(ref.international_short));

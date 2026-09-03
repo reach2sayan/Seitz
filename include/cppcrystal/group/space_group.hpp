@@ -6,7 +6,7 @@
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/group/wyckoff_position.hpp>
+#include <cppcrystal/group/wyckoff.hpp>
 
 #include <span>
 #include <vector>
@@ -21,7 +21,7 @@ namespace cppcrystal::group {
 //
 // Wyckoff positions are exposed as a span of objects rather than parallel
 // arrays of letters / multiplicities / symbols.
-class SpaceGroup {
+class SpaceGroup : public GroupBase {
 public:
   // The group of a Hall setting. A Flyweight: one immutable object per setting,
   // built on first use and shared thereafter, so the Wyckoff construction is
@@ -40,46 +40,25 @@ public:
                                                               int number);
 
   [[nodiscard]] HallNumber hall() const noexcept { return hall_; }
-  [[nodiscard]] int number() const noexcept { return type().number; }
   [[nodiscard]] data::SpacegroupType const &type() const noexcept {
     return data::spacegroup_type(hall_);
-  }
-  [[nodiscard]] std::string_view international_symbol() const noexcept {
-    return type().international_short;
   }
   [[nodiscard]] data::Centering centering() const noexcept {
     return type().centering;
   }
-
-  // The conventional symmetry operations of the setting.
-  [[nodiscard]] std::span<SymmetryOperation const> operations() const noexcept {
-    return operations_;
-  }
-
-  // The Wyckoff positions, ordered by ascending letter (a, b, c, ...). Owned as
-  // objects, not parallel arrays.
-  [[nodiscard]] std::span<WyckoffPosition const> wyckoffs() const noexcept {
-    return positions_;
-  }
-
-  // Look up a Wyckoff position by letter ('a' = the most special). Errors if
-  // the letter is out of range for this group.
-  [[nodiscard]] Result<WyckoffPosition const *> wyckoff(char letter) const;
 
 private:
   explicit SpaceGroup(HallNumber hall);
 
   // Build one Wyckoff position by partitioning the conventional operations into
   // its orbit (coset representatives) and site-symmetry stabilizer. A member so
-  // it can reach WyckoffPosition's private constructor (SpaceGroup is a
+  // it can reach Wyckoff's private constructor (SpaceGroup is a
   // friend).
-  [[nodiscard]] static WyckoffPosition
+  [[nodiscard]] static Wyckoff
   build_position(data::WyckoffEntry const &entry,
                  Operations const &conv_ops);
 
   HallNumber hall_;
-  Operations operations_;
-  std::vector<WyckoffPosition> positions_;
 };
 
 } // namespace cppcrystal::group

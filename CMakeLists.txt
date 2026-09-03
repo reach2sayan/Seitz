@@ -36,7 +36,7 @@ target_sources(cppcrystal PRIVATE
         src/analysis/symmetry_analyzer.cpp
         src/analysis/magnetic_symmetry_analyzer.cpp
         src/group/space_group.cpp
-        src/group/wyckoff_position.cpp
+        src/group/wyckoff.cpp
         src/group/point_group.cpp
         src/group/subgroup_graph.cpp
         src/generate/wyckoff_combinations.cpp

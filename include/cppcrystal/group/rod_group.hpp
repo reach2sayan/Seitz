@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cppcrystal/core/error.hpp>
-#include <cppcrystal/group/locus_wyckoff.hpp>
+#include <cppcrystal/group/wyckoff.hpp>
 
 namespace cppcrystal::group {
 

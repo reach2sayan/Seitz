@@ -3,7 +3,9 @@
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/group/locus_wyckoff.hpp>
+#include <cppcrystal/group/wyckoff.hpp>
+
+#include "math/subspace.hpp"
 
 #include <algorithm>
 #include <concepts>
@@ -32,19 +34,25 @@ struct DerivedLocus {
 struct WyckoffFactory {
   // Sort ('a' = most special: smallest multiplicity, then fewest degrees of
   // freedom; the general position lands last) and assign letters.
-  [[nodiscard]] static std::vector<LocusWyckoff>
+  [[nodiscard]] static std::vector<Wyckoff>
   to_wyckoffs(std::vector<DerivedLocus> derived) {
     std::ranges::sort(derived, {}, [](DerivedLocus const &d) {
       return std::pair{d.multiplicity, d.dof};
     });
-    std::vector<LocusWyckoff> out;
+    std::vector<Wyckoff> out;
     out.reserve(derived.size());
     char letter = 'a';
     for (auto &d : derived) {
-      out.push_back(LocusWyckoff{d.multiplicity, d.dof, letter++,
-                                 std::move(d.origin), std::move(d.locus_basis),
-                                 std::move(d.orbit_ops),
-                                 std::move(d.site_symmetry)});
+      // Orthogonal projection onto the locus directions, shifted so it is
+      // idempotent on the affine locus. A derived position carries no
+      // tabulated site-symmetry symbol.
+      Matrix3d const projector = math::projector(
+          Eigen::MatrixXd(d.locus_basis.leftCols(d.dof)));
+      out.push_back(Wyckoff{d.multiplicity, d.dof, letter++, {},
+                            d.origin, d.locus_basis, projector,
+                            Vector3d(d.origin - projector * d.origin),
+                            std::move(d.orbit_ops),
+                            std::move(d.site_symmetry)});
     }
     return out;
   }
@@ -100,7 +108,7 @@ concept LocusGeometry =
     };
 
 template <LocusGeometry G>
-[[nodiscard]] std::vector<LocusWyckoff>
+[[nodiscard]] std::vector<Wyckoff>
 derive_wyckoff_positions(std::span<SymmetryOperation const> ops, G const &geom) {
   using Locus = LocusOf<G>;
 

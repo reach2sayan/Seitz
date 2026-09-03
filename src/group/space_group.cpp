@@ -23,17 +23,38 @@ namespace cppcrystal::group {
 
 namespace {
 
-// Number of free coordinates of a Wyckoff position = rank of its representative
-// coordinate operator (the projector onto the canonical coordinate).
-[[nodiscard]] int rank_of(Matrix3i const &rotation) {
-  Eigen::FullPivLU<Matrix3d> lu(rotation.cast<double>());
+// Wyckoff letters run a..z then A.. for the rare groups with more than 26.
+[[nodiscard]] char letter_of(int index) {
+  return index < 26 ? static_cast<char>('a' + index)
+                    : static_cast<char>('A' + (index - 26));
+}
+
+// The locus of a Wyckoff position, read off its representative coordinate
+// operator (which IS the projector onto the position): the number of free
+// coordinates is the operator's rank and its image spans the locus directions.
+// Both come from one decomposition, so the basis has exactly `dof` columns --
+// deriving them separately (an LU rank against an SVD column space) can
+// disagree on a near-threshold singular value and silently mis-size the basis.
+struct Locus {
+  int dof = 0;
+  Matrix3d basis = Matrix3d::Zero(); // columns 0..dof-1
+};
+
+[[nodiscard]] Locus locus_of(Matrix3i const &rotation) {
+  Matrix3d const projector = rotation.cast<double>();
+  Eigen::FullPivLU<Matrix3d> lu(projector);
   lu.setThreshold(0.5); // integer entries: cleanly separates rank levels
-  return static_cast<int>(lu.rank());
+  Locus out;
+  out.dof = static_cast<int>(lu.rank());
+  if (out.dof > 0) {
+    out.basis.leftCols(out.dof) = lu.image(projector);
+  }
+  return out;
 }
 
 } // namespace
 
-WyckoffPosition SpaceGroup::build_position(data::WyckoffEntry const &entry,
+Wyckoff SpaceGroup::build_position(data::WyckoffEntry const &entry,
                                            Operations const &conv_ops) {
   data::WyckoffCoordinate const wc =
       data::wyckoff_coordinate(entry.global_index);
@@ -52,18 +73,25 @@ WyckoffPosition SpaceGroup::build_position(data::WyckoffEntry const &entry,
         return math::same_point(a, b, kDefaultSymprec);
       });
 
-  return WyckoffPosition{wc.multiplicity,
-                         entry.letter,
-                         rank_of(wc.rotation),
-                         data::site_symmetry_symbol(entry.global_index),
-                         wc.rotation,
-                         wc.translation,
-                         std::move(partition.orbit_ops),
-                         std::move(partition.site_symmetry)};
+  Locus const locus = locus_of(wc.rotation);
+  return Wyckoff{wc.multiplicity,
+                 locus.dof,
+                 letter_of(entry.letter),
+                 data::site_symmetry_symbol(entry.global_index),
+                 wc.translation,
+                 locus.basis,
+                 wc.rotation.cast<double>(),
+                 wc.translation,
+                 std::move(partition.orbit_ops),
+                 std::move(partition.site_symmetry)};
 }
 
-SpaceGroup::SpaceGroup(HallNumber hall)
-    : hall_(hall), operations_(data::operations_from_database(hall)) {
+SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
+  data::SpacegroupType const &t = data::spacegroup_type(hall);
+  number_ = t.number;
+  symbol_ = t.international_short;
+  operations_ = data::operations_from_database(hall);
+
   std::vector<data::WyckoffEntry> const entries = data::wyckoff_entries(hall);
   positions_.reserve(entries.size());
   std::ranges::transform(entries, std::back_inserter(positions_),
@@ -119,17 +147,6 @@ Result<SpaceGroup const *> SpaceGroup::from_number(GroupFamily family,
               "(expected 1..230)"});
   }
   return &of(*hall);
-}
-
-Result<WyckoffPosition const *> SpaceGroup::wyckoff(char letter) const {
-  if (auto const it = std::ranges::find(positions_, letter,
-                                        &WyckoffPosition::letter);
-      it != positions_.end()) {
-    return &*it;
-  }
-  return leaf::new_error(
-      e_message{std::string("SpaceGroup::wyckoff: no Wyckoff position '") +
-                letter + "' in this space group"});
 }
 
 } // namespace cppcrystal::group

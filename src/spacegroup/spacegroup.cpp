@@ -30,8 +30,6 @@ namespace cppcrystal {
 data::SpacegroupType const &SpacegroupMatch::type() const noexcept {
   return data::spacegroup_type(hall);
 }
-int SpacegroupMatch::number() const noexcept { return type().number; }
-
 } // namespace cppcrystal
 
 namespace cppcrystal::spacegroup {

@@ -14,26 +14,6 @@ namespace cppcrystal::generate {
 
 namespace {
 
-// Expand one placement's orbit for a layer cell: the coset operations are
-// applied without folding the non-periodic axis (folding it would send a
-// c-flipping image to 1-z instead of -z and break that operation), and only the
-// periodic axes are wrapped to [0, 1).
-void expand_layer_orbit(Placement<group::WyckoffPosition> const &placement,
-                        Vector3d const &xyz, int aperiodic_axis,
-                        std::vector<Vector3d> &rows, Types &types) {
-  Vector3d const canonical = placement.position->canonical_coordinate(xyz);
-  for (auto const &op : placement.position->orbit_operations()) {
-    Vector3d image = op.apply(canonical);
-    for (int axis : {0,1,2}) {
-      if (axis != aperiodic_axis) {
-        image[axis] = math::wrap_to_unit_cell(image[axis]);
-      }
-    }
-    rows.push_back(image);
-    types.push_back(placement.type);
-  }
-}
-
 // Assemble the conventional cell for one Wyckoff assignment: each placement's
 // free coordinate is drawn uniformly and expanded into its full orbit.
 // `aperiodic_axis` is carried into the Cell (set for layer-group generation),
@@ -44,24 +24,24 @@ void expand_layer_orbit(Placement<group::WyckoffPosition> const &placement,
                             std::optional<int> aperiodic_axis = std::nullopt) {
   std::uniform_real_distribution<double> unit(0.0, 1.0);
 
+  CellPeriodicity const periodicity = aperiodic_axis
+                                          ? aperiodic_along(*aperiodic_axis)
+                                          : all_periodic();
   std::vector<Vector3d> rows;
   Types types;
   for (auto const &placement : combo) {
+    Vector3d xyz{unit(rng), unit(rng), unit(rng)};
     if (aperiodic_axis) {
       // The free aperiodic coordinate is drawn near 0 (a thin band) so a
       // c-flipping image lands at -z, also near 0, keeping the layer thin; the
-      // layer is recentred below.
+      // layer is recentred below. Wyckoff::orbit leaves that axis unfolded.
       constexpr double kBand = 0.05;
-      Vector3d xyz{unit(rng), unit(rng), unit(rng)};
       xyz[*aperiodic_axis] = kBand * (2.0 * unit(rng) - 1.0);
-      expand_layer_orbit(placement, xyz, *aperiodic_axis, rows, types);
-    } else {
-      Vector3d const xyz{unit(rng), unit(rng), unit(rng)};
-      Positions const orbit = placement.position->get_all_positions(xyz);
-      for (Index i = 0; i < orbit.rows(); ++i) {
-        rows.push_back(orbit.row(i).transpose());
-        types.push_back(placement.type);
-      }
+    }
+    Positions const orbit = placement.position->orbit(xyz, periodicity);
+    for (Index i = 0; i < orbit.rows(); ++i) {
+      rows.push_back(orbit.row(i).transpose());
+      types.push_back(placement.type);
     }
   }
 
@@ -128,7 +108,7 @@ namespace {
 // fractional space and expanded over its orbit, then mapped to Cartesian by the
 // metric basis. The result is non-periodic.
 [[nodiscard]] std::pair<Positions, Types>
-assemble_cluster(Assignment<group::LocusWyckoff> const &combo,
+assemble_cluster(Assignment<group::Wyckoff> const &combo,
                  Matrix3d const &basis, std::mt19937_64 &rng) {
   std::uniform_real_distribution<double> coord(-0.5, 0.5);
 
@@ -166,7 +146,7 @@ Result<GeneratedCluster> random_cluster(group::PointGroup const &pg,
 
   return detail::search_assignments(
       pg.wyckoffs(), comp, options, "generate::random_cluster", "point group",
-      [&](Assignment<group::LocusWyckoff> const &combo, int attempt,
+      [&](Assignment<group::Wyckoff> const &combo, int attempt,
           std::mt19937_64 &rng) -> std::optional<GeneratedCluster> {
         // Grow the metric on repeated failure to spread atoms apart.
         double const volume = base_volume * (1.0 + 0.2 * attempt);

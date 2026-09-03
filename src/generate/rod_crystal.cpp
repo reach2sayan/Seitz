@@ -20,7 +20,7 @@ namespace {
 // periodic axis spanning [0, 1) and the aperiodic axes confined to a thin band
 // near 0 (so a flipping operation's image stays near the rod core), then the
 // orbit is expanded folding ONLY the periodic axis.
-[[nodiscard]] Cell assemble_rod(Assignment<group::LocusWyckoff> const &combo,
+[[nodiscard]] Cell assemble_rod(Assignment<group::Wyckoff> const &combo,
                                 Matrix3d const &lattice, int periodic_axis,
                                 std::mt19937_64 &rng) {
   std::uniform_real_distribution<double> unit(0.0, 1.0);
@@ -99,7 +99,7 @@ random_rod_crystal(group::RodGroup const &rg, Composition const &comp,
   return detail::search_assignments(
       rg.wyckoffs(), comp, options, "generate::random_rod_crystal",
       "rod group",
-      [&](Assignment<group::LocusWyckoff> const &combo, int attempt,
+      [&](Assignment<group::Wyckoff> const &combo, int attempt,
           std::mt19937_64 &rng) -> std::optional<GeneratedRodCrystal> {
         double const c_length = repeat * (1.0 + 0.2 * attempt);
         Matrix3d const lattice =
