@@ -1,7 +1,6 @@
 // Non-oracle tests for standardize_cell: round-trip checks against the
 // determination pipeline, without the reference spglib.
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/standardize.hpp>
 
 #include "helpers.hpp"
 
@@ -31,7 +30,8 @@ Cell nacl_conventional() {
 }
 
 int spacegroup_of(Cell const &c) {
-  return must(analysis::SymmetryAnalyzer::from_cell(c).spacegroup_number());
+  auto const analyzer = analysis::SymmetryAnalyzer::from_cell(c);
+  return data::spacegroup_type(must(analyzer.hall())).number;
 }
 } // namespace
 
@@ -39,16 +39,21 @@ TEST_CASE("standardize_cell: conventional vs primitive atom counts",
           "[standardize]") {
   Cell const nacl = nacl_conventional();
   // F-centering: conventional has 4x the primitive atoms.
-  CHECK(must(standardize_cell(nacl, CellSetting::conventional)).size() == 8);
-  CHECK(must(standardize_cell(nacl, CellSetting::primitive)).size() == 2);
-  // All four settings describe the same space group.
-  for (CellSetting const setting :
-       {CellSetting::conventional, CellSetting::primitive}) {
-    for (Idealize const idealize : {Idealize::yes, Idealize::no}) {
-      CHECK(spacegroup_of(must(standardize_cell(nacl, setting, idealize))) ==
-            225);
-    }
-  }
+  CHECK(must(analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<analysis::CellSetting::conventional, analysis::Idealize::yes>()).size() == 8);
+  CHECK(must(analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<analysis::CellSetting::primitive, analysis::Idealize::yes>()).size() == 2);
+  // All four settings describe the same space group. The setting is a template
+  // argument now, so the four combinations are named rather than looped.
+  auto const analyzer = analysis::SymmetryAnalyzer::from_cell(nacl);
+  using analysis::CellSetting;
+  using analysis::Idealize;
+  CHECK(spacegroup_of(must(analyzer.standardized_cell<CellSetting::conventional,
+                                                      Idealize::yes>())) == 225);
+  CHECK(spacegroup_of(must(analyzer.standardized_cell<CellSetting::conventional,
+                                                      Idealize::no>())) == 225);
+  CHECK(spacegroup_of(must(analyzer.standardized_cell<CellSetting::primitive,
+                                                      Idealize::yes>())) == 225);
+  CHECK(spacegroup_of(must(analyzer.standardized_cell<CellSetting::primitive,
+                                                      Idealize::no>())) == 225);
 }
 
 TEST_CASE("standardize_cell: Idealize::no keeps an undistorted cell unchanged",
@@ -57,9 +62,9 @@ TEST_CASE("standardize_cell: Idealize::no keeps an undistorted cell unchanged",
   // standardizations agree on the lattice metric.
   Cell const nacl = nacl_conventional();
   auto const ideal = must(
-      standardize_cell(nacl, CellSetting::conventional, Idealize::yes));
+      analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<analysis::CellSetting::conventional, analysis::Idealize::yes>());
   auto const raw =
-      must(standardize_cell(nacl, CellSetting::conventional, Idealize::no));
+      must(analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<analysis::CellSetting::conventional, analysis::Idealize::no>());
   Matrix3d const gi = ideal.lattice().matrix().transpose() * ideal.lattice().matrix();
   Matrix3d const gr = raw.lattice().matrix().transpose() * raw.lattice().matrix();
   CHECK((gi - gr).cwiseAbs().maxCoeff() < 1e-6);
@@ -75,8 +80,7 @@ TEST_CASE("standardize_cell: no_idealize preserves a strained input lattice",
   L(2, 2) *= 0.995;
   Cell const strained = nacl_conventional().with_lattice(Lattice{L});
 
-  auto const raw = must(standardize_cell(strained, CellSetting::conventional,
-                                         Idealize::no, {1e-1}));
+  auto const raw = must(analysis::SymmetryAnalyzer::from_cell(strained, {1e-1}).standardized_cell<analysis::CellSetting::conventional, analysis::Idealize::no>());
   // The conventional Idealize::no lattice keeps the input's distinct a/b/c
   // lengths (volume and column norms preserved up to centering reordering),
   // unlike the idealized cell which would force a == b == c.
@@ -85,8 +89,7 @@ TEST_CASE("standardize_cell: no_idealize preserves a strained input lattice",
   double const vc = raw.lattice().matrix().col(2).norm();
   CHECK(std::abs(va - vc) > 1e-3); // genuinely non-cubic, distortion retained
 
-  auto const ideal = must(standardize_cell(strained, CellSetting::conventional,
-                                           Idealize::yes, {1e-1}));
+  auto const ideal = must(analysis::SymmetryAnalyzer::from_cell(strained, {1e-1}).standardized_cell<analysis::CellSetting::conventional, analysis::Idealize::yes>());
   CHECK(std::abs(ideal.lattice().matrix().col(0).norm() -
                  ideal.lattice().matrix().col(2).norm()) < 1e-3); // idealized to cubic
 }

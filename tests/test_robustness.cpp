@@ -5,7 +5,9 @@
 
 #include "corpus.hpp"
 
-#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+
+#include "helpers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -67,9 +69,9 @@ TEST_CASE("get_dataset is stable under sub-symprec jitter",
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const jittered = jitter(entry.cell, rng, 0.15 * symprec);
-    auto const got = cppcrystal::get_dataset(jittered, {symprec});
+    auto const got = cppcrystal::test::dataset_of(jittered, {symprec});
     REQUIRE(got);
-    CHECK(got->spacegroup_number == entry.space_group_number);
+    CHECK(data::spacegroup_type(got->hall).number == entry.space_group_number);
   }
 }
 
@@ -83,8 +85,8 @@ TEST_CASE("get_dataset returns the same space group for a 2x2x2 supercell",
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const sc = supercell(entry.cell, 2);
-    auto const got = cppcrystal::get_dataset(sc, {symprec});
+    auto const got = cppcrystal::test::dataset_of(sc, {symprec});
     REQUIRE(got);
-    CHECK(got->spacegroup_number == entry.space_group_number);
+    CHECK(data::spacegroup_type(got->hall).number == entry.space_group_number);
   }
 }

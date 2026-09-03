@@ -1,29 +1,49 @@
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 
-#include <utility>
+#include "core/validation.hpp"
+#include "magnetic/identify.hpp"
+#include "spin/search.hpp"
+#include "symmetry/search.hpp"
 
 namespace cppcrystal::analysis {
 
-MagneticSymmetryAnalyzer
-MagneticSymmetryAnalyzer::from_cell(MagneticCell cell, MagneticTolerance tol) {
-  return MagneticSymmetryAnalyzer{std::move(cell), tol};
-}
+Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
+  // The magnetic determination always searches with time reversal (the full
+  // family space group), and is a 3D path only.
+  constexpr TimeReversal kTimeReversal = TimeReversal::on;
+  if (auto valid = validate_cell(cell_.cell()); !valid) {
+    return valid.error();
+  }
 
-Result<MagneticDataset const *>
-MagneticSymmetryAnalyzer::cached_dataset() const {
-  return dataset_.get([&] { return get_magnetic_dataset(cell_, tol_); });
-}
+  // 1. Magnetic symmetry of the input cell.
+  symmetry::SymmetrySearch<GroupFamily::space> const spatial(cell_.cell(),
+                                                             tol_);
+  BOOST_LEAF_AUTO(sym_nonspin, spatial.operations());
+  spin::SpinSearch const spin_search(cell_, sym_nonspin, tol_);
+  BOOST_LEAF_AUTO(search, spin_search.operations<kTimeReversal>());
 
-Result<MagneticCell> MagneticSymmetryAnalyzer::standardized_cell() const {
-  BOOST_LEAF_AUTO(ds, cached_dataset());
-  return MagneticCell{
-      Cell{Lattice{ds->std_lattice}, ds->std_positions, ds->std_types},
-      ds->std_tensors, cell_.kind()};
-}
+  // 2. Identify the magnetic space-group type.
+  magnetic::MagneticIdentification const identification(
+      cell_.cell().lattice(), search.operations, tol_);
+  BOOST_LEAF_AUTO(ident, identification.identify());
 
-Result<void> MagneticSymmetryAnalyzer::warm() const {
-  BOOST_LEAF_CHECK(cached_dataset());
-  return {};
+  // 3. Idealize positions and site tensors, then transform into the
+  //    standardized setting.
+  MagneticCell const exact = spin_search.idealized<kTimeReversal>(search);
+  BOOST_LEAF_AUTO(standardized, identification.transform(exact, ident));
+
+  return MagneticDataset{
+      .uni = ident.uni,
+      .type = ident.msg_type,
+      .hall = ident.hall,
+      .setting = {.transformation = ident.transformation_matrix,
+                  .origin_shift = ident.origin_shift,
+                  .rigid_rotation = ident.std_rotation_matrix},
+      .operations = search.operations,
+      .equivalent_atoms = search.equivalent_atoms,
+      .standardized = std::move(standardized),
+      .primitive = Lattice{search.primitive_lattice},
+  };
 }
 
 } // namespace cppcrystal::analysis

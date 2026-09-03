@@ -5,11 +5,13 @@
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/kpoint/grid.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
-#include <cppcrystal/magnetic_dataset.hpp>
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 #include "symmetry/search.hpp"
+
+#include "helpers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -64,7 +66,7 @@ Cell valid_cell() {
 } // namespace
 
 TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {
-  CHECK(classify([] { return get_dataset(empty_cell(), {1e-5}); }) == Err::empty);
+  CHECK(classify([] { return test::dataset_of(empty_cell(), {1e-5}); }) == Err::empty);
   CHECK(classify([] {
           Cell const cell = empty_cell();
           return symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}
@@ -72,12 +74,12 @@ TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {
         }) == Err::empty);
   MagneticCell const m(empty_cell(), SiteTensors{CollinearTensors{}},
                        TensorKind::axial);
-  CHECK(classify([&] { return get_magnetic_dataset(m, {1e-5}); }) ==
+  CHECK(classify([&] { return test::magnetic_dataset_of(m, {1e-5}); }) ==
         Err::empty);
 }
 
 TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
-  CHECK(classify([] { return get_dataset(singular_cell(), {1e-5}); }) ==
+  CHECK(classify([] { return test::dataset_of(singular_cell(), {1e-5}); }) ==
         Err::invalid_lattice);
   CHECK(classify([] {
           Cell const cell = singular_cell();
@@ -86,7 +88,7 @@ TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
         }) == Err::invalid_lattice);
   MagneticCell const m(singular_cell(), SiteTensors{CollinearTensors{1.0}},
                        TensorKind::axial);
-  CHECK(classify([&] { return get_magnetic_dataset(m, {1e-5}); }) ==
+  CHECK(classify([&] { return test::magnetic_dataset_of(m, {1e-5}); }) ==
         Err::invalid_lattice);
 }
 

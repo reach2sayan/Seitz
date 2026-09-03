@@ -68,6 +68,16 @@ public:
   // tighter tolerance). Requires similar_bravais() to have been applied.
   [[nodiscard]] std::optional<Operations> operations() const;
 
+  // Bring `cell` into the primitive setting implied by `transformation` (cell
+  // -> conventional) and the matched centering (conventional -> primitive),
+  // folding the atoms into the primitive lattice.
+  [[nodiscard]] Result<Cell> to_primitive(Cell const &cell,
+                                          Matrix3d const &transformation) const;
+
+  // Expand a primitive cell into the centered conventional cell: one copy of
+  // each atom per centering translation, folded back into the lattice.
+  [[nodiscard]] Result<Cell> from_primitive(Cell const &primitive) const;
+
   // The standardized cell and the per-atom Wyckoff data. `cell_operations` are
   // the input cell's own operations (used only for the supercell
   // broken-symmetry check); `mapping_table[i]` maps input atom i to its
@@ -85,6 +95,16 @@ private:
 
 // The two members are defined in different translation units, so they are
 // instantiated one at a time rather than by whole-class instantiation.
+extern template Result<Cell>
+Refinement<GroupFamily::space>::to_primitive(Cell const &,
+                                             Matrix3d const &) const;
+extern template Result<Cell>
+Refinement<GroupFamily::layer>::to_primitive(Cell const &,
+                                             Matrix3d const &) const;
+extern template Result<Cell>
+Refinement<GroupFamily::space>::from_primitive(Cell const &) const;
+extern template Result<Cell>
+Refinement<GroupFamily::layer>::from_primitive(Cell const &) const;
 extern template std::optional<Operations>
 Refinement<GroupFamily::space>::operations() const;
 extern template std::optional<Operations>

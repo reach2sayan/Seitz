@@ -2,7 +2,7 @@
 
 #include "core/matrix_order.hpp" // unique_by_rotation
 #include <cppcrystal/core/tolerance.hpp>    // approx_equal
-#include <cppcrystal/dataset.hpp>           // get_dataset
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>           // get_dataset
 #include <cppcrystal/kpoint/grid.hpp>
 #include "math/fractional.hpp" // math::nint
 
@@ -195,7 +195,8 @@ ir_reciprocal_mesh(Cell const &cell, Vector3i const &mesh,
   if (mesh[0] <= 0 || mesh[1] <= 0 || mesh[2] <= 0) {
     return leaf::new_error(e_invalid_mesh{});
   }
-  BOOST_LEAF_AUTO(dataset, get_dataset(cell, tol));
+  BOOST_LEAF_AUTO(dataset,
+                  analysis::SymmetryAnalyzer::from_cell(cell, tol).dataset());
   std::vector<Matrix3i> rotations;
   rotations.reserve(dataset.operations.size());
   std::ranges::transform(dataset.operations, std::back_inserter(rotations),

@@ -143,7 +143,7 @@ namespace {
 Lattice conventional_lattice(SpacegroupMatch const &sg) {
   Matrix3d const g = Lattice{sg.bravais_lattice}.metric();
   Holohedry const holohedry =
-      symmetry::pointgroup_by_number(sg.type().pointgroup_number).holohedry;
+      pointgroup_by_number(sg.type().pointgroup_number).holohedry;
 
   return Lattice{[&]() -> Matrix3d {
     switch (holohedry) {

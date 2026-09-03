@@ -4,6 +4,8 @@
 // (symmetry/, spacegroup/, refine/, spin/, magnetic/, and the numeric and
 // container helpers behind them) is private to src/ and deliberately absent.
 
+#include <cppcrystal/analysis/analyzer.hpp>
+#include <cppcrystal/analysis/dataset.hpp>
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/core/cell.hpp>
@@ -20,16 +22,14 @@
 #include <cppcrystal/core/version.hpp>
 #include <cppcrystal/data/msg_database.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/dataset.hpp>
 #include <cppcrystal/generate/crystal_builder.hpp>
 #include <cppcrystal/generate/random_lattice.hpp>
 #include <cppcrystal/generate/wyckoff_combinations.hpp>
 #include <cppcrystal/group/space_group.hpp>
-#include <cppcrystal/group/wyckoff_position.hpp>
+#include <cppcrystal/group/wyckoff.hpp>
 #include <cppcrystal/kpoint/brillouin_zone.hpp>
 #include <cppcrystal/kpoint/grid.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh.hpp>
 #include <cppcrystal/kpoint/reciprocal_mesh_builder.hpp>
-#include <cppcrystal/magnetic_dataset.hpp>
-#include <cppcrystal/standardize.hpp>
+#include <cppcrystal/spacegroup_match.hpp>
 #include <cppcrystal/warmup.hpp>

@@ -8,7 +8,7 @@
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
-#include <cppcrystal/magnetic_dataset.hpp> // magnetic::MagneticType
+#include <cppcrystal/analysis/dataset.hpp> // magnetic::MagneticType
 
 // Magnetic space-group determination (3D path): given a lattice and a set of
 // magnetic symmetry operations, identify the magnetic space group (UNI number)

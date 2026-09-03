@@ -32,7 +32,6 @@ add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
 target_sources(cppcrystal PRIVATE
         src/version.cpp
         src/warmup.cpp
-        src/dataset.cpp
         src/analysis/symmetry_analyzer.cpp
         src/analysis/magnetic_symmetry_analyzer.cpp
         src/group/space_group.cpp
@@ -64,7 +63,6 @@ target_sources(cppcrystal PRIVATE
         src/data/msg_database.cpp
         src/spin/spin.cpp
         src/magnetic/magnetic_spacegroup.cpp
-        src/magnetic_dataset.cpp
         src/kpoint/grid.cpp
         src/kpoint/reciprocal_mesh.cpp
         src/kpoint/reciprocal_mesh_builder.cpp

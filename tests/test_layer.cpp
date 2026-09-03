@@ -4,7 +4,6 @@
 // oracle suite; these cases pin the behavior in the default build.
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/dataset.hpp>
 
 #include "helpers.hpp"
 
@@ -53,16 +52,16 @@ TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;
   Cell const cell{Lattice{lat}, pos, Types{6, 6}};
 
-  auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
-  REQUIRE(ds.spacegroup_number == 80);  // layer-group number
+  auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+  REQUIRE(data::spacegroup_type(ds.hall).number == 80);  // layer-group number
   REQUIRE(ds.hall == layer_hall(116));      // negative-hall convention
-  REQUIRE(ds.international_symbol == "p6/mmm");
-  REQUIRE(ds.aperiodic_axis == 2);
+  REQUIRE(data::spacegroup_type(ds.hall).international_short == "p6/mmm");
+  REQUIRE(aperiodic_axis(ds.standardized.periodicity()) == 2);
   REQUIRE(ds.operations.size() == 24);
   // Both carbons sit on the same Wyckoff orbit with -6m2 site symmetry.
-  REQUIRE(ds.wyckoffs.size() == 2);
-  REQUIRE(ds.wyckoffs[0] == ds.wyckoffs[1]);
-  REQUIRE(ds.site_symmetry_symbols[0] == "-6m2");
+  REQUIRE(ds.sites.size() == 2);
+  REQUIRE(ds.sites[0].wyckoff == ds.sites[1].wyckoff);
+  REQUIRE(ds.sites[0].site_symmetry == "-6m2");
 }
 
 TEST_CASE("graphene offset along the aperiodic axis still resolves", "[layer]") {
@@ -75,11 +74,11 @@ TEST_CASE("graphene offset along the aperiodic axis still resolves", "[layer]") 
     pos.row(0) << 1.0 / 3, 2.0 / 3, z;
     pos.row(1) << 2.0 / 3, 1.0 / 3, z;
     Cell const cell{Lattice{lat}, pos, Types{6, 6}};
-    auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+    auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
     INFO("z offset = " << z);
-    REQUIRE(ds.spacegroup_number == 80);
-    REQUIRE(ds.international_symbol == "p6/mmm");
-    REQUIRE(ds.site_symmetry_symbols[0] == "-6m2");
+    REQUIRE(data::spacegroup_type(ds.hall).number == 80);
+    REQUIRE(data::spacegroup_type(ds.hall).international_short == "p6/mmm");
+    REQUIRE(ds.sites[0].site_symmetry == "-6m2");
   }
 }
 
@@ -92,10 +91,10 @@ TEST_CASE("square lattice single atom is p4/mmm (LG 61)", "[layer]") {
   pos.row(0) << 0, 0, 0;
   Cell const cell{Lattice{lat}, pos, Types{1}};
 
-  auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
-  REQUIRE(ds.spacegroup_number == 61);
-  REQUIRE(ds.international_symbol == "p4/mmm");
-  REQUIRE(ds.site_symmetry_symbols[0] == "4/mmm");
+  auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+  REQUIRE(data::spacegroup_type(ds.hall).number == 61);
+  REQUIRE(data::spacegroup_type(ds.hall).international_short == "p4/mmm");
+  REQUIRE(ds.sites[0].site_symmetry == "4/mmm");
 }
 
 TEST_CASE("SymmetryAnalyzer auto-routes layer cells", "[layer][analysis]") {
@@ -107,7 +106,7 @@ TEST_CASE("SymmetryAnalyzer auto-routes layer cells", "[layer][analysis]") {
 
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(
       cell.with_periodicity(aperiodic_along(2)), {1e-4});
-  REQUIRE(must(analyzer.spacegroup_number()) == 80);
+  REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == 80);
   REQUIRE(must(analyzer.hall()) == layer_hall(116));
 }
 
@@ -117,7 +116,7 @@ TEST_CASE("a 3D cell is unaffected by the layer code paths", "[layer]") {
   Positions pos(1, 3);
   pos.row(0) << 0, 0, 0;
   Cell const cell{Lattice{Matrix3d::Identity()}, pos, Types{1}};
-  auto ds = must(get_dataset(cell));
-  REQUIRE(ds.spacegroup_number == 221);
-  REQUIRE_FALSE(ds.aperiodic_axis.has_value());
+  auto ds = must(test::dataset_of(cell));
+  REQUIRE(data::spacegroup_type(ds.hall).number == 221);
+  REQUIRE_FALSE(aperiodic_axis(ds.standardized.periodicity()).has_value());
 }

@@ -6,7 +6,6 @@
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include "core/overlap.hpp"
 #include "data/rod_database.hpp"
-#include <cppcrystal/dataset.hpp>
 #include <cppcrystal/generate/crystal_builder.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
 #include <cppcrystal/generate/rod_crystal.hpp>
@@ -95,7 +94,7 @@ TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
 
   // The assembled structure actually has the requested symmetry.
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
-  REQUIRE(must(analyzer.spacegroup_number()) == 225);
+  REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == 225);
 }
 
 TEST_CASE("generated structures recover their target space group", "[generate]") {
@@ -114,7 +113,7 @@ TEST_CASE("generated structures recover their target space group", "[generate]")
     auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
     auto gen = must(generate::random_crystal(*sg, c.comp, {.seed = 7u}));
     auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
-    REQUIRE(must(analyzer.spacegroup_number()) == c.number);
+    REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == c.number);
   }
 }
 
@@ -195,9 +194,9 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
 
     auto gen = must(generate::random_layer_crystal(*lg, comp,
         {.scale = 4.0, .seed = 13u, .general_position_only = true}));
-    auto ds = must(get_dataset(gen.cell.with_periodicity(aperiodic_along(2)),
+    auto ds = must(test::dataset_of(gen.cell.with_periodicity(aperiodic_along(2)),
                                {1e-4}));
-    REQUIRE(ds.spacegroup_number == number); // exact layer-group recovery
+    REQUIRE(data::spacegroup_type(ds.hall).number == number); // exact layer-group recovery
   }
 }
 
@@ -286,14 +285,14 @@ TEST_CASE("SymmetryAnalyzer memoizes a consistent dataset", "[analysis]") {
   Cell const cell{Lattice{Matrix3d::Identity()}, pos, Types{1}};
 
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(cell);
-  int const first = must(analyzer.spacegroup_number());
-  int const cached = must(analyzer.spacegroup_number());
+  int const first = data::spacegroup_type(must(analyzer.hall())).number;
+  int const cached = data::spacegroup_type(must(analyzer.hall())).number;
   REQUIRE(first == 221); // simple cubic, one atom -> Pm-3m
   REQUIRE(first == cached);
 
   // Projections agree with the dataset.
   auto ds = must(analyzer.dataset());
-  REQUIRE(ds.spacegroup_number == first);
+  REQUIRE(data::spacegroup_type(ds.hall).number == first);
   REQUIRE(must(analyzer.operations()).size() == ds.operations.size());
 }
 

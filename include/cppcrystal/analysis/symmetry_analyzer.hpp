@@ -1,133 +1,116 @@
 #pragma once
 
-#include <cppcrystal/analysis/detail/lazy.hpp>
-#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/analysis/analyzer.hpp>
+#include <cppcrystal/analysis/dataset.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/point_group.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/dataset.hpp>
-#include <cppcrystal/standardize.hpp>
 
 #include <optional>
-#include <string>
-#include <type_traits>
-#include <vector>
+#include <span>
+#include <utility>
 
 namespace cppcrystal::analysis {
 
-// A persistent, stateful view over a Cell + tolerances that lazily computes and
-// memoizes the symmetry analysis: owns the inputs once and caches each pipeline
-// stage (detail::Lazy) so repeated queries do not recompute. Immutable after
-// construction (no setters); to analyze at a different tolerance, build a new
-// analyzer.
-//
-// Thread-safety: the per-instance caches are NOT race-free — concurrent
-// first-calls race. To share one instance read-only across threads, call
-// warm() once on a single thread first; afterwards every getter is served from
-// a populated cache and does no writing. (The shared global tables are primed
-// separately by cppcrystal::warmup().)
-class SymmetryAnalyzer {
+// Which setting the standardized cell is expressed in, and whether it carries
+// the metric-idealized (symmetrized) lattice or keeps the input's real —
+// possibly distorted — geometry. Template arguments, so the four combinations
+// are resolved at compile time.
+enum class CellSetting { conventional, primitive };
+enum class Idealize { yes, no };
+
+struct SpaceGroupTraits {
+  using CellType = Cell;
+  using DatasetType = Dataset;
+  using ToleranceType = Tolerance;
+};
+
+class SymmetryAnalyzer : public Analyzer<SymmetryAnalyzer, SpaceGroupTraits> {
 public:
   // Named factory (no overloaded constructors). An unset `setting` searches
   // every Hall setting of the cell's family; a set one fixes it.
   [[nodiscard]] static SymmetryAnalyzer
   from_cell(Cell cell, Tolerance tol = {},
-            std::optional<HallNumber> setting = std::nullopt);
-
-  [[nodiscard]] Cell const &cell() const noexcept { return cell_; }
-  [[nodiscard]] double symprec() const noexcept { return tol_.symprec; }
-  [[nodiscard]] AngleTolerance angle_tolerance() const noexcept {
-    return tol_.angle_tolerance;
-  }
-
-  // The full space-group dataset of the input cell (memoized). Every getter
-  // below is a projection of this and shares the one computation.
-  [[nodiscard]] Result<Dataset> dataset() const {
-    BOOST_LEAF_AUTO(ds, cached_dataset());
-    return *ds;
+            std::optional<HallNumber> setting = std::nullopt) {
+    return SymmetryAnalyzer{std::move(cell), tol, setting};
   }
 
   // Projections of the dataset.
-  [[nodiscard]] Result<Operations> operations() const {
-    return project<&Dataset::operations>();
-  }
-  [[nodiscard]] Result<int> spacegroup_number() const {
-    return project<&Dataset::spacegroup_number>();
-  }
   [[nodiscard]] Result<HallNumber> hall() const {
     return project<&Dataset::hall>();
   }
-  [[nodiscard]] Result<std::vector<int>> wyckoffs() const {
-    return project<&Dataset::wyckoffs>();
+  [[nodiscard]] Result<Operations> operations() const {
+    return project<&Dataset::operations>();
   }
-  [[nodiscard]] Result<std::vector<std::string>>
-  site_symmetry_symbols() const {
-    return project<&Dataset::site_symmetry_symbols>();
+  [[nodiscard]] Result<std::vector<Site>> sites() const {
+    return project<&Dataset::sites>();
   }
   [[nodiscard]] Result<data::SpacegroupType> spacegroup_type() const {
     BOOST_LEAF_AUTO(setting, hall());
     return data::spacegroup_type(setting);
   }
 
+  // The standardized conventional, idealized cell — the one the dataset
+  // already holds.
+  [[nodiscard]] Result<Cell> standardized_cell() const {
+    return project<&Dataset::standardized>();
+  }
+
+  // The standardized cell in another setting: primitive vs conventional,
+  // idealized vs the input's own geometry. Not memoized — keyed by its
+  // template arguments, and the conventional/idealized case is the accessor
+  // above.
+  template <CellSetting S, Idealize I>
+  [[nodiscard]] Result<Cell> standardized_cell() const;
+
   // All space-group operations of the input cell exactly as given, including
-  // the centering translations of a non-primitive cell
-  // (symmetry::find_symmetry). Distinct from operations(), which are the
-  // dataset's operations in the input basis. Cached independently.
+  // the centering translations of a non-primitive cell. Distinct from
+  // operations(), which are the dataset's operations in the input basis.
   [[nodiscard]] Result<Operations> cell_operations() const;
 
   // The lattice point group: the rotations (in the cell basis) that map the
-  // Delaunay-reduced lattice metric onto itself (symmetry::lattice_symmetry).
+  // Delaunay-reduced lattice metric onto itself.
   [[nodiscard]] Result<PointSymmetry> lattice_symmetry() const;
 
-  // The standardized conventional cell, assembled from the dataset's std_*
-  // fields (idealized lattice, fractional positions, atom types).
-  [[nodiscard]] Result<Cell> standardized_cell() const;
-
-  // The standardized cell in an explicit setting — primitive vs conventional,
-  // idealized vs input geometry (standardize_cell). The no-argument overload
-  // above is the (conventional, idealized) fast path served from the cached
-  // dataset; this one is keyed by its arguments and is not memoized.
-  [[nodiscard]] Result<Cell> standardized_cell(CellSetting setting,
-                                               Idealize idealize) const;
-
   // The primitive cell, cached independently of the full dataset so a caller
-  // that only wants it does not pay for standardization. The Primitive and
-  // Spacegroup intermediates behind it are private to the pipeline.
+  // that only wants it does not pay for standardization.
   [[nodiscard]] Result<Cell> primitive_cell() const;
 
-  // Force every lazy cache (the dataset plus the independently-cached
-  // primitive cell, raw cell operations and lattice symmetry). Returns the
-  // first error encountered, or success once all caches
-  // are populated. After warm() succeeds this const instance may be shared
-  // read-only across threads — all getters then hit a filled cache.
-  Result<void> warm() const;
-
 private:
-  SymmetryAnalyzer(Cell cell, Tolerance tol, std::optional<HallNumber> setting)
-      : cell_(std::move(cell)), tol_(tol), setting_(setting) {}
+  friend Analyzer;
+  SymmetryAnalyzer(Cell cell, Tolerance tol,
+                   std::optional<HallNumber> setting)
+      : Analyzer(std::move(cell), tol), setting_(setting) {}
 
-  [[nodiscard]] Result<Dataset const *> cached_dataset() const;
+  // The pipeline itself: find primitive -> match Hall setting -> refine, at
+  // progressively tighter tolerances until one attempt yields a consistent
+  // cell. One runtime branch on the family at the top; everything below it is
+  // compile-time specialised.
+  [[nodiscard]] Result<Dataset> determine() const;
+  [[nodiscard]] Result<void> warm_derived() const;
 
-  // Copy one field out of the memoized dataset.
-  template <auto Member> [[nodiscard]] auto project() const
-      -> Result<std::remove_cvref_t<
-          decltype(std::declval<Dataset const &>().*Member)>> {
-    BOOST_LEAF_AUTO(ds, cached_dataset());
-    return ds->*Member;
-  }
-
-  Cell cell_;
-  Tolerance tol_;
   std::optional<HallNumber> setting_;
 
-  detail::Lazy<Dataset> dataset_;
   detail::Lazy<Cell> primitive_cell_;
   detail::Lazy<Operations> cell_operations_;
   detail::Lazy<PointSymmetry> lattice_symmetry_;
 };
+
+extern template Result<Cell>
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
+                                    Idealize::yes>() const;
+extern template Result<Cell>
+SymmetryAnalyzer::standardized_cell<CellSetting::conventional,
+                                    Idealize::no>() const;
+extern template Result<Cell>
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
+                                    Idealize::yes>() const;
+extern template Result<Cell>
+SymmetryAnalyzer::standardized_cell<CellSetting::primitive,
+                                    Idealize::no>() const;
 
 } // namespace cppcrystal::analysis

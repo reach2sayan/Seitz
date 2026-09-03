@@ -93,7 +93,8 @@ get_exact_positions(Cell const &conv_prim, Operations const &conv_sym,
 
 struct WyckoffLabel {
   int letter;
-  std::string symbol;
+  // A view into the static site-symmetry table, never a copy.
+  std::string_view symbol;
 };
 
 // Match `position`'s orbit against the database Wyckoff positions of the Hall
@@ -149,7 +150,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
       // The database stores Wyckoff positions in reverse order (g f e ... a).
       return WyckoffLabel{
           range.count - wi - 1,
-          std::string(data::site_symmetry_symbol(range.start + wi))};
+          data::site_symmetry_symbol(range.start + wi)};
     }
   }
   return std::nullopt;

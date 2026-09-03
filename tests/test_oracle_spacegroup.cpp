@@ -2,7 +2,7 @@
 #include "oracle.hpp"
 
 #include "core/overlap.hpp"
-#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include "refine/refinement.hpp"
 #include "refine/standardize.hpp"
 #include "spacegroup/spacegroup.hpp"
@@ -242,18 +242,18 @@ TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0); // reference must succeed for the comparison
 
-    auto const ours = get_dataset(cell, {symprec});
+    auto const ours = test::dataset_of(cell, {symprec});
     REQUIRE(ours);
 
-    INFO("ours: SG " << ours->spacegroup_number << " hall "
-                     << ours->hall.index() << " (" << ours->international_symbol
+    INFO("ours: SG " << data::spacegroup_type(ours->hall).number << " hall "
+                     << ours->hall.index() << " (" << data::spacegroup_type(ours->hall).international_short
                      << "); ref: SG " << ref.number << " hall "
                      << ref.hall_number << " (" << ref.international << ")");
-    CHECK(ours->spacegroup_number == ref.number);
+    CHECK(data::spacegroup_type(ours->hall).number == ref.number);
     CHECK(ours->hall == space_hall(ref.hall_number));
-    CHECK(std::string(ours->international_symbol) == ref.international);
-    CHECK(std::string(ours->hall_symbol) == ref.hall_symbol);
-    CHECK(std::string(ours->choice) == ref.choice);
+    CHECK(std::string(data::spacegroup_type(ours->hall).international_short) == ref.international);
+    CHECK(std::string(data::spacegroup_type(ours->hall).hall_symbol) == ref.hall_symbol);
+    CHECK(std::string(data::spacegroup_type(ours->hall).choice) == ref.choice);
   }
 }
 
@@ -322,30 +322,30 @@ TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const d = get_dataset(cell, {symprec});
+    auto const d = test::dataset_of(cell, {symprec});
     REQUIRE(d);
 
     // Identity + transformation/standardization matrices.
-    CHECK(d->spacegroup_number == ref.number);
+    CHECK(data::spacegroup_type(d->hall).number == ref.number);
     CHECK(d->hall == space_hall(ref.hall_number));
-    CHECK((d->transformation_matrix - ref.transformation_matrix)
+    CHECK((d->setting.transformation - ref.transformation_matrix)
               .cwiseAbs()
               .maxCoeff() < 1e-4);
-    CHECK((d->std_lattice - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
-    CHECK((d->std_rotation_matrix - ref.std_rotation_matrix)
+    CHECK((d->standardized.lattice().matrix() - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
+    CHECK((d->setting.rigid_rotation - ref.std_rotation_matrix)
               .cwiseAbs()
               .maxCoeff() < 1e-4);
 
     // Standardized cell + per-atom Wyckoff data.
-    CHECK(static_cast<int>(d->std_positions.rows()) == ref.n_std_atoms);
-    CHECK(same_std_cell(d->std_positions, d->std_types, ref.std_positions,
-                        ref.std_types, d->std_lattice, 1e-4));
-    CHECK(d->wyckoffs == ref.wyckoffs);
-    CHECK(d->equivalent_atoms == ref.equivalent_atoms);
-    CHECK(d->site_symmetry_symbols.size() == ref.site_symmetry_symbols.size());
-    for (std::size_t i = 0; i < d->site_symmetry_symbols.size(); ++i) {
+    CHECK(static_cast<int>(d->standardized.positions().rows()) == ref.n_std_atoms);
+    CHECK(same_std_cell(d->standardized.positions(), d->standardized.types(), ref.std_positions,
+                        ref.std_types, d->standardized.lattice().matrix(), 1e-4));
+    REQUIRE(d->sites.size() == ref.wyckoffs.size());
+    for (std::size_t i = 0; i < d->sites.size(); ++i) {
       INFO("atom " << i);
-      CHECK(d->site_symmetry_symbols[i] == ref.site_symmetry_symbols[i]);
+      CHECK(d->sites[i].wyckoff == ref.wyckoffs[i]);
+      CHECK(d->sites[i].equivalent_atom == ref.equivalent_atoms[i]);
+      CHECK(d->sites[i].site_symmetry == ref.site_symmetry_symbols[i]);
     }
   }
 }
@@ -401,7 +401,7 @@ TEST_CASE("get_dataset operations equal the input cell symmetry set",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const ours = get_dataset(cell, {symprec});
+    auto const ours = test::dataset_of(cell, {symprec});
     REQUIRE(ours);
     CHECK(static_cast<int>(ours->operations.size()) == ref.n_operations);
 

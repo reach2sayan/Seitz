@@ -5,10 +5,12 @@
 // number embedded in each YAML.
 
 #include "corpus.hpp"
+#include <cppcrystal/data/spg_database.hpp>
+
 #include "helpers.hpp"
 #include "oracle.hpp"
 
-#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -28,17 +30,17 @@ TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
     INFO("cell " << entry.name << " (expected SG "
                  << entry.space_group_number << ")");
 
-    auto const got = cppcrystal::get_dataset(entry.cell, {symprec});
+    auto const got = cppcrystal::test::dataset_of(entry.cell, {symprec});
     REQUIRE(got);
     auto const ref = cppcrystal::oracle::reference_dataset(entry.cell, symprec);
     REQUIRE(ref.number != 0);
 
-    CHECK(got->spacegroup_number == ref.number);
-    CHECK(got->spacegroup_number == entry.space_group_number);
+    CHECK(cppcrystal::data::spacegroup_type(got->hall).number == ref.number);
+    CHECK(cppcrystal::data::spacegroup_type(got->hall).number == entry.space_group_number);
     CHECK(got->hall == space_hall(ref.hall_number));
-    CHECK(got->international_symbol == std::string_view(ref.international));
+    CHECK(cppcrystal::data::spacegroup_type(got->hall).international_short == std::string_view(ref.international));
     CHECK(static_cast<int>(got->operations.size()) == ref.n_operations);
-    CHECK(static_cast<int>(got->std_types.size()) == ref.n_std_atoms);
+    CHECK(static_cast<int>(got->standardized.types().size()) == ref.n_std_atoms);
     ++checked;
   }
   CHECK(checked >= 200);

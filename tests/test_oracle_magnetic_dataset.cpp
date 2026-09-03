@@ -7,9 +7,11 @@
 #include "oracle.hpp"
 
 #include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/magnetic_dataset.hpp>
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 
 #include "math/integer_matrix.hpp"
+
+#include "helpers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -74,7 +76,7 @@ bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
 void check(MagneticCell const &input, TensorKind kind, double symprec) {
   bool const is_axial = kind == TensorKind::axial;
   MagneticCell const mcell(input.cell(), input.tensors(), kind);
-  auto const got = cppcrystal::get_magnetic_dataset(mcell, {symprec});
+  auto const got = cppcrystal::test::magnetic_dataset_of(mcell, {symprec});
   REQUIRE(got);
 
   // Reference dataset.
@@ -88,25 +90,25 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
 
   // Magnetic space-group identity.
   CHECK(got->uni.value() == ref->uni_number);
-  CHECK(static_cast<int>(got->msg_type) == ref->msg_type);
+  CHECK(static_cast<int>(got->type) == ref->msg_type);
   CHECK(got->hall.index() == ref->hall_number);
-  CHECK(static_cast<int>(got->std_types.size()) == ref->n_std_atoms);
+  CHECK(static_cast<int>(got->standardized.cell().types().size()) == ref->n_std_atoms);
 
   // Transformation to the standardized setting.
   Matrix3d ref_tmat;
   cppcrystal::oracle::from_c_lattice(ref_tmat, ref->transformation_matrix);
-  CHECK((got->transformation_matrix - ref_tmat).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->setting.transformation - ref_tmat).cwiseAbs().maxCoeff() < 1e-5);
   Vector3d const ref_shift(ref->origin_shift[0], ref->origin_shift[1],
                            ref->origin_shift[2]);
-  CHECK((got->origin_shift - ref_shift).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->setting.origin_shift - ref_shift).cwiseAbs().maxCoeff() < 1e-5);
   Matrix3d ref_std_rot;
   cppcrystal::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
-  CHECK((got->std_rotation_matrix - ref_std_rot).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->setting.rigid_rotation - ref_std_rot).cwiseAbs().maxCoeff() < 1e-5);
 
   // Standardized lattice.
   Matrix3d ref_std_lat;
   cppcrystal::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
-  CHECK((got->std_lattice - ref_std_lat).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->standardized.cell().lattice().matrix() - ref_std_lat).cwiseAbs().maxCoeff() < 1e-5);
 
   // Equivalent atoms (per input atom).
   REQUIRE(static_cast<int>(got->equivalent_atoms.size()) == ref->n_atoms);
@@ -123,17 +125,17 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
     bool found = false;
     for (int g = 0; g < n_std && !found; ++g) {
       auto const ug = static_cast<std::size_t>(g);
-      if (got->std_types[ug] != ref->std_types[r])
+      if (got->standardized.cell().types()[ug] != ref->std_types[r])
         continue;
-      if (!fractional_overlap(got->std_positions.row(g).transpose(), ref_pos,
+      if (!fractional_overlap(got->standardized.cell().positions().row(g).transpose(), ref_pos,
                               symprec))
         continue;
       bool tensor_ok = true;
       if (collinear) {
-        tensor_ok = std::abs(std::get<CollinearTensors>(got->std_tensors)[ug] -
+        tensor_ok = std::abs(std::get<CollinearTensors>(got->standardized.tensors())[ug] -
                              ref->std_tensors[r]) < 1e-4;
       } else {
-        auto const v = std::get<NoncollinearTensors>(got->std_tensors).row(ug);
+        auto const v = std::get<NoncollinearTensors>(got->standardized.tensors()).row(ug);
         for (int s = 0; s < 3; ++s)
           tensor_ok = tensor_ok &&
                       std::abs(v[s] - ref->std_tensors[3 * r + s]) < 1e-4;
@@ -168,7 +170,7 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
 
   Matrix3d ref_prim;
   cppcrystal::oracle::from_c_lattice(ref_prim, ref->primitive_lattice);
-  CHECK(same_lattice(got->primitive_lattice, ref_prim));
+  CHECK(same_lattice(got->primitive.matrix(), ref_prim));
 
   spg_free_magnetic_dataset(ref);
 }

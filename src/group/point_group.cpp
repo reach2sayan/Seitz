@@ -137,7 +137,7 @@ Result<PointGroup> PointGroup::from_number(int number) {
         "(expected 1..32)"});
   }
 
-  auto const meta = symmetry::pointgroup_by_number(number);
+  auto const meta = pointgroup_by_number(number);
   int const rep = kRepresentativeSpacegroup[static_cast<std::size_t>(number)];
   std::span<int const> const halls =
       data::halls_with_number<GroupFamily::space>(rep);

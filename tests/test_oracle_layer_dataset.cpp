@@ -10,7 +10,9 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/dataset.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+
+#include <cppcrystal/data/spg_database.hpp>
 
 #include "helpers.hpp"
 
@@ -100,7 +102,7 @@ bool same_metric(Matrix3d const &a, Matrix3d const &b) {
 using cppcrystal::test::must;
 
 void check(Cell const &cell, int aperiodic_axis, double symprec) {
-  auto const got = must(cppcrystal::get_dataset(
+  auto const got = must(cppcrystal::test::dataset_of(
       cell.with_periodicity(cppcrystal::aperiodic_along(aperiodic_axis)),
       {symprec}));
   auto const ref =
@@ -108,20 +110,21 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
   REQUIRE(ref.number != 0); // reference succeeded
 
   // Layer-group identity.
-  CHECK(got.spacegroup_number == ref.number);
+  CHECK(cppcrystal::data::spacegroup_type(got.hall).number == ref.number);
   CHECK(got.hall == layer_hall(-ref.hall_number));
-  CHECK(std::string(got.international_symbol) == ref.international);
-  CHECK(std::string(got.hall_symbol) == ref.hall_symbol);
-  CHECK(std::string(got.pointgroup_symbol) == ref.pointgroup);
-  CHECK(got.aperiodic_axis.has_value());
+  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).international_short) == ref.international);
+  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).hall_symbol) == ref.hall_symbol);
+  CHECK(std::string(cppcrystal::pointgroup_by_number(cppcrystal::data::spacegroup_type(got.hall).pointgroup_number).symbol) == ref.pointgroup);
+  CHECK(cppcrystal::aperiodic_axis(got.standardized.periodicity())
+            .has_value());
 
   // Per input-atom Wyckoff / site-symmetry / equivalence data.
-  REQUIRE(got.wyckoffs.size() == ref.wyckoffs.size());
+  REQUIRE(got.sites.size() == ref.wyckoffs.size());
   for (std::size_t i = 0; i < ref.wyckoffs.size(); ++i) {
     INFO("atom " << i);
-    CHECK(got.wyckoffs[i] == ref.wyckoffs[i]);
-    CHECK(got.site_symmetry_symbols[i] == ref.site_symmetry_symbols[i]);
-    CHECK(got.equivalent_atoms[i] == ref.equivalent_atoms[i]);
+    CHECK(got.sites[i].wyckoff == ref.wyckoffs[i]);
+    CHECK(got.sites[i].site_symmetry == ref.site_symmetry_symbols[i]);
+    CHECK(got.sites[i].equivalent_atom == ref.equivalent_atoms[i]);
   }
 
   // Symmetry operations, matched as a set (aperiodic-aware translation compare).
@@ -141,19 +144,19 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
   }
 
   // Standardized layer cell: lattice + atoms (matched as a set), aperiodic c.
-  CHECK(static_cast<int>(got.std_types.size()) == ref.n_std_atoms);
-  CHECK(same_metric(got.std_lattice, ref.std_lattice));
+  CHECK(static_cast<int>(got.standardized.types().size()) == ref.n_std_atoms);
+  CHECK(same_metric(got.standardized.lattice().matrix(), ref.std_lattice));
   for (int r = 0; r < ref.n_std_atoms; ++r) {
     Vector3d const ref_pos = ref.std_positions.row(r).transpose();
     bool found = false;
-    for (int g = 0; g < static_cast<int>(got.std_types.size()) && !found; ++g) {
+    for (int g = 0; g < static_cast<int>(got.standardized.types().size()) && !found; ++g) {
       auto const ug = static_cast<std::size_t>(g);
-      if (got.std_types[ug] != ref.std_types[static_cast<std::size_t>(r)]) {
+      if (got.standardized.types()[ug] != ref.std_types[static_cast<std::size_t>(r)]) {
         continue;
       }
       // Standardized positions are stored folded into [0, 1) on every axis; the
       // aperiodic axis is c = 2 in the standardized setting.
-      found = overlap_layer(got.std_positions.row(g).transpose(), ref_pos,
+      found = overlap_layer(got.standardized.positions().row(g).transpose(), ref_pos,
                             /*aperiodic_axis=*/2, symprec);
     }
     INFO("standardized atom " << r << " not matched");

@@ -7,7 +7,7 @@
 #include <cppcrystal/core/types.hpp>
 
 #include <optional>
-#include <string>
+#include <string_view>
 #include <vector>
 
 namespace cppcrystal::refine {
@@ -17,7 +17,7 @@ struct ExactPosition {
   Vector3d position;        // exact (symmetrized) fractional position
   int wyckoff = 0;          // Wyckoff letter index (0 = a, 1 = b, ...)
   int equivalent_atom = 0;  // representative atom index
-  std::string site_symmetry_symbol{};
+  std::string_view site_symmetry_symbol{};
 };
 
 // Per-atom exact-position / Wyckoff data for the conventional primitive cell.

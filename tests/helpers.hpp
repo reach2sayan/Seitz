@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/core/keys.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -23,6 +25,19 @@ namespace cppcrystal::test {
 }
 [[nodiscard]] constexpr UniNumber uni_number(int number) noexcept {
   return *UniNumber::of(number);
+}
+
+// The determination of one cell, the way callers reach it now. A shorthand
+// only: SymmetryAnalyzer::from_cell(...).dataset() at two dozen call sites
+// would bury what each test is actually checking.
+[[nodiscard]] inline Result<analysis::Dataset>
+dataset_of(Cell const &cell, Tolerance const &tol = {}) {
+  return analysis::SymmetryAnalyzer::from_cell(cell, tol).dataset();
+}
+
+[[nodiscard]] inline Result<analysis::MagneticDataset>
+magnetic_dataset_of(MagneticCell const &cell, MagneticTolerance const &tol = {}) {
+  return analysis::MagneticSymmetryAnalyzer::from_cell(cell, tol).dataset();
 }
 
 // The success value of `r`, failing the current test if it carries an error.
