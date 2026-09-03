@@ -16,6 +16,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Matrix3i;
 using cppcrystal::Positions;
@@ -94,16 +95,17 @@ TEST_CASE("BZ grid points by rotations match reference", "[oracle][kpoint]") {
   // A cubic cell supplies the reciprocal rotations and lattice.
   Positions p(1, 3);
   p.row(0) = Eigen::RowVector3d(0, 0, 0);
-  Cell const cell(4.0 * Matrix3d::Identity(), p, {0});
+  Cell const cell(Lattice{4.0 * Matrix3d::Identity()}, p, {0});
 
   auto const ops = cppcrystal::oracle::reference_symmetry(cell, symprec);
   std::vector<Matrix3i> rotations;
   for (auto const &op : ops)
     rotations.push_back(op.rotation);
   auto const rot_reciprocal =
-      cppcrystal::kpoint::point_group_reciprocal(rotations, false);
+      cppcrystal::kpoint::point_group_reciprocal(rotations,
+                                             cppcrystal::TimeReversal::off);
 
-  Matrix3d const rec = cell.lattice().inverse().transpose();
+  Matrix3d const rec = cell.lattice().matrix().inverse().transpose();
   Vector3i const mesh(4, 4, 4);
   Vector3i const shift(0, 0, 0);
   auto const grid = cppcrystal::kpoint::all_grid_addresses(mesh);

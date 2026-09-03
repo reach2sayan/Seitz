@@ -10,6 +10,14 @@
 
 namespace cppcrystal {
 
+// How a rank-1 site tensor transforms under an improper operation: an axial
+// vector picks up the |det R| factor, a polar one does not. A property of the
+// structure, so it is carried by the cell rather than passed at every call.
+enum class TensorKind { polar, axial };
+
+// Rank of per-site tensors for magnetic structures.
+enum class SiteTensor { none = -1, collinear = 0, noncollinear = 1 };
+
 // Per-site magnetic tensors. The rank is carried by the variant alternative, so
 // there is no separate `tensor_rank` field to keep in sync:
 //   - collinear     : one scalar magnetic moment per atom.
@@ -37,11 +45,13 @@ noncollinear_tensors(std::initializer_list<Vector3d> moments) {
 // tensors are only meaningful for magnetic structures.
 class MagneticCell {
 public:
-  MagneticCell(Cell cell, SiteTensors tensors)
-      : cell_(std::move(cell)), tensors_(std::move(tensors)) {}
+  MagneticCell(Cell cell, SiteTensors tensors,
+               TensorKind kind = TensorKind::polar)
+      : cell_(std::move(cell)), tensors_(std::move(tensors)), kind_(kind) {}
 
   [[nodiscard]] Cell const &cell() const noexcept { return cell_; }
   [[nodiscard]] SiteTensors const &tensors() const noexcept { return tensors_; }
+  [[nodiscard]] TensorKind kind() const noexcept { return kind_; }
   [[nodiscard]] Index size() const noexcept { return cell_.size(); }
 
   // collinear when the tensors are scalars, non-collinear when 3-vectors.
@@ -62,6 +72,7 @@ public:
 private:
   Cell cell_;
   SiteTensors tensors_;
+  TensorKind kind_;
 };
 
 } // namespace cppcrystal

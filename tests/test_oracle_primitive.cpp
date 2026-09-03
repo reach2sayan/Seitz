@@ -1,6 +1,6 @@
 #include "oracle.hpp"
 
-#include <cppcrystal/reduce/niggli.hpp>
+#include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/symmetry/primitive.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -17,7 +17,7 @@ Cell fcc_conventional(double a) {
   pos.row(1) << 0.5, 0.5, 0.0;
   pos.row(2) << 0.5, 0.0, 0.5;
   pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0, 0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0});
 }
 
 Cell rock_salt(double a) {
@@ -31,7 +31,7 @@ Cell rock_salt(double a) {
   pos.row(5) << 0.0, 0.0, 0.5;
   pos.row(6) << 0.0, 0.5, 0.0;
   pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(lattice, pos, {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
 }
 
 // Two formula units of a tetragonal body-centered structure (I-centered).
@@ -43,7 +43,7 @@ Cell body_centered_tetragonal() {
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0});
 }
 } // namespace
 
@@ -51,21 +51,21 @@ TEST_CASE("find_primitive matches spg_find_primitive (size, lattice, volume)",
           "[oracle][primitive]") {
   for (Cell const &cell :
        {fcc_conventional(4.0), rock_salt(5.6), body_centered_tetragonal()}) {
-    auto ours = symmetry::find_primitive(cell, 1e-5);
+    auto ours = symmetry::find_primitive(cell, {1e-5});
     REQUIRE(ours);
     Cell const ref = oracle::reference_find_primitive(cell, 1e-5);
 
     INFO("ours size = " << ours->cell.size() << ", ref size = " << ref.size());
     REQUIRE(ours->cell.size() == ref.size());
-    CHECK(ours->cell.volume() == Approx(ref.volume()));
+    CHECK(ours->cell.lattice().volume() == Approx(ref.lattice().volume()));
     // Both describe the same lattice; compare the Niggli-reduced metric tensor,
     // which is invariant to basis choice and rigid rotation.
-    auto const gours = reduce::niggli_reduce(ours->cell.lattice(), 1e-5);
-    auto const gref = reduce::niggli_reduce(ref.lattice(), 1e-5);
+    auto const gours = ours->cell.lattice().niggli(1e-5);
+    auto const gref = ref.lattice().niggli(1e-5);
     REQUIRE(gours);
     REQUIRE(gref);
-    Matrix3d const mours = gours->transpose() * (*gours);
-    Matrix3d const mref = gref->transpose() * (*gref);
+    Matrix3d const mours = gours->metric();
+    Matrix3d const mref = gref->metric();
     CHECK((mours - mref).cwiseAbs().maxCoeff() < 1e-6);
   }
 }

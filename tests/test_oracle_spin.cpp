@@ -20,6 +20,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
 using cppcrystal::MagneticCell;
 using cppcrystal::MagneticSymmetryOperations;
@@ -38,7 +39,7 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(lattice, p, types);
+  return Cell(Lattice{lattice}, p, types);
 }
 
 // Reference magnetic symmetry via spg_get_symmetry_with_site_tensors. `tensors`
@@ -116,14 +117,21 @@ bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
   return std::abs(rounded.determinant()) == 1;
 }
 
-void check(MagneticCell const &mcell, std::vector<double> const &tensors,
+void check(MagneticCell const &input, std::vector<double> const &tensors,
            int tensor_rank, bool with_time_reversal, bool is_axial,
            double symprec) {
-  auto const sym_nonspin = cppcrystal::symmetry::find_symmetry(mcell.cell(), symprec);
+  MagneticCell const mcell(input.cell(), input.tensors(),
+                           is_axial ? cppcrystal::TensorKind::axial
+                                    : cppcrystal::TensorKind::polar);
+  auto const sym_nonspin =
+      cppcrystal::symmetry::find_symmetry(mcell.cell(), {symprec});
   REQUIRE(sym_nonspin);
 
   auto const got = cppcrystal::spin::operations_with_site_tensors(
-      sym_nonspin.value(), mcell, with_time_reversal, is_axial, symprec);
+      sym_nonspin.value(), mcell,
+      with_time_reversal ? cppcrystal::TimeReversal::on
+                         : cppcrystal::TimeReversal::off,
+      {{symprec}});
   REQUIRE(got);
 
   auto const ref = reference_magnetic(mcell.cell(), tensors, tensor_rank,

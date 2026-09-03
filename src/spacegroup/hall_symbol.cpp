@@ -2,7 +2,7 @@
 
 #include <cppcrystal/core/centering.hpp>
 #include <cppcrystal/core/matrix_order.hpp>
-#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/tolerance.hpp>
@@ -62,11 +62,11 @@ struct Setting {
   // For a layer setting (hall_number < 0) the conventional c axis (index 2)
   // is aperiodic: the overlap test must not fold it, and a shift along it
   // stays raw — that is what re-centers a layer onto the database convention.
-  [[nodiscard]] std::optional<int> aperiodic_axis() const noexcept {
-    return hall_number < 0 ? std::optional<int>(2) : std::nullopt;
+  [[nodiscard]] CellPeriodicity periodicity() const noexcept {
+    return hall_number < 0 ? aperiodic_along(2) : all_periodic();
   }
   [[nodiscard]] Vector3d wrap(Vector3d const &v) const noexcept {
-    return wrap_periodic(v, aperiodic_axis());
+    return cppcrystal::wrap(v, periodicity());
   }
 };
 
@@ -159,9 +159,9 @@ dw_choices(Setting const &s, Centering c, Generators const &rot) {
     auto const it = std::ranges::find_if(lo, hi, [&](auto const &entry) {
       auto const idx = static_cast<std::size_t>(entry.second);
       return !matched[idx] &&
-             is_overlap(lhs - transform_translation(c, s.db_ops[idx].translation),
+             coincident(lhs - transform_translation(c, s.db_ops[idx].translation),
                         shift_rot, s.primitive_lattice, s.symprec,
-                        s.aperiodic_axis());
+                        s.periodicity());
     });
     if (it == hi) {
       return false;

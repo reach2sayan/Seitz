@@ -21,7 +21,7 @@ namespace cppcrystal {
 // True when fractional points a and b are the same site: their difference,
 // folded to the minimal image along the periodic axes only, is within a
 // Cartesian distance of symprec (inclusive). The one definition of "same site"
-// for any periodicity; is_overlap is its single-aperiodic-axis spelling.
+// for any periodicity.
 [[nodiscard]] bool coincident(Vector3d const &a, Vector3d const &b,
                               Matrix3d const &lattice, double symprec,
                               CellPeriodicity const &periodicity) noexcept;

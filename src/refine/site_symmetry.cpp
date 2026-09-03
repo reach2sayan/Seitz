@@ -1,6 +1,5 @@
 #include <cppcrystal/refine/site_symmetry.hpp>
 
-#include <cppcrystal/core/overlap.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/data/sitesym_database.hpp>
@@ -30,13 +29,13 @@ constexpr double kIncreaseRate = 1.05;
                                           SymmetryOperations const &conv_sym,
                                           Matrix3d const &lattice,
                                           double symprec,
-                                          std::optional<int> aperiodic_axis) {
+                                          CellPeriodicity const &periodicity) {
   Matrix3d sum_rot = Matrix3d::Zero();
   Vector3d sum_trans = Vector3d::Zero();
   int num = 0;
   for (auto const &op : conv_sym) {
     Vector3d const pos = op.apply(position);
-    if (is_overlap(pos, position, lattice, symprec, aperiodic_axis)) {
+    if (coincident(pos, position, lattice, symprec, periodicity)) {
       sum_rot += op.rotation.cast<double>();
       Vector3d const wrap = math::round_to_int(pos - position).cast<double>();
       sum_trans += op.translation - wrap;
@@ -61,7 +60,7 @@ struct Equivalent {
 [[nodiscard]] ExactPositions
 get_exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
                     double symprec) {
-  std::optional<int> const aperiodic_axis = conv_prim.aperiodic_axis();
+  CellPeriodicity const &periodicity = conv_prim.periodicity();
   PositionIndex const index(conv_prim, symprec);
   auto const n = static_cast<std::size_t>(conv_prim.size());
   std::vector<std::optional<Equivalent>> claimed(n);
@@ -76,7 +75,7 @@ get_exact_positions(Cell const &conv_prim, SymmetryOperations const &conv_sym,
     }
     Vector3d const exact =
         set_exact_location(conv_prim.position(i), conv_sym,
-                           conv_prim.lattice(), symprec, aperiodic_axis);
+                           conv_prim.lattice().matrix(), symprec, periodicity);
     out.push_back({.position = exact, .equivalent_atom = i});
     for (auto const &op : conv_sym) {
       Vector3d const mapped = op.apply(exact);
@@ -105,24 +104,22 @@ struct WyckoffLabel {
 get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
                      int hall_number, double symprec,
-                     std::optional<int> aperiodic_axis) {
+                     CellPeriodicity const &periodicity) {
   std::vector<Vector3d> orbit;
   orbit.reserve(conv_sym.size());
   std::ranges::transform(conv_sym, std::back_inserter(orbit),
                          [&](auto const &op) { return op.apply(position); });
 
   // Coincidence classes of the orbit, found once through an index over it.
-  CellPeriodicity const periodicity =
-      periodicity_from_aperiodic_axis(aperiodic_axis);
   Positions const orbit_positions = to_positions(orbit);
   Types const orbit_types(orbit.size(), 0);
   PositionIndex const index(BucketGeometry::of(lattice, symprec, periodicity),
                             orbit_positions, orbit_types, lattice, symprec,
                             periodicity);
-  std::vector<std::vector<int>> coincident;
-  coincident.reserve(orbit.size());
+  std::vector<std::vector<int>> classes;
+  classes.reserve(orbit.size());
   for (auto const &point : orbit) {
-    coincident.push_back(std::ranges::to<std::vector<int>>(index.matches(point)));
+    classes.push_back(std::ranges::to<std::vector<int>>(index.matches(point)));
   }
 
   auto const group_order = static_cast<int>(conv_sym.size());
@@ -138,10 +135,10 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
     for (auto const [k, point] : orbit | std::views::enumerate) {
       Vector3d const mapped = wc.rotation.cast<double>() * point + wc.translation;
       fixed[static_cast<std::size_t>(k)] =
-          is_overlap(point, mapped, lattice, symprec, aperiodic_axis);
+          coincident(point, mapped, lattice, symprec, periodicity);
     }
     bool const consistent =
-        std::ranges::any_of(coincident, [&](std::vector<int> const &cls) {
+        std::ranges::any_of(classes, [&](std::vector<int> const &cls) {
           auto const fixed_in_class = std::ranges::count_if(
               cls, [&](int k) { return fixed[static_cast<std::size_t>(k)]; });
           return static_cast<int>(fixed_in_class) * wc.multiplicity ==
@@ -164,7 +161,7 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
                                       SymmetryOperations const &conv_sym,
                                       int num_pure_trans, int hall_number,
                                       double symprec) {
-  std::optional<int> const aperiodic_axis = conv_prim.aperiodic_axis();
+  CellPeriodicity const &periodicity = conv_prim.periodicity();
 
   std::vector<int> nums_equiv(atoms.size(), 0);
   for (auto const &atom : atoms) {
@@ -178,7 +175,7 @@ get_wyckoff_notation(Vector3d const &position, SymmetryOperations const &conv_sy
     auto const label = get_wyckoff_notation(
         atom.position, conv_sym,
         nums_equiv[static_cast<std::size_t>(i)] * num_pure_trans,
-        conv_prim.lattice(), hall_number, symprec, aperiodic_axis);
+        conv_prim.lattice().matrix(), hall_number, symprec, periodicity);
     if (!label) {
       return false;
     }

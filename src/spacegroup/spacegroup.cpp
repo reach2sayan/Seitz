@@ -7,8 +7,6 @@
 #include <cppcrystal/data/hall_classification.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/reduce/delaunay.hpp>
-#include <cppcrystal/reduce/niggli.hpp>
 #include <cppcrystal/spacegroup/hall_symbol.hpp>
 #include <cppcrystal/symmetry/find_symmetry.hpp>
 #include <cppcrystal/symmetry/pointgroup.hpp>
@@ -312,7 +310,7 @@ is_equivalent_lattice(int mode, Matrix3d const &lattice, Matrix3d const &orig,
     if (tmat_int.determinant() != 1) {
       break;
     }
-    if (matrices_close(math::metric_tensor(orig), math::metric_tensor(lattice),
+    if (matrices_close(Lattice{orig}.metric(), Lattice{lattice}.metric(),
                        symprec)) {
       return tmat;
     }
@@ -445,12 +443,13 @@ get_initial_conventional_symmetry(Centering centering, Matrix3d const &tmat,
 [[nodiscard]] std::optional<Matrix3i>
 change_basis_tricli(Matrix3d const &conv_lattice,
                     Matrix3d const &primitive_lattice, double symprec) {
-  auto const reduced = reduce::niggli_reduce(conv_lattice, symprec * symprec);
+  auto const reduced = Lattice{conv_lattice}.niggli(symprec * symprec);
   if (!reduced) {
     return std::nullopt;
   }
-  Matrix3d const smallest =
-      reduced->determinant() < 0 ? Matrix3d(-*reduced) : *reduced;
+  Matrix3d const smallest = reduced->matrix().determinant() < 0
+                                ? Matrix3d(-reduced->matrix())
+                                : reduced->matrix();
   Matrix3d const tmat = primitive_lattice.inverse() * smallest;
   return math::round_to_int(tmat);
 }
@@ -464,12 +463,11 @@ change_basis_monocli(Matrix3d const &conv_lattice,
                      Matrix3d const &primitive_lattice, double symprec,
                      std::optional<int> aperiodic_axis_conv) {
   int const keep_axis = aperiodic_axis_conv.value_or(1);
-  auto const smallest =
-      reduce::delaunay_reduce(conv_lattice, keep_axis, symprec);
+  auto const smallest = Lattice{conv_lattice}.delaunay(keep_axis, symprec);
   if (!smallest) {
     return std::nullopt;
   }
-  Matrix3d const tmat = primitive_lattice.inverse() * *smallest;
+  Matrix3d const tmat = primitive_lattice.inverse() * smallest->matrix();
   return math::round_to_int(tmat);
 }
 
@@ -873,13 +871,14 @@ struct SearchResult {
 search_hall_number(std::optional<int> forced_hall, Primitive const &primitive,
                    SymmetryOperations const &symmetry, double symprec) {
   std::vector<Matrix3i> const rotations = symmetry::rotations_of(symmetry);
-  auto const ptg =
-      symmetry::get_pointgroup(rotations, primitive.cell.aperiodic_axis());
+  std::optional<int> const layer_axis =
+      aperiodic_axis(primitive.cell.periodicity());
+  auto const ptg = symmetry::get_pointgroup(rotations, layer_axis);
   if (!ptg || ptg->pointgroup.number == 0) {
     return std::nullopt;
   }
 
-  Matrix3d const &prim_lat = primitive.cell.lattice();
+  Matrix3d const &prim_lat = primitive.cell.lattice().matrix();
   Matrix3i tmat_int = ptg->transformation;
   Laue const laue = ptg->pointgroup.laue;
 
@@ -891,7 +890,7 @@ search_hall_number(std::optional<int> forced_hall, Primitive const &primitive,
     // column the primitive aperiodic axis maps to under tmat_int) so the
     // monoclinic reduction keeps it and reduces the periodic plane.
     std::optional<int> aperiodic_conv;
-    if (auto const ap = primitive.cell.aperiodic_axis()) {
+    if (auto const ap = layer_axis) {
       // The last nonzero column wins, matching the historical scan direction.
       auto const cols = std::views::iota(0, 3) | std::views::reverse;
       auto const it = std::ranges::find_if(
@@ -923,7 +922,7 @@ search_hall_number(std::optional<int> forced_hall, Primitive const &primitive,
 
   std::span<int const> const candidates =
       forced_hall ? std::span<int const>(&*forced_hall, 1)
-      : primitive.cell.aperiodic_axis()
+      : layer_axis
           ? data::layer_default_halls_with_pointgroup(ptg->pointgroup.number)
           : data::default_halls_with_pointgroup(ptg->pointgroup.number);
 
@@ -946,21 +945,23 @@ search_hall_number(std::optional<int> forced_hall, Primitive const &primitive,
 [[nodiscard]] std::optional<SearchResult>
 iterative_search_hall_number(std::optional<int> forced_hall,
                              Primitive const &primitive,
-                             SymmetryOperations const &symmetry, double symprec,
-                             AngleTolerance angle_tolerance) {
-  if (auto r = search_hall_number(forced_hall, primitive, symmetry, symprec)) {
+                             SymmetryOperations const &symmetry,
+                             Tolerance const &tol) {
+  if (auto r =
+          search_hall_number(forced_hall, primitive, symmetry, tol.symprec)) {
     return r;
   }
 
-  double tolerance = symprec;
+  Tolerance tightened = tol;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
-    tolerance *= kReduceRate;
-    SymmetryOperations const reduced = symmetry::reduce_symmetry(
-        primitive.cell, symmetry, tolerance, angle_tolerance);
+    tightened.symprec *= kReduceRate;
+    SymmetryOperations const reduced =
+        symmetry::reduce_symmetry(primitive.cell, symmetry, tightened);
     if (reduced.empty()) {
       continue;
     }
-    if (auto r = search_hall_number(forced_hall, primitive, reduced, symprec)) {
+    if (auto r =
+            search_hall_number(forced_hall, primitive, reduced, tol.symprec)) {
       return r;
     }
   }
@@ -975,14 +976,13 @@ iterative_search_hall_number(std::optional<int> forced_hall,
 
 [[nodiscard]] Result<Spacegroup> search_spacegroup_with_symmetry(
     std::optional<int> forced_hall, Primitive const &primitive,
-    SymmetryOperations const &symmetry, double symprec,
-    AngleTolerance angle_tolerance) {
+    SymmetryOperations const &symmetry, Tolerance const &tol) {
   if (!point_symmetry_intact(symmetry)) {
     return leaf::new_error(e_spacegroup_search_failed{});
   }
 
-  auto const found = iterative_search_hall_number(
-      forced_hall, primitive, symmetry, symprec, angle_tolerance);
+  auto const found =
+      iterative_search_hall_number(forced_hall, primitive, symmetry, tol);
   if (!found) {
     return leaf::new_error(e_spacegroup_search_failed{});
   }
@@ -994,15 +994,12 @@ iterative_search_hall_number(std::optional<int> forced_hall,
 } // namespace
 
 Result<Spacegroup> search_spacegroup(Primitive const &primitive,
-                                     int hall_number, double symprec,
-                                     AngleTolerance angle_tolerance) {
-  BOOST_LEAF_AUTO(symmetry, symmetry::find_symmetry(primitive.cell, symprec,
-                                                    angle_tolerance));
+                                     int hall_number, Tolerance const &tol) {
+  BOOST_LEAF_AUTO(symmetry, symmetry::find_symmetry(primitive.cell, tol));
 
   std::optional<int> const forced_hall =
       hall_number != 0 ? std::optional<int>(hall_number) : std::nullopt;
-  return search_spacegroup_with_symmetry(forced_hall, primitive, symmetry,
-                                         symprec, angle_tolerance);
+  return search_spacegroup_with_symmetry(forced_hall, primitive, symmetry, tol);
 }
 
 Result<Spacegroup>
@@ -1011,11 +1008,11 @@ search_spacegroup_with_symmetry(SymmetryOperations const &operations,
   // A single notional atom at the origin; only the lattice matters here.
   Positions pos(1, 3);
   pos.setZero();
-  symmetry::Primitive const primitive{Cell(prim_lattice, pos, Types{1}),
-                                      std::vector<int>{0}, prim_lattice,
-                                      symprec, std::nullopt};
+  symmetry::Primitive const primitive{
+      Cell(Lattice{prim_lattice}, pos, Types{1}), std::vector<int>{0},
+      prim_lattice, {symprec, std::nullopt}};
   return search_spacegroup_with_symmetry(std::nullopt, primitive, operations,
-                                         symprec, std::nullopt);
+                                         {symprec, std::nullopt});
 }
 
 template <LatticeSetting Setting>
@@ -1039,7 +1036,8 @@ spacegroup_type_from_symmetry(SymmetryOperations const &operations,
   // Niggli-reduce the primitive cell (required by the Hall-symbol matcher),
   // then bring the operations into that reduced basis (the rotations are already
   // distinct, so it is just the change of basis).
-  BOOST_LEAF_AUTO(red_lat, reduce::niggli_reduce(prim_lat, symprec));
+  BOOST_LEAF_AUTO(red, Lattice{prim_lat}.niggli(symprec));
+  Matrix3d const &red_lat = red.matrix();
   Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
   Matrix3d const inv2 = t_mat2.inverse();
   SymmetryOperations red_sym;

@@ -224,9 +224,58 @@ Matrix3i const kIdentity = Matrix3i::Identity();
 // class-count table indexes them: {-6,-4,-3,-2,-1,1,2,3,4,6}.
 constexpr std::size_t kRotationTypeCount = 10;
 
-// rotation_type() is now public (declared in the header) and defined below,
-// after this anonymous namespace; class_table() calls it through that
-// declaration.
+// Crystallographic type of a single rotation, in a lattice basis, ordered as
+// the class-count table indexes them.
+enum class RotationType {
+  rotoinversion_6, // -6
+  rotoinversion_4, // -4
+  rotoinversion_3, // -3
+  mirror,          // -2
+  inversion,       // -1
+  identity,        //  1
+  rotation_2,      //  2
+  rotation_3,      //  3
+  rotation_4,      //  4
+  rotation_6,      //  6
+};
+
+// Classify a single integer rotation by determinant and trace; std::nullopt if
+// it is not a crystallographic rotation.
+[[nodiscard]] std::optional<RotationType> rotation_type(Matrix3i const &rot) noexcept {
+  int const det = rot.determinant();
+  int const tr = rot.trace();
+  if (det == -1) {
+    switch (tr) {
+    case -2:
+      return RotationType::rotoinversion_6;
+    case -1:
+      return RotationType::rotoinversion_4;
+    case 0:
+      return RotationType::rotoinversion_3;
+    case 1:
+      return RotationType::mirror;
+    case -3:
+      return RotationType::inversion;
+    default:
+      return std::nullopt;
+    }
+  }
+  switch (tr) {
+  case 3:
+    return RotationType::identity;
+  case -1:
+    return RotationType::rotation_2;
+  case 0:
+    return RotationType::rotation_3;
+  case 1:
+    return RotationType::rotation_4;
+  case 2:
+    return RotationType::rotation_6;
+  default:
+    return std::nullopt;
+  }
+}
+
 
 // De-duplicate rotations by value; distinct rotations beyond the capacity of
 // PointSymmetry are dropped, as before.
@@ -615,56 +664,6 @@ get_axes(Laue laue, PointSymmetry const &ps,
 
 } // namespace
 
-std::optional<RotationType> rotation_type(Matrix3i const &rot) noexcept {
-  int const det = rot.determinant();
-  int const tr = rot.trace();
-  if (det == -1) {
-    switch (tr) {
-    case -2:
-      return RotationType::rotoinversion_6;
-    case -1:
-      return RotationType::rotoinversion_4;
-    case 0:
-      return RotationType::rotoinversion_3;
-    case 1:
-      return RotationType::mirror;
-    case -3:
-      return RotationType::inversion;
-    default:
-      return std::nullopt;
-    }
-  }
-  switch (tr) {
-  case 3:
-    return RotationType::identity;
-  case -1:
-    return RotationType::rotation_2;
-  case 0:
-    return RotationType::rotation_3;
-  case 1:
-    return RotationType::rotation_4;
-  case 2:
-    return RotationType::rotation_6;
-  default:
-    return std::nullopt;
-  }
-}
-
-int rotation_order(Matrix3i const &rot) noexcept {
-  // Signed orders in RotationType declaration order.
-  constexpr std::array<int, 10> kOrders{-6, -4, -3, -2, -1, 1, 2, 3, 4, 6};
-  return rotation_type(rot)
-      .transform([&](RotationType t) {
-        return kOrders[static_cast<std::size_t>(std::to_underlying(t))];
-      })
-      .value_or(0);
-}
-
-std::optional<Vector3i> rotation_axis(Matrix3i const &rot) {
-  auto const idx = axis_index(proper_rotation(rot));
-  return idx ? std::optional<Vector3i>{rot_axis(*idx)} : std::nullopt;
-}
-
 PointGroup pointgroup_by_number(int number) noexcept {
   if (number < 1 || number > 32) {
     return {};
@@ -673,10 +672,6 @@ PointGroup pointgroup_by_number(int number) noexcept {
   // CrystalClass enumerators are aligned to the point-group numbering (1..32).
   return {number, e.symbol, e.schoenflies, e.holohedry, e.laue,
           static_cast<CrystalClass>(number)};
-}
-
-int identify_pointgroup_number(std::span<Matrix3i const> rotations) noexcept {
-  return pointgroup_number(unique_rotations(rotations));
 }
 
 Result<PointgroupTransform> get_pointgroup(std::span<Matrix3i const> rotations,

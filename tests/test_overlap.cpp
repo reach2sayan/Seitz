@@ -17,7 +17,7 @@ Cell bcc(double a) {
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0});
 }
 
 Matrix3i inversion() { return -Matrix3i::Identity(); }
@@ -37,9 +37,9 @@ bool reference_total_overlap(Cell const &cell, Vector3d const &trans,
         continue;
       }
       Vector3d const image = rotd * cell.position(ir) + trans;
-      if (is_overlap_same_type(cell.position(io), image, cell.type(io),
-                               cell.type(ir), cell.lattice(), symprec,
-                               cell.aperiodic_axis())) {
+      if (cell.type(io) == cell.type(ir) &&
+          coincident(cell.position(io), image, cell.lattice().matrix(), symprec,
+                     cell.periodicity())) {
         found[static_cast<std::size_t>(ir)] = true;
         break;
       }
@@ -76,7 +76,7 @@ Cell supercell(int k, double noise, std::mt19937 &rng) {
       pos(i, d) += jitter(rng);
     }
   }
-  return Cell(lattice, pos, types);
+  return Cell(Lattice{lattice}, pos, types);
 }
 
 Matrix3i random_rotation(std::mt19937 &rng) {
@@ -91,12 +91,12 @@ Matrix3i random_rotation(std::mt19937 &rng) {
 }
 } // namespace
 
-TEST_CASE("is_overlap uses the Cartesian minimal image", "[overlap]") {
+TEST_CASE("coincident uses the Cartesian minimal image", "[overlap]") {
   Matrix3d lat = Matrix3d::Identity() * 5.0;
-  CHECK(
-      is_overlap(Vector3d(0.0, 0.0, 0.0), Vector3d(1.0, -2.0, 3.0), lat, 1e-5));
-  CHECK_FALSE(
-      is_overlap(Vector3d(0.0, 0.0, 0.0), Vector3d(0.1, 0.0, 0.0), lat, 1e-5));
+  CHECK(coincident(Vector3d(0.0, 0.0, 0.0), Vector3d(1.0, -2.0, 3.0), lat, 1e-5,
+                   all_periodic()));
+  CHECK_FALSE(coincident(Vector3d(0.0, 0.0, 0.0), Vector3d(0.1, 0.0, 0.0), lat,
+                         1e-5, all_periodic()));
   // 0.1 fractional along a=5 -> 0.5 Angstrom > symprec.
 }
 
@@ -128,7 +128,7 @@ TEST_CASE("symmetry breaks when the two atoms differ in type", "[overlap]") {
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  OverlapChecker checker(Cell(lattice, pos, {0, 1}),
+  OverlapChecker checker(Cell(Lattice{lattice}, pos, {0, 1}),
                          1e-5); // CsCl-like, distinct types
   // The centering translation now swaps unlike atoms -> not a symmetry.
   CHECK_FALSE(checker.check_total_overlap(Vector3d(0.5, 0.5, 0.5),

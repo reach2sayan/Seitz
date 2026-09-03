@@ -74,18 +74,8 @@ struct Dataset {
 //
 // For the object-oriented entry point that owns the cell and memoizes this and
 // every derived query, prefer cppcrystal::analysis::SymmetryAnalyzer::dataset().
-[[nodiscard]] Result<Dataset>
-get_dataset(Cell const &cell, double symprec = kDefaultSymprec,
-            AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);
-
-// Determine the LAYER group of `cell` — a 2D-periodic crystal with the given
-// `aperiodic_axis` (0/1/2 = a/b/c). The returned Dataset uses the
-// negative-Hall-number convention (hall_number in -1..-116) and layer-group
-// number (1..80); its aperiodic_axis field is set. Equivalent to setting the
-// aperiodic axis on `cell` and calling get_dataset.
-[[nodiscard]] Result<Dataset>
-get_layer_dataset(Cell const &cell, int aperiodic_axis,
-                  double symprec = kDefaultSymprec,
-                  AngleTolerance angle_tolerance = std::nullopt);
+[[nodiscard]] Result<Dataset> get_dataset(Cell const &cell,
+                                          Tolerance const &tol = {},
+                                          int hall_number = 0);
 
 } // namespace cppcrystal

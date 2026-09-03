@@ -475,7 +475,7 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
   Cell const &prim_cell = prim.cell;
   // tmat_prm = tmat . cell.lattice^-1 . primitive.lattice.
   Matrix3d const tmat_prm =
-      transformation_matrix * cell.lattice().inverse() * prim_cell.lattice();
+      transformation_matrix * cell.lattice().matrix().inverse() * prim_cell.lattice().matrix();
 
   // The cell -> primitive map is many-to-one; pick the first preimage per
   // primitive atom (site tensors are invariant under pure translations).
@@ -529,8 +529,8 @@ transform_cell(MagneticCell const &mcell, Matrix3d const &transformation_matrix,
     }
   }
 
-  Matrix3d const lattice =
-      rigid_rotation * cell.lattice() * transformation_matrix.inverse();
+  Lattice const lattice{rigid_rotation * cell.lattice().matrix() *
+                        transformation_matrix.inverse()};
   SiteTensors tensors = collinear ? SiteTensors{std::move(scalars)}
                                   : SiteTensors{std::move(vectors)};
   return MagneticCell(Cell(lattice, positions, types), std::move(tensors));

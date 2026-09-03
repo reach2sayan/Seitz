@@ -37,10 +37,10 @@ template <> struct MomentOps<double> {
   // det(R).
   [[nodiscard]] static double transform(double src, Matrix3d const &rot_cart,
                                         bool time_reversal,
-                                        bool with_time_reversal,
-                                        bool is_axial) {
-    double dst = (with_time_reversal && time_reversal) ? -src : src;
-    if (is_axial) {
+                                        TimeReversal mode, TensorKind kind) {
+    double dst =
+        (mode == TimeReversal::on && time_reversal) ? -src : src;
+    if (kind == TensorKind::axial) {
       dst *= rot_cart.determinant();
     }
     return dst;
@@ -61,13 +61,12 @@ template <> struct MomentOps<Vector3d> {
   [[nodiscard]] static Vector3d transform(Vector3d const &v,
                                           Matrix3d const &rot_cart,
                                           bool time_reversal,
-                                          bool with_time_reversal,
-                                          bool is_axial) {
+                                          TimeReversal mode, TensorKind kind) {
     Vector3d dst = rot_cart * v;
-    if (with_time_reversal && time_reversal) {
+    if (mode == TimeReversal::on && time_reversal) {
       dst = -dst;
     }
-    if (is_axial) {
+    if (kind == TensorKind::axial) {
       dst *= rot_cart.determinant();
     }
     return dst;
@@ -103,11 +102,11 @@ template <class F>
 // for the matching timerev.
 template <class M>
 [[nodiscard]] int spin_sign(M const &m_j, M const &m_k,
-                            Matrix3d const &rot_cart, bool with_time_reversal,
-                            bool is_axial, double mag_symprec) {
+                            Matrix3d const &rot_cart, TimeReversal mode,
+                            TensorKind kind, double mag_symprec) {
   for (int timerev = 0; timerev <= 1; ++timerev) {
-    M const transformed = MomentOps<M>::transform(
-        m_j, rot_cart, timerev != 0, with_time_reversal, is_axial);
+    M const transformed =
+        MomentOps<M>::transform(m_j, rot_cart, timerev != 0, mode, kind);
     if (MomentOps<M>::close(m_k, transformed, mag_symprec)) {
       return 1 - 2 * timerev;
     }
@@ -134,11 +133,11 @@ cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
 template <class M>
 [[nodiscard]] MagneticSymmetryOperations
 get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
-               bool with_time_reversal, bool is_axial, double symprec,
-               double mag_symprec) {
+               TimeReversal mode, double symprec, double mag_symprec) {
+  TensorKind const kind = mcell.kind();
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  auto const rot_cart = cartesian_rotations(cell.lattice(), sym_nonspin);
+  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), sym_nonspin);
   PositionIndex const index(cell, symprec);
 
   MagneticSymmetryOperations out;
@@ -170,12 +169,12 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
       }
 
       int const s =
-          spin_sign(m_j, m_k, rc, with_time_reversal, is_axial, mag_symprec);
+          spin_sign(m_j, m_k, rc, mode, kind, mag_symprec);
 
       if (!determined) {
         sign = s;
         determined = true;
-        if (sign == 0 || (!with_time_reversal && sign != 1)) {
+        if (sign == 0 || (mode == TimeReversal::off && sign != 1)) {
           found = false;
           break;
         }
@@ -191,7 +190,7 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
     if (determined) {
       // sign == -1 only occurs with time reversal -> anti-operation.
       out.push_back({op.rotation, op.translation, sign == -1});
-    } else if (with_time_reversal) {
+    } else if (mode == TimeReversal::on) {
       out.push_back({op.rotation, op.translation, false}); // sign = +1
       out.push_back({op.rotation, op.translation, true});  // sign = -1
     } else {
@@ -207,11 +206,12 @@ get_operations(SymmetryOperations const &sym_nonspin, MagneticCell const &mcell,
 template <class M>
 [[nodiscard]] std::optional<std::vector<int>>
 get_permutations(MagneticSymmetryOperations const &operations,
-                 MagneticCell const &mcell, bool with_time_reversal,
-                 bool is_axial, double symprec, double mag_symprec) {
+                 MagneticCell const &mcell, TimeReversal mode,
+                 double symprec, double mag_symprec) {
+  TensorKind const kind = mcell.kind();
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
+  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), operations);
   PositionIndex const index(cell, symprec);
 
   std::vector<int> perm;
@@ -221,8 +221,7 @@ get_permutations(MagneticSymmetryOperations const &operations,
       Vector3d const pos = op.spatial().apply(cell.position(i));
       M const moment =
           MomentOps<M>::transform(MomentOps<M>::moment(mcell, i), rc,
-                                  op.time_reversal, with_time_reversal,
-                                  is_axial);
+                                  op.time_reversal, mode, kind);
 
       auto const j = index.first_match(pos, cell.type(i), [&](int k) {
         return MomentOps<M>::close(MomentOps<M>::moment(mcell, k), moment,
@@ -261,12 +260,11 @@ get_permutations(MagneticSymmetryOperations const &operations,
 template <class M>
 [[nodiscard]] MagneticCell
 idealized_cell_impl(MagneticSymmetrySearch const &search,
-                    MagneticCell const &mcell, bool with_time_reversal,
-                    bool is_axial) {
+                    MagneticCell const &mcell, TimeReversal mode) {
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
   auto const &operations = search.operations;
-  auto const rot_cart = cartesian_rotations(cell.lattice(), operations);
+  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), operations);
 
   // inverse[p, i] = the atom that operation p maps onto atom i.
   auto const perm = search.permutations();
@@ -296,8 +294,8 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
       Vector3d const diff = pos_tmp - cell.position(i);
       pos_res += math::nearest_offset(diff);
       moment_res += MomentOps<M>::transform(MomentOps<M>::moment(mcell, j), rc,
-                                            op.time_reversal,
-                                            with_time_reversal, is_axial) -
+                                            op.time_reversal, mode,
+                                            mcell.kind()) -
                     MomentOps<M>::moment(mcell, i);
     }
     positions.row(i) = (cell.position(i) + pos_res / denom).transpose();
@@ -306,7 +304,7 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
   }
 
   return MagneticCell(Cell(cell.lattice(), positions, cell.types()),
-                      MomentOps<M>::pack(std::move(moments)));
+                      MomentOps<M>::pack(std::move(moments)), mcell.kind());
 }
 
 } // namespace
@@ -323,31 +321,32 @@ collect_pure_translations(MagneticSymmetryOperations const &operations) {
 }
 
 MagneticCell idealized_cell(MagneticSymmetrySearch const &search,
-                            MagneticCell const &mcell, bool with_time_reversal,
-                            bool is_axial) {
+                            MagneticCell const &mcell,
+                            TimeReversal time_reversal) {
   return visit_moment_kind(mcell, [&]<class M>() {
-    return idealized_cell_impl<M>(search, mcell, with_time_reversal, is_axial);
+    return idealized_cell_impl<M>(search, mcell, time_reversal);
   });
 }
 
 Result<MagneticSymmetrySearch>
 operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
-                             MagneticCell const &mcell, bool with_time_reversal,
-                             bool is_axial, double symprec,
-                             AngleTolerance angle_tolerance,
-                             std::optional<double> mag_symprec) {
-  (void)angle_tolerance; // primitive_lattice_vectors uses the Delaunay path
-  double const mag_tol = mag_symprec.value_or(symprec);
+                             MagneticCell const &mcell,
+                             TimeReversal time_reversal,
+                             MagneticTolerance const &tol) {
+  // The angle tolerance plays no part here: primitive_lattice_vectors takes
+  // the Delaunay path, which is driven by symprec alone.
+  double const symprec = tol.symprec;
+  double const mag_tol = tol.moment_or_symprec();
 
   MagneticSymmetryOperations operations =
       visit_moment_kind(mcell, [&]<class M>() {
-        return get_operations<M>(sym_nonspin, mcell, with_time_reversal,
-                                 is_axial, symprec, mag_tol);
+        return get_operations<M>(sym_nonspin, mcell, time_reversal, symprec,
+                                 mag_tol);
       });
 
   auto permutations = visit_moment_kind(mcell, [&]<class M>() {
-    return get_permutations<M>(operations, mcell, with_time_reversal, is_axial,
-                               symprec, mag_tol);
+    return get_permutations<M>(operations, mcell, time_reversal, symprec,
+                               mag_tol);
   });
   if (!permutations) {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
@@ -367,7 +366,8 @@ operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
 
   return MagneticSymmetrySearch{std::move(operations),
                                 std::move(equivalent_atoms),
-                                std::move(*permutations), *prim_lattice};
+                                std::move(*permutations),
+                                prim_lattice->matrix()};
 }
 
 } // namespace cppcrystal::spin

@@ -6,7 +6,6 @@
 #include <cppcrystal/core/validation.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/reduce/delaunay.hpp>
 
 #include <boost/container/flat_map.hpp>
 
@@ -122,8 +121,8 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
     if (int const det = axes.determinant(); det != 1 && det != -1) {
       continue;
     }
-    Matrix3d const lattice = min_lattice * axes.cast<double>();
-    Matrix3d const metric = math::metric_tensor(lattice);
+    Matrix3d const metric =
+        Lattice{min_lattice * axes.cast<double>()}.metric();
     if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
       if (found.size() >= cap) {
         return std::nullopt;
@@ -179,8 +178,7 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
 // Translations t such that x -> rot . x + t maps the cell onto itself.
 [[nodiscard]] std::vector<Vector3d>
 translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
-                          Matrix3i const &rot, int min_index,
-                          std::optional<int> aperiodic_axis) {
+                          Matrix3i const &rot, int min_index) {
   Vector3d const origin = rot.cast<double>() * cell.position(min_index);
   std::vector<Vector3d> result;
   int const n = static_cast<int>(cell.size());
@@ -192,7 +190,7 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
     if (checker.check_total_overlap(trans, rot)) {
       // Layer translations live in the periodic plane; the aperiodic component
       // is kept raw rather than folded into [0, 1).
-      result.push_back(wrap_periodic(trans, aperiodic_axis));
+      result.push_back(wrap(trans, cell.periodicity()));
     }
   }
   return result;
@@ -200,25 +198,26 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
 
 } // namespace
 
-Result<PointSymmetry> lattice_symmetry(Cell const &cell, double symprec,
-                                       AngleTolerance angle_tolerance) {
-  std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
+Result<PointSymmetry> lattice_symmetry(Cell const &cell,
+                                       Tolerance const &tol) {
+  double const symprec = tol.symprec;
+  std::optional<int> const layer_axis = aperiodic_axis(cell.periodicity());
   // A layer cell reduces only the two periodic lattice vectors, leaving the
   // aperiodic axis fixed; a 3D cell uses the full Delaunay reduction.
-  auto const min_lattice =
-      aperiodic_axis
-          ? reduce::delaunay_reduce(cell.lattice(), *aperiodic_axis, symprec)
-          : reduce::delaunay_reduce(cell.lattice(), symprec);
+  auto const min_lattice = layer_axis
+                               ? cell.lattice().delaunay(*layer_axis, symprec)
+                               : cell.lattice().delaunay(symprec);
   if (!min_lattice) {
     return leaf::new_error(e_symmetry_operation_search_failed{});
   }
-  Matrix3d const metric_orig = math::metric_tensor(*min_lattice);
-  AngleTolerance angle = angle_tolerance;
+  Matrix3d const metric_orig = min_lattice->metric();
+  AngleTolerance angle = tol.angle_tolerance;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
-    auto found = collect_metric_symmetries(*min_lattice, metric_orig, symprec,
-                                           angle, aperiodic_axis);
+    auto found = collect_metric_symmetries(min_lattice->matrix(), metric_orig,
+                                           symprec, angle, layer_axis);
     if (found) {
-      return transform_pointsymmetry(*found, cell.lattice(), *min_lattice);
+      return transform_pointsymmetry(*found, cell.lattice().matrix(),
+                                     min_lattice->matrix());
     }
     if (angle) {
       *angle *= kAngleReduceRate; // too many: tighten and retry
@@ -228,12 +227,12 @@ Result<PointSymmetry> lattice_symmetry(Cell const &cell, double symprec,
   return leaf::new_error(e_symmetry_operation_search_failed{});
 }
 
-Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
-                                         AngleTolerance angle_tolerance) {
+Result<SymmetryOperations> find_symmetry(Cell const &cell,
+                                         Tolerance const &tol) {
   if (auto valid = validate_cell(cell); !valid) {
     return valid.error();
   }
-  BOOST_LEAF_AUTO(lat_sym, lattice_symmetry(cell, symprec, angle_tolerance));
+  BOOST_LEAF_AUTO(lat_sym, lattice_symmetry(cell, tol));
   if (lat_sym.empty())
     return leaf::new_error(e_symmetry_operation_search_failed{});
 
@@ -241,12 +240,11 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
   if (!min_index)
     return leaf::new_error(e_empty_cell{});
 
-  OverlapChecker const checker(cell, symprec);
-  std::optional<int> const aperiodic_axis = cell.aperiodic_axis();
+  OverlapChecker const checker(cell, tol.symprec);
   SymmetryOperations ops;
   for (Matrix3i const &rot : lat_sym)
-    for (Vector3d const &t : translations_for_rotation(
-             cell, checker, rot, *min_index, aperiodic_axis))
+    for (Vector3d const &t :
+         translations_for_rotation(cell, checker, rot, *min_index))
       ops.push_back({rot, t});
 
   return ops;
@@ -254,13 +252,12 @@ Result<SymmetryOperations> find_symmetry(Cell const &cell, double symprec,
 
 SymmetryOperations reduce_symmetry(Cell const &cell,
                                    SymmetryOperations const &operations,
-                                   double symprec,
-                                   AngleTolerance angle_tolerance) {
-  auto const lat_sym = lattice_symmetry(cell, symprec, angle_tolerance);
+                                   Tolerance const &tol) {
+  auto const lat_sym = lattice_symmetry(cell, tol);
   if (!lat_sym) {
     return {};
   }
-  OverlapChecker const checker(cell, symprec);
+  OverlapChecker const checker(cell, tol.symprec);
   RotationSet const lattice_rotations = rotation_set(*lat_sym);
   auto survives = [&](SymmetryOperation const &op) {
     return lattice_rotations.contains(op.rotation) &&
@@ -276,7 +273,7 @@ std::vector<Vector3d> pure_translations(Cell const &cell, double symprec) {
     return {};
   OverlapChecker const checker(cell, symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
-                                   *min_index, cell.aperiodic_axis());
+                                   *min_index);
 }
 
 } // namespace cppcrystal::symmetry

@@ -32,10 +32,21 @@ inline constexpr double kZeroPrec = 1e-10;
 // from symprec.
 using AngleTolerance = std::optional<double>;
 
-// Bundle of tolerances threaded through the symmetry-finding pipeline.
+// Bundle of tolerances threaded through the symmetry-finding pipeline: the one
+// parameter every stage takes, in place of the (symprec, angle) pair.
 struct Tolerance {
   double symprec = kDefaultSymprec;
   AngleTolerance angle_tolerance;
+};
+
+// The magnetic search adds a moment-comparison tolerance, which defaults to
+// symprec when unset.
+struct MagneticTolerance : Tolerance {
+  std::optional<double> moment;
+
+  [[nodiscard]] double moment_or_symprec() const noexcept {
+    return moment.value_or(symprec);
+  }
 };
 
 } // namespace cppcrystal

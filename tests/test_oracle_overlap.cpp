@@ -12,7 +12,7 @@ Cell bcc(double a) {
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0});
 }
 
 // Rutile-like tetragonal cell (lower symmetry, several operations).
@@ -28,7 +28,7 @@ Cell rutile() {
   pos.row(3) << 0.7, 0.7, 0.0;
   pos.row(4) << 0.2, 0.8, 0.5;
   pos.row(5) << 0.8, 0.2, 0.5;
-  return Cell(lattice, pos, {0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{lattice}, pos, {0, 0, 1, 1, 1, 1});
 }
 } // namespace
 

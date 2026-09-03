@@ -4,7 +4,6 @@
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
 
-#include <algorithm>
 #include <array>
 #include <optional>
 #include <ranges>
@@ -19,31 +18,26 @@ enum class AxisKind { periodic, aperiodic };
 //   point group    : {aperiodic, aperiodic, aperiodic} (dim 0, a cluster)
 using CellPeriodicity = std::array<AxisKind, 3>;
 
-[[nodiscard]] constexpr int
-periodic_dimension(CellPeriodicity const &p) noexcept {
-  return static_cast<int>(std::ranges::count(p, AxisKind::periodic));
-}
-
 // The fully-periodic descriptor (a 3D space-group cell).
 [[nodiscard]] constexpr CellPeriodicity all_periodic() noexcept {
   return {AxisKind::periodic, AxisKind::periodic, AxisKind::periodic};
 }
 
-[[nodiscard]] constexpr CellPeriodicity
-periodicity_from_aperiodic_axis(std::optional<int> aperiodic_axis) noexcept {
+// The layer-group descriptor: periodic in the plane, aperiodic along `axis`
+// (c, axis 2, in the conventional setting). The inverse of aperiodic_axis().
+[[nodiscard]] constexpr CellPeriodicity aperiodic_along(int axis) noexcept {
   CellPeriodicity p = all_periodic();
-  if (aperiodic_axis) {
-    p[static_cast<std::size_t>(*aperiodic_axis)] = AxisKind::aperiodic;
-  }
+  p[static_cast<std::size_t>(axis)] = AxisKind::aperiodic;
   return p;
 }
 
-// The inverse bridge: the single aperiodic axis if there is exactly one,
-// otherwise std::nullopt (all-periodic 3D, or the >1-aperiodic rod/point cases
-// the legacy API cannot represent). A caller that must stay on the single-axis
-// API can detect those cases by the nullopt-with-non-3D mismatch.
+// The single aperiodic axis if there is exactly one — a layer group's c. The
+// layer path needs the axis index itself (to pick the in-plane pair, to reject
+// the cubic point groups, ...); this is the one place that search lives.
+// std::nullopt for the 3D case and for the rod/cluster cases, which have no
+// single distinguished aperiodic axis.
 [[nodiscard]] constexpr std::optional<int>
-single_aperiodic_axis(CellPeriodicity const &p) noexcept {
+aperiodic_axis(CellPeriodicity const &p) noexcept {
   std::optional<int> found;
 
   for (auto const [axis, kind] : p | std::views::enumerate) {
@@ -73,15 +67,15 @@ minimal_image(Vector3d const &diff, CellPeriodicity const &p) noexcept {
   return out;
 }
 
-// Fold a fractional coordinate into the cell [0, 1), but leave the aperiodic
-// axis (if any) at its raw value — layer/rod cells are not periodic along it.
-[[nodiscard]] inline Vector3d
-wrap_periodic(Vector3d const &v, std::optional<int> aperiodic_axis) noexcept {
+// Fold a fractional coordinate into the cell [0, 1) along every periodic axis,
+// leaving the aperiodic axes at their raw values — a layer/rod/cluster cell is
+// not periodic along those.
+[[nodiscard]] inline Vector3d wrap(Vector3d const &v,
+                                   CellPeriodicity const &p) noexcept {
   Vector3d out;
-  for (int j = 0; j < 3; ++j) {
-    out[j] = (aperiodic_axis && j == *aperiodic_axis)
-                 ? v[j]
-                 : math::wrap_to_unit_cell(v[j]);
+  for (auto const [axis, kind] : p | std::views::enumerate) {
+    out[axis] = kind == AxisKind::aperiodic ? v[axis]
+                                            : math::wrap_to_unit_cell(v[axis]);
   }
   return out;
 }

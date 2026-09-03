@@ -23,9 +23,11 @@ namespace {
   };
   std::vector<Keyed> keyed;
   keyed.reserve(static_cast<std::size_t>(cell.size()));
-  for (Index i = 0; i < cell.size(); ++i) {
-    Vector3d const image = minimal_image(cell.position(i), cell.periodicity());
-    keyed.push_back({cell.type(i), (cell.lattice() * image).squaredNorm(), i});
+  for (auto const [i, atom] : cell.atoms() | std::views::enumerate) {
+    auto const &[position, type] = atom;
+    Vector3d const image = minimal_image(position, cell.periodicity());
+    keyed.push_back({type, (cell.lattice().matrix() * image).squaredNorm(),
+                     static_cast<Index>(i)});
   }
   std::ranges::sort(keyed, {}, [](Keyed const &k) {
     return std::tie(k.type, k.distance_sq);

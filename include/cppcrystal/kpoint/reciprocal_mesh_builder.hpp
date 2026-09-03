@@ -18,9 +18,8 @@ namespace cppcrystal::kpoint {
 // different mesh, so there is nothing to cache.
 class ReciprocalMeshBuilder {
 public:
-  [[nodiscard]] static ReciprocalMeshBuilder
-  from_cell(Cell cell, double symprec = kDefaultSymprec,
-            AngleTolerance angle_tolerance = std::nullopt);
+  [[nodiscard]] static ReciprocalMeshBuilder from_cell(Cell cell,
+                                                       Tolerance tol = {});
 
   [[nodiscard]] Cell const &cell() const noexcept { return cell_; }
   [[nodiscard]] double symprec() const noexcept { return tol_.symprec; }
@@ -34,7 +33,7 @@ public:
   // kpoint::ir_reciprocal_mesh(Cell, ...). Errors via get_dataset.
   [[nodiscard]] Result<IrReciprocalMesh>
   irreducible(Vector3i const &mesh, Vector3i const &is_shift,
-              bool time_reversal) const;
+              TimeReversal time_reversal) const;
 
 private:
   ReciprocalMeshBuilder(Cell cell, Tolerance tol)

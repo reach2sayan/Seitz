@@ -7,7 +7,7 @@ add_executable(cppcrystal_tests
         test_position_index.cpp
         test_mdspan.cpp
         test_generate.cpp
-        test_reduce.cpp
+        test_lattice.cpp
         test_find_symmetry.cpp
         test_primitive.cpp
         test_database.cpp

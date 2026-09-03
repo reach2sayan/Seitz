@@ -24,9 +24,9 @@ using data::operations_from_database;
 namespace {
 
 // In the conventional/standardized setting a layer group always has its
-// aperiodic axis as c (axis 2); a 3D group has none.
-[[nodiscard]] std::optional<int> conventional_aperiodic_axis(int hall_number) {
-  return hall_number < 0 ? std::optional<int>(2) : std::nullopt;
+// aperiodic axis as c (axis 2); a 3D group is periodic on all three.
+[[nodiscard]] CellPeriodicity conventional_periodicity(int hall_number) {
+  return hall_number < 0 ? aperiodic_along(2) : all_periodic();
 }
 
 // Number of pure (identity-rotation) translations among the conventional ops.
@@ -39,9 +39,9 @@ namespace {
 // by the origin shift and folded into the cell.
 [[nodiscard]] Cell conventional_primitive(spacegroup::Spacegroup const &sg,
                                           Cell const &primitive,
-                                          Matrix3d const &std_lattice,
-                                          std::optional<int> aperiodic_axis) {
-  Matrix3d const trans_mat = sg.bravais_lattice.inverse() * primitive.lattice();
+                                          Lattice const &std_lattice,
+                                          CellPeriodicity const &periodicity) {
+  Matrix3d const trans_mat = sg.bravais_lattice.inverse() * primitive.lattice().matrix();
   Positions pos(primitive.size(), 3);
   for (Index i = 0; i < primitive.size(); ++i) {
     Vector3d const p = trans_mat * primitive.position(i) + sg.origin_shift;
@@ -49,10 +49,10 @@ namespace {
     // aperiodic one: the origin shift has aligned the layer onto the database
     // convention (symmetry plane at c = 0), so folding c resolves the sign
     // ambiguity of the shift. (The aperiodic axis is only left un-folded in the
-    // overlap *distance*, via is_overlap, not in stored coordinates.)
+    // overlap *distance*, via `coincident`, not in stored coordinates.)
     pos.row(i) = math::wrap_to_unit_cell(p).transpose();
   }
-  return Cell(std_lattice, std::move(pos), primitive.types(), aperiodic_axis);
+  return Cell(std_lattice, std::move(pos), primitive.types(), periodicity);
 }
 
 // Replicate the exact conventional-primitive atoms across the pure translations
@@ -63,10 +63,10 @@ struct Bravais {
 };
 
 [[nodiscard]] Bravais expand_in_bravais(Cell const &conv_prim,
-                                        Matrix3d const &std_lattice,
+                                        Lattice const &std_lattice,
                                         SymmetryOperations const &conv_sym,
                                         ExactPositions const &exact,
-                                        std::optional<int> aperiodic_axis) {
+                                        CellPeriodicity const &periodicity) {
   auto const total =
       exact.size() * static_cast<std::size_t>(num_pure_translations(conv_sym));
 
@@ -85,9 +85,8 @@ struct Bravais {
       mapping.push_back(static_cast<int>(j));
     }
   }
-  return {
-      Cell(std_lattice, to_positions(pos), std::move(types), aperiodic_axis),
-      std::move(mapping)};
+  return {Cell(std_lattice, to_positions(pos), std::move(types), periodicity),
+          std::move(mapping)};
 }
 
 // first_index_of(values, size)[v] = the first position holding value v (for
@@ -179,11 +178,11 @@ get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
   int const hall = sg.type.hall_number;
   SymmetryOperations const conv_sym = operations_from_database(hall);
   int const multi = num_pure_translations(conv_sym);
-  std::optional<int> const conv_ap = conventional_aperiodic_axis(hall);
+  CellPeriodicity const conv_periodicity = conventional_periodicity(hall);
 
-  Matrix3d const std_lattice = conventional_lattice(sg);
+  Lattice const std_lattice{conventional_lattice(sg)};
   Cell const conv_prim =
-      conventional_primitive(sg, primitive, std_lattice, conv_ap);
+      conventional_primitive(sg, primitive, std_lattice, conv_periodicity);
 
   auto const exact =
       exact_positions(conv_prim, conv_sym, multi, hall, symprec);
@@ -191,8 +190,8 @@ get_wyckoff_positions(spacegroup::Spacegroup const &sg, Cell const &primitive,
     return std::nullopt;
   }
 
-  Bravais bravais =
-      expand_in_bravais(conv_prim, std_lattice, conv_sym, *exact, conv_ap);
+  Bravais bravais = expand_in_bravais(conv_prim, std_lattice, conv_sym, *exact,
+                                      conv_periodicity);
 
   // Per input-cell atom Wyckoff letter + site-symmetry symbol (the first
   // bravais block is in primitive-atom order).

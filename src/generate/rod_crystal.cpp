@@ -61,7 +61,7 @@ namespace {
     }
   }
 
-  return Cell{lattice, to_positions(rows), std::move(types)};
+  return Cell{Lattice{lattice}, to_positions(rows), std::move(types)};
 }
 
 } // namespace
@@ -104,9 +104,9 @@ random_rod_crystal(group::RodGroup const &rg, Composition const &comp,
         double const c_length = repeat * (1.0 + 0.2 * attempt);
         Matrix3d const lattice =
             random_layer_lattice(rg.operations(), area, c_length, rng());
-        Cell cell = assemble_rod(combo, lattice, periodic_axis, rng);
         // Self-describing: {aperiodic, aperiodic, periodic}.
-        cell.set_periodicity(periodicity);
+        Cell const cell = assemble_rod(combo, lattice, periodic_axis, rng)
+                              .with_periodicity(periodicity);
         if (!distances_valid(cell, options.distance)) {
           return std::nullopt;
         }

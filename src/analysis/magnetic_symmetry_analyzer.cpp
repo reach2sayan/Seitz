@@ -6,20 +6,14 @@
 
 namespace cppcrystal::analysis {
 
-MagneticSymmetryAnalyzer MagneticSymmetryAnalyzer::from_cell(
-    MagneticCell cell, bool is_axial, double symprec,
-    AngleTolerance angle_tolerance, std::optional<double> mag_symprec) {
-  return MagneticSymmetryAnalyzer{std::move(cell), is_axial,
-                                  Tolerance{symprec, angle_tolerance},
-                                  mag_symprec};
+MagneticSymmetryAnalyzer
+MagneticSymmetryAnalyzer::from_cell(MagneticCell cell, MagneticTolerance tol) {
+  return MagneticSymmetryAnalyzer{std::move(cell), tol};
 }
 
 Result<MagneticDataset const *>
 MagneticSymmetryAnalyzer::cached_dataset() const {
-  return dataset_.get([&] {
-    return get_magnetic_dataset(cell_, is_axial_, tol_.symprec,
-                                tol_.angle_tolerance, mag_symprec_);
-  });
+  return dataset_.get([&] { return get_magnetic_dataset(cell_, tol_); });
 }
 
 Result<spin::MagneticSymmetrySearch>
@@ -28,19 +22,18 @@ MagneticSymmetryAnalyzer::symmetry_search() const {
       search,
       symmetry_search_.get([&]() -> Result<spin::MagneticSymmetrySearch> {
         BOOST_LEAF_AUTO(sym_nonspin,
-                        symmetry::find_symmetry(cell_.cell(), tol_.symprec,
-                                                tol_.angle_tolerance));
-        return spin::operations_with_site_tensors(
-            sym_nonspin, cell_, /*with_time_reversal=*/true, is_axial_,
-            tol_.symprec, tol_.angle_tolerance, mag_symprec_);
+                        symmetry::find_symmetry(cell_.cell(), tol_));
+        return spin::operations_with_site_tensors(sym_nonspin, cell_,
+                                                  TimeReversal::on, tol_);
       }));
   return *search;
 }
 
 Result<MagneticCell> MagneticSymmetryAnalyzer::standardized_cell() const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
-  return MagneticCell{Cell{ds->std_lattice, ds->std_positions, ds->std_types},
-                      ds->std_tensors};
+  return MagneticCell{
+      Cell{Lattice{ds->std_lattice}, ds->std_positions, ds->std_types},
+      ds->std_tensors, cell_.kind()};
 }
 
 Result<void> MagneticSymmetryAnalyzer::warm() const {

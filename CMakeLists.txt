@@ -49,6 +49,7 @@ target_sources(cppcrystal PRIVATE
         src/data/rod_database.cpp
         src/group/rod_group.cpp
         src/generate/rod_crystal.cpp
+        src/core/lattice.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp
         src/core/centering.cpp

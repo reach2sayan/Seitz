@@ -17,15 +17,16 @@ namespace cppcrystal::kpoint {
 
 std::vector<Matrix3i>
 point_group_reciprocal(std::vector<Matrix3i> const &rotations,
-                       bool time_reversal) {
+                       TimeReversal time_reversal) {
   // All transposes first, then (with time reversal) all inversion partners
   // (-transpose); de-duplication keeps first occurrence, so order matters.
   std::vector<Matrix3i> candidates;
-  candidates.reserve(rotations.size() * (time_reversal ? 2 : 1));
+  candidates.reserve(rotations.size() *
+                     (time_reversal == TimeReversal::on ? 2 : 1));
 
   std::ranges::transform(rotations, std::back_inserter(candidates),
                          [](const Matrix3i &r) { return r.transpose(); });
-  if (time_reversal) {
+  if (time_reversal == TimeReversal::on) {
     std::ranges::transform(rotations, std::back_inserter(candidates),
                            [](const Matrix3i &r) { return -r.transpose(); });
   }
@@ -33,7 +34,12 @@ point_group_reciprocal(std::vector<Matrix3i> const &rotations,
   return unique_by_rotation(candidates);
 }
 
-std::vector<Matrix3i>
+namespace {
+
+// The subset of `rot_reciprocal` that maps the q-point set onto itself (modulo
+// a reciprocal lattice vector) within `symprec` — the stabilizer of the
+// q-points. Only stabilized_reciprocal_mesh needs it.
+[[nodiscard]] std::vector<Matrix3i>
 point_group_reciprocal_with_q(std::vector<Matrix3i> const &rot_reciprocal,
                               double symprec,
                               std::vector<Vector3d> const &qpoints) {
@@ -54,8 +60,6 @@ point_group_reciprocal_with_q(std::vector<Matrix3i> const &rot_reciprocal,
                     std::back_inserter(out));
   return out;
 }
-
-namespace {
 
 // True -> the fast "normal" reduction; false -> the "distortion" path (3/6-fold
 // rotations or non-conventional cells). NOTE the deliberate quirk that the a=b
@@ -186,12 +190,12 @@ ir_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
 
 Result<IrReciprocalMesh>
 ir_reciprocal_mesh(Cell const &cell, Vector3i const &mesh,
-                   Vector3i const &is_shift, bool time_reversal, double symprec,
-                   AngleTolerance angle_tolerance) {
+                   Vector3i const &is_shift, TimeReversal time_reversal,
+                   Tolerance const &tol) {
   if (mesh[0] <= 0 || mesh[1] <= 0 || mesh[2] <= 0) {
     return leaf::new_error(e_invalid_mesh{});
   }
-  BOOST_LEAF_AUTO(dataset, get_dataset(cell, symprec, angle_tolerance));
+  BOOST_LEAF_AUTO(dataset, get_dataset(cell, tol));
   std::vector<Matrix3i> rotations;
   rotations.reserve(dataset.operations.size());
   std::ranges::transform(dataset.operations, std::back_inserter(rotations),
@@ -202,7 +206,7 @@ ir_reciprocal_mesh(Cell const &cell, Vector3i const &mesh,
 
 IrReciprocalMesh
 stabilized_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
-                           bool time_reversal,
+                           TimeReversal time_reversal,
                            std::vector<Matrix3i> const &rotations,
                            std::vector<Vector3d> const &qpoints) {
   auto const rot_reciprocal = point_group_reciprocal(rotations, time_reversal);

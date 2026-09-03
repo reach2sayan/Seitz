@@ -24,16 +24,12 @@ namespace cppcrystal::analysis {
 // shareable read-only across threads.
 class MagneticSymmetryAnalyzer {
 public:
-  // `is_axial` selects axial-vector transformation of the rank-1 tensors;
-  // `mag_symprec` (std::nullopt -> symprec) is the moment tolerance.
+  // The rank-1 tensors transform as axial or polar vectors according to
+  // `cell.kind()`; `tol.moment` (unset -> symprec) is the moment tolerance.
   [[nodiscard]] static MagneticSymmetryAnalyzer
-  from_cell(MagneticCell cell, bool is_axial,
-            double symprec = kDefaultSymprec,
-            AngleTolerance angle_tolerance = std::nullopt,
-            std::optional<double> mag_symprec = std::nullopt);
+  from_cell(MagneticCell cell, MagneticTolerance tol = {});
 
   [[nodiscard]] MagneticCell const &cell() const noexcept { return cell_; }
-  [[nodiscard]] bool is_axial() const noexcept { return is_axial_; }
   [[nodiscard]] double symprec() const noexcept { return tol_.symprec; }
   [[nodiscard]] AngleTolerance angle_tolerance() const noexcept {
     return tol_.angle_tolerance;
@@ -82,10 +78,8 @@ public:
   Result<void> warm() const;
 
 private:
-  MagneticSymmetryAnalyzer(MagneticCell cell, bool is_axial, Tolerance tol,
-                           std::optional<double> mag_symprec)
-      : cell_(std::move(cell)), is_axial_(is_axial), tol_(tol),
-        mag_symprec_(mag_symprec) {}
+  MagneticSymmetryAnalyzer(MagneticCell cell, MagneticTolerance tol)
+      : cell_(std::move(cell)), tol_(tol) {}
 
   [[nodiscard]] Result<MagneticDataset const *> cached_dataset() const;
 
@@ -98,9 +92,7 @@ private:
   }
 
   MagneticCell cell_;
-  bool is_axial_ = false;
-  Tolerance tol_;
-  std::optional<double> mag_symprec_;
+  MagneticTolerance tol_;
 
   detail::Lazy<MagneticDataset> dataset_;
   detail::Lazy<spin::MagneticSymmetrySearch> symmetry_search_;

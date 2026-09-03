@@ -23,7 +23,7 @@ namespace {
 Cell primitive_cubic(double a) { // -> Pm-3m
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Matrix3d::Identity() * a, pos, {0});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0});
 }
 
 Cell fcc(double a) { // -> Fm-3m
@@ -32,7 +32,7 @@ Cell fcc(double a) { // -> Fm-3m
   pos.row(1) << 0.5, 0.5, 0.0;
   pos.row(2) << 0.5, 0.0, 0.5;
   pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(Matrix3d::Identity() * a, pos, {0, 0, 0, 0});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0});
 }
 
 Cell rock_salt(double a) { // -> Fm-3m, two species
@@ -45,7 +45,7 @@ Cell rock_salt(double a) { // -> Fm-3m, two species
   pos.row(5) << 0.0, 0.0, 0.5;
   pos.row(6) << 0.0, 0.5, 0.0;
   pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(Matrix3d::Identity() * a, pos, {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
 }
 
 Cell bcc_tetragonal() { // -> I4/mmm
@@ -56,7 +56,7 @@ Cell bcc_tetragonal() { // -> I4/mmm
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(l, pos, {0, 0});
+  return Cell(Lattice{l}, pos, {0, 0});
 }
 
 Cell rutile() { // -> P4_2/mnm (tetragonal, non-symmorphic)
@@ -71,7 +71,7 @@ Cell rutile() { // -> P4_2/mnm (tetragonal, non-symmorphic)
   pos.row(3) << 0.7, 0.7, 0.0;
   pos.row(4) << 0.8, 0.2, 0.5;
   pos.row(5) << 0.2, 0.8, 0.5;
-  return Cell(l, pos, {0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{l}, pos, {0, 0, 1, 1, 1, 1});
 }
 
 Cell orthorhombic_p() { // -> Pmmm
@@ -81,7 +81,7 @@ Cell orthorhombic_p() { // -> Pmmm
   l(2, 2) = 6.0;
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(l, pos, {0});
+  return Cell(Lattice{l}, pos, {0});
 }
 
 Cell monoclinic_p() { // unique axis b, beta != 90 -> exercises monocli matcher
@@ -91,7 +91,7 @@ Cell monoclinic_p() { // unique axis b, beta != 90 -> exercises monocli matcher
   l.col(2) = Vector3d(1.5, 0.0, 7.0);
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(l, pos, {0});
+  return Cell(Lattice{l}, pos, {0});
 }
 
 Cell hcp() { // -> P6_3/mmc (hexagonal)
@@ -104,7 +104,7 @@ Cell hcp() { // -> P6_3/mmc (hexagonal)
   Positions pos(2, 3);
   pos.row(0) << 1.0 / 3.0, 2.0 / 3.0, 0.25;
   pos.row(1) << 2.0 / 3.0, 1.0 / 3.0, 0.75;
-  return Cell(l, pos, {0, 0});
+  return Cell(Lattice{l}, pos, {0, 0});
 }
 
 Cell rhombohedral_r() { // R-centered hexagonal cell -> trigonal/rhombohedral
@@ -118,7 +118,7 @@ Cell rhombohedral_r() { // R-centered hexagonal cell -> trigonal/rhombohedral
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0;
   pos.row(2) << 2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0;
-  return Cell(l, pos, {0, 0, 0});
+  return Cell(Lattice{l}, pos, {0, 0, 0});
 }
 
 Cell diamond(double a) { // -> Fd-3m (cubic F, non-symmorphic)
@@ -131,26 +131,26 @@ Cell diamond(double a) { // -> Fd-3m (cubic F, non-symmorphic)
   pos.row(5) << 0.25, 0.75, 0.75;
   pos.row(6) << 0.75, 0.25, 0.75;
   pos.row(7) << 0.75, 0.75, 0.25;
-  return Cell(Matrix3d::Identity() * a, pos, {0, 0, 0, 0, 0, 0, 0, 0});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0, 0, 0, 0, 0});
 }
 
 Cell zincblende(double a) { // -> F-43m
   Cell d = diamond(a);
-  return Cell(d.lattice(), d.positions(), {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{d.lattice().matrix()}, d.positions(), {0, 0, 0, 0, 1, 1, 1, 1});
 }
 
 Cell bcc(double a) { // -> Im-3m
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Matrix3d::Identity() * a, pos, {0, 0});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0});
 }
 
 Cell cscl(double a) { // -> Pm-3m, two species
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Matrix3d::Identity() * a, pos, {0, 1});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 1});
 }
 
 Cell wurtzite() { // -> P6_3mc (hexagonal, polar)
@@ -166,7 +166,7 @@ Cell wurtzite() { // -> P6_3mc (hexagonal, polar)
   pos.row(1) << 2.0 / 3.0, 1.0 / 3.0, 0.5;
   pos.row(2) << 1.0 / 3.0, 2.0 / 3.0, u;
   pos.row(3) << 2.0 / 3.0, 1.0 / 3.0, 0.5 + u;
-  return Cell(l, pos, {0, 0, 1, 1});
+  return Cell(Lattice{l}, pos, {0, 0, 1, 1});
 }
 
 Cell c_centered_ortho() { // C-centered orthorhombic -> Cmmm-ish
@@ -177,7 +177,7 @@ Cell c_centered_ortho() { // C-centered orthorhombic -> Cmmm-ish
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.0;
-  return Cell(l, pos, {0, 0});
+  return Cell(Lattice{l}, pos, {0, 0});
 }
 
 Cell c_centered_monocli() { // C-centered monoclinic (unique b) -> C2/m
@@ -189,7 +189,7 @@ Cell c_centered_monocli() { // C-centered monoclinic (unique b) -> C2/m
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.0;
-  return Cell(l, pos, {0, 0});
+  return Cell(Lattice{l}, pos, {0, 0});
 }
 
 Cell triclinic() { // -> P1
@@ -200,7 +200,7 @@ Cell triclinic() { // -> P1
   Positions pos(2, 3);
   pos.row(0) << 0.1, 0.2, 0.3;
   pos.row(1) << 0.6, 0.55, 0.27;
-  return Cell(l, pos, {0, 1});
+  return Cell(Lattice{l}, pos, {0, 1});
 }
 
 struct Case {
@@ -238,7 +238,7 @@ TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0); // reference must succeed for the comparison
 
-    auto const ours = get_dataset(cell, symprec);
+    auto const ours = get_dataset(cell, {symprec});
     REQUIRE(ours);
 
     INFO("ours: SG " << ours->spacegroup_number << " hall "
@@ -261,17 +261,16 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim = symmetry::find_primitive(cell, symprec);
+    auto const prim = symmetry::find_primitive(cell, {symprec});
     REQUIRE(prim);
-    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance,
-                                                  prim->angle_tolerance);
+    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance);
     REQUIRE(sg);
 
-    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance);
+    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
     Matrix3d const std_lat = refine::conventional_lattice(sg2);
     Matrix3d const std_rot =
-        refine::measure_rigid_rotation(sg2.bravais_lattice, std_lat);
-    Matrix3d const trans = sg2.bravais_lattice.inverse() * cell.lattice();
+        Lattice{sg2.bravais_lattice}.rigid_rotation_to(Lattice{std_lat});
+    Matrix3d const trans = sg2.bravais_lattice.inverse() * cell.lattice().matrix();
 
     CHECK((std_lat - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
     CHECK((std_rot - ref.std_rotation_matrix).cwiseAbs().maxCoeff() < 1e-4);
@@ -293,8 +292,8 @@ bool same_std_cell(Positions const &ours_pos, std::vector<int> const &ours_types
       if (ours_types[static_cast<std::size_t>(o)] !=
           ref_types[static_cast<std::size_t>(r)])
         continue;
-      if (is_overlap(ours_pos.row(o).transpose(), ref_pos.row(r).transpose(),
-                     lattice, tol)) {
+      if (coincident(ours_pos.row(o).transpose(), ref_pos.row(r).transpose(),
+                     lattice, tol, all_periodic())) {
         matched = true;
         break;
       }
@@ -314,7 +313,7 @@ TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const d = get_dataset(cell, symprec);
+    auto const d = get_dataset(cell, {symprec});
     REQUIRE(d);
 
     // Identity + transformation/standardization matrices.
@@ -350,24 +349,23 @@ TEST_CASE("standardized cell + Wyckoffs + equivalent atoms match the oracle",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim = symmetry::find_primitive(cell, symprec);
+    auto const prim = symmetry::find_primitive(cell, {symprec});
     REQUIRE(prim);
-    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance,
-                                                  prim->angle_tolerance);
+    auto const sg = spacegroup::search_spacegroup(*prim, 0, prim->tolerance);
     REQUIRE(sg);
     auto const ops = symmetry::find_symmetry(cell, prim->tolerance);
     REQUIRE(ops);
 
-    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance);
+    auto const sg2 = refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
     auto const std = refine::get_wyckoff_positions(
-        sg2, prim->cell, cell, *ops, prim->mapping_table, prim->tolerance);
+        sg2, prim->cell, cell, *ops, prim->mapping_table, prim->tolerance.symprec);
     REQUIRE(std);
 
     // Standardized cell: same atom count, same atoms (set, mod lattice).
     CHECK(static_cast<int>(std->bravais.size()) == ref.n_std_atoms);
     CHECK(same_std_cell(std->bravais.positions(), std->bravais.types(),
                         ref.std_positions, ref.std_types,
-                        std->bravais.lattice(), 1e-4));
+                        std->bravais.lattice().matrix(), 1e-4));
 
     // Per-atom Wyckoff letters, site-symmetry symbols, equivalent atoms.
     CHECK(std->wyckoffs == ref.wyckoffs);
@@ -389,7 +387,7 @@ TEST_CASE("get_dataset operations equal the input cell symmetry set",
     auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const ours = get_dataset(cell, symprec);
+    auto const ours = get_dataset(cell, {symprec});
     REQUIRE(ours);
     CHECK(static_cast<int>(ours->operations.size()) == ref.n_operations);
 

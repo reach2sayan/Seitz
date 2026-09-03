@@ -35,17 +35,7 @@ public:
   // Named factory (no overloaded constructors). `hall_number == 0` searches all
   // 230 space groups; a non-zero value fixes the Hall setting.
   [[nodiscard]] static SymmetryAnalyzer
-  from_cell(Cell cell, double symprec = kDefaultSymprec,
-            AngleTolerance angle_tolerance = std::nullopt, int hall_number = 0);
-
-  // Analyze `cell` as a layer group with the given aperiodic axis (0/1/2). The
-  // axis is stamped onto the owned cell, so dataset()/operations()/etc. all
-  // return layer results. (from_cell auto-routes too if the cell already
-  // carries an aperiodic axis; this is the explicit convenience form.)
-  [[nodiscard]] static SymmetryAnalyzer
-  from_layer_cell(Cell cell, int aperiodic_axis,
-                  double symprec = kDefaultSymprec,
-                  AngleTolerance angle_tolerance = std::nullopt);
+  from_cell(Cell cell, Tolerance tol = {}, int hall_number = 0);
 
   [[nodiscard]] Cell const &cell() const noexcept { return cell_; }
   [[nodiscard]] double symprec() const noexcept { return tol_.symprec; }
@@ -96,11 +86,12 @@ public:
   // fields (idealized lattice, fractional positions, atom types).
   [[nodiscard]] Result<Cell> standardized_cell() const;
 
-  // The standardized cell under explicit flags — primitive vs conventional,
+  // The standardized cell in an explicit setting — primitive vs conventional,
   // idealized vs input geometry (standardize_cell). The no-argument overload
-  // above is the {} (conventional, idealized) fast path served from the cached
-  // dataset; this overload is keyed by `options` and is not memoized.
-  [[nodiscard]] Result<Cell> standardized_cell(StandardizeOptions options) const;
+  // above is the (conventional, idealized) fast path served from the cached
+  // dataset; this one is keyed by its arguments and is not memoized.
+  [[nodiscard]] Result<Cell> standardized_cell(CellSetting setting,
+                                               Idealize idealize) const;
 
   // Pipeline intermediates, cached independently of the full dataset so a
   // caller that only wants the primitive cell or the matched Hall setting does

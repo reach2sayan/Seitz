@@ -19,20 +19,20 @@ using namespace cppcrystal;
 // Perturb every atom by a random Cartesian displacement bounded well below
 // symprec (so symmetry-related atoms still coincide within symprec).
 Cell jitter(Cell const &cell, std::mt19937 &rng, double cart_amplitude) {
-  Matrix3d const lattice_inv = cell.lattice().inverse();
+  Matrix3d const lattice_inv = cell.lattice().matrix().inverse();
   std::uniform_real_distribution<double> dist(-cart_amplitude, cart_amplitude);
   Positions positions = cell.positions();
   for (Index i = 0; i < cell.size(); ++i) {
     Vector3d const cart(dist(rng), dist(rng), dist(rng));
     positions.row(i) += (lattice_inv * cart).transpose();
   }
-  return Cell(cell.lattice(), positions, cell.types());
+  return Cell(Lattice{cell.lattice().matrix()}, positions, cell.types());
 }
 
 // A diagonal n x n x n supercell (same space group as the input).
 Cell supercell(Cell const &cell, int n) {
   auto const nd = static_cast<double>(n);
-  Matrix3d const lattice = cell.lattice() * nd;
+  Matrix3d const lattice = cell.lattice().matrix() * nd;
   Index const atoms = cell.size();
   Index const reps = static_cast<Index>(n) * n * n;
   Positions positions(atoms * reps, 3);
@@ -51,7 +51,7 @@ Cell supercell(Cell const &cell, int n) {
       }
     }
   }
-  return Cell(lattice, positions, types);
+  return Cell(Lattice{lattice}, positions, types);
 }
 
 } // namespace
@@ -67,7 +67,7 @@ TEST_CASE("get_dataset is stable under sub-symprec jitter",
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const jittered = jitter(entry.cell, rng, 0.15 * symprec);
-    auto const got = cppcrystal::get_dataset(jittered, symprec);
+    auto const got = cppcrystal::get_dataset(jittered, {symprec});
     REQUIRE(got);
     CHECK(got->spacegroup_number == entry.space_group_number);
   }
@@ -83,7 +83,7 @@ TEST_CASE("get_dataset returns the same space group for a 2x2x2 supercell",
     auto const &entry = corpus[i];
     INFO("cell " << entry.name << " (SG " << entry.space_group_number << ")");
     Cell const sc = supercell(entry.cell, 2);
-    auto const got = cppcrystal::get_dataset(sc, symprec);
+    auto const got = cppcrystal::get_dataset(sc, {symprec});
     REQUIRE(got);
     CHECK(got->spacegroup_number == entry.space_group_number);
   }

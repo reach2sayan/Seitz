@@ -47,12 +47,12 @@ struct CCell {
   explicit CCell(Cell const &cell)
       : position(static_cast<std::size_t>(cell.size())),
         types(static_cast<std::size_t>(cell.size())) {
-    to_c_lattice(lattice, cell.lattice());
-    for (Index i = 0; i < cell.size(); ++i) {
+    to_c_lattice(lattice, cell.lattice().matrix());
+    for (auto const [i, atom] : cell.atoms() | std::views::enumerate) {
+      auto const &[p, t] = atom;
       auto const u = static_cast<std::size_t>(i);
-      position[u] = {cell.positions()(i, 0), cell.positions()(i, 1),
-                     cell.positions()(i, 2)};
-      types[u] = cell.types()[u];
+      position[u] = {p[0], p[1], p[2]};
+      types[u] = t;
     }
   }
 
@@ -143,7 +143,7 @@ inline Cell reference_find_primitive(Cell const &cell, double symprec) {
         c.position[static_cast<std::size_t>(i)][2];
     types[static_cast<std::size_t>(i)] = c.types[static_cast<std::size_t>(i)];
   }
-  return Cell(lattice, pos, types);
+  return Cell(Lattice{lattice}, pos, types);
 }
 
 // Reference database operations for a Hall number
@@ -262,7 +262,7 @@ inline Cell reference_standardize_cell(Cell const &cell, bool to_primitive,
                                        bool no_idealize, double symprec) {
   int const n = static_cast<int>(cell.size());
   double lattice[3][3];
-  to_c_lattice(lattice, cell.lattice());
+  to_c_lattice(lattice, cell.lattice().matrix());
   std::vector<std::array<double, 3>> position(static_cast<std::size_t>(4 * n));
   std::vector<int> types(static_cast<std::size_t>(4 * n));
   for (int i = 0; i < n; ++i) {
@@ -284,7 +284,7 @@ inline Cell reference_standardize_cell(Cell const &cell, bool to_primitive,
         position[static_cast<std::size_t>(i)][2];
     out_types[static_cast<std::size_t>(i)] = types[static_cast<std::size_t>(i)];
   }
-  return Cell(out_lattice, pos, out_types);
+  return Cell(Lattice{out_lattice}, pos, out_types);
 }
 
 struct CPointgroup {

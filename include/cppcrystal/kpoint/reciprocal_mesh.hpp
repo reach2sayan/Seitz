@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
 
@@ -19,14 +20,7 @@ namespace cppcrystal::kpoint {
 // removed, keeping first occurrence.
 [[nodiscard]] std::vector<Matrix3i>
 point_group_reciprocal(std::vector<Matrix3i> const &rotations,
-                       bool time_reversal);
-
-// The subset of `rot_reciprocal` that maps the q-point set onto itself (modulo a
-// reciprocal lattice vector) within `symprec` — the stabilizer of the q-points.
-[[nodiscard]] std::vector<Matrix3i>
-point_group_reciprocal_with_q(std::vector<Matrix3i> const &rot_reciprocal,
-                              double symprec,
-                              std::vector<Vector3d> const &qpoints);
+                       TimeReversal time_reversal);
 
 // The irreducible reciprocal mesh: the reducible grid points and, for each, the
 // grid-point index of its irreducible representative (the smallest index in its
@@ -52,15 +46,14 @@ ir_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
 // cppcrystal::kpoint::ReciprocalMeshBuilder::irreducible(...).
 [[nodiscard]] Result<IrReciprocalMesh>
 ir_reciprocal_mesh(Cell const &cell, Vector3i const &mesh,
-                   Vector3i const &is_shift, bool time_reversal,
-                   double symprec = kDefaultSymprec,
-                   AngleTolerance angle_tolerance = std::nullopt);
+                   Vector3i const &is_shift, TimeReversal time_reversal,
+                   Tolerance const &tol = {});
 
 // Irreducible mesh stabilized by a set of q-points: reduce only by the
 // rotations that map the q-point set onto itself.
 [[nodiscard]] IrReciprocalMesh
 stabilized_reciprocal_mesh(Vector3i const &mesh, Vector3i const &is_shift,
-                           bool time_reversal,
+                           TimeReversal time_reversal,
                            std::vector<Matrix3i> const &rotations,
                            std::vector<Vector3d> const &qpoints);
 

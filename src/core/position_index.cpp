@@ -81,9 +81,9 @@ PositionIndex::PositionIndex(BucketGeometry geometry, Positions const &positions
 }
 
 PositionIndex::PositionIndex(Cell const &cell, double symprec)
-    : PositionIndex(BucketGeometry::of(cell.lattice(), symprec,
+    : PositionIndex(BucketGeometry::of(cell.lattice().matrix(), symprec,
                                        cell.periodicity()),
-                    cell.positions(), cell.types(), cell.lattice(), symprec,
+                    cell.positions(), cell.types(), cell.lattice().matrix(), symprec,
                     cell.periodicity()) {}
 
 PositionIndex::Buckets

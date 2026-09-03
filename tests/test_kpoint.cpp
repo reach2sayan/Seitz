@@ -34,11 +34,13 @@ TEST_CASE("all_grid_addresses round-trips through grid_point_from_address",
 
 TEST_CASE("reciprocal point group: transpose, inversion, dedup", "[kpoint]") {
   std::vector<Matrix3i> const rots{Matrix3i::Identity()};
-  auto const group = cppcrystal::kpoint::point_group_reciprocal(rots, false);
+  auto const group = cppcrystal::kpoint::point_group_reciprocal(
+          rots, cppcrystal::TimeReversal::off);
   REQUIRE(group.size() == 1U);
   REQUIRE(group[0] == Matrix3i::Identity());
 
-  auto const grey = cppcrystal::kpoint::point_group_reciprocal(rots, true);
+  auto const grey = cppcrystal::kpoint::point_group_reciprocal(
+      rots, cppcrystal::TimeReversal::on);
   REQUIRE(grey.size() == 2U); // identity and its inversion partner -I
   Matrix3i const minus_identity = -Matrix3i::Identity();
   REQUIRE((grey[0] == minus_identity || grey[1] == minus_identity));

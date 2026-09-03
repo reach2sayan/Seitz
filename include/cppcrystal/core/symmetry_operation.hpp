@@ -19,6 +19,10 @@ concept SpaceGroupOperationLike = requires(Op op) {
   { op.translation } -> std::convertible_to<Vector3d>;
 };
 
+// Whether an operation set includes its time-reversal partners: the magnetic
+// search's anti-operations, and the reciprocal point group's inversion partner.
+enum class TimeReversal { off, on };
+
 // A space-group symmetry operation acting on fractional coordinates:
 //   x -> rotation . x + translation.
 struct SymmetryOperation {

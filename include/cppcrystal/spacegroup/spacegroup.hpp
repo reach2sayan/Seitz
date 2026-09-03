@@ -29,7 +29,7 @@ struct Spacegroup {
 // 230 space groups; a non-zero value restricts the search to that Hall setting.
 [[nodiscard]] Result<Spacegroup>
 search_spacegroup(symmetry::Primitive const &primitive, int hall_number,
-                  double symprec, AngleTolerance angle_tolerance);
+                  Tolerance const &tol);
 
 // Whether the `lattice` given to spacegroup_type_from_symmetry is the
 // conventional cell (recover the primitive setting via the t_mat implied by the

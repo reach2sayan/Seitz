@@ -4,28 +4,14 @@
 
 namespace cppcrystal::analysis {
 
-SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, double symprec,
-                                             AngleTolerance angle_tolerance,
+SymmetryAnalyzer SymmetryAnalyzer::from_cell(Cell cell, Tolerance tol,
                                              int hall_number) {
-  return SymmetryAnalyzer{
-      std::move(cell),
-      Tolerance{.symprec = symprec, .angle_tolerance = angle_tolerance},
-      hall_number};
-}
-
-SymmetryAnalyzer
-SymmetryAnalyzer::from_layer_cell(Cell cell, int aperiodic_axis, double symprec,
-                                  AngleTolerance angle_tolerance) {
-  cell.set_aperiodic_axis(aperiodic_axis);
-  return SymmetryAnalyzer{
-      std::move(cell),
-      Tolerance{.symprec = symprec, .angle_tolerance = angle_tolerance},
-      /*hall_number=*/0};
+  return SymmetryAnalyzer{std::move(cell), tol, hall_number};
 }
 
 Result<symmetry::Primitive const *> SymmetryAnalyzer::cached_primitive() const {
   return primitive_.get([&] {
-    return symmetry::find_primitive(cell_, tol_.symprec, tol_.angle_tolerance);
+    return symmetry::find_primitive(cell_, tol_);
   });
 }
 
@@ -33,40 +19,38 @@ Result<spacegroup::Spacegroup const *>
 SymmetryAnalyzer::cached_spacegroup() const {
   return spacegroup_.get([&]() -> Result<spacegroup::Spacegroup> {
     BOOST_LEAF_AUTO(prim, cached_primitive());
-    return spacegroup::search_spacegroup(*prim, hall_number_, tol_.symprec,
-                                         tol_.angle_tolerance);
+    return spacegroup::search_spacegroup(*prim, hall_number_, tol_);
   });
 }
 
 Result<Dataset const *> SymmetryAnalyzer::cached_dataset() const {
   return dataset_.get([&] {
-    return get_dataset(cell_, tol_.symprec, tol_.angle_tolerance, hall_number_);
+    return get_dataset(cell_, tol_, hall_number_);
   });
 }
 
 Result<SymmetryOperations> SymmetryAnalyzer::cell_operations() const {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {
-    return symmetry::find_symmetry(cell_, tol_.symprec, tol_.angle_tolerance);
+    return symmetry::find_symmetry(cell_, tol_);
   }));
   return *ops;
 }
 
 Result<PointSymmetry> SymmetryAnalyzer::lattice_symmetry() const {
   BOOST_LEAF_AUTO(ps, lattice_symmetry_.get([&] {
-    return symmetry::lattice_symmetry(cell_, tol_.symprec,
-                                      tol_.angle_tolerance);
+    return symmetry::lattice_symmetry(cell_, tol_);
   }));
   return *ps;
 }
 
 Result<Cell> SymmetryAnalyzer::standardized_cell() const {
   BOOST_LEAF_AUTO(ds, cached_dataset());
-  return Cell{ds->std_lattice, ds->std_positions, ds->std_types};
+  return Cell{Lattice{ds->std_lattice}, ds->std_positions, ds->std_types};
 }
 
-Result<Cell> SymmetryAnalyzer::standardized_cell(
-    StandardizeOptions options) const {
-  return standardize_cell(cell_, options, tol_.symprec, tol_.angle_tolerance);
+Result<Cell> SymmetryAnalyzer::standardized_cell(CellSetting setting,
+                                                 Idealize idealize) const {
+  return standardize_cell(cell_, setting, idealize, tol_);
 }
 
 Result<symmetry::Primitive> SymmetryAnalyzer::primitive() const {

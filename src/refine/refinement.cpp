@@ -1,5 +1,6 @@
 #include <cppcrystal/refine/refinement.hpp>
 
+#include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/math/fractional.hpp>
@@ -136,24 +137,10 @@ namespace {
   return m;
 }
 
-// Orthonormal frame from the first two basis vectors
-// (e1 = a^, e3 = (a x b)^, e2 = (e3 x a)^); columns are the frame vectors.
-[[nodiscard]] Matrix3d orthonormal_basis(Matrix3d const &lattice) {
-  Vector3d const a = lattice.col(0);
-  Vector3d const b = lattice.col(1);
-  Vector3d const e1 = a.normalized();
-  Vector3d const e3 = a.cross(b).normalized();
-  Vector3d const e2 = e3.cross(a).normalized();
-
-  Matrix3d basis;
-  basis << e1, e2, e3;
-  return basis;
-}
-
 } // namespace
 
 Matrix3d conventional_lattice(spacegroup::Spacegroup const &sg) {
-  Matrix3d const g = math::metric_tensor(sg.bravais_lattice);
+  Matrix3d const g = Lattice{sg.bravais_lattice}.metric();
   Holohedry const holohedry =
       symmetry::pointgroup_by_number(sg.type.pointgroup_number).holohedry;
 
@@ -229,13 +216,6 @@ spacegroup::Spacegroup find_similar_bravais_lattice(spacegroup::Spacegroup sg,
   sg.origin_shift = shortest_p;
   sg.bravais_lattice = rot_lat;
   return sg;
-}
-
-Matrix3d measure_rigid_rotation(Matrix3d const &bravais_lattice,
-                                Matrix3d const &std_lattice) {
-  Matrix3d const brv = orthonormal_basis(bravais_lattice);
-  Matrix3d const std = orthonormal_basis(std_lattice);
-  return std * brv.inverse();
 }
 
 } // namespace cppcrystal::refine

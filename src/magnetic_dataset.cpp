@@ -7,32 +7,28 @@
 
 namespace cppcrystal {
 
-Result<MagneticDataset>
-get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
-                     AngleTolerance angle_tolerance,
-                     std::optional<double> mag_symprec) {
+Result<MagneticDataset> get_magnetic_dataset(MagneticCell const &cell,
+                                             MagneticTolerance const &tol) {
   // The magnetic dataset always searches with time reversal (the full family
   // space group).
-  constexpr bool kWithTimeReversal = true;
+  constexpr TimeReversal kTimeReversal = TimeReversal::on;
   if (auto valid = validate_cell(cell.cell()); !valid) {
     return valid.error();
   }
+  double const symprec = tol.symprec;
 
   // 1. Magnetic symmetry of the input cell.
-  BOOST_LEAF_AUTO(sym_nonspin, symmetry::find_symmetry(cell.cell(), symprec,
-                                                       angle_tolerance));
+  BOOST_LEAF_AUTO(sym_nonspin, symmetry::find_symmetry(cell.cell(), tol));
   BOOST_LEAF_AUTO(search, spin::operations_with_site_tensors(
-                              sym_nonspin, cell, kWithTimeReversal, is_axial,
-                              symprec, angle_tolerance, mag_symprec));
+                              sym_nonspin, cell, kTimeReversal, tol));
 
   // 2. Identify the magnetic space-group type.
-  BOOST_LEAF_AUTO(ident,
-                  magnetic::identify_magnetic_spacegroup_type(
-                      cell.cell().lattice(), search.operations, symprec));
+  BOOST_LEAF_AUTO(ident, magnetic::identify_magnetic_spacegroup_type(
+                             cell.cell().lattice().matrix(), search.operations,
+                             symprec));
 
   // 3. Idealize positions and site tensors.
-  MagneticCell const exact =
-      spin::idealized_cell(search, cell, kWithTimeReversal, is_axial);
+  MagneticCell const exact = spin::idealized_cell(search, cell, kTimeReversal);
 
   // 4. Transform the idealized cell into the standardized setting.
   BOOST_LEAF_AUTO(std_cell,
@@ -52,7 +48,7 @@ get_magnetic_dataset(MagneticCell const &cell, bool is_axial, double symprec,
       .transformation_matrix = ident.transformation_matrix,
       .origin_shift = ident.origin_shift,
 
-      .std_lattice = std_cell.cell().lattice(),
+      .std_lattice = std_cell.cell().lattice().matrix(),
       .std_positions = std_cell.cell().positions(),
       .std_types = std_cell.cell().types(),
       .std_tensors = std_cell.tensors(),

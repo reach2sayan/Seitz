@@ -1,4 +1,4 @@
-#include <cppcrystal/reduce/delaunay.hpp>
+#include <cppcrystal/core/lattice.hpp>
 
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
@@ -9,7 +9,7 @@
 #include <ranges>
 #include <utility>
 
-namespace cppcrystal::reduce {
+namespace cppcrystal {
 
 namespace {
 
@@ -174,8 +174,8 @@ shortest_vectors(std::array<Vector3d, 3> const &basis,
 
 } // namespace
 
-Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, int unique_axis,
-                                 double symprec) {
+Result<Lattice> Lattice::delaunay(int unique_axis, double symprec) const {
+  Matrix3d const &lattice = basis_;
   // The two in-plane axes (j < k) are those other than the unique axis.
   static constexpr std::array<std::array<int, 2>, 3> planes{{
       {{1, 2}},
@@ -207,10 +207,11 @@ Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, int unique_axis,
   if (volume < 0.0) {
     red.col(unique_axis) = -red.col(unique_axis);
   }
-  return red;
+  return Lattice{red};
 }
 
-Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, double symprec) {
+Result<Lattice> Lattice::delaunay(double symprec) const {
+  Matrix3d const &lattice = basis_;
   auto const reduced = reduce_basis(extended_basis(lattice), symprec)
                            .transform([&](std::array<Vector3d, 4> const &b) {
                              return shortest_vectors(b, symprec);
@@ -225,7 +226,7 @@ Result<Matrix3d> delaunay_reduce(Matrix3d const &lattice, double symprec) {
   if (!reduced) {
     return leaf::new_error(e_delaunay_failed{});
   }
-  return *reduced;
+  return Lattice{*reduced};
 }
 
-} // namespace cppcrystal::reduce
+} // namespace cppcrystal

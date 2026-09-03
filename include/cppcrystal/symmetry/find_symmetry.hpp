@@ -14,17 +14,15 @@ namespace cppcrystal::symmetry {
 // Point group of the lattice: the rotations (in the cell's own basis) that map
 // the Delaunay-reduced lattice metric onto itself. At most 48. Errors with
 // e_symmetry_operation_search_failed.
-[[nodiscard]] Result<PointSymmetry>
-lattice_symmetry(Cell const &cell, double symprec,
-                 AngleTolerance angle_tolerance = std::nullopt);
+[[nodiscard]] Result<PointSymmetry> lattice_symmetry(Cell const &cell,
+                                                     Tolerance const &tol);
 
 // All space-group operations of the cell exactly as given (including the
 // centering/pure translations of a non-primitive cell). Errors with
 // e_empty_cell for a cell with no atoms, otherwise
 // e_symmetry_operation_search_failed.
-[[nodiscard]] Result<SymmetryOperations>
-find_symmetry(Cell const &cell, double symprec,
-              AngleTolerance angle_tolerance = std::nullopt);
+[[nodiscard]] Result<SymmetryOperations> find_symmetry(Cell const &cell,
+                                                       Tolerance const &tol);
 
 // Re-filter `operations` at a (usually tighter) tolerance: keep only those
 // whose rotation is still a lattice symmetry of `cell` at `symprec` and whose
@@ -32,7 +30,7 @@ find_symmetry(Cell const &cell, double symprec,
 // set if the lattice symmetry cannot be determined at this tolerance.
 [[nodiscard]] SymmetryOperations
 reduce_symmetry(Cell const &cell, SymmetryOperations const &operations,
-                double symprec, AngleTolerance angle_tolerance = std::nullopt);
+                Tolerance const &tol);
 
 // Pure translations: every t for which (identity, t) maps the cell onto itself
 // (the centering translations, including the zero translation). These number

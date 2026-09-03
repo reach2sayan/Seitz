@@ -1,4 +1,4 @@
-#include <cppcrystal/reduce/niggli.hpp>
+#include <cppcrystal/core/lattice.hpp>
 
 #include <algorithm>
 #include <array>
@@ -11,7 +11,7 @@
 // and each step right-multiplies the lattice by an integer matrix `tmat`,
 // transforming the basis columns. Which steps restart the pass is part of the
 // algorithm (see the restart set below) and must not be changed.
-namespace cppcrystal::reduce {
+namespace cppcrystal {
 
 namespace {
 
@@ -144,7 +144,8 @@ bool step8(State &p) {
 
 } // namespace
 
-Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
+Result<Lattice> Lattice::niggli(double eps) const {
+  Matrix3d const &lattice = basis_;
   struct Step {
     bool (*apply)(State &);
     bool restarts; // firing this step restarts the pass from step 1
@@ -186,7 +187,7 @@ Result<Matrix3d> niggli_reduce(Matrix3d const &lattice, double eps) {
   if (!converged) {
     return leaf::new_error(e_niggli_failed{});
   }
-  return p.lattice;
+  return Lattice{p.lattice};
 }
 
-} // namespace cppcrystal::reduce
+} // namespace cppcrystal

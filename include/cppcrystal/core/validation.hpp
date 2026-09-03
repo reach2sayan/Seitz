@@ -16,7 +16,7 @@ namespace cppcrystal {
   if (cell.size() == 0) {
     return leaf::new_error(e_empty_cell{});
   }
-  double const determinant = cell.lattice().determinant();
+  double const determinant = cell.lattice().matrix().determinant();
   if (std::abs(determinant) < kZeroPrec) {
     return leaf::new_error(e_invalid_lattice{determinant});
   }

@@ -45,14 +45,12 @@ struct MagneticDataset {
 };
 
 // Determine the magnetic space group of `cell` (positions + per-site magnetic
-// tensors) and standardize it (3D path). `is_axial` selects axial-vector
-// transformation of the rank-1 tensors; `mag_symprec` (std::nullopt -> symprec)
+// tensors) and standardize it (3D path). The rank-1 tensors transform as axial
+// or polar vectors according to `cell.kind()`; `tol.moment` (unset -> symprec)
 // is the moment tolerance. Errors with e_magnetic_symmetry_search_failed /
 // e_cell_standardization_failed on failure.
 [[nodiscard]] Result<MagneticDataset>
-get_magnetic_dataset(MagneticCell const &cell, bool is_axial,
-                     double symprec = kDefaultSymprec,
-                     AngleTolerance angle_tolerance = std::nullopt,
-                     std::optional<double> mag_symprec = std::nullopt);
+get_magnetic_dataset(MagneticCell const &cell,
+                     MagneticTolerance const &tol = {});
 
 } // namespace cppcrystal

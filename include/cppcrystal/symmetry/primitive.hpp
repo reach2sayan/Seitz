@@ -2,6 +2,7 @@
 
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -19,24 +20,22 @@ struct Primitive {
   // space-group search to prefer a conventional setting whose basis vectors
   // resemble the input.
   Matrix3d orig_lattice{Matrix3d::Identity()};
-  // The (possibly tightened) symprec at which the primitive cell was found, and
-  // the angle tolerance carried into the symmetry search.
-  double tolerance{0.0};
-  AngleTolerance angle_tolerance{std::nullopt};
+  // The (possibly tightened) tolerance at which the primitive cell was found,
+  // carried into the space-group search that follows.
+  Tolerance tolerance{};
 };
 
 // Find the primitive cell of `cell`. Errors with e_cell_standardization_failed
 // when no primitive cell can be determined.
-[[nodiscard]] Result<Primitive>
-find_primitive(Cell const &cell, double symprec,
-               AngleTolerance angle_tolerance = std::nullopt);
+[[nodiscard]] Result<Primitive> find_primitive(Cell const &cell,
+                                               Tolerance const &tol);
 
 // The primitive lattice (columns = basis vectors) spanned by a set of pure
 // translations of `cell` (which must include the zero translation). std::nullopt
 // when no primitive lattice of the implied multiplicity (= pure_trans.size())
 // exists. The result is Delaunay-reduced. Used by the magnetic-symmetry search
 // to rebuild the primitive cell from the magnetic pure translations.
-[[nodiscard]] std::optional<Matrix3d>
+[[nodiscard]] std::optional<Lattice>
 primitive_lattice_vectors(Cell const &cell,
                           std::vector<Vector3d> const &pure_trans,
                           double symprec);
@@ -68,10 +67,10 @@ find_primitive_with_pure_translations(Cell const &cell,
 // de-duplicating translationally-equivalent atoms and averaging their
 // positions. Returns the trimmed cell together with the input->trimmed atom
 // mapping, or std::nullopt if the atoms do not divide evenly into the lattice.
-// The aperiodic axis (for layer cells) is read from `cell`. Exposed for cell
+// The periodicity (for layer cells) is read from `cell`. Exposed for cell
 // standardization (transform-to-primitive).
 [[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
-trim_to_lattice(Matrix3d const &trimmed_lattice, Cell const &cell,
+trim_to_lattice(Lattice const &trimmed_lattice, Cell const &cell,
                 double symprec);
 
 } // namespace cppcrystal::symmetry

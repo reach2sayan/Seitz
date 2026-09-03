@@ -1,5 +1,5 @@
 // Oracle test for the layer-group dataset (spglib.c get_layer_dataset):
-// cppcrystal::get_layer_dataset must reproduce the reference spg_get_layer_dataset —
+// the cppcrystal layer path must reproduce the reference spg_get_layer_dataset —
 // the layer-group identity (negative hall number, layer-group number 1..80,
 // symbol, point group), the symmetry operations, the per-atom Wyckoff /
 // site-symmetry / equivalence data, and the standardized layer cell.
@@ -11,6 +11,8 @@
 #include "oracle.hpp"
 
 #include <cppcrystal/dataset.hpp>
+
+#include "helpers.hpp"
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -26,6 +28,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
 using cppcrystal::Result;
@@ -40,7 +43,7 @@ Cell make_layer_cell(Matrix3d const &lattice,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(lattice, p, types);
+  return Cell(Lattice{lattice}, p, types);
 }
 
 Matrix3d hexagonal_layer(double a, double c) {
@@ -93,18 +96,12 @@ bool same_metric(Matrix3d const &a, Matrix3d const &b) {
   return (ga - gb).cwiseAbs().maxCoeff() < 1e-3;
 }
 
-template <class T> T must(Result<T> r) {
-  namespace leaf = cppcrystal::leaf;
-  return leaf::try_handle_all(
-      [&]() -> Result<T> { return std::move(r); },
-      [](leaf::error_info const &) -> T {
-        FAIL("get_layer_dataset returned an error");
-        throw std::logic_error("unreachable");
-      });
-}
+using cppcrystal::test::must;
 
 void check(Cell const &cell, int aperiodic_axis, double symprec) {
-  auto const got = must(cppcrystal::get_layer_dataset(cell, aperiodic_axis, symprec));
+  auto const got = must(cppcrystal::get_dataset(
+      cell.with_periodicity(cppcrystal::aperiodic_along(aperiodic_axis)),
+      {symprec}));
   auto const ref =
       cppcrystal::oracle::reference_layer_dataset(cell, aperiodic_axis, symprec);
   REQUIRE(ref.number != 0); // reference succeeded

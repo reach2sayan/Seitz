@@ -8,6 +8,7 @@
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/centering.hpp>
 #include <cppcrystal/core/error.hpp>
+#include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/overlap.hpp>
@@ -33,8 +34,6 @@
 #include <cppcrystal/magnetic_dataset.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
-#include <cppcrystal/reduce/delaunay.hpp>
-#include <cppcrystal/reduce/niggli.hpp>
 #include <cppcrystal/spacegroup/hall_symbol.hpp>
 #include <cppcrystal/spacegroup/spacegroup.hpp>
 #include <cppcrystal/warmup.hpp>

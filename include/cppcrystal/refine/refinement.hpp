@@ -21,9 +21,4 @@ namespace cppcrystal::refine {
 [[nodiscard]] spacegroup::Spacegroup
 find_similar_bravais_lattice(spacegroup::Spacegroup sg, double symprec);
 
-// Rigid rotation R such that std_lattice = R . bravais_lattice, built from the
-// orthonormal frames of the two lattices' first two basis vectors.
-[[nodiscard]] Matrix3d measure_rigid_rotation(Matrix3d const &bravais_lattice,
-                                              Matrix3d const &std_lattice);
-
 } // namespace cppcrystal::refine

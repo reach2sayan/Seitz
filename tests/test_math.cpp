@@ -67,15 +67,6 @@ TEST_CASE("checked inverse fails on a singular matrix", "[math]") {
   CHECK((*inv * a).isApprox(Matrix3d::Identity(), 1e-12));
 }
 
-TEST_CASE("metric tensor is L^T . L", "[math]") {
-  Matrix3d lattice;
-  lattice << 2, 0, 0, 0, 3, 0, 0, 0, 4; // columns = basis vectors
-  Matrix3d g = math::metric_tensor(lattice);
-  CHECK(g(0, 0) == Approx(4.0));
-  CHECK(g(1, 1) == Approx(9.0));
-  CHECK(g(2, 2) == Approx(16.0));
-}
-
 TEST_CASE("integer inverse of a unimodular rotation", "[math]") {
   Matrix3i rot; // 90 degrees about z
   rot << 0, -1, 0, 1, 0, 0, 0, 0, 1;
@@ -85,14 +76,6 @@ TEST_CASE("integer inverse of a unimodular rotation", "[math]") {
   // Non-unimodular -> no integer inverse.
   Matrix3i scale = Matrix3i::Identity() * 2;
   CHECK_FALSE(math::integer_inverse(scale).has_value());
-}
-
-TEST_CASE("similar matrix is b^-1 . a . b", "[math]") {
-  Matrix3d a;
-  a << 1, 2, 3, 0, 1, 4, 0, 0, 1;
-  auto s = math::similar(a, Matrix3d::Identity(), 1e-10);
-  REQUIRE(s.has_value());
-  CHECK(s->isApprox(a, 1e-12));
 }
 
 TEST_CASE("frac displacement is the minimal image", "[math]") {

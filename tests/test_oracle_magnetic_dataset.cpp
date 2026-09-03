@@ -20,6 +20,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
 using cppcrystal::MagneticCell;
 using cppcrystal::Matrix3d;
@@ -28,6 +29,7 @@ using cppcrystal::NoncollinearTensors;
 using cppcrystal::noncollinear_tensors;
 using cppcrystal::Positions;
 using cppcrystal::SiteTensor;
+using cppcrystal::TensorKind;
 using cppcrystal::SiteTensors;
 using cppcrystal::Vector3d;
 
@@ -38,7 +40,7 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(a * Matrix3d::Identity(), p, types);
+  return Cell(Lattice{a * Matrix3d::Identity()}, p, types);
 }
 
 // Flat tensor array (spglib layout) from a MagneticCell.
@@ -69,8 +71,10 @@ bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
          std::abs(rounded.determinant()) == 1;
 }
 
-void check(MagneticCell const &mcell, bool is_axial, double symprec) {
-  auto const got = cppcrystal::get_magnetic_dataset(mcell, is_axial, symprec);
+void check(MagneticCell const &input, TensorKind kind, double symprec) {
+  bool const is_axial = kind == TensorKind::axial;
+  MagneticCell const mcell(input.cell(), input.tensors(), kind);
+  auto const got = cppcrystal::get_magnetic_dataset(mcell, {symprec});
   REQUIRE(got);
 
   // Reference dataset.
@@ -174,14 +178,14 @@ void check(MagneticCell const &mcell, bool is_axial, double symprec) {
 TEST_CASE("magnetic dataset: collinear ferromagnet", "[oracle][magnetic]") {
   Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}}, {0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0}});
-  check(mcell, true, 1e-5);
+  check(mcell, TensorKind::axial, 1e-5);
 }
 
 TEST_CASE("magnetic dataset: collinear antiferromagnet", "[oracle][magnetic]") {
   Cell const cell =
       make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, -1.0}});
-  check(mcell, true, 1e-5);
+  check(mcell, TensorKind::axial, 1e-5);
 }
 
 TEST_CASE("magnetic dataset: non-collinear antiferromagnet",
@@ -191,12 +195,12 @@ TEST_CASE("magnetic dataset: non-collinear antiferromagnet",
   MagneticCell const mcell(
       cell, SiteTensors{noncollinear_tensors(
                 {Vector3d(0.0, 0.0, 1.0), Vector3d(0.0, 0.0, -1.0)})});
-  check(mcell, true, 1e-5);
+  check(mcell, TensorKind::axial, 1e-5);
 }
 
 TEST_CASE("magnetic dataset: type-II grey group", "[oracle][magnetic]") {
   Cell const cell =
       make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, 1.0}});
-  check(mcell, true, 1e-5);
+  check(mcell, TensorKind::axial, 1e-5);
 }

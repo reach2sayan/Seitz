@@ -30,7 +30,7 @@ bool same_operation_set(SymmetryOperations const &a,
 Cell primitive_cubic(double a) {
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Matrix3d::Identity() * a, pos, {0});
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0});
 }
 
 Cell rutile() {
@@ -45,7 +45,7 @@ Cell rutile() {
   pos.row(3) << 0.7, 0.7, 0.0;
   pos.row(4) << 0.8, 0.2, 0.5;
   pos.row(5) << 0.2, 0.8, 0.5;
-  return Cell(l, pos, {0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{l}, pos, {0, 0, 1, 1, 1, 1});
 }
 
 Cell rock_salt(double a) {
@@ -59,7 +59,7 @@ Cell rock_salt(double a) {
   pos.row(5) << 0.0, 0.0, 0.5;
   pos.row(6) << 0.0, 0.5, 0.0;
   pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(lattice, pos, {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
 }
 
 // Low-symmetry P1-ish cell with two unlike atoms in general positions.
@@ -71,7 +71,7 @@ Cell triclinic() {
   Positions pos(2, 3);
   pos.row(0) << 0.1, 0.2, 0.3;
   pos.row(1) << 0.6, 0.55, 0.27;
-  return Cell(l, pos, {0, 1});
+  return Cell(Lattice{l}, pos, {0, 1});
 }
 } // namespace
 
@@ -79,7 +79,7 @@ TEST_CASE("find_symmetry matches spg_get_symmetry as a set",
           "[oracle][symmetry]") {
   for (Cell const &cell :
        {primitive_cubic(4.0), rutile(), rock_salt(5.6), triclinic()}) {
-    auto ours = symmetry::find_symmetry(cell, 1e-5);
+    auto ours = symmetry::find_symmetry(cell, {1e-5});
     REQUIRE(ours);
     auto const ref = oracle::reference_symmetry(cell, 1e-5);
     INFO("ours = " << ours->size() << ", reference = " << ref.size());

@@ -27,8 +27,8 @@ using data::Centering;
                                                   Matrix3d const &trans_mat,
                                                   Centering centering,
                                                   double symprec) {
-  Matrix3d const prim_lattice =
-      cell.lattice() * trans_mat.inverse() * centering_matrix_inv(centering);
+  Lattice const prim_lattice{cell.lattice().matrix() * trans_mat.inverse() *
+                             centering_matrix_inv(centering)};
   auto trimmed = symmetry::trim_to_lattice(prim_lattice, cell, symprec);
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
@@ -44,7 +44,7 @@ using data::Centering;
                                                     Centering centering,
                                                     double symprec) {
   Matrix3d const conv_lattice =
-      primitive.lattice() * centering_matrix(centering).cast<double>();
+      primitive.lattice().matrix() * centering_matrix(centering).cast<double>();
   Matrix3d const to_conv = centering_matrix_inv(centering);
   auto const shifts = centering_shifts(centering);
   Index const np = primitive.size();
@@ -65,9 +65,10 @@ using data::Centering;
                  primitive.type(i));
   }
 
-  Cell const expanded(conv_lattice, to_positions(pos), std::move(types));
+  Cell const expanded(Lattice{conv_lattice}, to_positions(pos), std::move(types));
   // Fold/normalize the expanded cell.
-  auto trimmed = symmetry::trim_to_lattice(conv_lattice, expanded, symprec);
+  auto trimmed =
+      symmetry::trim_to_lattice(Lattice{conv_lattice}, expanded, symprec);
   if (!trimmed) {
     return leaf::new_error(e_cell_standardization_failed{});
   }
@@ -76,16 +77,16 @@ using data::Centering;
 
 } // namespace
 
-Result<Cell> standardize_cell(Cell const &cell, StandardizeOptions options,
-                              double symprec, AngleTolerance angle_tolerance) {
-  BOOST_LEAF_AUTO(ds, get_dataset(cell, symprec, angle_tolerance));
-  Centering const centering =
-      data::spacegroup_type(ds.hall_number).centering;
+Result<Cell> standardize_cell(Cell const &cell, CellSetting setting,
+                              Idealize idealize, Tolerance const &tol) {
+  BOOST_LEAF_AUTO(ds, get_dataset(cell, tol));
+  Centering const centering = data::spacegroup_type(ds.hall_number).centering;
+  double const symprec = tol.symprec;
 
-  if (!options.no_idealize) {
-    // Idealized: the dataset already holds the standardized conventional cell.
-    Cell std_cell(ds.std_lattice, ds.std_positions, ds.std_types);
-    if (!options.to_primitive) {
+  if (idealize == Idealize::yes) {
+    // The dataset already holds the standardized conventional cell.
+    Cell std_cell(Lattice{ds.std_lattice}, ds.std_positions, ds.std_types);
+    if (setting == CellSetting::conventional) {
       return std_cell;
     }
     // The bravais cell -> primitive (identity tmat).
@@ -93,11 +94,11 @@ Result<Cell> standardize_cell(Cell const &cell, StandardizeOptions options,
                                   symprec);
   }
 
-  // no_idealize: transform the input cell, preserving its real geometry.
+  // Idealize::no: transform the input cell, preserving its real geometry.
   BOOST_LEAF_AUTO(primitive,
                   transform_to_primitive(cell, ds.transformation_matrix,
                                          centering, symprec));
-  if (options.to_primitive || centering == Centering::primitive) {
+  if (setting == CellSetting::primitive || centering == Centering::primitive) {
     return primitive;
   }
   return transform_from_primitive(primitive, centering, symprec);

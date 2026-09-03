@@ -12,7 +12,7 @@ Cell bcc_conventional(double a) {
   Positions pos(2, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
   pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0});
 }
 
 Cell fcc_conventional(double a) {
@@ -22,7 +22,7 @@ Cell fcc_conventional(double a) {
   pos.row(1) << 0.5, 0.5, 0.0;
   pos.row(2) << 0.5, 0.0, 0.5;
   pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(lattice, pos, {0, 0, 0, 0});
+  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0});
 }
 
 Cell rock_salt(double a) {
@@ -36,29 +36,29 @@ Cell rock_salt(double a) {
   pos.row(5) << 0.0, 0.0, 0.5;
   pos.row(6) << 0.0, 0.5, 0.0;
   pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(lattice, pos, {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
 }
 } // namespace
 
 TEST_CASE("bcc conventional cell reduces to a 1-atom primitive cell",
           "[primitive]") {
-  auto p = symmetry::find_primitive(bcc_conventional(3.0), 1e-5);
+  auto p = symmetry::find_primitive(bcc_conventional(3.0), {1e-5});
   REQUIRE(p);
   CHECK(p->cell.size() == 1);
-  CHECK(p->cell.volume() == Approx(27.0 / 2.0)); // half the conventional volume
+  CHECK(p->cell.lattice().volume() == Approx(27.0 / 2.0)); // half the conventional volume
 }
 
 TEST_CASE("fcc conventional cell reduces to a 1-atom primitive cell",
           "[primitive]") {
-  auto p = symmetry::find_primitive(fcc_conventional(4.0), 1e-5);
+  auto p = symmetry::find_primitive(fcc_conventional(4.0), {1e-5});
   REQUIRE(p);
   CHECK(p->cell.size() == 1);
-  CHECK(p->cell.volume() == Approx(64.0 / 4.0));
+  CHECK(p->cell.lattice().volume() == Approx(64.0 / 4.0));
 }
 
 TEST_CASE("rock-salt conventional cell reduces to a 2-atom primitive cell",
           "[primitive]") {
-  auto p = symmetry::find_primitive(rock_salt(5.6), 1e-5);
+  auto p = symmetry::find_primitive(rock_salt(5.6), {1e-5});
   REQUIRE(p);
   CHECK(p->cell.size() == 2); // one of each species
   // mapping_table covers all 8 input atoms, into 2 primitive atoms.
@@ -69,8 +69,8 @@ TEST_CASE("an already-primitive cell is returned with one atom",
           "[primitive]") {
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  auto p = symmetry::find_primitive(Cell(Matrix3d::Identity() * 4.0, pos, {0}),
-                                    1e-5);
+  auto p = symmetry::find_primitive(
+      Cell(Lattice{Matrix3d::Identity() * 4.0}, pos, {0}), {1e-5});
   REQUIRE(p);
   CHECK(p->cell.size() == 1);
 }

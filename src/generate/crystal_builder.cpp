@@ -68,7 +68,9 @@ void expand_layer_orbit(Placement<group::WyckoffPosition> const &placement,
   // The orbit is built symmetric about the operations' fixed planes (near c =
   // 0, from the small seed band); it is left there rather than recentred, which
   // would move the layer's symmetry planes away from the database operations.
-  return Cell{lattice, to_positions(rows), std::move(types), aperiodic_axis};
+  return Cell{Lattice{lattice}, to_positions(rows), std::move(types),
+              aperiodic_axis ? aperiodic_along(*aperiodic_axis)
+                             : all_periodic()};
 }
 
 } // namespace

@@ -19,6 +19,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
 using cppcrystal::MagneticCell;
 using cppcrystal::MagneticSymmetryOperations;
@@ -35,18 +36,24 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(a * Matrix3d::Identity(), p, types);
+  return Cell(Lattice{a * Matrix3d::Identity()}, p, types);
 }
 
 // The magnetic symmetry of `mcell`, via the ported spin module.
-MagneticSymmetryOperations magnetic_symmetry(MagneticCell const &mcell,
+MagneticSymmetryOperations magnetic_symmetry(MagneticCell const &input,
                                              bool with_time_reversal,
                                              bool is_axial, double symprec) {
+  MagneticCell const mcell(input.cell(), input.tensors(),
+                           is_axial ? cppcrystal::TensorKind::axial
+                                    : cppcrystal::TensorKind::polar);
   auto const sym_nonspin =
-      cppcrystal::symmetry::find_symmetry(mcell.cell(), symprec);
+      cppcrystal::symmetry::find_symmetry(mcell.cell(), {symprec});
   REQUIRE(sym_nonspin);
   auto const search = cppcrystal::spin::operations_with_site_tensors(
-      sym_nonspin.value(), mcell, with_time_reversal, is_axial, symprec);
+      sym_nonspin.value(), mcell,
+      with_time_reversal ? cppcrystal::TimeReversal::on
+                         : cppcrystal::TimeReversal::off,
+      {{symprec}});
   REQUIRE(search);
   return search->operations;
 }
@@ -82,11 +89,11 @@ void check(MagneticCell const &mcell, bool with_time_reversal, bool is_axial,
            double symprec) {
   auto const ops = magnetic_symmetry(mcell, with_time_reversal, is_axial, symprec);
   auto const got = cppcrystal::magnetic::identify_magnetic_spacegroup_type(
-      mcell.cell().lattice(), ops, symprec);
+      mcell.cell().lattice().matrix(), ops, symprec);
   REQUIRE(got);
 
   auto const [ref_uni, ref_type] =
-      reference_uni(ops, mcell.cell().lattice(), symprec);
+      reference_uni(ops, mcell.cell().lattice().matrix(), symprec);
   REQUIRE(ref_uni != 0);
   REQUIRE(got->uni_number == ref_uni);
   REQUIRE(static_cast<int>(got->msg_type) == ref_type);

@@ -25,7 +25,7 @@ TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
     INFO("cell " << entry.name << " (expected SG "
                  << entry.space_group_number << ")");
 
-    auto const got = cppcrystal::get_dataset(entry.cell, symprec);
+    auto const got = cppcrystal::get_dataset(entry.cell, {symprec});
     REQUIRE(got);
     auto const ref = cppcrystal::oracle::reference_dataset(entry.cell, symprec);
     REQUIRE(ref.number != 0);

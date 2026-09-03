@@ -1,7 +1,7 @@
 #include <cppcrystal/refine/operations.hpp>
 
 #include <cppcrystal/core/matrix_order.hpp>
-#include <cppcrystal/core/overlap.hpp>
+#include <cppcrystal/core/position_index.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/math/fractional.hpp>
 #include <cppcrystal/math/integer_matrix.hpp>
@@ -81,7 +81,7 @@ unique_translations(Matrix3d const &lattice,
   out.reserve(candidates.size());
   for (const auto &t : candidates) {
     push_unique(out, t, [&](Vector3d const &kept, Vector3d const &cand) {
-      return is_overlap(cand, kept, lattice, symprec);
+      return coincident(cand, kept, lattice, symprec, all_periodic());
     });
   }
 
@@ -151,7 +151,7 @@ refined_operations(spacegroup::Spacegroup const &sg, Cell const &primitive,
   SymmetryOperations const conv_sym =
       operations_from_database(sg.type.hall_number);
 
-  Matrix3d const inv_prim = primitive.lattice().inverse();
+  Matrix3d const inv_prim = primitive.lattice().matrix().inverse();
 
   // Conventional ops in the shifted origin, transformed to the primitive cell.
   Matrix3d const t_mat_pb = inv_prim * sg.bravais_lattice;
@@ -160,9 +160,9 @@ refined_operations(spacegroup::Spacegroup const &sg, Cell const &primitive,
 
   // Recover them in the input cell.
   Matrix3i const t_mat_pc =
-      math::round_to_int(Matrix3d(inv_prim * cell.lattice()));
+      math::round_to_int(Matrix3d(inv_prim * cell.lattice().matrix()));
   int const multiplicity = static_cast<int>(cell.size() / primitive.size());
-  return recover_in_original_cell(prim_sym, t_mat_pc, cell.lattice(),
+  return recover_in_original_cell(prim_sym, t_mat_pc, cell.lattice().matrix(),
                                   multiplicity, symprec);
 }
 

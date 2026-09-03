@@ -17,6 +17,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
 using cppcrystal::SymmetryOperations;
@@ -30,7 +31,7 @@ Cell make_cell(Matrix3d const &lattice,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(lattice, p, types);
+  return Cell(Lattice{lattice}, p, types);
 }
 
 Matrix3d cubic(double a) { return a * Matrix3d::Identity(); }
@@ -73,14 +74,14 @@ void check_conventional(Cell const &cell, double symprec) {
   REQUIRE(!ops.empty());
 
   auto const got =
-      cppcrystal::spacegroup::spacegroup_type_from_symmetry(ops, cell.lattice(), symprec);
+      cppcrystal::spacegroup::spacegroup_type_from_symmetry(ops, cell.lattice().matrix(), symprec);
   REQUIRE(got);
 
   std::vector<int> rot;
   std::vector<double> trans;
   to_c_operations(rot, trans, ops);
   double lat[3][3];
-  cppcrystal::oracle::to_c_lattice(lat, cell.lattice());
+  cppcrystal::oracle::to_c_lattice(lat, cell.lattice().matrix());
   SpglibSpacegroupType const ref = spg_get_spacegroup_type_from_symmetry(
       reinterpret_cast<int(*)[3][3]>(rot.data()),
       reinterpret_cast<double(*)[3]>(trans.data()),

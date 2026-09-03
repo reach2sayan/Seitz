@@ -7,6 +7,8 @@
 
 #include <cppcrystal/standardize.hpp>
 
+#include "helpers.hpp"
+
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,6 +22,7 @@
 namespace {
 
 using cppcrystal::Cell;
+using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
 using cppcrystal::Result;
@@ -34,7 +37,7 @@ Cell make_cell(Matrix3d const &lattice,
     p.row(static_cast<Eigen::Index>(i)) =
         Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
   }
-  return Cell(lattice, p, types);
+  return Cell(Lattice{lattice}, p, types);
 }
 
 // Lattices match up to a rigid rotation iff their metric tensors agree.
@@ -56,27 +59,23 @@ bool overlap(Vector3d const &a, Vector3d const &b, double tol) {
   return d.cwiseAbs().maxCoeff() <= tol;
 }
 
-template <class T> T must(Result<T> r) {
-  namespace leaf = cppcrystal::leaf;
-  return leaf::try_handle_all(
-      [&]() -> Result<T> { return std::move(r); },
-      [](leaf::error_info const &) -> T {
-        FAIL("standardize_cell returned an error");
-        throw std::logic_error("unreachable");
-      });
-}
+using cppcrystal::test::must;
 
 void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
                double symprec) {
   INFO("to_primitive=" << to_primitive << " no_idealize=" << no_idealize);
   auto const got = must(cppcrystal::standardize_cell(
-      cell, {to_primitive, no_idealize}, symprec));
+      cell,
+      to_primitive ? cppcrystal::CellSetting::primitive
+                   : cppcrystal::CellSetting::conventional,
+      no_idealize ? cppcrystal::Idealize::no : cppcrystal::Idealize::yes,
+      {symprec}));
   Cell const ref = cppcrystal::oracle::reference_standardize_cell(
       cell, to_primitive, no_idealize, symprec);
   REQUIRE(ref.size() > 0); // reference succeeded
 
   CHECK(got.size() == ref.size());
-  CHECK(same_metric(got.lattice(), ref.lattice()));
+  CHECK(same_metric(got.lattice().matrix(), ref.lattice().matrix()));
   CHECK(composition(got) == composition(ref));
 
   // Every reference atom is matched (same type, coincident position mod 1) by a
@@ -171,11 +170,11 @@ TEST_CASE("standardize: strained cell, no_idealize preserves input geometry",
   check_all(cell, 1e-2);
 }
 
-TEST_CASE("standardize: find_primitive / refine_cell convenience wrappers",
+TEST_CASE("standardize: the to_primitive / idealized option pairs",
           "[oracle][standardize]") {
   // The two named wrappers must be bit-identical to the standardize_cell calls
   // they delegate to. find_primitive == spg_find_primitive (to_primitive,
-  // idealized); refine_cell == spg_refine_cell (conventional, idealized) — both
+  // idealized); the default == spg_refine_cell (conventional, idealized) — both
   // already oracle-checked via check_all above, so equality with their delegate
   // transitively proves the wrapper.
   Cell const nacl = make_cell(5.64 * Matrix3d::Identity(),
@@ -191,17 +190,18 @@ TEST_CASE("standardize: find_primitive / refine_cell convenience wrappers",
 
   auto const same_cell = [](Cell const &a, Cell const &b) {
     return a.size() == b.size() &&
-           (a.lattice() - b.lattice()).cwiseAbs().maxCoeff() < 1e-12 &&
+           (a.lattice().matrix() - b.lattice().matrix()).cwiseAbs().maxCoeff() < 1e-12 &&
            (a.positions() - b.positions()).cwiseAbs().maxCoeff() < 1e-12 &&
            a.types() == b.types();
   };
 
-  Cell const prim = must(cppcrystal::find_primitive(nacl));
-  Cell const prim_ref =
-      must(cppcrystal::standardize_cell(nacl, {.to_primitive = true}));
+  Cell const prim = must(
+      cppcrystal::standardize_cell(nacl, cppcrystal::CellSetting::primitive));
+  Cell const prim_ref = must(
+      cppcrystal::standardize_cell(nacl, cppcrystal::CellSetting::primitive));
   CHECK(same_cell(prim, prim_ref));
 
-  Cell const refined = must(cppcrystal::refine_cell(nacl));
-  Cell const refined_ref = must(cppcrystal::standardize_cell(nacl, {}));
+  Cell const refined = must(cppcrystal::standardize_cell(nacl));
+  Cell const refined_ref = must(cppcrystal::standardize_cell(nacl));
   CHECK(same_cell(refined, refined_ref));
 }

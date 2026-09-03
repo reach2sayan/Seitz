@@ -49,13 +49,11 @@ private:
 };
 
 // Magnetic symmetry operations of `mcell` consistent with its site tensors.
-//   - with_time_reversal: when true, anti-operations (moment-reversing) are
-//     allowed and the result is the magnetic family space group; when false,
-//     only ordinary operations are kept (the maximal space subgroup).
-//   - is_axial: site tensors of rank 1 transform as axial vectors
-//     (v' = |det R| R v) rather than ordinary vectors (v' = R v). Collinear
-//     scalars pick up a |det R| factor when is_axial.
-//   - mag_symprec: tolerance for comparing moments; std::nullopt uses `symprec`.
+//   - time_reversal: `on` allows anti-operations (moment-reversing) and yields
+//     the magnetic family space group; `off` keeps only ordinary operations
+//     (the maximal space subgroup).
+//   - the tensor kind (axial vs polar) is carried by `mcell`.
+//   - tol.moment: tolerance for comparing moments; unset uses tol.symprec.
 // `sym_nonspin` is the spatial symmetry (e.g. from symmetry::find_symmetry).
 // Errors with e_magnetic_symmetry_search_failed when the orbits or the
 // primitive lattice cannot be resolved. For the object-oriented entry point that
@@ -63,10 +61,9 @@ private:
 // cppcrystal::analysis::MagneticSymmetryAnalyzer::symmetry_search().
 [[nodiscard]] Result<MagneticSymmetrySearch>
 operations_with_site_tensors(SymmetryOperations const &sym_nonspin,
-                             MagneticCell const &mcell, bool with_time_reversal,
-                             bool is_axial, double symprec,
-                             AngleTolerance angle_tolerance = std::nullopt,
-                             std::optional<double> mag_symprec = std::nullopt);
+                             MagneticCell const &mcell,
+                             TimeReversal time_reversal,
+                             MagneticTolerance const &tol);
 
 // The pure translations of a magnetic symmetry: the translations whose rotation
 // is the identity and which are not time-reversal operations (the type-IV
@@ -79,8 +76,8 @@ collect_pure_translations(MagneticSymmetryOperations const &operations);
 // The idealized magnetic cell: each atom's position and site tensor is replaced
 // by the average, over all magnetic operations, of the operation applied to the
 // atom that maps onto it (per `search`'s operations and permutations).
-[[nodiscard]] MagneticCell
-idealized_cell(MagneticSymmetrySearch const &search, MagneticCell const &mcell,
-               bool with_time_reversal, bool is_axial);
+[[nodiscard]] MagneticCell idealized_cell(MagneticSymmetrySearch const &search,
+                                          MagneticCell const &mcell,
+                                          TimeReversal time_reversal);
 
 } // namespace cppcrystal::spin

@@ -41,7 +41,7 @@ template <class F> Err classify(F f) {
 }
 
 Cell empty_cell() {
-  return Cell(4.0 * Matrix3d::Identity(), Positions(0, 3), Types{});
+  return Cell(Lattice{4.0 * Matrix3d::Identity()}, Positions(0, 3), Types{});
 }
 
 // Two collinear basis vectors -> determinant 0 (a degenerate "lattice").
@@ -52,45 +52,47 @@ Cell singular_cell() {
   lattice.col(2) = Vector3d(0, 0, 4);
   Positions p(1, 3);
   p.row(0) = Eigen::RowVector3d(0, 0, 0);
-  return Cell(lattice, p, Types{0});
+  return Cell(Lattice{lattice}, p, Types{0});
 }
 
 Cell valid_cell() {
   Positions p(1, 3);
   p.row(0) = Eigen::RowVector3d(0, 0, 0);
-  return Cell(4.0 * Matrix3d::Identity(), p, Types{0});
+  return Cell(Lattice{4.0 * Matrix3d::Identity()}, p, Types{0});
 }
 
 } // namespace
 
 TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {
-  CHECK(classify([] { return get_dataset(empty_cell(), 1e-5); }) == Err::empty);
-  CHECK(classify([] { return symmetry::find_symmetry(empty_cell(), 1e-5); }) ==
+  CHECK(classify([] { return get_dataset(empty_cell(), {1e-5}); }) == Err::empty);
+  CHECK(classify([] { return symmetry::find_symmetry(empty_cell(), {1e-5}); }) ==
         Err::empty);
-  MagneticCell const m(empty_cell(), SiteTensors{CollinearTensors{}});
-  CHECK(classify([&] { return get_magnetic_dataset(m, true, 1e-5); }) ==
+  MagneticCell const m(empty_cell(), SiteTensors{CollinearTensors{}},
+                       TensorKind::axial);
+  CHECK(classify([&] { return get_magnetic_dataset(m, {1e-5}); }) ==
         Err::empty);
 }
 
 TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
-  CHECK(classify([] { return get_dataset(singular_cell(), 1e-5); }) ==
+  CHECK(classify([] { return get_dataset(singular_cell(), {1e-5}); }) ==
         Err::invalid_lattice);
   CHECK(classify([] {
-          return symmetry::find_symmetry(singular_cell(), 1e-5);
+          return symmetry::find_symmetry(singular_cell(), {1e-5});
         }) == Err::invalid_lattice);
-  MagneticCell const m(singular_cell(), SiteTensors{CollinearTensors{1.0}});
-  CHECK(classify([&] { return get_magnetic_dataset(m, true, 1e-5); }) ==
+  MagneticCell const m(singular_cell(), SiteTensors{CollinearTensors{1.0}},
+                       TensorKind::axial);
+  CHECK(classify([&] { return get_magnetic_dataset(m, {1e-5}); }) ==
         Err::invalid_lattice);
 }
 
 TEST_CASE("non-positive mesh is rejected with e_invalid_mesh", "[error]") {
   CHECK(classify([] {
           return kpoint::ir_reciprocal_mesh(valid_cell(), Vector3i(4, 0, 4),
-                                            Vector3i::Zero(), true);
+                                            Vector3i::Zero(), TimeReversal::on);
         }) == Err::invalid_mesh);
   CHECK(classify([] {
           return kpoint::ir_reciprocal_mesh(valid_cell(), Vector3i(4, -2, 4),
-                                            Vector3i::Zero(), true);
+                                            Vector3i::Zero(), TimeReversal::on);
         }) == Err::invalid_mesh);
 }
 

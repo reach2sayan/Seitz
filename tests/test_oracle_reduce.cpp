@@ -1,7 +1,6 @@
 #include "oracle.hpp"
 
-#include <cppcrystal/reduce/delaunay.hpp>
-#include <cppcrystal/reduce/niggli.hpp>
+#include <cppcrystal/core/lattice.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -37,16 +36,16 @@ void check_close(Matrix3d const &a, Matrix3d const &b) {
 
 TEST_CASE("delaunay reduction matches the reference", "[oracle][reduce]") {
   for (Matrix3d const &lat : test_lattices()) {
-    auto ours = reduce::delaunay_reduce(lat, 1e-5);
+    auto ours = Lattice{lat}.delaunay(1e-5);
     REQUIRE(ours);
-    check_close(*ours, oracle::reference_delaunay(lat, 1e-5));
+    check_close(ours->matrix(), oracle::reference_delaunay(lat, 1e-5));
   }
 }
 
 TEST_CASE("niggli reduction matches the reference", "[oracle][reduce]") {
   for (Matrix3d const &lat : test_lattices()) {
-    auto ours = reduce::niggli_reduce(lat, 1e-5);
+    auto ours = Lattice{lat}.niggli(1e-5);
     REQUIRE(ours);
-    check_close(*ours, oracle::reference_niggli(lat, 1e-5));
+    check_close(ours->matrix(), oracle::reference_niggli(lat, 1e-5));
   }
 }

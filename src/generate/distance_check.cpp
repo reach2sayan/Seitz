@@ -99,7 +99,7 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
 }
 
 bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
-  return pairwise_distances_ok(cell.positions(), cell.types(), cell.lattice(),
+  return pairwise_distances_ok(cell.positions(), cell.types(), cell.lattice().matrix(),
                                cell.periodicity(), tol);
 }
 

@@ -15,6 +15,8 @@
 #include <cppcrystal/group/space_group.hpp>
 #include <cppcrystal/group/subgroup_graph.hpp>
 
+#include "helpers.hpp"
+
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -27,14 +29,8 @@ using namespace cppcrystal;
 
 namespace {
 // Unwrap a move-only Result<T>, failing the test on an error result.
-template <class T> T must(Result<T> r) {
-  return leaf::try_handle_all(
-      [&]() -> Result<T> { return std::move(r); },
-      [](leaf::error_info const &) -> T {
-        FAIL("unexpected error result");
-        throw std::logic_error("unreachable");
-      });
-}
+using cppcrystal::test::errored;
+using cppcrystal::test::must;
 } // namespace
 
 TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
@@ -83,14 +79,7 @@ TEST_CASE("WyckoffPosition orbit expansion respects multiplicity", "[group]") {
 }
 
 TEST_CASE("from_number rejects out-of-range numbers", "[group]") {
-  bool errored = leaf::try_handle_all(
-      [&]() -> Result<bool> {
-        BOOST_LEAF_AUTO(sg, group::SpaceGroup::from_number(231));
-        (void)sg;
-        return false;
-      },
-      [](leaf::error_info const &) { return true; });
-  REQUIRE(errored);
+  REQUIRE(errored([] { return group::SpaceGroup::from_number(231); }));
 }
 
 TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
@@ -143,7 +132,7 @@ TEST_CASE("generation is deterministic in the seed", "[generate]") {
   auto a = must(generate::random_crystal(sg, comp, {.seed = 123u}));
   auto b = must(generate::random_crystal(sg, comp, {.seed = 123u}));
   REQUIRE(a.cell.positions().isApprox(b.cell.positions()));
-  REQUIRE(a.cell.lattice().isApprox(b.cell.lattice()));
+  REQUIRE(a.cell.lattice().matrix().isApprox(b.cell.lattice().matrix()));
 }
 
 TEST_CASE("incompatible composition is rejected", "[generate]") {
@@ -183,7 +172,7 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
     auto gen = must(generate::random_layer_crystal(
         lg, comp,
         {.scale = 4.0, .seed = 13u, .general_position_only = true}));
-    REQUIRE(gen.cell.aperiodic_axis() == 2);
+    REQUIRE(aperiodic_axis(gen.cell.periodicity()) == 2);
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
 
@@ -194,9 +183,9 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
   }
 }
 
-TEST_CASE("layer crystal round-trips through get_layer_dataset", "[layergen]") {
+TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
   // End-to-end self-validation through the layer determination. Restricted to
-  // c-preserving layer groups (one atomic plane): get_layer_dataset currently
+  // c-preserving layer groups (one atomic plane): the layer path currently
   // does not resolve multi-level (c-flipping) layers, so those are covered by
   // the direct op-invariance test above rather than a determination round-trip.
   for (int number : {1, 49, 55, 65}) {
@@ -208,7 +197,8 @@ TEST_CASE("layer crystal round-trips through get_layer_dataset", "[layergen]") {
     auto gen = must(generate::random_layer_crystal(
         lg, comp,
         {.scale = 4.0, .seed = 13u, .general_position_only = true}));
-    auto ds = must(get_layer_dataset(gen.cell, 2, 1e-4));
+    auto ds = must(get_dataset(gen.cell.with_periodicity(aperiodic_along(2)),
+                               {1e-4}));
     REQUIRE(ds.spacegroup_number == number); // exact layer-group recovery
   }
 }
@@ -299,7 +289,7 @@ TEST_CASE("reachability and symmetry-breaking paths", "[subgroup]") {
 TEST_CASE("SymmetryAnalyzer memoizes a consistent dataset", "[analysis]") {
   Positions pos(1, 3);
   pos.row(0) << 0.0, 0.0, 0.0;
-  Cell const cell{Matrix3d::Identity(), pos, Types{1}};
+  Cell const cell{Lattice{Matrix3d::Identity()}, pos, Types{1}};
 
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(cell);
   int const first = must(analyzer.spacegroup_number());
@@ -382,14 +372,7 @@ TEST_CASE("point-group orders match the textbook values", "[cluster]") {
 }
 
 TEST_CASE("from_number rejects out-of-range point groups", "[cluster]") {
-  bool errored = leaf::try_handle_all(
-      [&]() -> Result<bool> {
-        BOOST_LEAF_AUTO(pg, group::PointGroup::from_number(33));
-        (void)pg;
-        return false;
-      },
-      [](leaf::error_info const &) { return true; });
-  REQUIRE(errored);
+  REQUIRE(errored([] { return group::PointGroup::from_number(33); }));
 }
 
 TEST_CASE("generated clusters carry their full point-group symmetry",
@@ -426,14 +409,7 @@ TEST_CASE("incompatible cluster composition is rejected", "[cluster]") {
   auto pg = must(group::PointGroup::from_number(32)); // m-3m, order 48
   // 5 atoms cannot tile the available multiplicities (1, ..., 48) of m-3m.
   generate::Composition const comp{{6, 5}};
-  bool errored = leaf::try_handle_all(
-      [&]() -> Result<bool> {
-        BOOST_LEAF_AUTO(gen, generate::random_cluster(pg, comp));
-        (void)gen;
-        return false;
-      },
-      [](leaf::error_info const &) { return true; });
-  REQUIRE(errored);
+  REQUIRE(errored([&] { return generate::random_cluster(pg, comp); }));
 }
 
 namespace {

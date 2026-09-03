@@ -38,12 +38,6 @@ namespace cppcrystal::math {
           }).maxCoeff() <= symprec;
 }
 
-// Metric (Gram) tensor L^T . L for a lattice whose columns are the basis
-// vectors.
-[[nodiscard]] inline Matrix3d metric_tensor(Matrix3d const &lattice) noexcept {
-  return lattice.transpose() * lattice;
-}
-
 // Checked real inverse: std::nullopt when |det| < precision.
 [[nodiscard]] inline std::optional<Matrix3d>
 inverse(Matrix3d const &a, double precision) noexcept {
@@ -52,16 +46,6 @@ inverse(Matrix3d const &a, double precision) noexcept {
     return std::nullopt;
   }
   return a.inverse();
-}
-
-// b^-1 . a . b; nullopt when b is singular.
-[[nodiscard]] inline std::optional<Matrix3d>
-similar(Matrix3d const &a, Matrix3d const &b, double precision) noexcept {
-  auto const binv = inverse(b, precision);
-  if (!binv) {
-    return std::nullopt;
-  }
-  return *binv * a * b;
 }
 
 // Exact integer inverse of a unimodular matrix (|det| == 1); std::nullopt

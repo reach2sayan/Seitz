@@ -139,7 +139,7 @@ parse_unitcell(std::filesystem::path const &path) {
   for (std::size_t a = 0; a < coordinates.size(); ++a) {
     positions.row(static_cast<Index>(a)) = coordinates[a].transpose();
   }
-  return CorpusEntry{Cell(lattice, positions, types), space_group,
+  return CorpusEntry{Cell(Lattice{lattice}, positions, types), space_group,
                      path.filename().string()};
 }
 

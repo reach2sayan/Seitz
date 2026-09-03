@@ -6,6 +6,8 @@
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/dataset.hpp>
 
+#include "helpers.hpp"
+
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -17,14 +19,7 @@
 using namespace cppcrystal;
 
 namespace {
-template <class T> T must(Result<T> r) {
-  return leaf::try_handle_all(
-      [&]() -> Result<T> { return std::move(r); },
-      [](leaf::error_info const &) -> T {
-        FAIL("unexpected error result");
-        throw std::logic_error("unreachable");
-      });
-}
+using cppcrystal::test::must;
 
 // A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along c,
 // the aperiodic axis. Columns are basis vectors.
@@ -54,9 +49,9 @@ TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
   Positions pos(2, 3);
   pos.row(0) << 1.0 / 3, 2.0 / 3, 0.0; // honeycomb sites in the z=0 plane
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;
-  Cell const cell{lat, pos, Types{6, 6}};
+  Cell const cell{Lattice{lat}, pos, Types{6, 6}};
 
-  auto ds = must(get_layer_dataset(cell, /*aperiodic_axis=*/2, 1e-4));
+  auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
   REQUIRE(ds.spacegroup_number == 80);  // layer-group number
   REQUIRE(ds.hall_number == -116);      // negative-hall convention
   REQUIRE(ds.international_symbol == "p6/mmm");
@@ -77,8 +72,8 @@ TEST_CASE("graphene offset along the aperiodic axis still resolves", "[layer]") 
     Positions pos(2, 3);
     pos.row(0) << 1.0 / 3, 2.0 / 3, z;
     pos.row(1) << 2.0 / 3, 1.0 / 3, z;
-    Cell const cell{lat, pos, Types{6, 6}};
-    auto ds = must(get_layer_dataset(cell, 2, 1e-4));
+    Cell const cell{Lattice{lat}, pos, Types{6, 6}};
+    auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
     INFO("z offset = " << z);
     REQUIRE(ds.spacegroup_number == 80);
     REQUIRE(ds.international_symbol == "p6/mmm");
@@ -93,9 +88,9 @@ TEST_CASE("square lattice single atom is p4/mmm (LG 61)", "[layer]") {
   lat.col(2) = Vector3d(0, 0, 8);
   Positions pos(1, 3);
   pos.row(0) << 0, 0, 0;
-  Cell const cell{lat, pos, Types{1}};
+  Cell const cell{Lattice{lat}, pos, Types{1}};
 
-  auto ds = must(get_layer_dataset(cell, 2, 1e-4));
+  auto ds = must(get_dataset(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
   REQUIRE(ds.spacegroup_number == 61);
   REQUIRE(ds.international_symbol == "p4/mmm");
   REQUIRE(ds.site_symmetry_symbols[0] == "4/mmm");
@@ -106,9 +101,10 @@ TEST_CASE("SymmetryAnalyzer auto-routes layer cells", "[layer][analysis]") {
   Positions pos(2, 3);
   pos.row(0) << 1.0 / 3, 2.0 / 3, 0.0;
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;
-  Cell const cell{lat, pos, Types{6, 6}};
+  Cell const cell{Lattice{lat}, pos, Types{6, 6}};
 
-  auto analyzer = analysis::SymmetryAnalyzer::from_layer_cell(cell, 2, 1e-4);
+  auto analyzer = analysis::SymmetryAnalyzer::from_cell(
+      cell.with_periodicity(aperiodic_along(2)), {1e-4});
   REQUIRE(must(analyzer.spacegroup_number()) == 80);
   REQUIRE(must(analyzer.hall_number()) == -116);
 }
@@ -118,7 +114,7 @@ TEST_CASE("a 3D cell is unaffected by the layer code paths", "[layer]") {
   // perturb the 3D result.
   Positions pos(1, 3);
   pos.row(0) << 0, 0, 0;
-  Cell const cell{Matrix3d::Identity(), pos, Types{1}};
+  Cell const cell{Lattice{Matrix3d::Identity()}, pos, Types{1}};
   auto ds = must(get_dataset(cell));
   REQUIRE(ds.spacegroup_number == 221);
   REQUIRE_FALSE(ds.aperiodic_axis.has_value());
