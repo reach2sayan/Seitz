@@ -427,8 +427,11 @@ get_conventional_symmetry(Matrix3d const &tmat, Centering centering,
                           Operations const &primitive_sym) {
   Operations const base = primitive_sym.conjugated_by(tmat.inverse(), tmat);
 
-  std::vector<SymmetryOperation> out(base.begin(), base.end());
-  for (Vector3d const &shift : centering_shifts(centering)) {
+  auto const shifts = centering_shifts(centering);
+  std::vector<SymmetryOperation> out;
+  out.reserve(base.size() * (shifts.size() + 1));
+  out.assign(base.begin(), base.end());
+  for (Vector3d const &shift : shifts) {
     for (auto const &op : base) {
       out.push_back({op.rotation, Vector3d(op.translation + shift)});
     }

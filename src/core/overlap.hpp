@@ -5,6 +5,11 @@
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/types.hpp>
 
+#include <boost/container/small_vector.hpp>
+
+#include <cstdint>
+#include <vector>
+
 namespace cppcrystal {
 
 // Tests candidate symmetry operations against a cell. Built once per cell and
@@ -12,6 +17,11 @@ namespace cppcrystal {
 // lattice point) so that the cheap rejection probes the most discriminating
 // atoms first, and a PositionIndex over them makes the full check
 // O(n log n) per operation instead of O(n^2).
+//
+// NOT thread-safe: check_total_overlap runs once per candidate (rotation,
+// translation) pair, so its working buffers live here and are reused rather
+// than reallocated per call. They are mutable because every caller holds the
+// checker by const reference; the price is that one checker serves one thread.
 class OverlapChecker {
 public:
   OverlapChecker(Cell const &cell, double symprec);
@@ -27,6 +37,11 @@ private:
   Cell sorted_; // the input cell with atoms sorted as described above
   double symprec_;
   PositionIndex index_; // over sorted_; ties the checker to its address
+
+  mutable Positions rotated_;                                 // n x 3 images
+  mutable std::vector<boost::container::small_vector<int, 2>> images_;
+  mutable std::vector<std::uint8_t> taken_;
+  mutable PositionIndex::Scratch scratch_;
 };
 
 } // namespace cppcrystal

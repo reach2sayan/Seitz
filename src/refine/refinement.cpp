@@ -166,7 +166,7 @@ Lattice conventional_lattice(SpacegroupMatch const &sg) {
 
 SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
                                              double symprec) {
-  Operations const conv_sym = operations_from_database(sg.hall);
+  Operations const &conv_sym = operations_from_database(sg.hall);
   Matrix3d const std_lattice = conventional_lattice(sg).matrix();
 
   // Find the proper-rotation setting closest (Frobenius) to the idealized one.
@@ -196,12 +196,16 @@ SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
   Matrix3i const &chosen = conv_sym[rot_i.value()].rotation;
   double shortest_length = 2.0;
   Vector3d shortest_p = sg.origin_shift;
+  // The filter admits only operations whose rotation *is* `chosen`, so the
+  // inverse and the shifted origin are the same on every iteration; only the
+  // translation term varies.
+  Matrix3d const inv = chosen.cast<double>().inverse();
+  Vector3d const inv_shift = inv * sg.origin_shift;
   for (auto const &op :
        conv_sym | std::views::filter([&chosen](auto const &op) {
          return op.rotation == chosen;
        })) {
-    Matrix3d const inv = op.rotation.cast<double>().inverse();
-    Vector3d p = inv * sg.origin_shift - inv * op.translation;
+    Vector3d p = inv_shift - inv * op.translation;
     p = math::nearest_offset(p); // p[j] -= nint(p[j]) for all 3 axes
     double const length = p.norm();
     if (length < shortest_length - symprec) {

@@ -5,6 +5,8 @@
 #include "spin/search.hpp"
 #include "symmetry/search.hpp"
 
+#include <utility>
+
 namespace cppcrystal::analysis {
 
 Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
@@ -39,8 +41,10 @@ Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
       .setting = {.transformation = ident.transformation_matrix,
                   .origin_shift = ident.origin_shift,
                   .rigid_rotation = ident.std_rotation_matrix},
-      .operations = search.operations,
-      .equivalent_atoms = search.equivalent_atoms,
+      // Moved: `search` is dead after this aggregate except for
+      // primitive_lattice below, which is a different member.
+      .operations = std::move(search.operations),
+      .equivalent_atoms = std::move(search.equivalent_atoms),
       .standardized = std::move(standardized),
       .primitive = Lattice{search.primitive_lattice},
   };

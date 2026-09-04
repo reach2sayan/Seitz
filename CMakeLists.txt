@@ -114,9 +114,11 @@ target_compile_options(cppcrystal PRIVATE
         -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
 
 # The magnetic database decodes all 76683 operations + the alternative
-# transformations into constexpr tables at compile time, and subgroup_graph.hpp
-# closes the 230-group t-subgroup relation at compile time; both blow past the
-# compilers' default constant-evaluation budget. GCC and Clang spell the knob
+# transformations into constexpr tables at compile time, subgroup_graph.hpp
+# closes the 230-group t-subgroup relation at compile time, and
+# find_symmetry.cpp filters the 26^3 candidate axis triples down to the 6960
+# unimodular ones; each blows past the compilers' default constant-evaluation
+# budget (find_symmetry.cpp on Clang only -- GCC clears it on the default). GCC and Clang spell the knob
 # differently (-fconstexpr-ops-limit, default 33554432, vs -fconstexpr-steps,
 # default 1048576). PUBLIC, not per-source: the subgroup tables live in an
 # installed header, so consumers evaluate them too.

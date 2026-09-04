@@ -151,7 +151,7 @@ Result<PointGroup> PointGroup::from_number(int number) {
     return leaf::new_error(e_message{
         "PointGroup::from_number: representative space group not found"});
   }
-  Operations const conv = data::operations_from_database(
+  Operations const &conv = data::operations_from_database(
       *HallNumber::of(GroupFamily::space, halls.front()));
 
   PointGroup pg;

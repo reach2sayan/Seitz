@@ -4,6 +4,7 @@
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/types.hpp>
 
+#include <boost/container/small_vector.hpp>
 #include <boost/geometry/algorithms/disjoint.hpp>
 #include <boost/geometry/algorithms/intersects.hpp>
 #include <boost/geometry/geometries/box.hpp>
@@ -13,6 +14,7 @@
 #include <concepts>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -30,16 +32,32 @@ namespace cppcrystal {
 // fractional point". An R-tree over the atoms' Cartesian positions, each
 // folded into the cell along the periodic axes. A query folds its point the
 // same way and asks the tree for everything inside a symprec-sized box around
-// each image the minimal-image fold in `coincident` can pick: shifts of -1, 0,
-// +1 along every periodic axis. The symprec sphere sits inside that box, so
-// candidates() is a guaranteed superset of the coincident atoms; matches()
-// re-tests each with the exact predicate, so a caller replaces its linear
-// scan without changing what it accepts. Candidates come out ascending, so a
-// first hit is the first hit of the linear scan it replaces.
+// each image the minimal-image fold in `coincident` can pick. The symprec
+// sphere sits inside that box, so candidates() is a guaranteed superset of the
+// coincident atoms; matches() re-tests each with the exact predicate, so a
+// caller replaces its linear scan without changing what it accepts. Candidates
+// come out ascending, so a first hit is the first hit of the linear scan it
+// replaces.
+//
+// Only the images that can actually contain a match are queried. Both the
+// query point and the indexed atoms are folded into [0, 1), and a Cartesian
+// offset of at most `half_width_` is a fractional offset of at most
+// ||lattice^-1||_inf * half_width_ -- so the +1 image along an axis can only
+// match when the folded coordinate is that close to 0, and the -1 image only
+// when it is that close to 1. For a typical symprec that is one box per query
+// rather than the 27 of the full +-1 cube.
+//
+// Queries take a caller-owned Scratch buffer so the hot paths -- which query
+// once per atom per candidate operation -- do not allocate. The allocating
+// overloads remain for the cold callers.
 //
 // Non-owning: the positions and types must outlive the index.
 class PositionIndex {
 public:
+  // Reused across queries; each query clears it. Sized for the common case:
+  // a coincidence query typically returns one or two atoms.
+  using Scratch = boost::container::small_vector<int, 8>;
+
   PositionIndex(Positions const &positions, Types const &types,
                 Matrix3d const &lattice, double symprec,
                 CellPeriodicity const &periodicity);
@@ -49,10 +67,20 @@ public:
   PositionIndex &operator=(PositionIndex const &) = delete;
 
   // Atoms in the box neighbourhood of `point`: a superset of the coincident
-  // ones, ascending, each once.
+  // ones, ascending, each once. Refills `out` and returns a view of it.
+  [[nodiscard]] std::span<int const> candidates(Vector3d const &point,
+                                                Scratch &out) const;
+
+  // Allocating form, for callers not in a loop.
   [[nodiscard]] std::vector<int> candidates(Vector3d const &point) const;
 
-  // Atoms coincident with `point`, ascending.
+  // Atoms coincident with `point`, ascending. The view borrows `out`, which
+  // must outlive it and must not be reused while it is being iterated.
+  [[nodiscard]] auto matches(Vector3d const &point, Scratch &out) const {
+    return candidates(point, out) | std::views::filter([this, point](int atom) {
+             return coincides(point, atom);
+           });
+  }
   [[nodiscard]] auto matches(Vector3d const &point) const {
     return candidates(point) | std::views::filter([this, point](int atom) {
              return coincides(point, atom);
@@ -60,6 +88,13 @@ public:
   }
 
   // Atoms of `type` coincident with `point`, ascending.
+  [[nodiscard]] auto matches(Vector3d const &point, int type,
+                             Scratch &out) const {
+    return candidates(point, out) |
+           std::views::filter([this, point, type](int atom) {
+             return type_of(atom) == type && coincides(point, atom);
+           });
+  }
   [[nodiscard]] auto matches(Vector3d const &point, int type) const {
     return candidates(point) |
            std::views::filter([this, point, type](int atom) {
@@ -70,14 +105,24 @@ public:
   // The lowest-index atom of `type` coincident with `point` that `accept`s:
   // the first-hit-in-index-order primitive of the linear scans this replaces.
   [[nodiscard]] std::optional<int>
-  first_match(Vector3d const &point, int type,
+  first_match(Vector3d const &point, int type, Scratch &out,
               std::predicate<int> auto accept) const {
-    for (int const atom : matches(point, type)) {
+    for (int const atom : matches(point, type, out)) {
       if (accept(atom)) {
         return atom;
       }
     }
     return std::nullopt;
+  }
+  [[nodiscard]] std::optional<int> first_match(Vector3d const &point, int type,
+                                               Scratch &out) const {
+    return first_match(point, type, out, [](int) { return true; });
+  }
+  [[nodiscard]] std::optional<int>
+  first_match(Vector3d const &point, int type,
+              std::predicate<int> auto accept) const {
+    Scratch out;
+    return first_match(point, type, out, accept);
   }
   [[nodiscard]] std::optional<int> first_match(Vector3d const &point,
                                                int type) const {
@@ -100,8 +145,10 @@ private:
   }
 
   Matrix3d lattice_;
+  Matrix3d lattice_inv_;
   double symprec_;
   double half_width_; // of the query box: symprec plus a rounding margin
+  double image_reach_; // half_width_ expressed as a fractional coordinate
   CellPeriodicity periodicity_;
   Positions const *positions_;
   Types const *types_;

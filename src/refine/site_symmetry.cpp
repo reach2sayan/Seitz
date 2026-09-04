@@ -63,6 +63,7 @@ struct Equivalent {
                                                  double symprec) {
   CellPeriodicity const &periodicity = conv_prim.periodicity();
   PositionIndex const index(conv_prim, symprec);
+  PositionIndex::Scratch scratch; // reused by every query in the loop below
   auto const n = static_cast<std::size_t>(conv_prim.size());
   std::vector<std::optional<Equivalent>> claimed(n);
   ExactPositions out;
@@ -80,7 +81,7 @@ struct Equivalent {
     out.push_back({.position = exact, .equivalent_atom = i});
     for (auto const &op : conv_sym) {
       Vector3d const mapped = op.apply(exact);
-      for (int const k : index.matches(mapped, conv_prim.type(i))) {
+      for (int const k : index.matches(mapped, conv_prim.type(i), scratch)) {
         auto &slot = claimed[static_cast<std::size_t>(k)];
         if (k > i && !slot) {
           slot = Equivalent{math::wrap_to_unit_cell(mapped), i};
@@ -119,12 +120,15 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                             periodicity);
   std::vector<std::vector<int>> classes;
   classes.reserve(orbit.size());
+  PositionIndex::Scratch scratch;
   for (auto const &point : orbit) {
-    classes.emplace_back(std::from_range, index.matches(point));
+    classes.emplace_back(std::from_range, index.matches(point, scratch));
   }
 
   auto const group_order = static_cast<int>(conv_sym.size());
   data::WyckoffRange const range = data::wyckoff_indices(hall);
+  // Hoisted: every candidate below overwrites all of it, so one buffer does.
+  std::vector<char> fixed(orbit.size());
   for (int wi = 0; wi < range.count; ++wi) {
     data::WyckoffCoordinate const wc =
         data::wyckoff_coordinate(range.start + wi);
@@ -132,17 +136,17 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
       continue;
     }
     // Which orbit points the candidate's site-symmetry generator fixes.
-    std::vector<bool> fixed(orbit.size());
     for (auto const [k, point] : orbit | std::views::enumerate) {
       Vector3d const mapped =
           wc.rotation.cast<double>() * point + wc.translation;
-      fixed[static_cast<std::size_t>(k)] =
-          coincident(point, mapped, lattice, symprec, periodicity);
+      fixed[static_cast<std::size_t>(k)] = static_cast<char>(
+          coincident(point, mapped, lattice, symprec, periodicity));
     }
     bool const consistent =
         std::ranges::any_of(classes, [&](std::vector<int> const &cls) {
-          auto const fixed_in_class = std::ranges::count_if(
-              cls, [&](int k) { return fixed[static_cast<std::size_t>(k)]; });
+          auto const fixed_in_class = std::ranges::count_if(cls, [&](int k) {
+            return fixed[static_cast<std::size_t>(k)] != 0;
+          });
           return static_cast<int>(fixed_in_class) * wc.multiplicity ==
                  group_order;
         });

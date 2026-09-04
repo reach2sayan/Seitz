@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include <ranges>
+#include <vector>
 
 namespace cppcrystal::generate {
 
@@ -30,13 +31,17 @@ radius_of(int type, DistanceTolerance const &tol) noexcept {
                                          Types const &types,
                                          Matrix3d const &lattice,
                                          CellPeriodicity const &periodicity,
-                                         DistanceTolerance tol) noexcept {
+                                         DistanceTolerance tol) {
   if (types.empty()) {
     return true;
   }
-  auto const radius = types | std::views::transform([&](int type) {
-                        return radius_of(type, tol);
-                      });
+  // Materialised, not a lazy transform view: radius[i] / radius[j] are read in
+  // the pair loop below, and a view would re-run the covalent-radius lookup on
+  // every one of those reads.
+  std::vector<double> const radius{std::from_range,
+                                   types | std::views::transform([&](int type) {
+                                     return radius_of(type, tol);
+                                   })};
   double const cutoff = 2.0 * tol.scale * std::ranges::max(radius);
 
   // Self-images: the nearest non-trivial image of any point is the same
@@ -50,12 +55,15 @@ radius_of(int type, DistanceTolerance const &tol) noexcept {
   }
 
   PositionIndex const index(positions, types, lattice, cutoff, periodicity);
+  PositionIndex::Scratch scratch;
   auto const row = [&](Index i) { return Vector3d(positions.row(i)); };
   for (Index i = 0; i < positions.rows(); ++i) {
-    auto later = index.candidates(row(i)) |
+    auto later = index.candidates(row(i), scratch) |
                  std::views::filter([i](int j) { return j > i; });
     for (int const j : later) {
-      double const min_dist = tol.scale * (radius[i] + radius[j]);
+      double const min_dist =
+          tol.scale * (radius[static_cast<std::size_t>(i)] +
+                       radius[static_cast<std::size_t>(j)]);
       if (minimum_image_distance(row(i), row(j), lattice, periodicity) <
           min_dist) {
         return false;
@@ -95,7 +103,7 @@ double minimum_image_distance(Vector3d const &a, Vector3d const &b,
   return std::sqrt(best);
 }
 
-bool distances_valid(Cell const &cell, DistanceTolerance tol) noexcept {
+bool distances_valid(Cell const &cell, DistanceTolerance tol) {
   return pairwise_distances_ok(cell.positions(), cell.types(),
                                cell.lattice().matrix(), cell.periodicity(),
                                tol);

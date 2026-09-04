@@ -210,8 +210,13 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   // atom that is its own representative) of i's type coinciding with i, or i
   // itself, which then starts a class.
   std::vector<int> overlap(static_cast<std::size_t>(n));
+  // Hoisted out of the retry loop below: the keys change every attempt but the
+  // capacity does not, and this loop runs up to kTrimNumAttempt times.
+  boost::container::flat_map<int, int> class_size;
+  class_size.reserve(static_cast<std::size_t>(n));
   double tol = symprec;
   bool ok = false;
+  PositionIndex::Scratch scratch;
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
     PositionIndex const index(pos, cell.types(), trimmed_lattice.matrix(), tol,
                               periodicity);
@@ -220,7 +225,7 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
       overlap[ui] = i; // i is a representative until a lower one claims it
       overlap[ui] =
           index
-              .first_match(row(pos, i), cell.type(i),
+              .first_match(row(pos, i), cell.type(i), scratch,
                            [&](int j) {
                              return j <= i &&
                                     overlap[static_cast<std::size_t>(j)] == j;
@@ -230,7 +235,7 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
 
     // Class sizes in one pass: every overlap entry names its representative,
     // so the histogram keys are exactly the representatives, in index order.
-    boost::container::flat_map<int, int> class_size;
+    class_size.clear();
     for (int const rep : overlap) {
       ++class_size[rep];
     }
@@ -282,8 +287,9 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
                       .transpose();
   }
 
-  return std::make_pair(Cell(trimmed_lattice, tpos, trimmed_types, periodicity),
-                        mapping);
+  return std::make_pair(Cell(trimmed_lattice, std::move(tpos),
+                             std::move(trimmed_types), periodicity),
+                        std::move(mapping));
 }
 
 // The translations of a symmetry-operation set whose rotation is the identity.

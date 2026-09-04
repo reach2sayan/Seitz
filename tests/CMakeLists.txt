@@ -18,7 +18,8 @@ add_executable(cppcrystal_tests
         test_error_paths.cpp
         test_oo.cpp
         test_layer.cpp
-        test_standardize.cpp)
+        test_standardize.cpp
+        test_benchmark.cpp)
 target_link_libraries(cppcrystal_tests PRIVATE
         cppcrystal::cppcrystal
         Boost::geometry

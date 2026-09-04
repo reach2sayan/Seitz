@@ -41,8 +41,14 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                             Matrix3d const &lattice,
                             CellPeriodicity const &periodicity,
                             SeedBox const &box, std::mt19937_64 &rng) {
+  auto const total = std::ranges::fold_left(
+      assignment, std::size_t{0}, [](std::size_t sum, auto const &placed) {
+        return sum + static_cast<std::size_t>(placed.position->multiplicity());
+      });
   std::vector<Vector3d> rows;
+  rows.reserve(total);
   Types types;
+  types.reserve(total);
   for (auto const &placed : assignment) {
     Positions const orbit =
         placed.position->orbit(box.sample(rng), periodicity);

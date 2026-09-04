@@ -12,6 +12,7 @@
 #include <iterator>
 #include <optional>
 #include <ranges>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -20,10 +21,13 @@ namespace cppcrystal::spin {
 namespace {
 
 // rot_cart = lattice . rot . lattice^-1: the rotation expressed in Cartesian
-// coordinates.
+// coordinates. The inverse is passed in rather than taken here: the only caller
+// applies this to every operation of one cell, and inverting the same 3x3 up to
+// 192 times was the whole cost of the loop.
 [[nodiscard]] Matrix3d rotation_in_cartesian(Matrix3d const &lattice,
+                                             Matrix3d const &lattice_inv,
                                              Matrix3i const &rot) {
-  return lattice * rot.cast<double>() * lattice.inverse();
+  return lattice * rot.cast<double>() * lattice_inv;
 }
 
 // How one kind of magnetic moment (collinear scalar / non-collinear 3-vector)
@@ -119,10 +123,11 @@ template <class M>
 cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
   std::vector<Matrix3d> out;
   out.reserve(operations.size());
+  Matrix3d const lattice_inv = lattice.inverse();
   std::ranges::transform(
       operations, std::back_inserter(out), [&](auto const &op) {
         return rotation_in_cartesian(
-            lattice,
+            lattice, lattice_inv,
             OperationTraits<std::remove_cvref_t<decltype(op)>>::spatial(op)
                 .rotation);
       });
@@ -144,6 +149,7 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
   auto const rot_cart =
       cartesian_rotations(cell.lattice().matrix(), sym_nonspin);
   PositionIndex const index(cell, symprec);
+  PositionIndex::Scratch scratch;
 
   std::vector<MagneticSymmetryOperation> out;
   out.reserve(
@@ -155,7 +161,7 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
 
     for (Index const j : std::views::iota(Index{0}, n)) {
       auto const image =
-          index.first_match(op.apply(cell.position(j)), cell.type(j));
+          index.first_match(op.apply(cell.position(j)), cell.type(j), scratch);
       if (!image) {
         // Rare: failure to overlap (e.g. too loose symprec); skip the op.
         found = false;
@@ -219,6 +225,7 @@ get_permutations(MagneticOperations const &operations,
   auto const rot_cart =
       cartesian_rotations(cell.lattice().matrix(), operations);
   PositionIndex const index(cell, symprec);
+  PositionIndex::Scratch scratch;
 
   std::vector<int> perm;
   perm.reserve(operations.size() * static_cast<std::size_t>(n));
@@ -228,7 +235,7 @@ get_permutations(MagneticOperations const &operations,
       M const moment = MomentOps<M>::transform(
           MomentOps<M>::moment(mcell, i), rc, op.time_reversal, mode, kind);
 
-      auto const j = index.first_match(pos, cell.type(i), [&](int k) {
+      auto const j = index.first_match(pos, cell.type(i), scratch, [&](int k) {
         return MomentOps<M>::close(MomentOps<M>::moment(mcell, k), moment,
                                    mag_symprec);
       });
@@ -311,7 +318,7 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
         MomentOps<M>::moment(mcell, i) + moment_res / denom;
   }
 
-  return MagneticCell(Cell(cell.lattice(), positions, cell.types()),
+  return MagneticCell(Cell(cell.lattice(), std::move(positions), cell.types()),
                       MomentOps<M>::pack(std::move(moments)), mcell.kind());
 }
 

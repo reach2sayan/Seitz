@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <numbers>
 #include <optional>
 #include <ranges>
@@ -46,6 +48,80 @@ constexpr int kRelativeAxes[26][3] = {
 
 [[nodiscard]] Vector3i axis(int const (&a)[3]) { return {a[0], a[1], a[2]}; }
 
+// The candidate axis triples worth testing at all: those whose matrix is
+// unimodular. That is a property of kRelativeAxes alone, so it is decided once
+// at compile time rather than 26^3 times per pass -- and the search re-enters
+// this loop up to kNumAttempt times per determination attempt. Index triples
+// rather than the matrices themselves: 3 bytes an entry instead of 9, and the
+// unpacking below is the same comma-initializer the runtime loop already used.
+//
+// Order is the cartesian-product order of the loop this replaces, and the two
+// filters (determinant here, couples_aperiodic at runtime) commute, so exactly
+// the same candidates are visited in exactly the same sequence.
+using AxisTriple = std::array<std::uint8_t, 3>;
+
+// 6960 of the 17576 triples are unimodular; `count` below pins that.
+struct UnimodularAxes {
+  std::array<AxisTriple, 6960> triples{};
+  std::size_t count = 0;
+};
+
+inline constexpr UnimodularAxes kUnimodularAxes = [] {
+  UnimodularAxes out{};
+  constexpr std::size_t n = std::size(kRelativeAxes);
+  for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t j = 0; j < n; ++j) {
+      for (std::size_t k = 0; k < n; ++k) {
+        // Row-major proxy whose columns are the three candidate vectors:
+        // Eigen fixed matrices are not literal types for arithmetic.
+        math::Mat3Rows m{};
+        for (std::size_t r = 0; r < 3; ++r) {
+          m[r * 3 + 0] = kRelativeAxes[i][r];
+          m[r * 3 + 1] = kRelativeAxes[j][r];
+          m[r * 3 + 2] = kRelativeAxes[k][r];
+        }
+        if (int const det = math::determinant(m); det == 1 || det == -1) {
+          // Overflows at compile time if the size above is ever wrong.
+          out.triples[out.count++] = {static_cast<std::uint8_t>(i),
+                                      static_cast<std::uint8_t>(j),
+                                      static_cast<std::uint8_t>(k)};
+        }
+      }
+    }
+  }
+  return out;
+}();
+static_assert(kUnimodularAxes.count == kUnimodularAxes.triples.size());
+
+// The `orig` side of is_identity_metric, which is the same for every candidate
+// in a pass: three sqrt and (on the angle path) three acos that used to be
+// recomputed 17576 times.
+struct MetricReference {
+  Eigen::Array3d length;            // sqrt of the metric diagonal
+  std::array<double, 3> cosine{};   // pairs (0,1), (0,2), (1,2)
+  std::array<double, 3> angle_deg{};
+};
+
+// The pairs of basis vectors whose angles the metric comparison tests.
+constexpr std::array<std::pair<int, int>, 3> kElemSets{{{0, 1}, {0, 2}, {1, 2}}};
+
+// The degree conversion keeps the original `/ pi * 180` spelling rather than
+// folding a 180/pi constant, so the result stays bit-identical to what the
+// reference produces.
+[[nodiscard]] double metric_angle_deg(Matrix3d const &m, int a, int b) {
+  return math::metric_angle(m, a, b) / std::numbers::pi * 180.0;
+}
+
+[[nodiscard]] MetricReference reference_of(Matrix3d const &metric) {
+  MetricReference ref{.length = metric.diagonal().array().sqrt()};
+  for (auto const [i, pair] : kElemSets | std::views::enumerate) {
+    auto const [j, k] = pair;
+    ref.cosine[static_cast<std::size_t>(i)] = math::metric_cosine(metric, j, k);
+    ref.angle_deg[static_cast<std::size_t>(i)] = metric_angle_deg(metric, j, k);
+  }
+  return ref;
+}
+
 // For a layer group the aperiodic axis must map to itself: no candidate axis
 // matrix may couple the aperiodic axis with the periodic plane. True if the
 // off-diagonal block for `aperiodic_axis` has any nonzero entry. Candidate
@@ -58,44 +134,42 @@ constexpr int kRelativeAxes[26][3] = {
   });
 }
 
-// Whether two metric tensors agree. An unset angle_tolerance uses the sin-based
-// criterion; a positive angle_tolerance compares angles in degrees.
+// Whether a candidate metric agrees with the reference one. An unset
+// angle_tolerance uses the sin-based criterion; a positive angle_tolerance
+// compares angles in degrees. math::metric_cosine clamps to [-1, 1] -- see
+// there for why.
 [[nodiscard]] bool is_identity_metric(Matrix3d const &rotated,
-                                      Matrix3d const &orig, double symprec,
+                                      MetricReference const &orig,
+                                      double symprec,
                                       AngleTolerance angle_tolerance) {
-  const auto length_orig = orig.diagonal().array().sqrt();
-  const auto length_rot = rotated.diagonal().array().sqrt();
+  // Materialised, not `auto`: as an unevaluated Eigen expression every
+  // length_rot[k] read below would re-run the sqrt, and this function is
+  // called once per candidate axis triple.
+  Eigen::Array3d const length_rot = rotated.diagonal().array().sqrt();
 
   auto ok_to_continue =
-      ((length_orig - length_rot).abs().maxCoeff() <= symprec);
+      ((orig.length - length_rot).abs().maxCoeff() <= symprec);
   if (!ok_to_continue) {
     return false;
   }
 
-  // math::metric_cosine clamps to [-1, 1] -- see there for why. The degree
-  // conversion keeps the original `/ pi * 180` spelling rather than folding a
-  // 180/pi constant, so the result is bit-identical to what the reference
-  // produces.
-  auto const angle = [](Matrix3d const &m, int a, int b) {
-    return math::metric_angle(m, a, b) / std::numbers::pi * 180.0;
-  };
-  constexpr std::array<std::pair<int, int>, 3> elem_sets{
-      {{0, 1}, {0, 2}, {1, 2}}};
-  for (auto const &[j, k] : elem_sets) {
+  for (auto const [i, pair] : kElemSets | std::views::enumerate) {
+    auto const [j, k] = pair;
+    auto const ui = static_cast<std::size_t>(i);
     if (angle_tolerance) {
-      if (std::fabs(angle(orig, j, k) - angle(rotated, j, k)) >
+      if (std::fabs(orig.angle_deg[ui] - metric_angle_deg(rotated, j, k)) >
           *angle_tolerance) {
         return false;
       }
     } else {
-      double const cos1 = math::metric_cosine(orig, j, k);
+      double const cos1 = orig.cosine[ui];
       double const cos2 = math::metric_cosine(rotated, j, k);
       double const x =
           cos1 * cos2 + std::sqrt(1 - cos1 * cos1) * std::sqrt(1 - cos2 * cos2);
       double const sin_dtheta2 = 1 - x * x;
-      double const length_ave2 = ((length_orig[j] + length_rot[j]) *
-                                  (length_orig[k] + length_rot[k])) /
-                                 4;
+      double const length_ave2 =
+          ((orig.length[j] + length_rot[j]) * (orig.length[k] + length_rot[k])) /
+          4;
       if (sin_dtheta2 > kSinDtheta2Cutoff &&
           sin_dtheta2 * length_ave2 > symprec * symprec) {
         return false;
@@ -114,21 +188,19 @@ template <GroupFamily F>
   // Layer groups admit at most 24 lattice symmetries (the aperiodic axis halves
   // the 48 of a 3D point group); overflowing the cap asks for a tighter angle.
   constexpr std::size_t cap = F == GroupFamily::layer ? 24 : 48;
+  MetricReference const reference = reference_of(metric_orig);
   PointSymmetry found;
-  for (auto const &[ai, aj, ak] : std::views::cartesian_product(
-           kRelativeAxes, kRelativeAxes, kRelativeAxes)) {
+  for (AxisTriple const &triple : kUnimodularAxes.triples) {
     Matrix3i axes;
-    axes << axis(ai), axis(aj), axis(ak);
+    axes << axis(kRelativeAxes[triple[0]]), axis(kRelativeAxes[triple[1]]),
+        axis(kRelativeAxes[triple[2]]);
     if constexpr (F == GroupFamily::layer) {
       if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
         continue;
       }
     }
-    if (int const det = axes.determinant(); det != 1 && det != -1) {
-      continue;
-    }
     Matrix3d const metric = Lattice{min_lattice * axes.cast<double>()}.metric();
-    if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
+    if (is_identity_metric(metric, reference, symprec, angle_tolerance)) {
       if (found.size() >= cap) {
         return std::nullopt;
       }

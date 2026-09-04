@@ -38,8 +38,12 @@ Result<Cell> Refinement<F>::from_primitive(Cell const &primitive) const {
   Matrix3d const to_conv = centering_matrix_inv(centering);
   auto const shifts = centering_shifts(centering);
 
+  auto const expanded_size =
+      static_cast<std::size_t>(primitive.size()) * (shifts.size() + 1);
   std::vector<Vector3d> pos;
+  pos.reserve(expanded_size);
   Types types;
+  types.reserve(expanded_size);
   for (auto const &[position, type] : primitive.atoms()) {
     Vector3d const base = math::wrap_to_unit_cell(Vector3d(to_conv * position));
     pos.push_back(base);

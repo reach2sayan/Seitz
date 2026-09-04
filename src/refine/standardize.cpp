@@ -115,10 +115,11 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
 // onto among the atoms before it; `i` itself when none is found.
 [[nodiscard]] int search_equivalent_atom(int i, Cell const &cell,
                                          PositionIndex const &index,
-                                         Operations const &operations) {
+                                         Operations const &operations,
+                                         PositionIndex::Scratch &scratch) {
   for (auto const &op : operations) {
     if (auto const j =
-            index.first_match(op.apply(cell.position(i)), cell.type(i),
+            index.first_match(op.apply(cell.position(i)), cell.type(i), scratch,
                               [&](int k) { return k < i; })) {
       return *j;
     }
@@ -134,6 +135,7 @@ first_index_of(std::vector<int> const &values, std::size_t size) {
 equivalent_atoms_broken(Cell const &cell, Operations const &operations,
                         std::vector<int> const &mapping_table, double symprec) {
   PositionIndex const index(cell, symprec);
+  PositionIndex::Scratch scratch;
   auto const first_sharing =
       first_index_of(mapping_table, mapping_table.size());
   std::vector<int> equiv;
@@ -145,8 +147,8 @@ equivalent_atoms_broken(Cell const &cell, Operations const &operations,
       equiv.push_back(equiv[static_cast<std::size_t>(first)]);
       continue;
     }
-    int const found =
-        search_equivalent_atom(static_cast<int>(i), cell, index, operations);
+    int const found = search_equivalent_atom(static_cast<int>(i), cell, index,
+                                             operations, scratch);
     equiv.push_back(found == i ? static_cast<int>(i)
                                : equiv[static_cast<std::size_t>(found)]);
   }
@@ -183,7 +185,7 @@ Refinement<F>::standardize(Operations const &cell_operations,
   Cell const &cell = cell_;
   double const symprec = tol_.symprec;
   HallNumber const hall = sg.hall;
-  Operations const conv_sym = operations_from_database(hall);
+  Operations const &conv_sym = operations_from_database(hall);
   int const multi = num_pure_translations(conv_sym);
   constexpr CellPeriodicity conv_periodicity = conventional_periodicity<F>();
 

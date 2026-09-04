@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <iterator>
 #include <ranges>
+#include <utility>
 #include <vector>
 
 namespace cppcrystal::analysis {
@@ -43,7 +44,8 @@ attempt(Cell const &cell, Tolerance const &tol,
       refine::Refinement<F>{*matched, primitive->cell, cell,
                             primitive->tolerance}
           .similar_bravais();
-  auto const operations = refinement.operations();
+  // Not const: moved into the Dataset below, after its last read.
+  auto operations = refinement.operations();
   if (!operations) {
     return std::nullopt;
   }
@@ -79,7 +81,7 @@ attempt(Cell const &cell, Tolerance const &tol,
                       sg.bravais_lattice.inverse() * cell.lattice().matrix(),
                   .origin_shift = sg.origin_shift,
                   .rigid_rotation = bravais.rigid_rotation_to(std_lattice)},
-      .operations = *operations,
+      .operations = std::move(*operations),
       .sites = std::move(sites),
       .standardized = std::move(standardized->bravais),
       .std_mapping_to_primitive =
@@ -156,7 +158,7 @@ template Result<Cell>
 SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>()
     const;
 
-Result<Operations> SymmetryAnalyzer::cell_operations() const {
+Result<Operations const &> SymmetryAnalyzer::cell_operations() const & {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {
     return dispatch_family(cell_.periodicity(), [&]<GroupFamily F>() {
       return symmetry::SymmetrySearch<F>{cell_, tol_}.operations();
@@ -165,7 +167,7 @@ Result<Operations> SymmetryAnalyzer::cell_operations() const {
   return *ops;
 }
 
-Result<PointSymmetry> SymmetryAnalyzer::lattice_symmetry() const {
+Result<PointSymmetry const &> SymmetryAnalyzer::lattice_symmetry() const & {
   BOOST_LEAF_AUTO(ps, lattice_symmetry_.get([&] {
     return dispatch_family(cell_.periodicity(), [&]<GroupFamily F>() {
       return symmetry::SymmetrySearch<F>{cell_, tol_}.lattice_symmetry();
@@ -174,7 +176,7 @@ Result<PointSymmetry> SymmetryAnalyzer::lattice_symmetry() const {
   return *ps;
 }
 
-Result<Cell> SymmetryAnalyzer::primitive_cell() const {
+Result<Cell const &> SymmetryAnalyzer::primitive_cell() const & {
   BOOST_LEAF_AUTO(cell, primitive_cell_.get([&]() -> Result<Cell> {
     return dispatch_family(
         cell_.periodicity(), [&]<GroupFamily F>() -> Result<Cell> {

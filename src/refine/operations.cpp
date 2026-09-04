@@ -146,7 +146,7 @@ std::optional<Operations> Refinement<F>::operations() const {
   Cell const &primitive = primitive_;
   Cell const &cell = cell_;
   double const symprec = tol_.symprec;
-  Operations const conv_sym = operations_from_database(sg.hall);
+  Operations const &conv_sym = operations_from_database(sg.hall);
 
   Matrix3d const inv_prim = primitive.lattice().matrix().inverse();
 

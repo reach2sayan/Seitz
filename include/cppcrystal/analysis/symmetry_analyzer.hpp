@@ -75,15 +75,22 @@ public:
   // All space-group operations of the input cell exactly as given, including
   // the centering translations of a non-primitive cell. Distinct from
   // operations(), which are the dataset's operations in the input basis.
-  [[nodiscard]] Result<Operations> cell_operations() const;
+  //
+  // A reference into the memo, and &-qualified for it, like the dataset
+  // projections above: these three used to copy their cache on every call, and
+  // for lattice_symmetry() that copy is a static_vector<Matrix3i, 48>.
+  [[nodiscard]] Result<Operations const &> cell_operations() const &;
+  Result<Operations const &> cell_operations() const && = delete;
 
   // The lattice point group: the rotations (in the cell basis) that map the
   // Delaunay-reduced lattice metric onto itself.
-  [[nodiscard]] Result<PointSymmetry> lattice_symmetry() const;
+  [[nodiscard]] Result<PointSymmetry const &> lattice_symmetry() const &;
+  Result<PointSymmetry const &> lattice_symmetry() const && = delete;
 
   // The primitive cell, cached independently of the full dataset so a caller
   // that only wants it does not pay for standardization.
-  [[nodiscard]] Result<Cell> primitive_cell() const;
+  [[nodiscard]] Result<Cell const &> primitive_cell() const &;
+  Result<Cell const &> primitive_cell() const && = delete;
 
   // The irreducible reciprocal mesh of this crystal: the determination's
   // rotations, made reciprocal (adding the inversion partner with time

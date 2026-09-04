@@ -425,11 +425,13 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
           data::magnetic_std_transformations(uni, hall);
       auto const match = std::ranges::find_if(
           transformations, [&](SymmetryOperation const &transform) {
-            auto const symmetry_cor = distinct_changed_magnetic_symmetry(
+            // Not const: sunk into the MagneticOperations below, whose
+            // constructor takes its vector by value.
+            auto symmetry_cor = distinct_changed_magnetic_symmetry(
                 transform.rotation.cast<double>(), transform.translation,
                 reference->changed_symmetry);
             return same_magnetic_symmetry(
-                msg_uni, MagneticOperations{symmetry_cor}, symprec);
+                msg_uni, MagneticOperations{std::move(symmetry_cor)}, symprec);
           });
       if (match != transformations.end()) {
         return Correction{uni, match->rotation.cast<double>(),
@@ -542,7 +544,8 @@ Result<MagneticCell> MagneticIdentification::transform(
                         transformation_matrix.inverse()};
   SiteTensors tensors = collinear ? SiteTensors{std::move(scalars)}
                                   : SiteTensors{std::move(vectors)};
-  return MagneticCell(Cell(lattice, positions, types), std::move(tensors));
+  return MagneticCell(Cell(lattice, std::move(positions), std::move(types)),
+                      std::move(tensors));
 }
 
 } // namespace cppcrystal::magnetic
