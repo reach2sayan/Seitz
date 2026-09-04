@@ -205,7 +205,10 @@ public:
   // where no BZ point falls.
   [[nodiscard]] std::optional<std::size_t>
   map(std::size_t doubled_index) const noexcept {
-    return doubled_index < map_.size() ? map_[doubled_index] : std::nullopt;
+    if (doubled_index >= map_.size() || map_[doubled_index] == kNoPoint) {
+      return std::nullopt;
+    }
+    return map_[doubled_index];
   }
 
   // The BZ grid-point indices one address maps to under each rotation: rotate
@@ -215,16 +218,24 @@ public:
 
 private:
   friend class ReciprocalMesh;
+
+  // "No BZ point here", as a sentinel rather than std::optional: the map is
+  // indexed on the DOUBLED mesh, so it holds 8x the grid points, and
+  // optional<size_t> spends 16 bytes an entry to carry one bit. The public
+  // accessor above still hands back an optional.
+  static constexpr std::size_t kNoPoint = static_cast<std::size_t>(-1);
+
+  // The rotations are copied, not borrowed: this is returned by value from
+  // ReciprocalMesh::brillouin_zone and may outlive the mesh that built it.
   BrillouinZone(Mesh mesh, std::span<Matrix3i const> rotations,
-                std::vector<Address> addresses,
-                std::vector<std::optional<std::size_t>> map)
+                std::vector<Address> addresses, std::vector<std::size_t> map)
       : mesh_{mesh}, rotations_(rotations.begin(), rotations.end()),
         addresses_{std::move(addresses)}, map_{std::move(map)} {}
 
   Mesh mesh_;
   std::vector<Matrix3i> rotations_;
   std::vector<Address> addresses_;
-  std::vector<std::optional<std::size_t>> map_;
+  std::vector<std::size_t> map_;
 };
 
 } // namespace cppcrystal::kpoint

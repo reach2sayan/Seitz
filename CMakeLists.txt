@@ -129,6 +129,42 @@ else ()
 endif ()
 target_compile_options(cppcrystal PUBLIC "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
 
+# Interprocedural optimization, optimized configurations only.
+#
+# MEASURED: this buys no speed. An interleaved triplicate A/B over the whole
+# [!benchmark] set (see tests/test_benchmark.cpp) put every case within run-to-
+# run noise, geometric mean 1.00x -- the hot inner primitives (coincident(),
+# wrap(), minimal_image(), nint()) are already inline in headers, so there was
+# nothing left for cross-TU inlining to find. It is kept for what it does
+# measurably do: the shared object drops from 6.09 MB to 5.92 MB and from 717
+# exported dynamic symbols to 340, most of the difference being vague-linkage
+# Boost and Eigen template instantiations that have no business in the
+# interface. Do not add it elsewhere expecting a speedup.
+#
+# Safe for the bit-parity the oracle tests pin: the target is baseline x86-64
+# (SSE2, no FMA), so GCC's default -ffp-contract=fast has nothing to contract
+# and extra inlining cannot re-associate anything. Were -march= ever raised to
+# a level with FMA, add -ffp-contract=off to keep that guarantee.
+include(CheckIPOSupported)
+# LANGUAGES CXX explicitly: the project enables only C++, but fetched
+# subprojects enable C, and the default check would fail on that C compiler.
+check_ipo_supported(RESULT CPPCRYSTAL_HAS_IPO OUTPUT CPPCRYSTAL_IPO_ERROR
+        LANGUAGES CXX)
+if (CPPCRYSTAL_HAS_IPO)
+    set_target_properties(cppcrystal PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+else ()
+    message(STATUS "CppCrystal: IPO/LTO unavailable (${CPPCRYSTAL_IPO_ERROR})")
+endif ()
+
+# Nothing here reads errno after a libm call, and promising that it might blocks
+# GCC from emitting sqrt as a single instruction. Also measured as no change on
+# this benchmark set; kept because it is accurate about the code and costs
+# nothing. Deliberately NOT -ffast-math: the search is tolerance-sensitive and
+# bit-parity-tested against the reference implementation.
+target_compile_options(cppcrystal PRIVATE -fno-math-errno)
+
 if (CPPCRYSTAL_ENABLE_SANITIZERS)
     target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(cppcrystal PUBLIC -fsanitize=address,undefined)

@@ -93,6 +93,34 @@ inline constexpr UnimodularAxes kUnimodularAxes = [] {
 }();
 static_assert(kUnimodularAxes.count == kUnimodularAxes.triples.size());
 
+// Every pairwise dot product among the 26 candidate axes mapped into Cartesian
+// space. The metric of a candidate basis (a_i, a_j, a_k) IS the 3x3 of those
+// dot products -- metric(p, q) = (L.a_p).(L.a_q) -- so the whole scan shares
+// 676 values computed once, instead of each of its 6960 candidates doing two
+// 3x3 matrix products to rediscover six of them.
+struct AxisMetrics {
+  static constexpr std::size_t kAxes = std::size(kRelativeAxes);
+  std::array<double, kAxes * kAxes> dot{};
+
+  [[nodiscard]] double operator()(std::size_t a, std::size_t b) const noexcept {
+    return dot[a * kAxes + b];
+  }
+};
+
+[[nodiscard]] AxisMetrics axis_metrics(Matrix3d const &lattice) {
+  std::array<Vector3d, AxisMetrics::kAxes> cartesian;
+  for (auto const [a, v] : cartesian | std::views::enumerate) {
+    v = lattice * axis(kRelativeAxes[a]).cast<double>();
+  }
+  AxisMetrics out;
+  for (std::size_t a = 0; a < AxisMetrics::kAxes; ++a) {
+    for (std::size_t b = 0; b < AxisMetrics::kAxes; ++b) {
+      out.dot[a * AxisMetrics::kAxes + b] = cartesian[a].dot(cartesian[b]);
+    }
+  }
+  return out;
+}
+
 // The `orig` side of is_identity_metric, which is the same for every candidate
 // in a pass: three sqrt and (on the angle path) three acos that used to be
 // recomputed 17576 times.
@@ -138,21 +166,21 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{{{0, 1}, {0, 2}, {1, 2}}}
 // angle_tolerance uses the sin-based criterion; a positive angle_tolerance
 // compares angles in degrees. math::metric_cosine clamps to [-1, 1] -- see
 // there for why.
-[[nodiscard]] bool is_identity_metric(Matrix3d const &rotated,
-                                      MetricReference const &orig,
-                                      double symprec,
-                                      AngleTolerance angle_tolerance) {
-  // Materialised, not `auto`: as an unevaluated Eigen expression every
-  // length_rot[k] read below would re-run the sqrt, and this function is
-  // called once per candidate axis triple.
-  Eigen::Array3d const length_rot = rotated.diagonal().array().sqrt();
+// The cheap half of the comparison: the basis-vector lengths must agree. Split
+// out so the scan can run it off three table lookups and skip assembling the
+// rest of the metric for the candidates it rejects -- which is most of them.
+[[nodiscard]] bool lengths_agree(MetricReference const &orig,
+                                 Eigen::Array3d const &length_rot,
+                                 double symprec) {
+  return (orig.length - length_rot).abs().maxCoeff() <= symprec;
+}
 
-  auto ok_to_continue =
-      ((orig.length - length_rot).abs().maxCoeff() <= symprec);
-  if (!ok_to_continue) {
-    return false;
-  }
-
+// The remaining half: the inter-axis angles must agree too. `length_rot` is
+// passed in rather than recomputed, so the three sqrt happen once.
+[[nodiscard]] bool angles_agree(Matrix3d const &rotated,
+                                Eigen::Array3d const &length_rot,
+                                MetricReference const &orig, double symprec,
+                                AngleTolerance angle_tolerance) {
   for (auto const [i, pair] : kElemSets | std::views::enumerate) {
     auto const [j, k] = pair;
     auto const ui = static_cast<std::size_t>(i);
@@ -189,18 +217,39 @@ template <GroupFamily F>
   // the 48 of a 3D point group); overflowing the cap asks for a tighter angle.
   constexpr std::size_t cap = F == GroupFamily::layer ? 24 : 48;
   MetricReference const reference = reference_of(metric_orig);
+  AxisMetrics const metrics = axis_metrics(min_lattice);
   PointSymmetry found;
   for (AxisTriple const &triple : kUnimodularAxes.triples) {
+    std::array<std::size_t, 3> const a{triple[0], triple[1], triple[2]};
+
+    // The metric diagonal is three lookups, and the length test rejects the
+    // large majority of candidates -- so neither the off-diagonals nor the
+    // integer axis matrix is assembled until a candidate survives it.
+    Eigen::Array3d const length_rot{std::sqrt(metrics(a[0], a[0])),
+                                    std::sqrt(metrics(a[1], a[1])),
+                                    std::sqrt(metrics(a[2], a[2]))};
+    if (!lengths_agree(reference, length_rot, symprec)) {
+      continue;
+    }
+
     Matrix3i axes;
-    axes << axis(kRelativeAxes[triple[0]]), axis(kRelativeAxes[triple[1]]),
-        axis(kRelativeAxes[triple[2]]);
+    axes << axis(kRelativeAxes[a[0]]), axis(kRelativeAxes[a[1]]),
+        axis(kRelativeAxes[a[2]]);
     if constexpr (F == GroupFamily::layer) {
       if (aperiodic_axis && couples_aperiodic(axes, *aperiodic_axis)) {
         continue;
       }
     }
-    Matrix3d const metric = Lattice{min_lattice * axes.cast<double>()}.metric();
-    if (is_identity_metric(metric, reference, symprec, angle_tolerance)) {
+
+    Matrix3d metric;
+    for (int p = 0; p < 3; ++p) {
+      for (int q = 0; q < 3; ++q) {
+        metric(p, q) = metrics(a[static_cast<std::size_t>(p)],
+                               a[static_cast<std::size_t>(q)]);
+      }
+    }
+    if (angles_agree(metric, length_rot, reference, symprec,
+                     angle_tolerance)) {
       if (found.size() >= cap) {
         return std::nullopt;
       }

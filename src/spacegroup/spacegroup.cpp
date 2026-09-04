@@ -18,6 +18,7 @@
 #include <optional>
 #include <ranges>
 #include <span>
+#include <utility>
 #include <vector>
 
 // Given a primitive cell's symmetry operations, find the Hall number,
@@ -972,6 +973,17 @@ search_hall_number(std::optional<HallNumber> forced_hall,
   return std::nullopt;
 }
 
+// Exact, element-wise equality of two operation sets. Not a tolerance
+// comparison: reduce() copies surviving operations through unchanged, so two
+// runs that keep the same operations produce bitwise-identical values, and
+// that is precisely the question asked below.
+[[nodiscard]] bool same_operations(Operations const &a, Operations const &b) {
+  return std::ranges::equal(
+      a, b, [](SymmetryOperation const &x, SymmetryOperation const &y) {
+        return x.rotation == y.rotation && x.translation == y.translation;
+      });
+}
+
 // Try once, then progressively tighten the operation set (reduce_symmetry)
 // until a Hall number is found.
 template <GroupFamily F>
@@ -986,16 +998,28 @@ iterative_search_hall_number(std::optional<HallNumber> forced_hall,
 
   symmetry::SymmetrySearch<F> const search(primitive.cell, tol);
   Tolerance tightened = tol;
+  // The only input to search_hall_number that varies across attempts is the
+  // reduced operation set -- the tolerance passed to it is the original
+  // tol.symprec, not the tightened one. So an attempt that filters down to the
+  // set the previous one already tried is guaranteed to reach the same answer,
+  // and the search (up to 530 Hall candidates, each matching every operation)
+  // is far more expensive than the filtering that produced it. Tightening by
+  // 5% at a time usually leaves the set unchanged for many attempts in a row,
+  // so skipping the repeats is most of this loop's work.
+  // Held by value, not by pointer: `reduced` below dies at the end of each
+  // iteration. One copy of the operation set, against up to 100 Hall searches.
+  Operations last_tried = symmetry;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     tightened.symprec *= kReduceRate;
-    Operations const reduced = search.reduce(symmetry, tightened);
-    if (reduced.empty()) {
+    Operations reduced = search.reduce(symmetry, tightened);
+    if (reduced.empty() || same_operations(reduced, last_tried)) {
       continue;
     }
     if (auto r = search_hall_number<F>(forced_hall, primitive, reduced,
                                        tol.symprec)) {
       return r;
     }
+    last_tried = std::move(reduced);
   }
   return std::nullopt;
 }

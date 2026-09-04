@@ -2,8 +2,11 @@
 
 #include <cppcrystal/core/tolerance.hpp> // approx_equal
 
-#include "core/matrix_order.hpp" // unique_by_rotation
-#include "math/fractional.hpp"   // math::round_to_int
+#include "core/matrix_order.hpp"  // unique_by_rotation
+#include "core/parallel_for.hpp"   // the mapping loop is the one hot parallel loop
+#include "math/fractional.hpp"     // math::round_to_int
+
+#include <boost/container/small_vector.hpp>
 
 #include <algorithm>
 #include <array>
@@ -16,6 +19,11 @@
 namespace cppcrystal::kpoint {
 
 namespace {
+
+// Grid points below which the reduction runs on the calling thread. Each point
+// costs a min-reduction over up to 48 integer 3x3 products, so a few thousand
+// of them is already far more work than spawning threads.
+constexpr Index kMeshGrain = 4096;
 
 [[nodiscard]] Vector3i to_eigen(Address a) noexcept {
   return {a[0], a[1], a[2]};
@@ -157,16 +165,20 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
       static_cast<std::int64_t>(d[0]) * d[1],
   };
 
-  mapping_.reserve(mesh_.size());
-  for (auto const [index, address] :
-       mesh_.addresses() | std::views::enumerate) {
+  // Indexed writes, not push_back: each mapping_[i] depends only on i, both
+  // representative functions are pure, and normal_representative has no early
+  // exit at all -- it is a min-reduction over the rotations. This is the
+  // largest raw iteration count in the library (divisions can reach 10^6
+  // points), and the only loop in it worth threading.
+  mapping_.resize(mesh_.size());
+  parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
     auto const i = static_cast<std::size_t>(index);
-    Address const doubled = mesh_.doubled_address(address);
-    mapping_.push_back(
-        normal ? normal_representative(doubled, mesh_, i, rotations_)
-               : distortion_representative(doubled, mesh_, i, divisor,
-                                           rotations_));
-  }
+    Address const doubled = mesh_.doubled_address(mesh_.address_of(i));
+    mapping_[i] = normal
+                      ? normal_representative(doubled, mesh_, i, rotations_)
+                      : distortion_representative(doubled, mesh_, i, divisor,
+                                                  rotations_);
+  });
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
       mapping_ | std::views::enumerate, [](auto const &e) {
         const auto &[lindex, rindex] = e;
@@ -199,8 +211,9 @@ ReciprocalMesh::stabilized(std::span<Vector3d const> qpoints) const {
   auto const &d = mesh_.divisions();
   double const tolerance = 0.01 / (d[0] + d[1] + d[2]);
   auto preserves_qpoints = [&](Matrix3i const &rot) {
+    Matrix3d const rot_d = rot.cast<double>(); // once per rotation, not per q
     return std::ranges::all_of(qpoints, [&](Vector3d const &q) {
-      Vector3d const q_rot = rot.cast<double>() * q;
+      Vector3d const q_rot = rot_d * q;
       return std::ranges::any_of(qpoints, [&](Vector3d const &other) {
         Vector3d const diff = q_rot - other;
         return approx_equal(diff, math::round_to_int(diff).cast<double>(),
@@ -232,46 +245,66 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   auto const &shift = mesh_.shift();
   double const tolerance = bz_tolerance(rec, d);
 
-  std::vector<std::optional<std::size_t>> map(bzmesh.size(), std::nullopt);
+  std::vector<std::size_t> map(bzmesh.size(), BrillouinZone::kNoPoint);
   // The first mesh.size() slots hold each input point's closest image (at its
   // original index); boundary duplicates are appended afterwards.
   std::vector<Address> addresses(mesh_.size());
 
-  for (auto const [index, address] :
-       mesh_.addresses() | std::views::enumerate) {
-    auto const i = static_cast<std::size_t>(index);
-    // Squared distance to the origin of each candidate image.
-    std::array<double, kBzSearchSpace.size()> distance{};
-    std::ranges::transform(
-        kBzSearchSpace, distance.begin(), [&](Address const &offset) {
-          Vector3d q;
-          for (std::size_t k = 0; k < 3; ++k) {
-            auto const dk = static_cast<double>(d[k]);
-            q[static_cast<int>(k)] =
-                (static_cast<double>(address[k]) +
-                 static_cast<double>(offset[k]) * dk + (shift[k] ? 0.5 : 0.0)) /
-                dk;
+  // Split in two so the expensive half can be threaded. The distance scan is
+  // 125 reciprocal-space products per grid point and depends only on the grid
+  // point, but the pass that consumes it appends to a shared vector in index
+  // order -- so phase one records, per point, which of the 125 images qualify
+  // (ascending) and which is the closest, and phase two replays exactly the
+  // sequence the single loop used to perform.
+  struct Candidates {
+    std::uint8_t closest = 0;
+    boost::container::small_vector<std::uint8_t, 4> qualifying;
+  };
+  std::vector<Candidates> candidates(mesh_.size());
+
+  parallel_for(
+      static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
+        auto const i = static_cast<std::size_t>(index);
+        Address const address = mesh_.address_of(i);
+        // Squared distance to the origin of each candidate image.
+        std::array<double, kBzSearchSpace.size()> distance{};
+        std::ranges::transform(
+            kBzSearchSpace, distance.begin(), [&](Address const &offset) {
+              Vector3d q;
+              for (std::size_t k = 0; k < 3; ++k) {
+                auto const dk = static_cast<double>(d[k]);
+                q[static_cast<int>(k)] = (static_cast<double>(address[k]) +
+                                          static_cast<double>(offset[k]) * dk +
+                                          (shift[k] ? 0.5 : 0.0)) /
+                                         dk;
+              }
+              return (rec * q).squaredNorm();
+            });
+
+        auto const min_it = std::ranges::min_element(distance);
+        double const min_distance = *min_it;
+        Candidates &c = candidates[i];
+        c.closest = static_cast<std::uint8_t>(min_it - distance.begin());
+        for (auto const [slot, dist] : distance | std::views::enumerate) {
+          if (dist < min_distance + tolerance) {
+            c.qualifying.push_back(static_cast<std::uint8_t>(slot));
           }
-          return (rec * q).squaredNorm();
-        });
+        }
+      });
 
-    auto const min_it = std::ranges::min_element(distance);
-    double const min_distance = *min_it;
-    auto const min_index = static_cast<std::size_t>(min_it - distance.begin());
-
-    // Every image within tolerance of the closest is a BZ point: the closest
-    // keeps the input index, the ties are appended.
-    for (auto const [slot, dist] : distance | std::views::enumerate) {
-      if (dist >= min_distance + tolerance) {
-        continue;
-      }
+  // Every image within tolerance of the closest is a BZ point: the closest
+  // keeps the input index, the ties are appended.
+  for (std::size_t i = 0; i < mesh_.size(); ++i) {
+    Address const address = mesh_.address_of(i);
+    Candidates const &c = candidates[i];
+    for (std::uint8_t const slot : c.qualifying) {
       auto const j = static_cast<std::size_t>(slot);
       Address bz{};
       for (std::size_t k = 0; k < 3; ++k) {
         bz[k] = address[k] + kBzSearchSpace[j][k] * d[k];
       }
       std::size_t gp = i;
-      if (j == min_index) {
+      if (slot == c.closest) {
         addresses[i] = bz;
       } else {
         gp = addresses.size();

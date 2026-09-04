@@ -31,8 +31,12 @@ public:
                                          Matrix3i const &rot) const;
 
 private:
-  // Cheap rejection: a few atoms must map onto some atom of their type.
-  [[nodiscard]] bool possible_overlap(Positions const &rotated) const;
+  // Cheap rejection: a few atoms must map onto some atom of their type. Takes
+  // the transposed rotation rather than the mapped positions, so it can build
+  // just the probe rows -- the full n x 3 image is only worth computing once
+  // the probes have passed.
+  [[nodiscard]] bool possible_overlap(Matrix3d const &rot_transposed,
+                                      Vector3d const &trans) const;
 
   Cell sorted_; // the input cell with atoms sorted as described above
   double symprec_;

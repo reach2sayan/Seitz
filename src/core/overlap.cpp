@@ -52,23 +52,30 @@ OverlapChecker::OverlapChecker(Cell const &cell, double symprec)
       images_(static_cast<std::size_t>(sorted_.size())),
       taken_(static_cast<std::size_t>(sorted_.size()), 0) {}
 
-bool OverlapChecker::possible_overlap(Positions const &rotated) const {
+bool OverlapChecker::possible_overlap(Matrix3d const &rot_transposed,
+                                      Vector3d const &trans) const {
   Index const probes = std::min<Index>(sorted_.size(), 3);
   return std::ranges::all_of(std::views::iota(Index{0}, probes), [&](Index i) {
-    return index_
-        .first_match(rotated.row(i).transpose(), sorted_.type(i), scratch_)
-        .has_value();
+    Vector3d const image =
+        (sorted_.positions().row(i) * rot_transposed).transpose() + trans;
+    return index_.first_match(image, sorted_.type(i), scratch_).has_value();
   });
 }
 
 bool OverlapChecker::check_total_overlap(Vector3d const &trans,
                                          Matrix3i const &rot) const {
-  // x -> rot . x + trans applied to every row, into the reused buffer.
-  rotated_.noalias() = sorted_.positions() * rot.cast<double>().transpose();
-  rotated_.rowwise() += trans.transpose();
-  if (!possible_overlap(rotated_)) {
+  Matrix3d const rot_transposed = rot.cast<double>().transpose();
+
+  // Reject on the probe atoms before mapping the whole cell. Most candidate
+  // translations fail here, and building all n images to look at three of them
+  // was the single largest cost in the search.
+  if (!possible_overlap(rot_transposed, trans)) {
     return false;
   }
+
+  // x -> rot . x + trans applied to every row, into the reused buffer.
+  rotated_.noalias() = sorted_.positions() * rot_transposed;
+  rotated_.rowwise() += trans.transpose();
 
   // Greedy bipartite matching, original atoms in order, each taking the
   // lowest-index not-yet-taken image that coincides with it. Collecting the
@@ -78,9 +85,18 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
     candidates.clear();
   }
   for (Index ir = 0; ir < sorted_.size(); ++ir) {
+    bool mapped = false;
     for (int io : index_.matches(rotated_.row(ir).transpose(),
                                  sorted_.type(ir), scratch_)) {
       images_[static_cast<std::size_t>(io)].push_back(static_cast<int>(ir));
+      mapped = true;
+    }
+    // An image that coincides with no original can never be claimed, so the n
+    // originals would have to be matched from at most n-1 images -- by
+    // pigeonhole the matching below is already lost. Bailing here skips the
+    // rest of the scan for a translation that was going to fail anyway.
+    if (!mapped) {
+      return false;
     }
   }
 

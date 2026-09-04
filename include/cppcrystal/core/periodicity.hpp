@@ -81,6 +81,12 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
 // left as the raw difference (no images along it).
 [[nodiscard]] inline Vector3d minimal_image(Vector3d const &diff,
                                             CellPeriodicity const &p) noexcept {
+  // The fully-periodic case is the overwhelming majority of calls and needs no
+  // per-axis test at all. Split out because this sits in the innermost loop of
+  // every coincidence query, where the general form below was being outlined.
+  if (p == all_periodic()) {
+    return math::nearest_offset(diff);
+  }
   Vector3d out = math::nearest_offset(diff);
   for (auto const [axis, kind] : p | std::views::enumerate) {
     if (kind == AxisKind::aperiodic) {
@@ -95,6 +101,10 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
 // not periodic along those.
 [[nodiscard]] inline Vector3d wrap(Vector3d const &v,
                                    CellPeriodicity const &p) noexcept {
+  // Same fast path as minimal_image above, and the same reason.
+  if (p == all_periodic()) {
+    return math::wrap_to_unit_cell(v);
+  }
   Vector3d out;
   for (auto const [axis, kind] : p | std::views::enumerate) {
     out[axis] = kind == AxisKind::aperiodic ? v[axis]

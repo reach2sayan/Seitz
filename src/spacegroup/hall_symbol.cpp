@@ -19,6 +19,7 @@
 #include <optional>
 #include <ranges>
 #include <span>
+#include <vector>
 
 // Given the symmetry operations of the conventional (bravais) cell and a
 // candidate Hall number, determine whether the operations match that Hall
@@ -155,24 +156,54 @@ origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
   return s.wrap(data::vspu_matrix(vspu) * dw);
 }
 
+// The two operation lists re-expressed in the primitive setting: everything
+// matches_database needs that does NOT depend on the origin shift. It runs
+// once per element of the dw product below, and rebuilding M.t and M.R.M^-1
+// for all (up to 192) operations on each of those runs was the bulk of its
+// cost. Built once per (operation set, centering), which is once per
+// match_hall.
+struct CenteredOperations {
+  std::vector<Vector3d> sym_translation; // M . t, per input operation
+  std::vector<Matrix3d> sym_rotation;    // M . R . M^-1, per input operation
+  std::vector<Vector3d> db_translation;  // M . t, per database operation
+};
+
+template <GroupFamily F>
+[[nodiscard]] CenteredOperations centered_operations(MatchContext<F> const &s,
+                                                     Centering c) {
+  CenteredOperations out;
+  out.sym_translation.reserve(s.symmetry.size());
+  out.sym_rotation.reserve(s.symmetry.size());
+  out.db_translation.reserve(s.db_ops.size());
+  for (auto const &op : s.symmetry) {
+    out.sym_translation.push_back(transform_translation(c, op.translation));
+    out.sym_rotation.push_back(transform_rotation(c, op.rotation));
+  }
+  for (auto const &op : s.db_ops) {
+    out.db_translation.push_back(transform_translation(c, op.translation));
+  }
+  return out;
+}
+
 // Every operation must reproduce a distinct database operation once the
 // origin shift is applied: same rotation, translations agreeing within
 // symprec. Operations are matched in order, each to the first still-unmatched
 // database operation carrying its rotation.
 template <GroupFamily F>
-[[nodiscard]] bool matches_database(MatchContext<F> const &s, Centering c,
+[[nodiscard]] bool matches_database(MatchContext<F> const &s,
+                                    CenteredOperations const &centered,
                                     Vector3d const &shift) {
   boost::container::static_vector<bool, 192> matched(s.db_ops.size(), false);
-  for (auto const &op : s.symmetry) {
-    Vector3d const lhs = transform_translation(c, op.translation) + shift;
-    Vector3d const shift_rot = transform_rotation(c, op.rotation) * shift;
+  for (auto const [i, op] : s.symmetry | std::views::enumerate) {
+    auto const ui = static_cast<std::size_t>(i);
+    Vector3d const lhs = centered.sym_translation[ui] + shift;
+    Vector3d const shift_rot = centered.sym_rotation[ui] * shift;
     auto const [lo, hi] = s.db_by_rotation.equal_range(op.rotation);
     auto const it = std::ranges::find_if(lo, hi, [&](auto const &entry) {
       auto const idx = static_cast<std::size_t>(entry.second);
       return !matched[idx] &&
-             coincident(
-                 lhs - transform_translation(c, s.db_ops[idx].translation),
-                 shift_rot, s.primitive_lattice, s.symprec, s.periodicity());
+             coincident(lhs - centered.db_translation[idx], shift_rot,
+                        s.primitive_lattice, s.symprec, s.periodicity());
     });
     if (it == hi) {
       return false;
@@ -189,6 +220,7 @@ template <GroupFamily F>
 template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
 hall_symbol_shift(MatchContext<F> const &s, Centering c,
+                  CenteredOperations const &centered,
                   data::GeneratorSet const &gens, data::VSpUSet const &vspu) {
   auto const choices = dw_choices(s, c, unpack_generators(gens));
   if (!choices) {
@@ -197,21 +229,23 @@ hall_symbol_shift(MatchContext<F> const &s, Centering c,
   for (auto const &[dw0, dw1, dw2] : std::views::cartesian_product(
            (*choices)[0], (*choices)[1], (*choices)[2])) {
     Vector3d const shift = origin_shift(s, vspu, dw0, dw1, dw2);
-    if (matches_database(s, c, shift)) {
+    if (matches_database(s, centered, shift)) {
       return shift;
     }
   }
   return std::nullopt;
 }
 
-// The first candidate of a family that matches.
+// The first candidate of a family that matches. The centering is fixed here,
+// so this is where the shift-independent operation transforms are built.
 template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
 first_shift(MatchContext<F> const &s, Centering c,
             std::span<data::GeneratorSet const> gens,
             std::span<data::VSpUSet const> vspu) {
+  CenteredOperations const centered = centered_operations(s, c);
   for (auto const &[gen, vsp] : std::views::zip(gens, vspu)) {
-    if (auto shift = hall_symbol_shift(s, c, gen, vsp)) {
+    if (auto shift = hall_symbol_shift(s, c, centered, gen, vsp)) {
       return shift;
     }
   }

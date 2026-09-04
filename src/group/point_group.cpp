@@ -60,34 +60,40 @@ coset_representatives(std::span<SymmetryOperation const> ops,
 // as orthonormal bases (dim 0 is the origin), everything is exact about the
 // origin, and orbit counts come from cosets rather than sampled points.
 struct PointGeometry {
-  // A linear subspace, 3 x dim orthonormal basis.
+  // A linear subspace, 3 x dim orthonormal basis. The orthogonal projector
+  // onto it is cached rather than recomputed: same_locus below is the equality
+  // used by add_unique (O(n^2)) and by orbit marking (O(n^2 |G|)), and it used
+  // to build both operands' projectors on every one of those comparisons.
   struct Locus {
+    explicit Locus(Eigen::MatrixXd b)
+        : basis(std::move(b)), projector(math::projector(basis)) {}
+
     Eigen::MatrixXd basis;
+    Matrix3d projector;
     [[nodiscard]] int dim() const { return static_cast<int>(basis.cols()); }
   };
 
   std::span<SymmetryOperation const> ops;
 
   [[nodiscard]] Locus whole_space() const {
-    return Locus{.basis = Matrix3d::Identity()}; // R^3 (general position)
+    return Locus{Matrix3d::Identity()}; // R^3 (general position)
   }
 
   // The fixed subspace of an operation: the +1 eigenspace, i.e. ker(R - I).
   [[nodiscard]] std::array<Locus, 1>
   fixed_loci(SymmetryOperation const &op) const {
     Eigen::MatrixXd const m = op.rotation.cast<double>() - Matrix3d::Identity();
-    return {Locus{.basis = math::null_space(m, kTol)}};
+    return {Locus{math::null_space(m, kTol)}};
   }
 
   [[nodiscard]] std::array<Locus, 1> intersections(Locus const &a,
                                                    Locus const &b) const {
-    return {
-        Locus{.basis = math::intersect_column_spaces(a.basis, b.basis, kTol)}};
+    return {Locus{math::intersect_column_spaces(a.basis, b.basis, kTol)}};
   }
 
   [[nodiscard]] bool same_locus(Locus const &a, Locus const &b) const {
-    return a.dim() == b.dim() && approx_equal(math::projector(a.basis),
-                                              math::projector(b.basis), kTol);
+    return a.dim() == b.dim() &&
+           approx_equal(a.projector, b.projector, kTol);
   }
 
   // The image of a subspace under an operation (a new subspace of the same
@@ -95,10 +101,10 @@ struct PointGeometry {
   // Cartesian-orthogonal in the conventional basis).
   [[nodiscard]] Locus image(SymmetryOperation const &op, Locus const &l) const {
     if (l.dim() == 0) {
-      return Locus{.basis = Eigen::MatrixXd(3, 0)};
+      return Locus{Eigen::MatrixXd(3, 0)};
     }
-    return Locus{.basis = math::column_space(
-                     op.rotation.cast<double>() * l.basis, kTol)};
+    return Locus{
+        math::column_space(op.rotation.cast<double>() * l.basis, kTol)};
   }
 
   // Whether the subspace is fixed pointwise by `rot` (rot v == v for every v

@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <ranges>
 
@@ -12,6 +13,31 @@ namespace cppcrystal {
 namespace bgi = boost::geometry::index;
 
 namespace {
+
+// Output iterator that keeps only the atom index of each tree value.
+//
+// The point of it is the rtree call it enables: bgi::rtree::query(pred, out)
+// walks the tree with its state on the stack, whereas the qbegin()/qend()
+// iterator pair has to heap-allocate that state on every query -- and this is
+// the innermost query of the whole search. Templated on the value type so it
+// need not name PositionIndex's private Point.
+template <class Buffer> struct IndexCollector {
+  using iterator_category = std::output_iterator_tag;
+  using value_type = void;
+  using difference_type = std::ptrdiff_t;
+  using pointer = void;
+  using reference = void;
+
+  Buffer *out;
+
+  template <class Value> IndexCollector &operator=(Value const &value) {
+    out->push_back(value.second);
+    return *this;
+  }
+  IndexCollector &operator*() { return *this; }
+  IndexCollector &operator++() { return *this; }
+  IndexCollector operator++(int) { return *this; }
+};
 
 // Safety factor on the derived image reach. The bound below is exact, but it
 // is cheap to be generous -- an over-estimate only queries a box that turns
@@ -115,16 +141,17 @@ std::span<int const> PositionIndex::candidates(Vector3d const &point,
         }
         Box const box(Point(c[0] - h, c[1] - h, c[2] - h),
                       Point(c[0] + h, c[1] + h, c[2] + h));
-        for (auto it = tree_.qbegin(bgi::intersects(box)); it != tree_.qend();
-             ++it) {
-          out.push_back(it->second);
-        }
+        tree_.query(bgi::intersects(box), IndexCollector<Scratch>{&out});
       }
     }
   }
 
   // The tree yields each atom once per box, so duplicates only arise when a
-  // second image was queried -- and the ascending order is contract.
+  // second image was queried -- and the ascending order is contract. A single
+  // hit is already sorted, which is the common case by far.
+  if (out.size() < 2) {
+    return {out.data(), out.size()};
+  }
   std::ranges::sort(out);
   if (!single) {
     auto const [dup, end] = std::ranges::unique(out);
