@@ -84,21 +84,21 @@ template <GroupFamily F> struct SpacegroupFamily {
   }
 
   // The generated tables are 1-based with a dummy row 0; the catalog is not.
-  [[nodiscard]] static constexpr Catalog<SpacegroupFamily> decode() {
-    Catalog<SpacegroupFamily> c{};
+  [[nodiscard]] static constexpr std::array<Row, count> decode() {
+    std::array<Row, count> rows{};
     for (std::size_t i = 0; i < count; ++i) {
       auto const &r = raw()[i + 1];
-      c.rows[i] = SpacegroupType{r.number,
-                                 r.schoenflies,
-                                 r.hall_symbol,
-                                 r.international,
-                                 r.international_full,
-                                 r.international_short,
-                                 r.choice,
-                                 static_cast<Centering>(r.centering),
-                                 r.pointgroup_number};
+      rows[i] = SpacegroupType{r.number,
+                               r.schoenflies,
+                               r.hall_symbol,
+                               r.international,
+                               r.international_full,
+                               r.international_short,
+                               r.choice,
+                               static_cast<Centering>(r.centering),
+                               r.pointgroup_number};
     }
-    return c;
+    return rows;
   }
 };
 

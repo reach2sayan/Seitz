@@ -131,10 +131,10 @@ derive_wyckoff_positions(std::span<SymmetryOperation const> ops,
     }
   };
   add_unique(geom.whole_space());
-  for (auto const &op : ops) {
-    for (auto const &l : geom.fixed_loci(op)) {
-      add_unique(l);
-    }
+  for (auto const &l : ops | std::views::transform([&geom](auto const &op) {
+                         return geom.fixed_loci(op);
+                       }) | std::views::join) {
+    add_unique(l);
   }
   for (std::size_t i = 0; i < loci.size(); ++i) {
     for (std::size_t j = 0; j < i; ++j) {

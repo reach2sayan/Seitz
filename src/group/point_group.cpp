@@ -69,19 +69,20 @@ struct PointGeometry {
   std::span<SymmetryOperation const> ops;
 
   [[nodiscard]] Locus whole_space() const {
-    return Locus{Matrix3d::Identity()}; // R^3 (general position)
+    return Locus{.basis = Matrix3d::Identity()}; // R^3 (general position)
   }
 
   // The fixed subspace of an operation: the +1 eigenspace, i.e. ker(R - I).
   [[nodiscard]] std::array<Locus, 1>
   fixed_loci(SymmetryOperation const &op) const {
     Eigen::MatrixXd const m = op.rotation.cast<double>() - Matrix3d::Identity();
-    return {Locus{math::null_space(m, kTol)}};
+    return {Locus{.basis = math::null_space(m, kTol)}};
   }
 
   [[nodiscard]] std::array<Locus, 1> intersections(Locus const &a,
                                                    Locus const &b) const {
-    return {Locus{math::intersect_column_spaces(a.basis, b.basis, kTol)}};
+    return {
+        Locus{.basis = math::intersect_column_spaces(a.basis, b.basis, kTol)}};
   }
 
   [[nodiscard]] bool same_locus(Locus const &a, Locus const &b) const {
@@ -94,10 +95,10 @@ struct PointGeometry {
   // Cartesian-orthogonal in the conventional basis).
   [[nodiscard]] Locus image(SymmetryOperation const &op, Locus const &l) const {
     if (l.dim() == 0) {
-      return Locus{Eigen::MatrixXd(3, 0)};
+      return Locus{.basis = Eigen::MatrixXd(3, 0)};
     }
-    return Locus{
-        math::column_space(op.rotation.cast<double>() * l.basis, kTol)};
+    return Locus{.basis = math::column_space(
+                     op.rotation.cast<double>() * l.basis, kTol)};
   }
 
   // Whether the subspace is fixed pointwise by `rot` (rot v == v for every v
@@ -162,7 +163,8 @@ Result<PointGroup> PointGroup::from_number(int number) {
   // The point group = the distinct rotation parts (zero translation).
   pg.operations_ = Operations{unique_by_rotation(
       conv | std::views::transform([](SymmetryOperation const &op) {
-        return SymmetryOperation{op.rotation, Vector3d::Zero()};
+        return SymmetryOperation{.rotation = op.rotation,
+                                 .translation = Vector3d::Zero()};
       }),
       &SymmetryOperation::rotation)};
 

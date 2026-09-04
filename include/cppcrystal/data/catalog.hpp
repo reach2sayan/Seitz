@@ -39,8 +39,10 @@ template <CatalogFamily Family> struct Catalog {
 };
 
 // The one catalog per family, decoded from the generated tables at compile
-// time.
+// time. `decode()` yields the row array rather than a Catalog: a family policy
+// that named Catalog<Self> in its own body would make CatalogFamily<Self>
+// depend on itself.
 template <CatalogFamily Family>
-inline constexpr Catalog<Family> kCatalog = Family::decode();
+inline constexpr Catalog<Family> kCatalog{Family::decode()};
 
 } // namespace cppcrystal::data

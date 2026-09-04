@@ -114,17 +114,18 @@ target_compile_options(cppcrystal PRIVATE
         -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
 
 # The magnetic database decodes all 76683 operations + the alternative
-# transformations into constexpr tables at compile time, which blows past both
+# transformations into constexpr tables at compile time, and subgroup_graph.hpp
+# closes the 230-group t-subgroup relation at compile time; both blow past the
 # compilers' default constant-evaluation budget. GCC and Clang spell the knob
 # differently (-fconstexpr-ops-limit, default 33554432, vs -fconstexpr-steps,
-# default 1048576); raise it for this one translation unit.
+# default 1048576). PUBLIC, not per-source: the subgroup tables live in an
+# installed header, so consumers evaluate them too.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-ops-limit=100000000")
 else ()
     set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-steps=100000000")
 endif ()
-set_source_files_properties(src/data/msg_database.cpp
-        PROPERTIES COMPILE_OPTIONS "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
+target_compile_options(cppcrystal PUBLIC "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
 
 if (CPPCRYSTAL_ENABLE_SANITIZERS)
     target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)

@@ -47,15 +47,15 @@ struct MagneticFamily {
   }
 
   // The generated table is 1-based with a dummy row 0; the catalog is not.
-  [[nodiscard]] static constexpr Catalog<MagneticFamily> decode() {
-    Catalog<MagneticFamily> c{};
+  [[nodiscard]] static constexpr std::array<Row, count> decode() {
+    std::array<Row, count> rows{};
     for (std::size_t i = 0; i < count; ++i) {
       auto const &r = kMagneticSpacegroupTypes[i + 1];
-      c.rows[i] =
+      rows[i] =
           MagneticSpacegroupType{r.uni_number, r.litvin_number, r.bns_number,
                                  r.og_number,  r.number,        r.type};
     }
-    return c;
+    return rows;
   }
 };
 
