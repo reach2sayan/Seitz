@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
@@ -34,7 +35,7 @@ struct Primitive {
 // `if constexpr` branch rather than a runtime test.
 //
 // Non-owning: `cell` must outlive the finder.
-template <GroupFamily F> class PrimitiveFinder {
+template <GroupFamily F> class CPPCRYSTAL_TESTABLE PrimitiveFinder {
 public:
   PrimitiveFinder(Cell const &cell, Tolerance const &tol) noexcept
       : cell_(cell), tol_(tol) {}

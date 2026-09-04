@@ -9,6 +9,11 @@
 #include <string_view>
 #include <utility>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 // True iff `z` is a tabulated atomic number (1..kNumElements).
@@ -75,3 +80,5 @@ static_assert(atomic_number(*element_symbol(kNumElements)) == kNumElements);
 static_assert(!atomic_number("Xx"));
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

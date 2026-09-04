@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/lattice.hpp>
@@ -23,12 +24,14 @@ namespace cppcrystal::refine {
 // angles) of the matched bravais lattice, in the canonical orientation for the
 // crystal system. A pure function of the matched group: the magnetic path needs
 // it without a cell to refine.
-[[nodiscard]] Lattice conventional_lattice(SpacegroupMatch const &sg);
+[[nodiscard]] CPPCRYSTAL_TESTABLE Lattice
+conventional_lattice(SpacegroupMatch const &sg);
 
 // Rotate the bravais lattice — and correspondingly the origin shift — to the
 // proper-rotation setting whose basis vectors are closest (Frobenius) to the
 // idealized conventional lattice.
-[[nodiscard]] SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
+[[nodiscard]] CPPCRYSTAL_TESTABLE SpacegroupMatch
+find_similar_bravais_lattice(SpacegroupMatch sg,
                                                            double symprec);
 
 // Turns a matched space group plus the cell it was matched from into the
@@ -36,7 +39,7 @@ namespace cppcrystal::refine {
 // path leaves the conventional c axis aperiodic.
 //
 // Non-owning: `primitive` and `cell` must outlive the refinement.
-template <GroupFamily F> class Refinement {
+template <GroupFamily F> class CPPCRYSTAL_TESTABLE Refinement {
 public:
   Refinement(SpacegroupMatch matched, Cell const &primitive, Cell const &cell,
              Tolerance const &tol)

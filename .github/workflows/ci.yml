@@ -116,6 +116,15 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure --parallel
 
+      # A smoke run of the [!benchmark] cases, not a regression gate: a shared
+      # CI runner's timings are far too noisy for that (see the interleaved
+      # triplicate protocol the numbers in the perf notes were taken with).
+      # What this catches is the benchmark target silently rotting -- failing
+      # to build, or throwing on a cell it used to handle.
+      - name: Benchmarks (smoke)
+        if: matrix.build_type == 'Release'
+        run: ./build/tests/cppcrystal_tests "[!benchmark]" --benchmark-samples 3
+
       - name: Install
         run: cmake --install build
 

@@ -9,6 +9,11 @@
 #include <type_traits>
 #include <utility>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::analysis {
 
 namespace detail {
@@ -95,7 +100,7 @@ public:
 
 protected:
   Analyzer(CellType cell, ToleranceType tol)
-      : cell_(std::move(cell)), tol_(std::move(tol)) {}
+      : cell_{std::move(cell)}, tol_{std::move(tol)} {}
 
   [[nodiscard]] Derived const &derived() const noexcept {
     return static_cast<Derived const &>(*this);
@@ -122,3 +127,5 @@ private:
 };
 
 } // namespace cppcrystal::analysis
+
+#pragma GCC visibility pop

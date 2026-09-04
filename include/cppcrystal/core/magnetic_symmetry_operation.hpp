@@ -3,6 +3,11 @@
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 // A magnetic space-group operation: an ordinary space-group operation paired
@@ -18,3 +23,5 @@ struct MagneticSymmetryOperation {
 };
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop

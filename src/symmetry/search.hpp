@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
@@ -17,7 +18,7 @@ namespace cppcrystal::symmetry {
 // operation cap are `if constexpr` branches rather than runtime tests.
 //
 // Non-owning: `cell` must outlive the search.
-template <GroupFamily F> class SymmetrySearch {
+template <GroupFamily F> class CPPCRYSTAL_TESTABLE SymmetrySearch {
 public:
   SymmetrySearch(Cell const &cell, Tolerance const &tol) noexcept
       : cell_(cell), tol_(tol) {}

@@ -9,6 +9,11 @@
 #include <optional>
 #include <ranges>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 enum class AxisKind { periodic, aperiodic };
@@ -76,24 +81,28 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
   return found;
 }
 
+namespace detail {
+
+// The mixed-periodicity forms of the two folds below, out of line. A layer,
+// rod or cluster cell is the rare case, and its per-axis loop is what pushed
+// the whole function past the inliner's budget: keeping it out of the header
+// leaves an inline body small enough that the fully-periodic fast path folds
+// into its caller, which matters because these run once per atom per candidate
+// operation.
+[[nodiscard]] Vector3d minimal_image_mixed(Vector3d const &diff,
+                                           CellPeriodicity const &p) noexcept;
+[[nodiscard]] Vector3d wrap_mixed(Vector3d const &v,
+                                  CellPeriodicity const &p) noexcept;
+
+} // namespace detail
+
 // Minimal-image fractional offset of `diff`: every periodic component is
 // folded to its nearest-lattice-point residue, every aperiodic component is
 // left as the raw difference (no images along it).
 [[nodiscard]] inline Vector3d minimal_image(Vector3d const &diff,
                                             CellPeriodicity const &p) noexcept {
-  // The fully-periodic case is the overwhelming majority of calls and needs no
-  // per-axis test at all. Split out because this sits in the innermost loop of
-  // every coincidence query, where the general form below was being outlined.
-  if (p == all_periodic()) {
-    return math::nearest_offset(diff);
-  }
-  Vector3d out = math::nearest_offset(diff);
-  for (auto const [axis, kind] : p | std::views::enumerate) {
-    if (kind == AxisKind::aperiodic) {
-      out[axis] = diff[axis];
-    }
-  }
-  return out;
+  return p == all_periodic() ? Vector3d{math::nearest_offset(diff)}
+                             : detail::minimal_image_mixed(diff, p);
 }
 
 // Fold a fractional coordinate into the cell [0, 1) along every periodic axis,
@@ -101,16 +110,10 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
 // not periodic along those.
 [[nodiscard]] inline Vector3d wrap(Vector3d const &v,
                                    CellPeriodicity const &p) noexcept {
-  // Same fast path as minimal_image above, and the same reason.
-  if (p == all_periodic()) {
-    return math::wrap_to_unit_cell(v);
-  }
-  Vector3d out;
-  for (auto const [axis, kind] : p | std::views::enumerate) {
-    out[axis] = kind == AxisKind::aperiodic ? v[axis]
-                                            : math::wrap_to_unit_cell(v[axis]);
-  }
-  return out;
+  return p == all_periodic() ? math::wrap_to_unit_cell(v)
+                             : detail::wrap_mixed(v, p);
 }
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop

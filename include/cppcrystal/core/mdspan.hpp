@@ -31,6 +31,11 @@
 
 #include <cstddef>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::md {
 
 using MDSPAN_IMPL_STANDARD_NAMESPACE::dextents;
@@ -57,3 +62,5 @@ using table = mdspan<T const, extents<std::size_t, Extents...>>;
 template <class T> using matrix_view = mdspan<T, dextents<Index, 2>>;
 
 } // namespace cppcrystal::md
+
+#pragma GCC visibility pop

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include "core/position_index.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/periodicity.hpp>
@@ -22,7 +23,7 @@ namespace cppcrystal {
 // translation) pair, so its working buffers live here and are reused rather
 // than reallocated per call. They are mutable because every caller holds the
 // checker by const reference; the price is that one checker serves one thread.
-class OverlapChecker {
+class CPPCRYSTAL_TESTABLE OverlapChecker {
 public:
   OverlapChecker(Cell const &cell, double symprec);
 

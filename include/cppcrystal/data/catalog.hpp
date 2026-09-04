@@ -10,6 +10,11 @@
 // index-0 sentinel row they each carried is gone: a Catalog is keyed by a
 // validated key (HallNumber, UniNumber), so every lookup is in range by
 // construction and there is nothing to fall back to.
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 // A family policy supplies the decoded row type, how many there are, the key
@@ -46,3 +51,5 @@ template <CatalogFamily Family>
 inline constexpr Catalog<Family> kCatalog{Family::decode()};
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
@@ -55,7 +56,7 @@ private:
 // selects between the magnetic family group and its maximal space subgroup.
 //
 // Non-owning: `cell` and `spatial` must outlive the search.
-class SpinSearch {
+class CPPCRYSTAL_TESTABLE SpinSearch {
 public:
   SpinSearch(MagneticCell const &cell, Operations const &spatial,
              MagneticTolerance const &tol) noexcept

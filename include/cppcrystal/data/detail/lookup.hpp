@@ -12,6 +12,11 @@
 // at consteval time. (The 1-based-with-sentinel-row and negative-Hall lookups
 // that used to live here are gone: Catalog<Family> is keyed by a validated
 // HallNumber, so every lookup is in range by construction.)
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data::detail {
 
 // key -> the values of the ids with that key, as one contiguous span. Built by
@@ -55,3 +60,5 @@ bucket_index(KeyOf key_of, ValueOf value_of = {}) {
 }
 
 } // namespace cppcrystal::data::detail
+
+#pragma GCC visibility pop

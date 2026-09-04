@@ -28,6 +28,7 @@ option(CPPCRYSTAL_BUILD_DEMO "Build the demo executable" ON)
 option(CPPCRYSTAL_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
 option(CPPCRYSTAL_BUILD_TOOLS "Build offline data generators" OFF)
 option(CPPCRYSTAL_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
+option(CPPCRYSTAL_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 
 include(Dependencies)
 
@@ -66,6 +67,7 @@ target_sources(cppcrystal PRIVATE
         src/data/rod_database.cpp
         src/group/rod_group.cpp
         src/core/lattice.cpp
+        src/core/periodicity.cpp
         src/core/symmetry_operation.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp
@@ -131,15 +133,15 @@ target_compile_options(cppcrystal PUBLIC "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
 
 # Interprocedural optimization, optimized configurations only.
 #
-# MEASURED: this buys no speed. An interleaved triplicate A/B over the whole
-# [!benchmark] set (see tests/test_benchmark.cpp) put every case within run-to-
-# run noise, geometric mean 1.00x -- the hot inner primitives (coincident(),
-# wrap(), minimal_image(), nint()) are already inline in headers, so there was
-# nothing left for cross-TU inlining to find. It is kept for what it does
-# measurably do: the shared object drops from 6.09 MB to 5.92 MB and from 717
-# exported dynamic symbols to 340, most of the difference being vague-linkage
-# Boost and Eigen template instantiations that have no business in the
-# interface. Do not add it elsewhere expecting a speedup.
+# MEASURED, twice. On its own it bought nothing: an interleaved triplicate A/B
+# over the whole [!benchmark] set put every case within run-to-run noise,
+# geometric mean 1.00x. The reason turned out to be interposition -- every
+# exported function had to be assumed replaceable at load time, so there was
+# nothing LTO was allowed to inline across a TU boundary. Re-measured after the
+# visibility pass and -fno-semantic-interposition below, it is worth ~3% on
+# generation and nothing on determination, and it still cuts the shared object
+# from 6.04 to 5.90 MB and its exported symbols from 504 to 253. Kept for that
+# combination; do not add it elsewhere expecting a speedup on its own.
 #
 # Safe for the bit-parity the oracle tests pin: the target is baseline x86-64
 # (SSE2, no FMA), so GCC's default -ffp-contract=fast has nothing to contract
@@ -158,12 +160,50 @@ else ()
     message(STATUS "CppCrystal: IPO/LTO unavailable (${CPPCRYSTAL_IPO_ERROR})")
 endif ()
 
+# Symbol visibility. The library is compiled with everything hidden by default;
+# each public header under include/ opens a `#pragma GCC visibility push(default)`
+# window around its declarations, so the exported set is exactly the installed
+# interface (plus the handful of internal symbols marked CPPCRYSTAL_TESTABLE for
+# the unit tests, which link the shared object and reach into src/).
+#
+# --exclude-libs,ALL keeps the statically linked Boost archives from
+# re-exporting their vague-linkage instantiations through this shared object;
+# cmake/CppCrystalConfig.cmake.in promises consumers never need Boost, and this
+# is what makes that true of the symbol table as well as the CMake interface.
+set_target_properties(cppcrystal PROPERTIES CXX_VISIBILITY_PRESET hidden)
+target_link_options(cppcrystal PRIVATE -Wl,--exclude-libs,ALL)
+
+# Interposition. A default-visibility function in a shared object may be
+# replaced at load time, so GCC must emit a PLT call and may not inline it --
+# which is why the LTO above found nothing to do. This says the library never
+# expects to have its own symbols interposed, so calls inside it bind directly.
+# MEASURED: ~1.5% on the determination driver, consistent across 7 interleaved
+# runs. Small, but free and in the right direction.
+target_compile_options(cppcrystal PRIVATE -fno-semantic-interposition)
+
 # Nothing here reads errno after a libm call, and promising that it might blocks
 # GCC from emitting sqrt as a single instruction. Also measured as no change on
 # this benchmark set; kept because it is accurate about the code and costs
 # nothing. Deliberately NOT -ffast-math: the search is tolerance-sensitive and
 # bit-parity-tested against the reference implementation.
 target_compile_options(cppcrystal PRIVATE -fno-math-errno)
+
+# ISA. The shipped library targets the portable x86-64 baseline, which is why
+# Eigen gets no AVX/FMA here and why the oracle's bit-parity holds: with no FMA
+# in the instruction set, GCC's default -ffp-contract=fast has nothing to
+# contract. -march=native is therefore opt-in and local-only, and it pins
+# -ffp-contract=off so that a machine with FMA still computes what the
+# reference implementation computes. PUBLIC: Eigen's fixed-size types change
+# alignment and vectorization with the ISA, so the library and its consumer
+# must agree.
+#
+# EIGEN_NO_DEBUG is deliberately NOT set. It only gates eigen_assert, which is
+# already inert in the optimized build types (they define NDEBUG) and is worth
+# keeping in Debug, where an out-of-range block or a mis-sized product should
+# abort rather than corrupt memory quietly.
+if (CPPCRYSTAL_NATIVE_ARCH)
+    target_compile_options(cppcrystal PUBLIC -march=native -ffp-contract=off)
+endif ()
 
 if (CPPCRYSTAL_ENABLE_SANITIZERS)
     target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)

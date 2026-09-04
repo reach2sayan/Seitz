@@ -8,6 +8,11 @@
 #include <optional>
 #include <utility>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 // A crystal lattice: the three basis vectors as the columns of a 3x3 matrix.
@@ -82,3 +87,5 @@ private:
 };
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop

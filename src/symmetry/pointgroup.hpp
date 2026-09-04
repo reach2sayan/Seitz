@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/operation_set.hpp>
@@ -26,7 +27,7 @@ struct PointgroupTransform {
 // `layer_axis` is still data — a layer cell's aperiodic axis is whichever of
 // the three the input basis put it on — and is ignored for GroupFamily::space.
 template <GroupFamily F>
-[[nodiscard]] Result<PointgroupTransform>
+[[nodiscard]] CPPCRYSTAL_TESTABLE Result<PointgroupTransform>
 identify_point_group(std::span<Matrix3i const> rotations,
                      std::optional<int> layer_axis = std::nullopt);
 

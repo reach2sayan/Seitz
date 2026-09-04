@@ -6,6 +6,11 @@
 #include <concepts>
 #include <optional>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 // Anything shaped like a space-group operation: an integer rotation plus a
@@ -70,3 +75,5 @@ struct SymmetryOperation {
 }
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop

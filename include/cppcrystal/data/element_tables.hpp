@@ -6,6 +6,11 @@
 #include <array>
 #include <string_view>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 inline constexpr int kNumElements = 96;
@@ -31,3 +36,5 @@ inline constexpr std::array<double, 96> kCovalentRadii = {{
 }};
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

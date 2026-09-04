@@ -9,6 +9,11 @@
 
 #include <array>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 struct MagneticSpacegroupTypeRaw {
@@ -2150,3 +2155,5 @@ inline constexpr std::array<std::array<int, 2>, 1652> kMagneticUniMapping = {{
 }};
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

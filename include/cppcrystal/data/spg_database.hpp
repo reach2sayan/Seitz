@@ -24,6 +24,11 @@
 // decoded once at compile time into a Catalog per family; the operations go
 // through a lazily-built cache, since they carry Eigen, which is not a literal
 // type.
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 // Bravais centering.
@@ -242,3 +247,5 @@ static_assert(spacegroup_type(*HallNumber::of(GroupFamily::layer,
 [[nodiscard]] Operations const &operations_from_database(HallNumber hall);
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

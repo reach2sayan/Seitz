@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/analysis/dataset.hpp> // magnetic::MagneticType
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
@@ -34,7 +35,7 @@ struct MagneticTypeIdentification {
 // only: magnetic layer groups are not in the database.
 //
 // Non-owning: `lattice` and `operations` must outlive the identification.
-class MagneticIdentification {
+class CPPCRYSTAL_TESTABLE MagneticIdentification {
 public:
   MagneticIdentification(Lattice const &lattice,
                          MagneticOperations const &operations,

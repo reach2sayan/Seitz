@@ -15,6 +15,11 @@
 #include <span>
 #include <utility>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::analysis {
 
 // Which setting the standardized cell is expressed in, and whether it carries
@@ -131,3 +136,5 @@ SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>()
     const;
 
 } // namespace cppcrystal::analysis
+
+#pragma GCC visibility pop

@@ -23,6 +23,11 @@
 // by the .cpp). As with spg_database, metadata is decoded once at compile time
 // into a constexpr catalog, while the symmetry operations (which carry Eigen,
 // not a literal type) are decoded on demand.
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::data {
 
 inline constexpr int kNumUniNumbers = 1651;
@@ -84,3 +89,5 @@ magnetic_std_transformations(UniNumber uni,
                              std::optional<HallNumber> hall = std::nullopt);
 
 } // namespace cppcrystal::data
+
+#pragma GCC visibility pop

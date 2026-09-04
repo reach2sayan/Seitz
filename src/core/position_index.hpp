@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -24,9 +25,9 @@ namespace cppcrystal {
 // folded to the minimal image along the periodic axes only, is within a
 // Cartesian distance of symprec (inclusive). The one definition of "same site"
 // for any periodicity.
-[[nodiscard]] bool coincident(Vector3d const &a, Vector3d const &b,
-                              Matrix3d const &lattice, double symprec,
-                              CellPeriodicity const &periodicity) noexcept;
+[[nodiscard]] CPPCRYSTAL_TESTABLE bool
+coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
+           double symprec, CellPeriodicity const &periodicity) noexcept;
 
 // A build-once, query-many index answering "which atoms sit at this
 // fractional point". An R-tree over the atoms' Cartesian positions, each
@@ -51,8 +52,15 @@ namespace cppcrystal {
 // once per atom per candidate operation -- do not allocate. The allocating
 // overloads remain for the cold callers.
 //
+// A uniform bucket grid was tried here and REJECTED on measurement: with the
+// query box far smaller than a bucket, addressing the bucket arithmetically
+// beat the tree walk by ~5% on the determination driver, but cost ~14% on
+// generation, where the index is rebuilt per attempt over a small cell and the
+// bucket-array build never amortizes. The tree wins on the mix; the node size
+// below is the part of that experiment worth keeping.
+//
 // Non-owning: the positions and types must outlive the index.
-class PositionIndex {
+class CPPCRYSTAL_TESTABLE PositionIndex {
 public:
   // Reused across queries; each query clears it. Sized for the common case:
   // a coincidence query typically returns one or two atoms.
@@ -133,9 +141,14 @@ private:
   using Point =
       boost::geometry::model::point<double, 3, boost::geometry::cs::cartesian>;
   using Box = boost::geometry::model::box<Point>;
+  // Node capacity 8, measured rather than assumed: against the default 16 it
+  // is ~1% on the determination driver and ~12% on generation, where the cells
+  // are small (12-60 atoms) and a fatter node costs more box tests per level
+  // than the shallower tree saves. 4 and 32 were both worse (32 by 14%), and
+  // rstar / linear were indistinguishable from quadratic at 16.
   using Tree =
       boost::geometry::index::rtree<std::pair<Point, int>,
-                                    boost::geometry::index::quadratic<16>>;
+                                    boost::geometry::index::quadratic<8>>;
 
   // Cartesian position of a fractional point folded into the cell.
   [[nodiscard]] Vector3d cartesian(Vector3d const &frac) const noexcept;

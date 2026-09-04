@@ -7,6 +7,11 @@
 #include <array>
 #include <string_view>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 // Crystal system / holohedry.
@@ -294,3 +299,5 @@ static_assert([] {
 using PointSymmetry = boost::container::static_vector<Matrix3i, 48>;
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop

@@ -101,6 +101,10 @@ static_assert(kUnimodularAxes.count == kUnimodularAxes.triples.size());
 struct AxisMetrics {
   static constexpr std::size_t kAxes = std::size(kRelativeAxes);
   std::array<double, kAxes * kAxes> dot{};
+  // sqrt of the diagonal: the length of a candidate basis vector depends only
+  // on which of the 26 axes it is, not on the triple it appears in, so the
+  // scan reads 26 roots instead of taking 3 per candidate (20880 per pass).
+  std::array<double, kAxes> length{};
 
   [[nodiscard]] double operator()(std::size_t a, std::size_t b) const noexcept {
     return dot[a * kAxes + b];
@@ -117,6 +121,7 @@ struct AxisMetrics {
     for (std::size_t b = 0; b < AxisMetrics::kAxes; ++b) {
       out.dot[a * AxisMetrics::kAxes + b] = cartesian[a].dot(cartesian[b]);
     }
+    out.length[a] = std::sqrt(out.dot[a * AxisMetrics::kAxes + a]);
   }
   return out;
 }
@@ -222,12 +227,11 @@ template <GroupFamily F>
   for (AxisTriple const &triple : kUnimodularAxes.triples) {
     std::array<std::size_t, 3> const a{triple[0], triple[1], triple[2]};
 
-    // The metric diagonal is three lookups, and the length test rejects the
-    // large majority of candidates -- so neither the off-diagonals nor the
-    // integer axis matrix is assembled until a candidate survives it.
-    Eigen::Array3d const length_rot{std::sqrt(metrics(a[0], a[0])),
-                                    std::sqrt(metrics(a[1], a[1])),
-                                    std::sqrt(metrics(a[2], a[2]))};
+    // The lengths are three lookups, and the length test rejects the large
+    // majority of candidates -- so neither the off-diagonals nor the integer
+    // axis matrix is assembled until a candidate survives it.
+    Eigen::Array3d const length_rot{metrics.length[a[0]], metrics.length[a[1]],
+                                    metrics.length[a[2]]};
     if (!lengths_agree(reference, length_rot, symprec)) {
       continue;
     }

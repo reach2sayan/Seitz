@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/testable.hpp"
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
 #include <cppcrystal/core/operation_set.hpp>
@@ -21,7 +22,7 @@ namespace cppcrystal::spacegroup {
 // the 3D-only representative-Hall refinement -- all `if constexpr` branches.
 //
 // Non-owning: `primitive` must outlive the matcher.
-template <GroupFamily F> class SpacegroupMatcher {
+template <GroupFamily F> class CPPCRYSTAL_TESTABLE SpacegroupMatcher {
 public:
   // An unset `setting` searches every Hall setting of the family; a set one
   // restricts the search to it. The tolerance is the one the primitive cell was

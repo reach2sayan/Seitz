@@ -10,6 +10,11 @@
 #include <span>
 #include <vector>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal::group {
 
 // A space group as a standalone, structure-free object: built from a Hall
@@ -60,3 +65,5 @@ private:
 };
 
 } // namespace cppcrystal::group
+
+#pragma GCC visibility pop

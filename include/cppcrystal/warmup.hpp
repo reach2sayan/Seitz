@@ -3,6 +3,11 @@
 #include <future>
 #include <utility>
 
+// Everything declared below is the installed ABI: the library is compiled
+// with hidden visibility (see CMakeLists.txt), so a public header opens the
+// window and closes it again at the end of the file.
+#pragma GCC visibility push(default)
+
 namespace cppcrystal {
 
 // Which per-setting caches to build ahead of first use. group::SpaceGroup::of
@@ -38,3 +43,5 @@ void warmup(Warm what = Warm::all);
 [[nodiscard]] std::future<void> warmup_async(Warm what = Warm::all);
 
 } // namespace cppcrystal
+
+#pragma GCC visibility pop
