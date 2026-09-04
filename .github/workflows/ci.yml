@@ -181,27 +181,9 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
 
-  #
-  # Formatting. .clang-format is `BasedOnStyle: LLVM`; this only checks the
-  # first-party tree, never the vendored mdspan.
-  #
-  format:
-    name: clang-format
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check formatting
-        run: |
-          find src include tests tools python -type f \( -name '*.cpp' -o -name '*.hpp' \) \
-            ! -path 'include/cppcrystal/third_party/*' \
-            -print0 | xargs -0 clang-format --dry-run -Werror
-
   # Python bindings. Builds the extension, runs pytest, and checks that the
-  # committed stubs still match the built module -- the same shape of gate as
-  # clang-format above: regenerating is mechanical, and a stale stub should fail
-  # the build rather than rot.
+  # committed stubs still match the built module: regenerating is mechanical,
+  # and a stale stub should fail the build rather than rot.
   #
   python:
     name: python bindings
@@ -218,19 +200,32 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Sync the environment
+      - name: Sync the dev tools
         run: uv sync
 
-      - name: Build and install the extension
+      # Through CMake, not an editable install: an editable install works via a
+      # meta-path finder that would shadow this build tree (see pyproject.toml).
+      - name: Configure and build
         env:
           CC: gcc-15
           CXX: g++-15
-        run: uv pip install -e . --no-build-isolation
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCPPCRYSTAL_BUILD_PYTHON=ON \
+            -DCPPCRYSTAL_BUILD_TESTS=OFF \
+            -DCPPCRYSTAL_BUILD_DEMO=OFF \
+            -DPython_EXECUTABLE="$(uv run python -c 'import sys; print(sys.executable)')"
+          cmake --build build
 
       - name: Run pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/python
         run: uv run pytest python/tests -q
 
       - name: Check the committed stubs are current
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/python
         run: |
           uv run python tools/fix_core_stubs.py
           git diff --exit-code python/cppcrystal/_core

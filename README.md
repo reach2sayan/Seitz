@@ -276,22 +276,24 @@ cmake --build cmake-build-debug
 ctest --test-dir cmake-build-debug     # Catch2 suites + the pytest suite
 ```
 
-or, with [uv](https://docs.astral.sh/uv/):
+`ctest` sets `PYTHONPATH` to the build tree itself, so nothing needs installing
+first. To run pytest by hand against that same tree:
 
 ```bash
-uv sync                                              # environment + dev tools
-CXX=g++-15 uv pip install -e . --no-build-isolation  # editable, rebuilds on import
-uv run pytest python/tests -q
+uv sync                                   # dev tools (does not install the project)
+PYTHONPATH=cmake-build-debug/python uv run pytest python/tests -q
 ```
 
-`CXX=g++-15` matters: this path does not read `CMakePresets.json`, so without it
-CMake picks up whatever `c++` is on `PATH` — on Ubuntu 24.04 that is GCC 13, and
-configuring stops with a message telling you so.
+**Do not `pip install -e .` this project.** scikit-build-core's editable install
+works through a meta-path finder, which wins over `PYTHONPATH` unconditionally —
+so it silently shadows the build tree that `ctest` just compiled, and the suite
+passes having exercised some other build. `conftest.py` detects that and fails
+with an explanation rather than lying. The CMake build *is* the edit-rebuild
+loop here; `pip install .` (non-editable) is the path for users.
 
-`--no-build-isolation` is required for the editable install: scikit-build-core
-re-runs `cmake --build` from an import hook that executes in the *runtime*
-environment, so `scikit-build-core`, `cmake` and `ninja` have to be importable
-there. They are in the `dev` dependency group for exactly that reason.
+For a user install, `CXX=g++-15` matters: that path does not read
+`CMakePresets.json`, so without it CMake picks up whatever `c++` is on `PATH` —
+on Ubuntu 24.04 that is GCC 13, and configuring stops with a message saying so.
 
 **There are no manylinux wheels, deliberately.** The library hard-errors below
 GCC 15 and compiles as `gnu++23`, while the manylinux images top out several

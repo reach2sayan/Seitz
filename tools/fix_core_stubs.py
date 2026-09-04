@@ -20,8 +20,12 @@ Run it through `uv run`, always. The output depends on the interpreter -- Python
 regenerates under uv and fails on a diff, so stubs produced by some other python
 will fail the gate on an otherwise clean tree.
 
+It imports the module, so PYTHONPATH must point at a build tree -- and if that
+tree was built with sanitizers, the same LD_PRELOAD `ctest` sets is needed too,
+or the import aborts before stubgen sees anything. Against an ordinary build:
+
 Usage:
-    uv run python tools/fix_core_stubs.py   # from the repo root
+    PYTHONPATH=<build>/python uv run python tools/fix_core_stubs.py
 """
 
 import pathlib
