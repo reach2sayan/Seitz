@@ -2,6 +2,10 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(Eigen3)
+# Only the PUBLIC dependencies. cppcrystal is SHARED, so its PRIVATE links
+# (Boost::flyweight, Boost::geometry) are not recorded in the exported
+# interface and must not be required of a consumer. Eigen and Boost.Container
+# appear in the installed headers, Boost.LEAF in the Result<T> return type.
 find_dependency(Boost COMPONENTS container leaf)
 find_dependency(Threads)
 

@@ -2,6 +2,7 @@
 
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
+#include "math/lattice_parameters.hpp"
 #include "symmetry/pointgroup.hpp"
 #include <cppcrystal/core/lattice.hpp>
 #include <cppcrystal/core/operation_set.hpp>
@@ -20,27 +21,17 @@ namespace {
 // ---- idealized conventional lattice setters --------------------------------
 // Each fills `m` (columns = basis vectors) from the metric's lengths/angles.
 
-[[nodiscard]] double len(Matrix3d const &g, int i) {
-  return std::sqrt(g(i, i));
-}
+using math::metric_length;
 
+// The general case is just "cell parameters -> basis matrix", which
+// math/lattice_parameters.hpp shares with the random-lattice generator. The
+// crystal-system setters below are the ones that encode convention and so stay
+// written out here.
 [[nodiscard]] Matrix3d set_tricli(Matrix3d const &g) {
-  double const a = len(g, 0), b = len(g, 1), c = len(g, 2);
-  double const alpha = std::acos(g(1, 2) / b / c);
-  double const beta = std::acos(g(0, 2) / a / c);
-  double const gamma = std::acos(g(0, 1) / a / b);
-  double const cg = std::cos(gamma), cb = std::cos(beta), ca = std::cos(alpha);
-  double const sg = std::sin(gamma);
-
-  Matrix3d m = Matrix3d::Zero();
-  m(0, 0) = a;
-  m(0, 1) = b * cg;
-  m(0, 2) = c * cb;
-  m(1, 1) = b * sg;
-  m(1, 2) = c * (ca - cb * cg) / sg;
-  m(2, 2) =
-      c * std::sqrt(1 - ca * ca - cb * cb - cg * cg + 2 * ca * cb * cg) / sg;
-  return m;
+  return math::lattice_from_parameters(
+      metric_length(g, 0), metric_length(g, 1), metric_length(g, 2),
+      math::metric_angle(g, 1, 2), math::metric_angle(g, 0, 2),
+      math::metric_angle(g, 0, 1));
 }
 
 [[nodiscard]] Matrix3d set_monocli(Matrix3d const &g, std::string_view choice) {
@@ -48,7 +39,7 @@ namespace {
   // unique axis (the leading '-' is a sign convention, skipped).
   std::size_t const pos = (!choice.empty() && choice[0] == '-') ? 1 : 0;
   char const axis = pos < choice.size() ? choice[pos] : 'b';
-  double const a = len(g, 0), b = len(g, 1), c = len(g, 2);
+  double const a = metric_length(g, 0), b = metric_length(g, 1), c = metric_length(g, 2);
 
   Matrix3d m = Matrix3d::Zero();
   switch (axis) {
@@ -84,33 +75,33 @@ namespace {
 
 [[nodiscard]] Matrix3d set_ortho(Matrix3d const &g) {
   Matrix3d m = Matrix3d::Zero();
-  m(0, 0) = len(g, 0);
-  m(1, 1) = len(g, 1);
-  m(2, 2) = len(g, 2);
+  m(0, 0) = metric_length(g, 0);
+  m(1, 1) = metric_length(g, 1);
+  m(2, 2) = metric_length(g, 2);
   return m;
 }
 
 [[nodiscard]] Matrix3d set_tetra(Matrix3d const &g) {
-  double const ab = (len(g, 0) + len(g, 1)) / 2;
+  double const ab = (metric_length(g, 0) + metric_length(g, 1)) / 2;
   Matrix3d m = Matrix3d::Zero();
   m(0, 0) = ab;
   m(1, 1) = ab;
-  m(2, 2) = len(g, 2);
+  m(2, 2) = metric_length(g, 2);
   return m;
 }
 
 [[nodiscard]] Matrix3d set_trigo(Matrix3d const &g) {
-  double const ab = len(g, 0) + len(g, 1);
+  double const ab = metric_length(g, 0) + metric_length(g, 1);
   Matrix3d m = Matrix3d::Zero();
   m(0, 0) = ab / 2;
   m(0, 1) = -ab / 4;
   m(1, 1) = ab / 4 * std::sqrt(3.0);
-  m(2, 2) = len(g, 2);
+  m(2, 2) = metric_length(g, 2);
   return m;
 }
 
 [[nodiscard]] Matrix3d set_rhomb(Matrix3d const &g) {
-  double const a = len(g, 0), b = len(g, 1), c = len(g, 2);
+  double const a = metric_length(g, 0), b = metric_length(g, 1), c = metric_length(g, 2);
   double const angle =
       std::acos((g(0, 1) / a / b + g(0, 2) / a / c + g(1, 2) / b / c) / 3);
   double const ahex = 2 * (a + b + c) / 3 * std::sin(angle / 2);
@@ -131,7 +122,7 @@ namespace {
 }
 
 [[nodiscard]] Matrix3d set_cubic(Matrix3d const &g) {
-  double const a = (len(g, 0) + len(g, 1) + len(g, 2)) / 3;
+  double const a = (metric_length(g, 0) + metric_length(g, 1) + metric_length(g, 2)) / 3;
   Matrix3d m = Matrix3d::Zero();
   m(0, 0) = a;
   m(1, 1) = a;

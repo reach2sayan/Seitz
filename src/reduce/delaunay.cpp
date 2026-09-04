@@ -1,7 +1,7 @@
 #include <cppcrystal/core/lattice.hpp>
 
-#include <cppcrystal/core/tolerance.hpp>
 #include "math/integer_matrix.hpp"
+#include <cppcrystal/core/tolerance.hpp>
 
 #include <array>
 #include <cmath>
@@ -158,23 +158,27 @@ shortest_vectors(std::array<Vector3d, 3> const &basis,
         std::swap(b[j], b[j + 1]);
       }
 
+  // Same search as the rank-3 overload above: the first later vector that is
+  // linearly independent of b[0] and the unique axis.
   std::array<Vector3d, 2> out{b[0], b[0]};
-  for (std::size_t i = 1; i < 4; ++i) {
-    Matrix3d m;
-    m.col(0) = b[0];
-    m.col(1) = unique_vec;
-    m.col(2) = b[i];
-    if (std::abs(m.determinant()) > symprec) {
-      out[1] = b[i];
-      break;
-    }
+  auto const it =
+      std::ranges::find_if(std::views::drop(b, 1), [&](Vector3d const &v) {
+        Matrix3d m;
+        m.col(0) = b[0];
+        m.col(1) = unique_vec;
+        m.col(2) = v;
+        return std::abs(m.determinant()) > symprec;
+      });
+  if (it != b.end()) {
+    out[1] = *it;
   }
   return out;
 }
 
 } // namespace
 
-Result<Lattice> Lattice::delaunay_in_plane(int unique_axis, double symprec) const {
+Result<Lattice> Lattice::delaunay_in_plane(int unique_axis,
+                                           double symprec) const {
   Matrix3d const &lattice = basis_;
   // The two in-plane axes (j < k) are those other than the unique axis.
   static constexpr std::array<std::array<int, 2>, 3> planes{{

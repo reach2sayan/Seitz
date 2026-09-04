@@ -1,4 +1,5 @@
 #include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/group/rod_group.hpp>
 
 #include "data/rod_database.hpp"
@@ -53,7 +54,7 @@ struct RodGeometry {
   [[nodiscard]] bool same_point(Vector3d const &a, Vector3d const &b) const {
     Vector3d d = a - b;
     d[axis] -= std::round(d[axis]);
-    return d.cwiseAbs().maxCoeff() < kTol;
+    return approx_zero(d, kTol);
   }
 
   [[nodiscard]] Locus whole_space() const {
@@ -75,7 +76,7 @@ struct RodGeometry {
       Vector3d const rhs =
           -op.translation + static_cast<double>(n) * unit_axis(axis);
       Vector3d const particular = lu.solve(rhs);
-      if ((m * particular - rhs).cwiseAbs().maxCoeff() < kTol) {
+      if (approx_equal(m * particular, rhs, kTol)) {
         loci.push_back(Locus{reduce(particular), ker});
       }
     }
@@ -93,7 +94,7 @@ struct RodGeometry {
       Vector3d const p2 = b.point + static_cast<double>(shift) * unit_axis(axis);
       Vector3d const rhs = p2 - a.point;
       if (ka + kb == 0) {
-        if (rhs.cwiseAbs().maxCoeff() < kTol) {
+        if (approx_zero(rhs, kTol)) {
           results.push_back(Locus{reduce(a.point), Eigen::MatrixXd(3, 0)});
         }
         continue;
@@ -106,7 +107,7 @@ struct RodGeometry {
         stacked.rightCols(kb) = -b.dir;
       }
       Eigen::VectorXd const w = stacked.colPivHouseholderQr().solve(rhs);
-      if ((stacked * w - rhs).cwiseAbs().maxCoeff() < kTol) {
+      if (approx_equal(stacked * w, rhs, kTol)) {
         Vector3d common = a.point;
         if (ka > 0) {
           common += a.dir * w.head(ka);
@@ -130,7 +131,7 @@ struct RodGeometry {
       Vector3d const delta =
           a.point - b.point - static_cast<double>(n) * unit_axis(axis);
       Vector3d const perp = delta - pa * delta;
-      if (perp.cwiseAbs().maxCoeff() < kTol) {
+      if (approx_zero(perp, kTol)) {
         return true;
       }
     }
@@ -167,7 +168,7 @@ struct RodGeometry {
     Vector3d const e = unit_axis(axis);
     bool const has_periodic =
         dir.cols() > 0 &&
-        (dir * (dir.transpose() * e) - e).cwiseAbs().maxCoeff() < kTol;
+        approx_equal(dir * (dir.transpose() * e), e, kTol);
 
     // In-plane part: zero the periodic component of every direction, then
     // take a basis of what remains.

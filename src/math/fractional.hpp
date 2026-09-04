@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cppcrystal/core/fractional.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>
 
 // Fractional-coordinate comparisons used by the symmetry search. The folding
@@ -19,7 +20,7 @@ namespace cppcrystal::math {
 // `tol` per component.
 [[nodiscard]] inline bool same_point(Vector3d const &a, Vector3d const &b,
                                      double tol) noexcept {
-  return frac_displacement(a, b).cwiseAbs().maxCoeff() < tol;
+  return approx_zero(frac_displacement(a, b), tol);
 }
 
 } // namespace cppcrystal::math

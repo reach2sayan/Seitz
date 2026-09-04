@@ -60,13 +60,17 @@ auto const sa = analysis::SymmetryAnalyzer::from_cell(rutile);
 
 leaf::try_handle_all(
     [&]() -> Result<void> {
-      BOOST_LEAF_AUTO(hall, sa.hall());          // runs determination
-      BOOST_LEAF_AUTO(ops, sa.operations());     // reuses it
-      BOOST_LEAF_AUTO(prim, sa.primitive_cell()); // reuses it
-      std::printf("space group %d (%s), %zu operations\n",
-                  data::spacegroup_type(hall).number,
-                  data::spacegroup_type(hall).international_short.data(),
-                  ops.size());
+      auto hall = sa.hall();                 // runs determination
+      if (!hall) return hall.error();
+      auto ops = sa.operations();            // reuses it
+      if (!ops) return ops.error();
+      auto prim = sa.primitive_cell();       // reuses it
+      if (!prim) return prim.error();
+
+      auto const &type = data::spacegroup_type(*hall);
+      std::printf("space group %d (%s), %zu operations, %td primitive atoms\n",
+                  type.number, type.international_short.data(), ops->size(),
+                  prim->size());
       return {};
     },
     [](e_spacegroup_search_failed) {
@@ -88,12 +92,12 @@ site-symmetry symbol, equivalence class) and the fully standardized `Cell`.
 ### Generate a random crystal
 
 ```cpp
-BOOST_LEAF_AUTO(fm3m, group::SpaceGroup::from_number(GroupFamily::space, 225));
+auto const fm3m = group::SpaceGroup::from_number(GroupFamily::space, 225);
 generate::Composition const nacl{{11, 4}, {17, 4}};   // Na4 Cl4
 
-BOOST_LEAF_AUTO(xtal, generate::Generator(*fm3m, {.seed = 42})(nacl));
-// xtal.cell        -> the generated Cell
-// xtal.assignment  -> which Wyckoff position each atom was seated on
+auto const xtal = generate::Generator(*fm3m, {.seed = 42})(nacl);
+// xtal->cell        -> the generated Cell
+// xtal->assignment  -> which Wyckoff position each atom was seated on
 ```
 
 `Generator` enumerates the valid ways to seat the composition on the group's
@@ -199,11 +203,17 @@ generation, magnetic, and k-point pipelines, and
 
 ## Building
 
-Requires a C++23 compiler (the presets use **g++-15**) and CMake ≥ 3.28.
-Everything else is fetched: **Eigen 5.0.0** (the first release whose fixed-size
-matrices are literal types, so they can be built in `constexpr` context),
-**Boost 1.88** (`container`, `leaf`, `parser`, `preprocessor`), and **Catch2 3**
-for the tests. Nothing needs to be installed on the system.
+Requires **GCC 15+ or Clang** with libstdc++ (the presets use `g++-15`) and
+CMake ≥ 3.28; configuring with any other compiler is a hard error rather than an
+untested branch. Everything else is fetched, unconditionally — there is no
+system lookup and no `find_package` fallback to go stale: **Eigen 5.0.0** (the
+first release whose fixed-size matrices are literal types, so they can be built
+in `constexpr` context), **Boost 1.88** (`container`, `flyweight`, `geometry`,
+`leaf`), and **Catch2 3** for the tests. Nothing needs to be installed on the
+system.
+
+`cppcrystal` builds as a **shared library**, versioned `0.1.0` with
+`SONAME 0.1` — while the API is pre-1.0, every minor version may break ABI.
 
 ```bash
 cmake --preset default              # configure (Debug)
@@ -218,7 +228,6 @@ ctest --test-dir cmake-build-debug  # run the unit tests
 | `CPPCRYSTAL_BUILD_TESTS` | ON | unit test suite |
 | `CPPCRYSTAL_BUILD_DEMO` | ON | `cppcrystal_demo` executable |
 | `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 |
-| `CPPCRYSTAL_USE_MKL` | OFF | Intel MKL as Eigen's BLAS/LAPACK backend |
 | `CPPCRYSTAL_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
 | `CPPCRYSTAL_BUILD_TOOLS` | OFF | offline data generators |
 
@@ -253,10 +262,12 @@ find_package(CppCrystal REQUIRED)
 target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
 ```
 
-Eigen and Boost are public dependencies of the exported target, and this project
-fetches both rather than taking them from the system, so `cmake --install` writes
-their CMake packages into the same prefix. The result is self-contained: a
-consumer needs nothing installed system-wide.
+Eigen and Boost.Container/Boost.LEAF are public dependencies of the exported
+target, and this project fetches them rather than taking them from the system, so
+`cmake --install` writes their CMake packages into the same prefix. The result is
+self-contained: a consumer needs nothing installed system-wide. Boost.Flyweight
+and Boost.Geometry are linked `PRIVATE` and, because the library is shared, stay
+out of the exported interface entirely — a consumer never has to find them.
 
 ---
 

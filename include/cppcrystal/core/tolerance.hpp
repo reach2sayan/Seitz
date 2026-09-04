@@ -20,11 +20,25 @@ inline constexpr double kZeroPrec = 1e-10;
   return lhs_sqnorm > rhs_sqnorm + kZeroPrec;
 }
 
+// Entry-wise tolerance test against zero: every |entry| strictly below tol.
+[[nodiscard]] bool approx_zero(MatrixExpr auto const &a, double tol) noexcept {
+  return a.cwiseAbs().maxCoeff() < tol;
+}
+
 // Entry-wise tolerance comparison: every |a - b| entry strictly below tol.
 // The single definition of "equal within tolerance" for vectors and matrices.
+//
+// Strictly below, not at: a handful of spglib-parity sites deliberately accept
+// exactly-at-tolerance inputs and so spell their own `<= tol` (same_operation
+// in core/symmetry_operation.hpp, matrices_close in spacegroup/spacegroup.cpp,
+// the lattice check in refine/operations.cpp, and fixes() in
+// group/point_group.cpp, whose `none_of(... > kTol)` is the same inclusive
+// test turned inside out). Those are not oversights -- do not fold them in
+// here without an oracle run, because the two differ at exactly one input
+// value and that value is reachable.
 [[nodiscard]] bool approx_equal(MatrixExpr auto const &a,
                                 MatrixExpr auto const &b, double tol) noexcept {
-  return ((a - b).cwiseAbs().maxCoeff() < tol);
+  return approx_zero(a - b, tol);
 }
 
 // An angle tolerance in degrees, or std::nullopt to derive an effective value

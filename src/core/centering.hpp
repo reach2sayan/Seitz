@@ -1,5 +1,6 @@
 #pragma once
 
+#include "math/integer_matrix.hpp"
 #include <cppcrystal/core/types.hpp>
 #include <cppcrystal/data/spg_database.hpp> // data::Centering
 
@@ -18,10 +19,13 @@
 //                                      shift is implicit)
 // PRIMITIVE (and any unused entry) maps to the identity / an empty shift list.
 //
-// The tables are constexpr std::array proxies, row-major, because Eigen types
-// are not literal: M is exact integers, M^-1 is a rational num/den, and the
-// shifts are sixths. That lets the M . M^-1 = I identity be checked at compile
-// time (below) instead of trusted; Eigen materialises once at first use.
+// M is the only transcribed table. M^-1 is *derived* from it at compile time as
+// adjugate(M) / det(M), which is exact for every centering, so there is no
+// second table to keep in sync and no M . M^-1 = I transcription check to run --
+// the identity holds by construction (a static_assert below pins that claim).
+// The table is a constexpr std::array proxy, row-major, because Eigen types are
+// literal for construction and access but not for arithmetic; Eigen
+// materialises once at first use.
 namespace cppcrystal {
 
 inline constexpr std::size_t kCenteringCount = 9; // Centering::error..r_center
@@ -34,7 +38,7 @@ namespace detail {
 
 // Row-major 3x3, indexed by Centering. Unset entries are the identity.
 inline constexpr auto kCenteringMatrix = [] {
-  std::array<std::array<int, 9>, kCenteringCount> t{};
+  std::array<math::Mat3Rows, kCenteringCount> t{};
   for (auto &m : t) {
     m = {1, 0, 0, 0, 1, 0, 0, 0, 1};
   }
@@ -47,41 +51,36 @@ inline constexpr auto kCenteringMatrix = [] {
   return t;
 }();
 
-// M^-1 as exact rationals: numerators row-major, one denominator per centering.
+// M^-1 = adjugate(M) / det(M), exact for every centering: det is 1, 2, 3 or 4
+// and the adjugate entries are divisible into it in binary floating point
+// without rounding. Kept unreduced -- reducing by gcd would change num and den
+// by the same factor and land on the identical double.
 inline constexpr auto kCenteringMatrixInvNum = [] {
-  std::array<std::array<int, 9>, kCenteringCount> t{};
-  for (auto &m : t) {
-    m = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  std::array<math::Mat3Rows, kCenteringCount> t{};
+  for (std::size_t i = 0; i < kCenteringCount; ++i) {
+    t[i] = math::adjugate(kCenteringMatrix[i]);
   }
-  t[centering_index(data::Centering::body)] = {-1, 1, 1, 1, -1, 1, 1, 1, -1};
-  t[centering_index(data::Centering::face)] = {0, 1, 1, 1, 0, 1, 1, 1, 0};
-  t[centering_index(data::Centering::a_face)] = {2, 0, 0, 0, 1, -1, 0, 1, 1};
-  t[centering_index(data::Centering::b_face)] = {1, 0, -1, 0, 2, 0, 1, 0, 1};
-  t[centering_index(data::Centering::c_face)] = {1, 1, 0, -1, 1, 0, 0, 0, 2};
-  t[centering_index(data::Centering::r_center)] = {2,  -1, -1, 1, 1,
-                                                   -2, 1,  1,  1};
   return t;
 }();
 
 inline constexpr auto kCenteringMatrixInvDen = [] {
   std::array<int, kCenteringCount> d{};
-  d.fill(1);
-  d[centering_index(data::Centering::body)] = 2;
-  d[centering_index(data::Centering::face)] = 2;
-  d[centering_index(data::Centering::a_face)] = 2;
-  d[centering_index(data::Centering::b_face)] = 2;
-  d[centering_index(data::Centering::c_face)] = 2;
-  d[centering_index(data::Centering::r_center)] = 3;
+  for (std::size_t i = 0; i < kCenteringCount; ++i) {
+    d[i] = math::determinant(kCenteringMatrix[i]);
+  }
   return d;
 }();
 
-// M . M^-1 = I for every centering, in exact integer arithmetic:
-// M . num == den . I.
+// The derivation is only worth trusting if M . adjugate(M) == det(M) . I, so
+// assert exactly that -- on the derived values, not on transcribed ones.
 [[nodiscard]] consteval bool inverses_are_exact() {
   for (std::size_t c = 0; c < kCenteringCount; ++c) {
     auto const &m = kCenteringMatrix[c];
     auto const &n = kCenteringMatrixInvNum[c];
     int const den = kCenteringMatrixInvDen[c];
+    if (den == 0) {
+      return false; // singular M: no inverse to derive
+    }
     for (std::size_t i = 0; i < 3; ++i) {
       for (std::size_t j = 0; j < 3; ++j) {
         int sum = 0;

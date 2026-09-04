@@ -7,6 +7,7 @@
 #include "core/validation.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
+#include "math/lattice_parameters.hpp"
 
 #include <boost/container/flat_map.hpp>
 
@@ -71,9 +72,12 @@ constexpr int kRelativeAxes[26][3] = {
     return false;
   }
 
+  // math::metric_cosine clamps to [-1, 1] -- see there for why. The degree
+  // conversion keeps the original `/ pi * 180` spelling rather than folding a
+  // 180/pi constant, so the result is bit-identical to what the reference
+  // produces.
   auto const angle = [](Matrix3d const &m, int a, int b) {
-    return std::acos(m(a, b) / std::sqrt(m(a, a)) / std::sqrt(m(b, b))) /
-           std::numbers::pi * 180.0;
+    return math::metric_angle(m, a, b) / std::numbers::pi * 180.0;
   };
   constexpr std::array<std::pair<int, int>, 3> elem_sets{
       {{0, 1}, {0, 2}, {1, 2}}};
@@ -84,8 +88,8 @@ constexpr int kRelativeAxes[26][3] = {
         return false;
       }
     } else {
-      double const cos1 = orig(j, k) / length_orig[j] / length_orig[k];
-      double const cos2 = rotated(j, k) / length_rot[j] / length_rot[k];
+      double const cos1 = math::metric_cosine(orig, j, k);
+      double const cos2 = math::metric_cosine(rotated, j, k);
       double const x =
           cos1 * cos2 + std::sqrt(1 - cos1 * cos1) * std::sqrt(1 - cos2 * cos2);
       double const sin_dtheta2 = 1 - x * x;

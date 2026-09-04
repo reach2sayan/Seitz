@@ -1,77 +1,73 @@
+# Every dependency is fetched. Nothing is taken from the system, nothing is
+# searched for, and there is no find_package fallback to go stale: a fresh
+# checkout configures with only a compiler and CMake present, and every
+# developer builds against byte-identical sources. The one exception is
+# Threads, which is part of the toolchain rather than a library we vendor.
+#
+# Both Eigen and Boost are PUBLIC dependencies of the exported cppcrystal
+# target, so both must also be installable — otherwise install(EXPORT) writes a
+# config whose find_dependency() calls have nothing to point at. Each defaults
+# to skipping its install rules when built as a subproject; turn them back on so
+# `cmake --install` writes one self-contained prefix.
+#
+# SYSTEM on every FetchContent_Declare keeps third-party headers out of the
+# library's -Wconversion/-Wsign-conversion warning set.
 include(FetchContent)
 
-# Eigen 5.0.0 — fetched purely from git rather than the system package. 5.0 is the
-# first release in which fixed-size Matrix/Array are literal types, so they can be
-# built and accessed in constexpr context under C++20+ (we compile as C++23).
-# As a subproject PROJECT_IS_TOP_LEVEL is false, so Eigen's tests/blas/lapack/docs/
-# demos/pkgconfig/cmake-package all default OFF — only the Eigen3::Eigen interface
-# target is created. SYSTEM keeps Eigen's headers out of our -Wconversion warning set.
-# Eigen and Boost are fetched, not taken from the system, and both are public
-# dependencies of the exported cppcrystal target — so they must be installable
-# too, or install(EXPORT) has nothing to point find_dependency() at. Both default
-# to skipping their install rules when they are subprojects; turn them back on so
-# `cmake --install` writes one self-contained prefix.
 set(EIGEN_BUILD_CMAKE_PACKAGE ON CACHE BOOL "" FORCE)
 set(BOOST_SKIP_INSTALL_RULES OFF CACHE BOOL "" FORCE)
 
+# Eigen 5.0.0 — the first release in which fixed-size Matrix/Array are literal
+# types, so they can be constructed and accessed in constexpr context (we
+# compile as C++23). As a subproject Eigen's tests/blas/lapack/docs/demos all
+# default OFF, leaving only the Eigen3::Eigen interface target.
 FetchContent_Declare(Eigen3
         GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
         GIT_TAG 5.0.0
         GIT_SHALLOW TRUE
         SYSTEM)
-FetchContent_MakeAvailable(Eigen3)
 
-# Boost 1.88.0 — always fetched (no system/install flow), from the CMake-ready
-# release archive. 1.87 is the floor: it is the first release shipping
-# boost::parser (the house parsing library — never Spirit). Only the libraries
-# we actually link are configured.
-set(BOOST_INCLUDE_LIBRARIES container flyweight geometry leaf parser preprocessor)
+# Boost 1.88.0, from the CMake-ready release archive. The archive carries every
+# Boost library; BOOST_INCLUDE_LIBRARIES decides which get CMake targets, so an
+# unused entry is pure configure-time cost. What each one is for:
+#   container  — static_vector/small_vector/flat_map/flat_set
+#   flyweight  — one shared immutable SpaceGroup per Hall setting
+#   geometry   — the R-tree behind PositionIndex
+#   leaf       — the error model (Result<T>)
+# Nothing here parses text at runtime: the tables are constexpr, generated
+# offline by tools/transcribe_*.py. So boost::parser is not configured; were
+# that to change, 1.87 is the floor for it.
+set(BOOST_INCLUDE_LIBRARIES container flyweight geometry leaf)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON
         SYSTEM)
-FetchContent_MakeAvailable(Boost)
 
-if (CPPCRYSTAL_USE_MKL)
-    set(MKL_INTERFACE lp64)
-    set(MKL_THREADING sequential)
-    find_package(MKL CONFIG REQUIRED)
-endif ()
+FetchContent_MakeAvailable(Eigen3 Boost)
 
-# Catch2 v3 — fetched like Eigen and Boost so a checkout needs no system install.
-# A system Catch2 3.x is used when one is already present. The extras/ directory
-# holds the Catch.cmake module providing catch_discover_tests(); find_package adds
-# it to CMAKE_MODULE_PATH automatically, FetchContent does not.
+# Catch2 v3. extras/ holds the Catch.cmake module providing
+# catch_discover_tests(); FetchContent does not add it to CMAKE_MODULE_PATH.
 if (CPPCRYSTAL_BUILD_TESTS)
-    find_package(Catch2 3 QUIET)
-    if (NOT Catch2_FOUND)
-        FetchContent_Declare(Catch2
-                GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-                GIT_TAG v3.8.1
-                GIT_SHALLOW TRUE
-                SYSTEM)
-        FetchContent_MakeAvailable(Catch2)
-        list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
-    endif ()
+    FetchContent_Declare(Catch2
+            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+            GIT_TAG v3.8.1
+            GIT_SHALLOW TRUE
+            SYSTEM)
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 endif ()
 
-# Reference spglib v2.7.0 — the validation oracle. Built only for oracle tests and
-# never linked into the cppcrystal library itself. Exposes target Spglib::symspg.
+# Reference spglib v2.7.0 — the validation oracle. Built only for the oracle
+# tests and never linked into the cppcrystal library. Exposes Spglib::symspg.
 if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
-    include(FetchContent)
     set(SPGLIB_WITH_TESTS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Fortran OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Python OFF CACHE BOOL "" FORCE)
     set(SPGLIB_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_INSTALL OFF CACHE BOOL "" FORCE)
-    # Reuse the local clone (cloned during development) to avoid re-downloading.
-    if (EXISTS "$ENV{HOME}/.cache/spglib-ref/CMakeLists.txt")
-        FetchContent_Declare(spglib_reference SOURCE_DIR "$ENV{HOME}/.cache/spglib-ref")
-    else ()
-        FetchContent_Declare(spglib_reference
-                GIT_REPOSITORY https://github.com/spglib/spglib.git
-                GIT_TAG v2.7.0
-                GIT_SHALLOW TRUE)
-    endif ()
+    FetchContent_Declare(spglib_reference
+            GIT_REPOSITORY https://github.com/spglib/spglib.git
+            GIT_TAG v2.7.0
+            GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(spglib_reference)
 endif ()

@@ -13,10 +13,19 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# GCC 15 / Clang with libstdc++ only. The library needs <generator> and
+# std::ranges::to, compiles as gnu++23, and the constexpr-budget flag below has
+# no portable spelling — so rather than carry untested branches for other
+# toolchains, say so once, here.
+if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(FATAL_ERROR
+            "CppCrystal builds with GCC 15+ or Clang only (got ${CMAKE_CXX_COMPILER_ID}).")
+endif ()
+
 option(CPPCRYSTAL_BUILD_TESTS "Build the test suite" ON)
 option(CPPCRYSTAL_BUILD_DEMO "Build the demo executable" ON)
-option(CPPCRYSTAL_USE_MKL "Use Intel MKL as Eigen's BLAS/LAPACK backend" OFF)
 option(CPPCRYSTAL_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
+option(CPPCRYSTAL_BUILD_TOOLS "Build offline data generators" OFF)
 option(CPPCRYSTAL_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 
 include(Dependencies)
@@ -27,8 +36,18 @@ if (CCACHE_PROGRAM)
 endif ()
 
 # ---- library ----
-add_library(cppcrystal)
+# SHARED explicitly, not via BUILD_SHARED_LIBS: the type is part of the contract
+# here, so a consumer's cache variable cannot silently turn it into a static
+# archive. Being shared is what makes the exported dependency set below exact --
+# PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the interface,
+# which a static archive could not promise.
+add_library(cppcrystal SHARED)
 add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
+set_target_properties(cppcrystal PROPERTIES
+        # 0.x: SOVERSION tracks the minor, since every minor may break ABI
+        # before 1.0. From 1.0 on this becomes ${PROJECT_VERSION_MAJOR}.
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 target_sources(cppcrystal PRIVATE
         src/version.cpp
         src/warmup.cpp
@@ -82,46 +101,31 @@ target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
         Boost::leaf Threads::Threads)
 target_link_libraries(cppcrystal PRIVATE Boost::flyweight Boost::geometry)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    # Hardening warning set (Phase 9). The conversion warnings are applied to the
-    # library only — the oracle tests bridge to the reference C API
-    # (reinterpret_cast, size_t<->int), which would drown them in noise.
-    # -Wnull-dereference is deliberately absent: it is a middle-end warning that
-    # GCC reports at the inlined callee, so SYSTEM include marking cannot keep
-    # Eigen's evaluators and libstdc++'s <generator> out of it at -O2.
-    target_compile_options(cppcrystal PRIVATE
-            -Wall -Wextra -Wpedantic
-            -Wshadow -Wcast-align -Wdouble-promotion
-            -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
-endif ()
+# The conversion warnings are applied to the library only — the oracle tests
+# bridge to the reference C API (reinterpret_cast, size_t<->int), which would
+# drown them in noise. -Wnull-dereference is deliberately absent: it is a
+# middle-end warning GCC reports at the inlined callee, so SYSTEM include
+# marking cannot keep Eigen's evaluators and libstdc++'s <generator> out of it
+# at -O2.
+target_compile_options(cppcrystal PRIVATE
+        -Wall -Wextra -Wpedantic
+        -Wshadow -Wcast-align -Wdouble-promotion
+        -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
 
 # The magnetic database decodes all 76683 operations + the alternative
-# transformations into constexpr tables at compile time, which blows past every
-# compiler's default constant-evaluation budget. Each toolchain spells the knob
-# differently; raise all three for this one translation unit.
-#   Clang  -fconstexpr-steps      (default 1048576)
-#   GCC    -fconstexpr-ops-limit  (default 33554432)
-#   MSVC   /constexpr:steps       (default 1048576), plus the loop-nesting depth
-set(CPPCRYSTAL_CONSTEXPR_BUDGET 100000000)
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-steps=${CPPCRYSTAL_CONSTEXPR_BUDGET}")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-ops-limit=${CPPCRYSTAL_CONSTEXPR_BUDGET}")
-elseif (MSVC)
-    set(CPPCRYSTAL_CONSTEXPR_FLAGS
-            "/constexpr:steps${CPPCRYSTAL_CONSTEXPR_BUDGET}" "/constexpr:depth2048")
+# transformations into constexpr tables at compile time, which blows past both
+# compilers' default constant-evaluation budget. GCC and Clang spell the knob
+# differently (-fconstexpr-ops-limit, default 33554432, vs -fconstexpr-steps,
+# default 1048576); raise it for this one translation unit.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-ops-limit=100000000")
+else ()
+    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-steps=100000000")
 endif ()
-if (CPPCRYSTAL_CONSTEXPR_FLAGS)
-    set_source_files_properties(src/data/msg_database.cpp
-            PROPERTIES COMPILE_OPTIONS "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
-endif ()
+set_source_files_properties(src/data/msg_database.cpp
+        PROPERTIES COMPILE_OPTIONS "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
 
-if (CPPCRYSTAL_USE_MKL)
-    target_compile_definitions(cppcrystal PUBLIC EIGEN_USE_MKL_ALL)
-    target_link_libraries(cppcrystal PUBLIC MKL::MKL)
-endif ()
-
-if (CPPCRYSTAL_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+if (CPPCRYSTAL_ENABLE_SANITIZERS)
     target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(cppcrystal PUBLIC -fsanitize=address,undefined)
 endif ()
@@ -134,7 +138,6 @@ endif ()
 # Offline generator for the baked t-subgroup table (data/subgroup_relations.hpp).
 # Not built by default — it re-runs the slow in-house derivation. Build with
 # -DCPPCRYSTAL_BUILD_TOOLS=ON, run it, and redirect stdout over the header.
-option(CPPCRYSTAL_BUILD_TOOLS "Build offline data generators" OFF)
 if (CPPCRYSTAL_BUILD_TOOLS)
     add_executable(generate_subgroup_relations tools/generate_subgroup_relations.cpp)
     target_link_libraries(generate_subgroup_relations PRIVATE cppcrystal::cppcrystal)
@@ -153,11 +156,9 @@ endif ()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-install(TARGETS cppcrystal
-        EXPORT CppCrystalTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# GNUInstallDirs supplies every destination; naming them again would only
+# restate the defaults.
+install(TARGETS cppcrystal EXPORT CppCrystalTargets)
 install(DIRECTORY include/cppcrystal
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.hpp")

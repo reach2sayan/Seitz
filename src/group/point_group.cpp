@@ -104,6 +104,8 @@ struct PointGeometry {
   // in the subspace; trivially true for the origin).
   [[nodiscard]] static bool fixes(Matrix3i const &rot, Locus const &l) {
     Matrix3d const r = rot.cast<double>();
+    // Inclusive (`> kTol` negated, i.e. `<= kTol`), so deliberately not
+    // approx_equal, which is strict -- see core/tolerance.hpp.
     return std::ranges::none_of(std::views::iota(0, l.dim()), [&](int i) {
       return (r * l.basis.col(i) - l.basis.col(i)).cwiseAbs().maxCoeff() > kTol;
     });

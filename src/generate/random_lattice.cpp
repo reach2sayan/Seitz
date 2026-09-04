@@ -1,5 +1,6 @@
 #include "generate/random_lattice.hpp"
 
+#include "math/lattice_parameters.hpp"
 #include <cppcrystal/data/element_data.hpp>
 
 #include <algorithm>
@@ -13,31 +14,13 @@ namespace {
 
 constexpr double kDeg = std::numbers::pi / 180.0;
 
-// Build a lattice (columns = basis vectors) from cell parameters, in the
-// standard crystallographic orientation: a along x, b in the xy-plane.
+// Cell parameters -> basis matrix, angles in degrees here rather than the
+// radians math::lattice_from_parameters takes.
 [[nodiscard]] Matrix3d from_parameters(double a, double b, double c,
                                        double alpha, double beta,
                                        double gamma) {
-  double const ca = std::cos(alpha * kDeg);
-  double const cb = std::cos(beta * kDeg);
-  double const cg = std::cos(gamma * kDeg);
-  double const sg = std::sin(gamma * kDeg);
-
-  Vector3d const av{a, 0.0, 0.0};
-  Vector3d const bv{b * cg, b * sg, 0.0};
-  double const cx = c * cb;
-  double const cy = c * (ca - cb * cg) / sg;
-  double const cz = c *
-                    std::sqrt(std::max(0.0, 1.0 - ca * ca - cb * cb - cg * cg +
-                                                2.0 * ca * cb * cg)) /
-                    sg;
-  Vector3d const cv{cx, cy, cz};
-
-  Matrix3d lattice;
-  lattice.col(0) = av;
-  lattice.col(1) = bv;
-  lattice.col(2) = cv;
-  return lattice;
+  return math::lattice_from_parameters(a, b, c, alpha * kDeg, beta * kDeg,
+                                       gamma * kDeg);
 }
 
 } // namespace

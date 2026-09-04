@@ -28,14 +28,6 @@
       }
     },
     {
-      "name": "mkl",
-      "displayName": "Release + MKL",
-      "inherits": "release",
-      "cacheVariables": {
-        "CPPCRYSTAL_USE_MKL": "ON"
-      }
-    },
-    {
       "name": "oracle",
       "displayName": "Debug + reference-spglib oracle",
       "inherits": "default",
@@ -60,10 +52,6 @@
     {
       "name": "release",
       "configurePreset": "release"
-    },
-    {
-      "name": "mkl",
-      "configurePreset": "mkl"
     },
     {
       "name": "oracle",

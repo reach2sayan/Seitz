@@ -50,9 +50,9 @@ struct SymmetryOperation {
 // Change of basis of an operation: (T, 0)(R, t)(T, 0)^-1 = (T R T^-1, T t),
 // with the conjugated rotation rounded back to the integer basis. Any extra
 // fields of `Op` (e.g. a time-reversal flag) ride along unchanged.
-template <SpaceGroupOperationLike Op>
-[[nodiscard]] Op conjugated_by(Op op, Matrix3d const &t,
-                               Matrix3d const &t_inv) noexcept {
+[[nodiscard]] auto conjugated_by(SpaceGroupOperationLike auto op,
+                                 Matrix3d const &t,
+                                 Matrix3d const &t_inv) noexcept {
   op.rotation =
       math::round_to_int(t * op.rotation.template cast<double>() * t_inv);
   op.translation = t * op.translation;

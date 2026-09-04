@@ -107,10 +107,10 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                      int ref_multiplicity, Matrix3d const &lattice,
                      HallNumber hall, double symprec,
                      CellPeriodicity const &periodicity) {
-  std::vector<Vector3d> orbit;
-  orbit.reserve(conv_sym.size());
-  std::ranges::transform(conv_sym, std::back_inserter(orbit),
-                         [&](auto const &op) { return op.apply(position); });
+  std::vector<Vector3d> const orbit(
+      std::from_range, conv_sym | std::views::transform([&](auto const &op) {
+        return op.apply(position);
+      }));
 
   // Coincidence classes of the orbit, found once through an index over it.
   Positions const orbit_positions = to_positions(orbit);
@@ -120,7 +120,7 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
   std::vector<std::vector<int>> classes;
   classes.reserve(orbit.size());
   for (auto const &point : orbit) {
-    classes.push_back(std::ranges::to<std::vector<int>>(index.matches(point)));
+    classes.emplace_back(std::from_range, index.matches(point));
   }
 
   auto const group_order = static_cast<int>(conv_sym.size());

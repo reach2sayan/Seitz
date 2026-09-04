@@ -112,9 +112,8 @@ public:
   [[nodiscard]] std::vector<Assignment<group::Wyckoff>>
   assignments(Composition const &comp,
               std::size_t max = kMaxAssignments) const {
-    return std::ranges::to<std::vector<Assignment<group::Wyckoff>>>(
-        enumerate_assignments(group_->wyckoffs(), comp) |
-        std::views::take(max));
+    return {std::from_range, enumerate_assignments(group_->wyckoffs(), comp) |
+                                 std::views::take(max)};
   }
 
   // A random structure with this group's symmetry and `comp`'s composition,

@@ -88,8 +88,9 @@ private:
   using Point =
       boost::geometry::model::point<double, 3, boost::geometry::cs::cartesian>;
   using Box = boost::geometry::model::box<Point>;
-  using Tree = boost::geometry::index::rtree<
-      std::pair<Point, int>, boost::geometry::index::quadratic<16>>;
+  using Tree =
+      boost::geometry::index::rtree<std::pair<Point, int>,
+                                    boost::geometry::index::quadratic<16>>;
 
   // Cartesian position of a fractional point folded into the cell.
   [[nodiscard]] Vector3d cartesian(Vector3d const &frac) const noexcept;

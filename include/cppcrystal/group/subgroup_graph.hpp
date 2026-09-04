@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cppcrystal/data/detail/lookup.hpp>
 #include <cppcrystal/data/subgroup_relations.hpp>
 
-#include <algorithm>
 #include <array>
 #include <bitset>
 #include <cstddef>
@@ -23,43 +23,31 @@ struct SubgroupRelation {
 
 namespace detail {
 
-// The edge list grouped by one endpoint: `edges` sorted by key, with `offsets`
-// marking each key's block. A counting sort at compile time, so both adjacency
-// directions and the reachability closure below are constant-initialised — the
-// runtime does no graph construction at all.
-struct Adjacency {
-  std::array<SubgroupRelation, data::kTSubgroupRelations.size()> edges{};
-  std::array<int, kNumSpaceGroups + 2> offsets{};
+// The edge list grouped by one endpoint: the same consteval counting sort the
+// data catalogs are indexed with (data/detail/lookup.hpp), over the baked
+// relation table. Both adjacency directions and the reachability closure below
+// are constant-initialised, so the runtime does no graph construction at all.
+inline constexpr std::size_t kNumRelations = data::kTSubgroupRelations.size();
+inline constexpr std::size_t kNumKeys = static_cast<std::size_t>(kNumSpaceGroups) + 1;
 
-  [[nodiscard]] constexpr std::span<SubgroupRelation const>
-  operator[](int key) const noexcept {
-    if (key < 1 || key > kNumSpaceGroups) {
-      return {};
-    }
-    auto const k = static_cast<std::size_t>(key);
-    return {edges.data() + offsets[k], edges.data() + offsets[k + 1]};
-  }
-};
+using Adjacency =
+    data::detail::BucketIndex<SubgroupRelation, kNumRelations, kNumKeys>;
+
+[[nodiscard]] constexpr data::TSubgroupRelation const &relation(int id) noexcept {
+  return data::kTSubgroupRelations[static_cast<std::size_t>(id) - 1];
+}
 
 // `Endpoint` picks which end of the relation groups it (super for out-edges,
 // sub for in-edges); `Other` is the number stored alongside the index.
 template <int data::TSubgroupRelation::*Endpoint,
           int data::TSubgroupRelation::*Other>
 [[nodiscard]] consteval Adjacency group_by() {
-  Adjacency out{};
-  for (auto const &rel : data::kTSubgroupRelations) {
-    ++out.offsets[static_cast<std::size_t>(rel.*Endpoint) + 1];
-  }
-  for (std::size_t k = 1; k < out.offsets.size(); ++k) {
-    out.offsets[k] += out.offsets[k - 1];
-  }
-  auto cursor = out.offsets;
-  for (auto const &rel : data::kTSubgroupRelations) {
-    auto const k = static_cast<std::size_t>(rel.*Endpoint);
-    out.edges[static_cast<std::size_t>(cursor[k]++)] =
-        SubgroupRelation{.number = rel.*Other, .index = rel.index};
-  }
-  return out;
+  return data::detail::bucket_index<kNumRelations, kNumKeys, SubgroupRelation>(
+      [](int id) { return relation(id).*Endpoint; },
+      [](int id) {
+        return SubgroupRelation{.number = relation(id).*Other,
+                                .index = relation(id).index};
+      });
 }
 
 inline constexpr Adjacency kSubgroupsOf =

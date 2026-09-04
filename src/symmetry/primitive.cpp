@@ -11,12 +11,13 @@
 #include "math/integer_matrix.hpp"
 #include "symmetry/search.hpp"
 
+#include <boost/container/flat_map.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <iterator>
-#include <map>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -225,7 +226,7 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
 
     // Class sizes in one pass: every overlap entry names its representative,
     // so the histogram keys are exactly the representatives, in index order.
-    std::map<int, int> class_size;
+    boost::container::flat_map<int, int> class_size;
     for (int const rep : overlap) {
       ++class_size[rep];
     }
@@ -284,12 +285,10 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
 // The translations of a symmetry-operation set whose rotation is the identity.
 [[nodiscard]] std::vector<Vector3d>
 operation_pure_translations(std::span<SymmetryOperation const> operations) {
-  std::vector<Vector3d> out;
-  std::ranges::copy(operations | std::views::filter([](auto const &op) {
-                      return op.rotation == Matrix3i::Identity();
-                    }) | std::views::transform(&SymmetryOperation::translation),
-                    std::back_inserter(out));
-  return out;
+  return {std::from_range,
+          operations | std::views::filter([](auto const &op) {
+            return op.rotation == Matrix3i::Identity();
+          }) | std::views::transform(&SymmetryOperation::translation)};
 }
 
 // The primitive lattice in "translation space": a unit cell whose atoms sit at

@@ -1,5 +1,8 @@
 #include "core/centering.hpp"
 
+#include "math/integer_matrix.hpp"
+
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <span>
@@ -8,30 +11,18 @@ namespace cppcrystal {
 
 using data::Centering;
 
-namespace {
-
-// The proxies materialise into Eigen once, on first use: the tables are the
-// source of truth, these are just the typed views the pipeline works with.
-template <class Matrix, class Proxy>
-[[nodiscard]] Matrix materialise(Proxy const &rows, auto scale) {
-  Matrix m;
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      m(i, j) = scale(rows[static_cast<std::size_t>(i * 3 + j)]);
-    }
-  }
-  return m;
-}
-
-} // namespace
+// The tables are the source of truth; these are the typed views the pipeline
+// works with, materialised into Eigen once on first use. math::as_matrix maps
+// the row-major proxy in place rather than copying it entry by entry -- the
+// same pattern data/packed_decode.hpp uses for the operation tables.
 
 Matrix3i const &centering_matrix(Centering c) {
   static auto const table = [] {
     std::array<Matrix3i, kCenteringCount> t;
-    for (std::size_t i = 0; i < kCenteringCount; ++i) {
-      t[i] = materialise<Matrix3i>(detail::kCenteringMatrix[i],
-                                   [](int v) { return v; });
-    }
+    std::ranges::transform(detail::kCenteringMatrix, t.begin(),
+                           [](math::Mat3Rows const &rows) {
+                             return Matrix3i(math::as_matrix(rows));
+                           });
     return t;
   }();
   return table[static_cast<std::size_t>(c)];
@@ -40,12 +31,12 @@ Matrix3i const &centering_matrix(Centering c) {
 Matrix3d const &centering_matrix_inv(Centering c) {
   static auto const table = [] {
     std::array<Matrix3d, kCenteringCount> t;
-    for (std::size_t i = 0; i < kCenteringCount; ++i) {
-      double const den = static_cast<double>(detail::kCenteringMatrixInvDen[i]);
-      t[i] = materialise<Matrix3d>(
-          detail::kCenteringMatrixInvNum[i],
-          [den](int v) { return static_cast<double>(v) / den; });
-    }
+    std::ranges::transform(
+        detail::kCenteringMatrixInvNum, detail::kCenteringMatrixInvDen,
+        t.begin(), [](math::Mat3Rows const &num, int den) {
+          return Matrix3d(math::as_matrix(num).cast<double>() /
+                          static_cast<double>(den));
+        });
     return t;
   }();
   return table[static_cast<std::size_t>(c)];

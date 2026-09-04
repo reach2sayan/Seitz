@@ -85,10 +85,10 @@ template <WyckoffLike W> struct AssignmentContext {
     AssignmentContext ctx{
         .positions = positions,
     };
-    std::ranges::copy(comp | std::views::filter([](auto const &entry) {
-                        return entry.second > 0;
-                      }),
-                      std::back_inserter(ctx.elements));
+    ctx.elements = {std::from_range,
+                    comp | std::views::filter([](auto const &entry) {
+                      return entry.second > 0;
+                    })};
     if (ctx.elements.empty()) {
       return ctx;
     }

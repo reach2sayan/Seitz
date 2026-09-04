@@ -160,18 +160,15 @@ crystallographic_orbits(ExactPositions const &exact,
                         std::vector<int> const &mapping_table) {
   // For each primitive atom, the first input-cell atom in its orbit.
   auto const first_of = first_index_of(mapping_table, exact.size());
-  std::vector<int> rep;
-  rep.reserve(exact.size());
-  std::ranges::transform(exact, std::back_inserter(rep), [&](auto const &atom) {
-    return first_of[static_cast<std::size_t>(atom.equivalent_atom)].value_or(0);
-  });
+  std::vector<int> const rep(
+      std::from_range, exact | std::views::transform([&](auto const &atom) {
+        return first_of[static_cast<std::size_t>(atom.equivalent_atom)]
+            .value_or(0);
+      }));
 
-  std::vector<int> orbits;
-  orbits.reserve(mapping_table.size());
-  for (int const prim : mapping_table) {
-    orbits.push_back(rep[static_cast<std::size_t>(prim)]);
-  }
-  return orbits;
+  return {std::from_range, mapping_table | std::views::transform([&](int prim) {
+            return rep[static_cast<std::size_t>(prim)];
+          })};
 }
 
 } // namespace

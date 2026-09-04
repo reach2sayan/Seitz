@@ -281,18 +281,15 @@ changed_pure_translations(Matrix3d const &tmat,
   MagOps changed;
   changed.reserve(changed_representatives.size() * changed_pure->size() *
                   changed_factors.size());
-  for (auto const &pure : *changed_pure) {
-    for (auto const &rep : changed_representatives) {
-      for (auto const &factor : changed_factors) {
-        // (I, ti)(Pj, tj)(Pk, tk) = (Pj Pk, Pj tk + tj + ti).
-        Matrix3i const rot = rep.spatial.rotation * factor.spatial.rotation;
-        Vector3d const trans = math::wrap_to_unit_cell(Vector3d(
-            rep.spatial.rotation.cast<double>() * factor.spatial.translation +
-            rep.spatial.translation + pure));
-        changed.push_back(
-            {{rot, trans}, rep.time_reversal != factor.time_reversal});
-      }
-    }
+  for (auto const &[pure, rep, factor] : std::views::cartesian_product(
+           *changed_pure, changed_representatives, changed_factors)) {
+    // (I, ti)(Pj, tj)(Pk, tk) = (Pj Pk, Pj tk + tj + ti).
+    Matrix3i const rot = rep.spatial.rotation * factor.spatial.rotation;
+    Vector3d const trans = math::wrap_to_unit_cell(Vector3d(
+        rep.spatial.rotation.cast<double>() * factor.spatial.translation +
+        rep.spatial.translation + pure));
+    changed.push_back(
+        {{rot, trans}, rep.time_reversal != factor.time_reversal});
   }
   return changed;
 }
@@ -408,27 +405,35 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
     Vector3d shift;
   };
   auto const find_correction = [&]() -> std::optional<Correction> {
-    for (int u = first_uni.value(); u <= last_uni.value(); ++u) {
-      UniNumber const uni = *UniNumber::of(u);
-      if (data::magnetic_spacegroup_type(uni).type != type) {
-        continue;
-      }
-      auto const &msg_uni = data::magnetic_operations_from_database(uni, hall);
-      if (msg_uni.size() != reference->changed_symmetry.size()) {
-        continue;
-      }
+    // The candidates worth searching: right type, and enough tabulated
+    // operations to match at all. Staged so the database lookup only runs
+    // once the cheap type test has passed.
+    auto candidates =
+        std::views::iota(first_uni.value(), last_uni.value() + 1) |
+        std::views::transform([](int u) { return *UniNumber::of(u); }) |
+        std::views::filter([type](UniNumber uni) {
+          return data::magnetic_spacegroup_type(uni).type == type;
+        }) |
+        std::views::filter([&](UniNumber uni) {
+          return data::magnetic_operations_from_database(uni, hall).size() ==
+                 reference->changed_symmetry.size();
+        });
 
+    for (UniNumber const uni : candidates) {
+      auto const &msg_uni = data::magnetic_operations_from_database(uni, hall);
       auto const &transformations =
           data::magnetic_std_transformations(uni, hall);
-      for (auto const &transform : transformations) {
-        Matrix3d const cor = transform.rotation.cast<double>();
-        Vector3d const cor_shift = transform.translation;
-        auto const symmetry_cor = distinct_changed_magnetic_symmetry(
-            cor, cor_shift, reference->changed_symmetry);
-        if (same_magnetic_symmetry(msg_uni, MagneticOperations{symmetry_cor},
-                                   symprec)) {
-          return Correction{uni, cor, cor_shift};
-        }
+      auto const match = std::ranges::find_if(
+          transformations, [&](SymmetryOperation const &transform) {
+            auto const symmetry_cor = distinct_changed_magnetic_symmetry(
+                transform.rotation.cast<double>(), transform.translation,
+                reference->changed_symmetry);
+            return same_magnetic_symmetry(
+                msg_uni, MagneticOperations{symmetry_cor}, symprec);
+          });
+      if (match != transformations.end()) {
+        return Correction{uni, match->rotation.cast<double>(),
+                          match->translation};
       }
     }
     return std::nullopt;
@@ -486,8 +491,7 @@ Result<MagneticCell> MagneticIdentification::transform(
   // primitive atom (site tensors are invariant under pure translations).
   std::vector<std::optional<int>> remapping(
       static_cast<std::size_t>(prim_cell.size()));
-  for (Index i = 0; i < cell.size(); ++i) {
-    int const prim_atom = prim.mapping_table[static_cast<std::size_t>(i)];
+  for (auto const [i, prim_atom] : prim.mapping_table | std::views::enumerate) {
     auto &preimage = remapping[static_cast<std::size_t>(prim_atom)];
     if (!preimage) {
       preimage = static_cast<int>(i);
@@ -516,17 +520,16 @@ Result<MagneticCell> MagneticIdentification::transform(
     vectors.resize(total, 3);
   }
 
-  for (Index i = 0; i < static_cast<Index>(np); ++i) {
+  for (Index const i : std::views::iota(Index{0}, static_cast<Index>(np))) {
     Vector3d const pos_std =
         tmat_prm * prim_cell.position(i) + origin_shift; // x_std
     int const orig = *remapping[static_cast<std::size_t>(i)];
-    for (std::size_t p = 0; p < nc; ++p) {
+    for (auto const [p, pure] : *changed_pure | std::views::enumerate) {
       Index const ip = i * static_cast<Index>(nc) + static_cast<Index>(p);
       auto const uip = static_cast<std::size_t>(ip);
       types[uip] = prim_cell.type(i);
       positions.row(ip) =
-          math::wrap_to_unit_cell(Vector3d(pos_std + (*changed_pure)[p]))
-              .transpose();
+          math::wrap_to_unit_cell(Vector3d(pos_std + pure)).transpose();
       if (collinear) {
         scalars[uip] = mcell.scalar(orig);
       } else {

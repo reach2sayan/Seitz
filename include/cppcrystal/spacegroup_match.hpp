@@ -19,14 +19,12 @@ struct SpacegroupMatch {
   HallNumber hall;
   Matrix3d bravais_lattice{Matrix3d::Identity()};
   Vector3d origin_shift{Vector3d::Zero()};
-
   [[nodiscard]] data::SpacegroupType const &type() const noexcept;
 };
 
 // Whether the lattice handed to OperationSet::spacegroup is the conventional
 // cell (recover the primitive setting via the transformation the operations
-// imply) or already a primitive cell. A template argument, so the branch is
-// resolved at compile time.
+// imply) or already a primitive cell.
 enum class LatticeSetting { conventional, primitive };
 
 } // namespace cppcrystal

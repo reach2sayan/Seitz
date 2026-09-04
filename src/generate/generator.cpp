@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <ranges>
 #include <utility>
 #include <vector>
 
@@ -183,9 +184,10 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   auto const positions = group_->wyckoffs();
   auto const kind = Traits::kind(*group_);
 
-  auto assignments = std::ranges::to<std::vector<Assignment<group::Wyckoff>>>(
-      enumerate_assignments(positions, comp) |
-      std::views::take(kMaxAssignments));
+  // Not const: shuffled below.
+  std::vector<Assignment<group::Wyckoff>> assignments(
+      std::from_range, enumerate_assignments(positions, comp) |
+                           std::views::take(kMaxAssignments));
   if (assignments.empty()) {
     return leaf::new_error(e_message{
         std::format("generate: the composition is not compatible with the "

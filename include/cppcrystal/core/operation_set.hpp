@@ -96,16 +96,16 @@ public:
   // The rotation parts, one per operation, in order. De-duplication is the
   // caller's business (the point-group identification does its own).
   [[nodiscard]] std::vector<Matrix3i> rotations() const {
-    auto rots = ops_ | std::views::transform([](Op const &op) {
-                  return Traits::spatial(op).rotation;
-                });
-    return {rots.begin(), rots.end()};
+    return {std::from_range, ops_ | std::views::transform([](Op const &op) {
+              return Traits::spatial(op).rotation;
+            })};
   }
 
   // The pure translations: the identity-rotation operations' translations,
   // excluding the time-reversal anti-translations. Includes the zero
   // translation.
   [[nodiscard]] std::vector<Vector3d> pure_translations() const {
+    // Not const: filter_view caches its begin(), so it is not const-iterable.
     auto pure = ops_ | std::views::filter([](Op const &op) {
                   if constexpr (Traits::has_time_reversal) {
                     if (op.time_reversal) {
@@ -117,31 +117,31 @@ public:
                 std::views::transform([](Op const &op) {
                   return Traits::spatial(op).translation;
                 });
-    return {pure.begin(), pure.end()};
+    return {std::from_range, pure};
   }
 
   // Change of basis of every operation: (T, 0)(R, t)(T, 0)^-1. Any extra
   // fields (a time-reversal flag) ride along unchanged.
   [[nodiscard]] OperationSet conjugated_by(Matrix3d const &t,
                                            Matrix3d const &t_inv) const {
-    std::vector<Op> out;
-    out.reserve(ops_.size());
-    for (Op op : ops_) {
-      SymmetryOperation &sp = spatial_of(op);
-      sp.rotation = math::round_to_int(t * sp.rotation.cast<double>() * t_inv);
-      sp.translation = t * sp.translation;
-      out.push_back(op);
-    }
-    return OperationSet{std::move(out)};
+    // The per-operation formula lives once, in symmetry_operation.hpp; here it
+    // is applied to the spatial part so a time-reversal flag rides along.
+    return OperationSet{std::from_range,
+                        ops_ | std::views::transform([&](Op op) {
+                          SymmetryOperation &sp = spatial_of(op);
+                          sp = cppcrystal::conjugated_by(sp, t, t_inv);
+                          return op;
+                        })};
   }
 
   // The underlying space-group operations, dropping the time-reversal flags.
   [[nodiscard]] OperationSet<SymmetryOperation> spatial() const
     requires Traits::has_time_reversal
   {
-    auto sp = ops_ | std::views::transform(
-                         [](Op const &op) { return Traits::spatial(op); });
-    return OperationSet<SymmetryOperation>{{sp.begin(), sp.end()}};
+    return OperationSet<SymmetryOperation>{
+        std::from_range, ops_ | std::views::transform([](Op const &op) {
+          return Traits::spatial(op);
+        })};
   }
 
   // The primitive operations implied by these (typically conventional) ones,

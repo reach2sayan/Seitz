@@ -215,12 +215,10 @@ constexpr auto kAxisByVector = [] {
     rot = proper_rot * rot;
     sum_rot += rot;
   }
-  std::vector<int> result;
-  result.reserve(kNumRotAxes);
-  std::ranges::copy_if(std::views::iota(0, kNumRotAxes),
-                       std::back_inserter(result),
-                       [&](int i) { return (sum_rot * rot_axis(i)).isZero(); });
-  return result;
+  return {std::from_range,
+          std::views::iota(0, kNumRotAxes) | std::views::filter([&](int i) {
+            return (sum_rot * rot_axis(i)).isZero();
+          })};
 }
 
 // 1 if axis_vec == kRotAxes[idx], -1 if == -kRotAxes[idx], else 0.

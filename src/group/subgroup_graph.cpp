@@ -91,7 +91,7 @@ all_subgroups(std::vector<Matrix3i> const &pg) {
       for (std::size_t b = a + 1; b < snapshot.size(); ++b) {
         std::vector<Matrix3i> gens = matrices_of(snapshot[a]);
         std::vector<Matrix3i> const gb = matrices_of(snapshot[b]);
-        gens.insert(gens.end(), gb.begin(), gb.end());
+        gens.append_range(gb);
         if (subs.insert(closure(gens)).second) {
           changed = true; // a new subgroup appeared; another pass may add more
         }

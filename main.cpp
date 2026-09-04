@@ -4,15 +4,15 @@
 
 #include <cppcrystal/cppcrystal.hpp>
 
-#include <cstdio>
+#include <print>
 
 using namespace cppcrystal;
 
 int main() {
-  std::printf("CppCrystal %s — modern C++23 crystallography library "
-              "(validated against reference spglib v%d.%d.%d)\n",
-              version_string(), kReferenceSpglibVersion.major,
-              kReferenceSpglibVersion.minor, kReferenceSpglibVersion.patch);
+  std::println("CppCrystal {} — modern C++23 crystallography library "
+               "(validated against reference spglib v{}.{}.{})",
+               version_string(), kReferenceSpglibVersion.major,
+               kReferenceSpglibVersion.minor, kReferenceSpglibVersion.patch);
 
   // 1. Determination: a structure in, its symmetry out. The analyzer memoizes,
   //    so it is the object you keep, not a call you repeat.
@@ -26,26 +26,27 @@ int main() {
         BOOST_LEAF_AUTO(hall, analyzer.hall());
         BOOST_LEAF_AUTO(ops, analyzer.operations());
         auto const &type = data::spacegroup_type(hall);
-        std::printf("  bcc Fe -> %s (No. %d), %zu operations\n",
-                    type.international_short.data(), type.number, ops.size());
+        // international_short is a string_view; %s would have read past its
+        // end for any table entry that was not a literal.
+        std::println("  bcc Fe -> {} (No. {}), {} operations",
+                     type.international_short, type.number, ops.size());
 
         // 2. The catalog face: a group as a standalone object, no structure.
         group::SpaceGroup const &sg = group::SpaceGroup::of(hall);
-        std::printf("  %s has %zu Wyckoff positions, general position %dx\n",
-                    type.international_short.data(), sg.wyckoffs().size(),
-                    sg.wyckoffs().back().multiplicity());
+        std::println("  {} has {} Wyckoff positions, general position {}x",
+                     type.international_short, sg.wyckoffs().size(),
+                     sg.wyckoffs().back().multiplicity());
 
         // 3. Construction: a random structure with a prescribed symmetry.
         BOOST_LEAF_AUTO(generated,
                         generate::Generator(sg, {.seed = 20260903U})(
                             generate::Composition{{26, 2}}));
-        std::printf("  generated a %ld-atom cell of volume %.2f A^3\n",
-                    static_cast<long>(generated.cell.size()),
-                    generated.cell.lattice().volume());
+        std::println("  generated a {}-atom cell of volume {:.2f} A^3",
+                     generated.cell.size(), generated.cell.lattice().volume());
         return 0;
       },
       [](leaf::error_info const &) {
-        std::printf("  determination failed\n");
+        std::println("  determination failed");
         return 1;
       });
 }

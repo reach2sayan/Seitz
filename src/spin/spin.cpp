@@ -1,5 +1,5 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "spin/search.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "core/position_index.hpp"
 #include "math/fractional.hpp" // math::nearest_offset
@@ -37,10 +37,9 @@ template <> struct MomentOps<double> {
   // Time reversal flips the sign; an axial tensor additionally picks up
   // det(R).
   [[nodiscard]] static double transform(double src, Matrix3d const &rot_cart,
-                                        bool time_reversal,
-                                        TimeReversal mode, TensorKind kind) {
-    double dst =
-        (mode == TimeReversal::on && time_reversal) ? -src : src;
+                                        bool time_reversal, TimeReversal mode,
+                                        TensorKind kind) {
+    double dst = (mode == TimeReversal::on && time_reversal) ? -src : src;
     if (kind == TensorKind::axial) {
       dst *= rot_cart.determinant();
     }
@@ -61,8 +60,8 @@ template <> struct MomentOps<Vector3d> {
   }
   [[nodiscard]] static Vector3d transform(Vector3d const &v,
                                           Matrix3d const &rot_cart,
-                                          bool time_reversal,
-                                          TimeReversal mode, TensorKind kind) {
+                                          bool time_reversal, TimeReversal mode,
+                                          TensorKind kind) {
     Vector3d dst = rot_cart * v;
     if (mode == TimeReversal::on && time_reversal) {
       dst = -dst;
@@ -119,13 +118,13 @@ template <class M>
 cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
   std::vector<Matrix3d> out;
   out.reserve(operations.size());
-  std::ranges::transform(operations, std::back_inserter(out),
-                         [&](auto const &op) {
-                           return rotation_in_cartesian(
-                               lattice, OperationTraits<std::remove_cvref_t<
-                                            decltype(op)>>::spatial(op)
-                                            .rotation);
-                         });
+  std::ranges::transform(
+      operations, std::back_inserter(out), [&](auto const &op) {
+        return rotation_in_cartesian(
+            lattice,
+            OperationTraits<std::remove_cvref_t<decltype(op)>>::spatial(op)
+                .rotation);
+      });
   return out;
 }
 
@@ -141,17 +140,19 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
   TensorKind const kind = mcell.kind();
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), sym_nonspin);
+  auto const rot_cart =
+      cartesian_rotations(cell.lattice().matrix(), sym_nonspin);
   PositionIndex const index(cell, symprec);
 
   std::vector<MagneticSymmetryOperation> out;
-  out.reserve(2 * sym_nonspin.size()); // upper bound: 1-2 ops emitted per spatial op
+  out.reserve(
+      2 * sym_nonspin.size()); // upper bound: 1-2 ops emitted per spatial op
   for (auto const &[rc, op] : std::views::zip(rot_cart, sym_nonspin)) {
     bool found = true;
     bool determined = false;
     int sign = 0;
 
-    for (Index j = 0; j < n; ++j) {
+    for (Index const j : std::views::iota(Index{0}, n)) {
       auto const image =
           index.first_match(op.apply(cell.position(j)), cell.type(j));
       if (!image) {
@@ -172,8 +173,7 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
         continue;
       }
 
-      int const s =
-          spin_sign(m_j, m_k, rc, mode, kind, mag_symprec);
+      int const s = spin_sign(m_j, m_k, rc, mode, kind, mag_symprec);
 
       if (!determined) {
         sign = s;
@@ -210,22 +210,22 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
 template <class M>
 [[nodiscard]] std::optional<std::vector<int>>
 get_permutations(MagneticOperations const &operations,
-                 MagneticCell const &mcell, TimeReversal mode,
-                 double symprec, double mag_symprec) {
+                 MagneticCell const &mcell, TimeReversal mode, double symprec,
+                 double mag_symprec) {
   TensorKind const kind = mcell.kind();
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
-  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), operations);
+  auto const rot_cart =
+      cartesian_rotations(cell.lattice().matrix(), operations);
   PositionIndex const index(cell, symprec);
 
   std::vector<int> perm;
   perm.reserve(operations.size() * static_cast<std::size_t>(n));
   for (auto const &[op, rc] : std::views::zip(operations, rot_cart)) {
-    for (Index i = 0; i < n; ++i) {
+    for (Index const i : std::views::iota(Index{0}, n)) {
       Vector3d const pos = op.spatial.apply(cell.position(i));
-      M const moment =
-          MomentOps<M>::transform(MomentOps<M>::moment(mcell, i), rc,
-                                  op.time_reversal, mode, kind);
+      M const moment = MomentOps<M>::transform(
+          MomentOps<M>::moment(mcell, i), rc, op.time_reversal, mode, kind);
 
       auto const j = index.first_match(pos, cell.type(i), [&](int k) {
         return MomentOps<M>::close(MomentOps<M>::moment(mcell, k), moment,
@@ -245,12 +245,14 @@ get_permutations(MagneticOperations const &operations,
 [[nodiscard]] std::vector<int> get_orbits(md::matrix_view<int const> perm) {
   auto const n = static_cast<std::size_t>(perm.extent(1));
   std::vector<std::optional<int>> equivalent(n);
-  for (Index i = 0; i < perm.extent(1); ++i) {
+  for (Index const i :
+       std::views::iota(Index{0}, static_cast<Index>(perm.extent(1)))) {
     if (equivalent[static_cast<std::size_t>(i)]) {
       continue;
     }
     equivalent[static_cast<std::size_t>(i)] = static_cast<int>(i);
-    for (Index p = 0; p < perm.extent(0); ++p) {
+    for (Index const p :
+         std::views::iota(Index{0}, static_cast<Index>(perm.extent(0)))) {
       equivalent[static_cast<std::size_t>(perm[p, i])] = static_cast<int>(i);
     }
   }
@@ -268,17 +270,18 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
   Cell const &cell = mcell.cell();
   Index const n = cell.size();
   auto const &operations = search.operations;
-  auto const rot_cart = cartesian_rotations(cell.lattice().matrix(), operations);
+  auto const rot_cart =
+      cartesian_rotations(cell.lattice().matrix(), operations);
 
   // inverse[p, i] = the atom that operation p maps onto atom i.
   auto const perm = search.permutations();
   std::vector<int> inverse_buffer(perm.size());
   md::matrix_view<int> const inverse(inverse_buffer.data(), perm.extent(0),
                                      perm.extent(1));
-  for (Index p = 0; p < perm.extent(0); ++p) {
-    for (Index j = 0; j < perm.extent(1); ++j) {
-      inverse[p, perm[p, j]] = static_cast<int>(j);
-    }
+  for (auto const [p, j] : std::views::cartesian_product(
+           std::views::iota(Index{0}, static_cast<Index>(perm.extent(0))),
+           std::views::iota(Index{0}, static_cast<Index>(perm.extent(1))))) {
+    inverse[p, perm[p, j]] = static_cast<int>(j);
   }
 
   Positions positions(n, 3);
@@ -289,18 +292,18 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
     Vector3d pos_res = Vector3d::Zero();
     M moment_res = MomentOps<M>::zero();
     for (auto const &[p, op, rc] :
-         std::views::zip(std::views::iota(Index{0}, perm.extent(0)),
-                         operations, rot_cart)) {
+         std::views::zip(std::views::iota(Index{0}, perm.extent(0)), operations,
+                         rot_cart)) {
       Index const j = inverse[p, i];
       Vector3d const pos_tmp = op.spatial.apply(cell.position(j));
       // Subtract the input position so the accumulated residual stays small;
       // the per-component nint removes the lattice translation.
       Vector3d const diff = pos_tmp - cell.position(i);
       pos_res += math::nearest_offset(diff);
-      moment_res += MomentOps<M>::transform(MomentOps<M>::moment(mcell, j), rc,
-                                            op.time_reversal, mode,
-                                            mcell.kind()) -
-                    MomentOps<M>::moment(mcell, i);
+      moment_res +=
+          MomentOps<M>::transform(MomentOps<M>::moment(mcell, j), rc,
+                                  op.time_reversal, mode, mcell.kind()) -
+          MomentOps<M>::moment(mcell, i);
     }
     positions.row(i) = (cell.position(i) + pos_res / denom).transpose();
     moments[static_cast<std::size_t>(i)] =
@@ -316,8 +319,9 @@ idealized_cell_impl(MagneticSymmetrySearch const &search,
 template <TimeReversal TR>
 MagneticCell SpinSearch::idealized(MagneticSymmetrySearch const &search) const {
   MagneticCell const &mcell = cell_;
-  return visit_moment_kind(
-      mcell, [&]<class M>() { return idealized_cell_impl<M>(search, mcell, TR); });
+  return visit_moment_kind(mcell, [&]<class M>() {
+    return idealized_cell_impl<M>(search, mcell, TR);
+  });
 }
 
 template <TimeReversal TR>
@@ -331,11 +335,10 @@ Result<MagneticSymmetrySearch> SpinSearch::operations() const {
   double const symprec = tol.symprec;
   double const mag_tol = tol.moment_or_symprec();
 
-  MagneticOperations operations =
-      visit_moment_kind(mcell, [&]<class M>() {
-        return get_operations<M>(sym_nonspin, mcell, time_reversal, symprec,
-                                 mag_tol);
-      });
+  MagneticOperations operations = visit_moment_kind(mcell, [&]<class M>() {
+    return get_operations<M>(sym_nonspin, mcell, time_reversal, symprec,
+                             mag_tol);
+  });
 
   auto permutations = visit_moment_kind(mcell, [&]<class M>() {
     return get_permutations<M>(operations, mcell, time_reversal, symprec,
@@ -358,10 +361,9 @@ Result<MagneticSymmetrySearch> SpinSearch::operations() const {
     return leaf::new_error(e_magnetic_symmetry_search_failed{});
   }
 
-  return MagneticSymmetrySearch{std::move(operations),
-                                std::move(equivalent_atoms),
-                                std::move(*permutations),
-                                prim_lattice->matrix()};
+  return MagneticSymmetrySearch{
+      std::move(operations), std::move(equivalent_atoms),
+      std::move(*permutations), prim_lattice->matrix()};
 }
 
 template Result<MagneticSymmetrySearch>

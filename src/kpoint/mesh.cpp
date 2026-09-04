@@ -72,58 +72,65 @@ distortion_representative(Address doubled, Mesh const &mesh, std::size_t self,
                           std::array<std::int64_t, 3> const &divisor,
                           std::span<Matrix3i const> rots) {
   auto const &shift = mesh.shift();
-  std::array<std::int64_t, 3> long_address{};
-  for (std::size_t j = 0; j < 3; ++j) {
-    long_address[j] = static_cast<std::int64_t>(doubled[j]) * divisor[j];
-  }
+  // Both arrays viewed in place rather than copied entry by entry.
+  Eigen::Vector3<std::int64_t> const long_address =
+      Eigen::Map<Eigen::Vector3i const>(doubled.data())
+          .cast<std::int64_t>()
+          .cwiseProduct(
+              Eigen::Map<Eigen::Vector3<std::int64_t> const>(divisor.data()));
 
   std::size_t best = self;
   for (auto const &rot : rots) {
+    // One 64-bit matrix-vector product rather than three transcribed dot
+    // products. All three components are computed before the checks below,
+    // where the old loop could stop at the first failing one -- same result,
+    // and at most 48 rotations over 3 components it is not worth the branch.
+    Eigen::Vector3<std::int64_t> const value =
+        rot.cast<std::int64_t>() * long_address;
+
     Address rotated{};
-    bool indivisible = false;
-    for (int k = 0; k < 3; ++k) {
-      std::int64_t const value =
-          static_cast<std::int64_t>(rot(k, 0)) * long_address[0] +
-          static_cast<std::int64_t>(rot(k, 1)) * long_address[1] +
-          static_cast<std::int64_t>(rot(k, 2)) * long_address[2];
-      auto const div = divisor[static_cast<std::size_t>(k)];
-      if (value % div != 0) {
-        indivisible = true;
+    bool valid = true;
+    for (Eigen::Index k = 0; k < 3; ++k) {
+      auto const k_u = static_cast<std::size_t>(k);
+      std::int64_t const div = divisor[k_u];
+      if (value[k] % div != 0) {
+        valid = false;
         break;
       }
-      rotated[static_cast<std::size_t>(k)] = static_cast<int>(value / div);
-      bool const odd = rotated[static_cast<std::size_t>(k)] % 2 != 0;
-      if (odd != shift[static_cast<std::size_t>(k)]) {
-        indivisible = true;
+      rotated[k_u] = static_cast<int>(value[k] / div);
+      if ((rotated[k_u] % 2 != 0) != shift[k_u]) {
+        valid = false;
         break;
       }
     }
-    if (!indivisible) {
+    if (valid) {
       best = std::min(best, mesh.index_of_doubled(rotated));
     }
   }
   return best;
 }
 
-// The 125 reciprocal-lattice offsets searched per grid point: the +-2 cube in
-// odometer order over the digits 0,1,2,-2,-1 per axis (x outermost, z varying
-// fastest). Plain int triples rather than Vector3i: Eigen's (x, y, z)
-// constructor is not constexpr, and its coefficient accessors are not
-// constant-evaluable under MSVC, so an Eigen table cannot be built portably at
-// compile time.
+// The 125 reciprocal-lattice offsets searched per grid point: the +-2 cube over
+// the digits 0,1,2,-2,-1 per axis. cartesian_product varies its last range
+// fastest, which is exactly the documented order (x outermost, z fastest); the
+// static_asserts below pin that rather than leave it to the reader. Plain int
+// triples rather than Vector3i, because Eigen fixed-size matrices are literal
+// types for construction and access but not for arithmetic.
 inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
   constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
   std::array<Address, 125> table{};
-  std::size_t n = 0;
-  for (int const x : digits) {
-    for (int const y : digits) {
-      for (int const z : digits) {
-        table[n++] = {x, y, z};
-      }
-    }
-  }
+  std::ranges::transform(std::views::cartesian_product(digits, digits, digits),
+                         table.begin(), [](auto const &xyz) {
+                           auto const [x, y, z] = xyz;
+                           return Address{x, y, z};
+                         });
   return table;
 }();
+static_assert(kBzSearchSpace.front() == Address{0, 0, 0});
+static_assert(kBzSearchSpace[1] == Address{0, 0, 1});   // z varies fastest
+static_assert(kBzSearchSpace[5] == Address{0, 1, 0});   // then y
+static_assert(kBzSearchSpace[25] == Address{1, 0, 0});  // x is outermost
+static_assert(kBzSearchSpace.back() == Address{-1, -1, -1});
 
 // Adaptive tolerance for merging BZ-boundary points: 0.01 * max over axes of
 // |reciprocal vector|^2 / divisions^2.
@@ -162,7 +169,8 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
   }
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
       mapping_ | std::views::enumerate, [](auto const &e) {
-        return std::get<1>(e) == static_cast<std::size_t>(std::get<0>(e));
+        const auto& [lindex, rindex] = e;
+        return rindex == static_cast<std::size_t>(lindex);
       }));
 }
 
@@ -172,14 +180,15 @@ ReciprocalMesh::from_rotations(Mesh mesh,
                                TimeReversal time_reversal) {
   // All transposes first, then (with time reversal) all inversion partners
   // (-transpose); de-duplication keeps first occurrence, so order matters.
-  std::vector<Matrix3i> candidates;
-  candidates.reserve(real_rotations.size() *
-                     (time_reversal == TimeReversal::on ? 2 : 1));
-  std::ranges::transform(real_rotations, std::back_inserter(candidates),
-                         [](Matrix3i const &r) { return r.transpose(); });
+  std::vector<Matrix3i> candidates(
+      std::from_range, real_rotations | std::views::transform([](Matrix3i const &r) {
+                         return Matrix3i(r.transpose());
+                       }));
   if (time_reversal == TimeReversal::on) {
-    std::ranges::transform(real_rotations, std::back_inserter(candidates),
-                           [](Matrix3i const &r) { return -r.transpose(); });
+    candidates.append_range(real_rotations |
+                            std::views::transform([](Matrix3i const &r) {
+                              return Matrix3i(-r.transpose());
+                            }));
   }
   return ReciprocalMesh{mesh, unique_by_rotation(candidates)};
 }
@@ -209,13 +218,10 @@ std::vector<std::size_t> ReciprocalMesh::images_of(Address address) const {
       to_eigen(address) * 2 +
       to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
                 mesh_.shift()[2] ? 1 : 0});
-  std::vector<std::size_t> out;
-  out.reserve(rotations_.size());
-  std::ranges::transform(
-      rotations_, std::back_inserter(out), [&](Matrix3i const &rot) {
-        return mesh_.index_of_doubled(from_eigen(rot * doubled));
-      });
-  return out;
+  return {std::from_range,
+          rotations_ | std::views::transform([&](Matrix3i const &rot) {
+            return mesh_.index_of_doubled(from_eigen(rot * doubled));
+          })};
 }
 
 BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
@@ -289,13 +295,10 @@ BrillouinZone::images_of(Address address) const {
       to_eigen(address) * 2 +
       to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
                 mesh_.shift()[2] ? 1 : 0});
-  std::vector<std::optional<std::size_t>> out;
-  out.reserve(rotations_.size());
-  std::ranges::transform(
-      rotations_, std::back_inserter(out), [&](Matrix3i const &rot) {
-        return map(mesh_.index_of_doubled(from_eigen(rot * doubled)));
-      });
-  return out;
+  return {std::from_range,
+          rotations_ | std::views::transform([&](Matrix3i const &rot) {
+            return map(mesh_.index_of_doubled(from_eigen(rot * doubled)));
+          })};
 }
 
 } // namespace cppcrystal::kpoint

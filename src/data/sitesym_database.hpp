@@ -36,11 +36,11 @@ struct WyckoffRange {
 // removed at generation time, so the view points straight into static storage.
 [[nodiscard]] std::string_view site_symmetry_symbol(int index);
 
-// One Wyckoff position of a Hall setting: its global database index (the key for
-// wyckoff_coordinate / site_symmetry_symbol) paired with its Wyckoff letter.
-// The database lists positions from the general position downward, so the letter
-// is the reverse offset within the Hall range (0 = 'a' = the most special
-// position) — see wyckoff_entries.
+// One Wyckoff position of a Hall setting: its global database index (the key
+// for wyckoff_coordinate / site_symmetry_symbol) paired with its Wyckoff
+// letter. The database lists positions from the general position downward, so
+// the letter is the reverse offset within the Hall range (0 = 'a' = the most
+// special position) — see wyckoff_entries.
 struct WyckoffEntry {
   int global_index;
   int letter; // 0 = 'a'

@@ -7,6 +7,8 @@
 #include "symmetry/primitive.hpp"
 #include "symmetry/search.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <ranges>
 #include <vector>
 
@@ -55,16 +57,20 @@ attempt(Cell const &cell, Tolerance const &tol,
   Lattice const bravais{sg.bravais_lattice};
   Lattice const std_lattice = standardized->bravais.lattice();
 
+  // Zipped, not indexed: these five per-atom tables are parallel, and a shared
+  // subscript is the one way assembling a Site can silently go wrong.
   std::vector<Site> sites;
   sites.reserve(standardized->wyckoffs.size());
-  for (auto const [i, wyckoff] :
-       standardized->wyckoffs | std::views::enumerate) {
-    auto const u = static_cast<std::size_t>(i);
-    sites.push_back(Site{wyckoff, standardized->site_symmetry_symbols[u],
-                         standardized->equivalent_atoms[u],
-                         standardized->crystallographic_orbits[u],
-                         primitive->mapping_table[u]});
-  }
+  std::ranges::transform(
+      std::views::zip(
+          standardized->wyckoffs, standardized->site_symmetry_symbols,
+          standardized->equivalent_atoms, standardized->crystallographic_orbits,
+          primitive->mapping_table),
+      std::back_inserter(sites), [](auto const &fields) {
+        auto const &[wyckoff, symbol, equivalent, orbit, primitive_atom] =
+            fields;
+        return Site{wyckoff, symbol, equivalent, orbit, primitive_atom};
+      });
 
   return Dataset{
       .hall = sg.hall,
