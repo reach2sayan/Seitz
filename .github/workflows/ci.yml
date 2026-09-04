@@ -192,10 +192,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Same as the other jobs: gcc-15 is not in Ubuntu 24.04's own repositories,
+      # so the toolchain PPA has to come first. ninja-build because the configure
+      # step below asks for -G Ninja.
       - name: Install GCC 15
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5

@@ -5,6 +5,14 @@ project(CppCrystal VERSION 0.1.0 LANGUAGES CXX
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
+
+# Nothing here is a C++20 module -- no .cppm, no `export module`, no import.
+# CMake nonetheless turns on module scanning by default for C++20-and-later
+# targets, which runs a separate dependency-scanning pass over every translation
+# unit and generates a dyndep file, all to discover that there are no modules.
+# Say so once instead. (Set before any target is defined, so it applies to the
+# library, the demo, the tests, the tools and the Python extension alike.)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
