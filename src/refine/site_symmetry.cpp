@@ -109,8 +109,8 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                      CellPeriodicity const &periodicity) {
   std::vector<Vector3d> const orbit(
       std::from_range, conv_sym | std::views::transform([&](auto const &op) {
-        return op.apply(position);
-      }));
+                         return op.apply(position);
+                       }));
 
   // Coincidence classes of the orbit, found once through an index over it.
   Positions const orbit_positions = to_positions(orbit);

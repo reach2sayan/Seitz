@@ -2,12 +2,12 @@
 
 #include "core/matrix_order.hpp"
 #include "core/overlap.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
 #include "core/validation.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "math/lattice_parameters.hpp"
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/periodicity.hpp>
 
 #include <boost/container/flat_map.hpp>
 
@@ -108,11 +108,9 @@ constexpr int kRelativeAxes[26][3] = {
 // Collect lattice symmetries in the Delaunay basis. std::nullopt signals an
 // overflow (> 48 operations), which asks the caller to tighten the tolerance.
 template <GroupFamily F>
-[[nodiscard]] std::optional<PointSymmetry>
-collect_metric_symmetries(Matrix3d const &min_lattice,
-                          Matrix3d const &metric_orig, double symprec,
-                          AngleTolerance angle_tolerance,
-                          std::optional<int> aperiodic_axis) {
+[[nodiscard]] std::optional<PointSymmetry> collect_metric_symmetries(
+    Matrix3d const &min_lattice, Matrix3d const &metric_orig, double symprec,
+    AngleTolerance angle_tolerance, std::optional<int> aperiodic_axis) {
   // Layer groups admit at most 24 lattice symmetries (the aperiodic axis halves
   // the 48 of a 3D point group); overflowing the cap asks for a tighter angle.
   constexpr std::size_t cap = F == GroupFamily::layer ? 24 : 48;
@@ -129,8 +127,7 @@ collect_metric_symmetries(Matrix3d const &min_lattice,
     if (int const det = axes.determinant(); det != 1 && det != -1) {
       continue;
     }
-    Matrix3d const metric =
-        Lattice{min_lattice * axes.cast<double>()}.metric();
+    Matrix3d const metric = Lattice{min_lattice * axes.cast<double>()}.metric();
     if (is_identity_metric(metric, metric_orig, symprec, angle_tolerance)) {
       if (found.size() >= cap) {
         return std::nullopt;
@@ -177,9 +174,8 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
     return std::nullopt;
   }
   int const rarest = std::ranges::min(frequency | std::views::values);
-  auto const first = std::ranges::find_if(cell.types(), [&](int type) {
-    return frequency.at(type) == rarest;
-  });
+  auto const first = std::ranges::find_if(
+      cell.types(), [&](int type) { return frequency.at(type) == rarest; });
   return static_cast<int>(first - cell.types().begin());
 }
 
@@ -226,9 +222,8 @@ Result<PointSymmetry> SymmetrySearch<F>::lattice_symmetry() const {
   Matrix3d const metric_orig = min_lattice->metric();
   AngleTolerance angle = tol_.angle_tolerance;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
-    auto found = collect_metric_symmetries<F>(min_lattice->matrix(),
-                                              metric_orig, symprec, angle,
-                                              layer_axis);
+    auto found = collect_metric_symmetries<F>(
+        min_lattice->matrix(), metric_orig, symprec, angle, layer_axis);
     if (found) {
       return transform_pointsymmetry(*found, cell.lattice().matrix(),
                                      min_lattice->matrix());
@@ -279,8 +274,7 @@ Operations SymmetrySearch<F>::reduce(Operations const &operations,
     return lattice_rotations.contains(op.rotation) &&
            checker.check_total_overlap(op.translation, op.rotation);
   };
-  return Operations{std::from_range,
-                    operations | std::views::filter(survives)};
+  return Operations{std::from_range, operations | std::views::filter(survives)};
 }
 
 template <GroupFamily F>

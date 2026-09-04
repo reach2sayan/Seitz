@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/container/flat_map.hpp>
+
 #include <cppcrystal/core/mdspan.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
 
@@ -9,7 +11,6 @@
 #include <cstdint>
 #include <generator>
 #include <iterator>
-#include <map>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -22,7 +23,7 @@
 namespace cppcrystal::generate {
 
 // Atom type -> atom count.
-using Composition = std::map<int, int>;
+using Composition = boost::container::flat_map<int, int>;
 
 // The interface a Wyckoff position must offer to be assignable.
 template <class W>

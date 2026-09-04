@@ -46,10 +46,15 @@ struct WyckoffFactory {
       // Orthogonal projection onto the locus directions, shifted so it is
       // idempotent on the affine locus. A derived position carries no
       // tabulated site-symmetry symbol.
-      Matrix3d const projector = math::projector(
-          Eigen::MatrixXd(d.locus_basis.leftCols(d.dof)));
-      out.push_back(Wyckoff{d.multiplicity, d.dof, letter++, {},
-                            d.origin, d.locus_basis, projector,
+      Matrix3d const projector =
+          math::projector(Eigen::MatrixXd(d.locus_basis.leftCols(d.dof)));
+      out.push_back(Wyckoff{d.multiplicity,
+                            d.dof,
+                            letter++,
+                            {},
+                            d.origin,
+                            d.locus_basis,
+                            projector,
                             Vector3d(d.origin - projector * d.origin),
                             std::move(d.orbit_ops),
                             std::move(d.site_symmetry)});
@@ -86,8 +91,9 @@ partition_orbit(std::span<SymmetryOperation const> ops, Vector3d const &p0,
       orbit_ops.push_back(op);
     }
   }
-  return {Operations{std::move(orbit_ops)}, Operations{std::move(site_symmetry)},
-          std::move(points)};
+  return {.orbit_ops = Operations{std::move(orbit_ops)},
+          .site_symmetry = Operations{std::move(site_symmetry)},
+          .points = std::move(points)};
 }
 
 // The geometry's stabiliser-locus representation.
@@ -109,7 +115,8 @@ concept LocusGeometry =
 
 template <LocusGeometry G>
 [[nodiscard]] std::vector<Wyckoff>
-derive_wyckoff_positions(std::span<SymmetryOperation const> ops, G const &geom) {
+derive_wyckoff_positions(std::span<SymmetryOperation const> ops,
+                         G const &geom) {
   using Locus = LocusOf<G>;
 
   // 1. The arrangement: whole space (general position), every operation's

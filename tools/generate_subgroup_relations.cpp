@@ -5,7 +5,8 @@
 // regenerate the baked table, never as part of the normal build.
 //
 //   cmake --build <dir> --target generate_subgroup_relations
-//   ./generate_subgroup_relations > include/cppcrystal/data/subgroup_relations.hpp
+//   ./generate_subgroup_relations >
+//   include/cppcrystal/data/subgroup_relations.hpp
 //
 #include <cppcrystal/group/subgroup_graph.hpp>
 

@@ -46,7 +46,8 @@ TEST_CASE("bcc conventional cell reduces to a 1-atom primitive cell",
   auto p = symmetry::PrimitiveFinder<GroupFamily::space>{cell, {1e-5}}.find();
   REQUIRE(p);
   CHECK(p->cell.size() == 1);
-  CHECK(p->cell.lattice().volume() == Approx(27.0 / 2.0)); // half the conventional volume
+  CHECK(p->cell.lattice().volume() ==
+        Approx(27.0 / 2.0)); // half the conventional volume
 }
 
 TEST_CASE("fcc conventional cell reduces to a 1-atom primitive cell",

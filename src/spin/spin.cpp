@@ -1,5 +1,6 @@
 #include "spin/search.hpp"
 #include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/core/tolerance.hpp>
 
 #include "core/position_index.hpp"
 #include "math/fractional.hpp" // math::nearest_offset
@@ -73,7 +74,7 @@ template <> struct MomentOps<Vector3d> {
   }
   [[nodiscard]] static bool close(Vector3d const &a, Vector3d const &b,
                                   double tol) {
-    return (a - b).cwiseAbs().maxCoeff() < tol;
+    return approx_equal(a, b, tol);
   }
   [[nodiscard]] static Vector3d zero() { return Vector3d::Zero(); }
   [[nodiscard]] static SiteTensors pack(std::vector<Vector3d> const &moments) {

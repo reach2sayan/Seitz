@@ -1,7 +1,7 @@
 // Robustness sweep (Phase 9c): the space-group determination must be stable
-// under sub-symprec position/lattice jitter and must return the same space group
-// for an integer supercell. Exercises the tolerance-retry loops over a sample of
-// the reference corpus.
+// under sub-symprec position/lattice jitter and must return the same space
+// group for an integer supercell. Exercises the tolerance-retry loops over a
+// sample of the reference corpus.
 
 #include "corpus.hpp"
 
@@ -44,8 +44,7 @@ Cell supercell(Cell const &cell, int n) {
     for (int i = 0; i < n; ++i) {
       for (int j = 0; j < n; ++j) {
         for (int k = 0; k < n; ++k) {
-          Vector3d const frac =
-              (cell.position(a) + Vector3d(i, j, k)) / nd;
+          Vector3d const frac = (cell.position(a) + Vector3d(i, j, k)) / nd;
           positions.row(out) = frac.transpose();
           types[static_cast<std::size_t>(out)] = cell.type(a);
           ++out;

@@ -2,9 +2,9 @@
 
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
+#include <cppcrystal/generate/assignments.hpp> // Composition
 
 #include <cstdint>
-#include <map>
 #include <span>
 
 // The random metrics the generators draw their cells from. Private: a caller
@@ -56,9 +56,8 @@ crystal_system(int spacegroup_number) noexcept {
 // fraction so the estimate lands near real cell volumes rather than the cramped
 // sphere-sum. Replaces the old flat 20 A^3/atom constant. Untabulated types use
 // `fallback_volume` cubic angstrom.
-[[nodiscard]] double
-estimated_cell_volume(std::map<int, int> const &composition,
-                      double fallback_volume = 20.0);
+[[nodiscard]] double estimated_cell_volume(Composition const &composition,
+                                           double fallback_volume = 20.0);
 
 // A random layer lattice (columns = Cartesian basis vectors): a, b span the
 // periodic plane, c is perpendicular with length `c_length` (the non-periodic

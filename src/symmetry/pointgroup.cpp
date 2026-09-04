@@ -1,5 +1,5 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "symmetry/pointgroup.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
 
@@ -96,7 +96,8 @@ rotation_type(int det, int trace) noexcept {
   if ((det != 1 && det != -1) || trace < -3 || trace > 3) {
     return std::nullopt;
   }
-  return kTypeByDetTrace[det == -1 ? 0 : 1][static_cast<std::size_t>(trace + 3)];
+  return kTypeByDetTrace[det == -1 ? 0 : 1]
+                        [static_cast<std::size_t>(trace + 3)];
 }
 
 [[nodiscard]] std::optional<RotationType>
@@ -108,10 +109,9 @@ rotation_type(Matrix3i const &rot) noexcept {
 static_assert(rotation_type(1, 3) == RotationType::identity);
 static_assert(rotation_type(-1, -3) == RotationType::inversion);
 static_assert(rotation_type(-1, 1) == RotationType::mirror);
-static_assert(!rotation_type(1, -2).has_value());  // no proper 6-bar
-static_assert(!rotation_type(0, 0).has_value());   // singular
-static_assert(!rotation_type(2, 3).has_value());   // not unimodular
-
+static_assert(!rotation_type(1, -2).has_value()); // no proper 6-bar
+static_assert(!rotation_type(0, 0).has_value());  // singular
+static_assert(!rotation_type(2, 3).has_value());  // not unimodular
 
 // De-duplicate rotations by value; distinct rotations beyond the capacity of
 // PointSymmetry are dropped, as before.
@@ -182,14 +182,16 @@ constexpr auto kAxisByVector = [] {
 // The rotation axis of a proper rotation as a primitive integer vector: a
 // null vector of R - I (the cross product of two independent rows), reduced
 // by its gcd. nullopt for the identity, whose fixed space is everything.
-[[nodiscard]] std::optional<Vector3i> primitive_axis(Matrix3i const &proper_rot) {
+[[nodiscard]] std::optional<Vector3i>
+primitive_axis(Matrix3i const &proper_rot) {
   Matrix3i const m = proper_rot - kIdentity;
-  for (auto const &[a, b] : {std::pair{0, 1}, std::pair{0, 2}, std::pair{1, 2}}) {
+  for (auto const &[a, b] :
+       {std::pair{0, 1}, std::pair{0, 2}, std::pair{1, 2}}) {
     Vector3i const v =
         Vector3i(m.row(a).transpose()).cross(Vector3i(m.row(b).transpose()));
     if (!v.isZero()) {
-      int const g = std::gcd(std::gcd(std::abs(v[0]), std::abs(v[1])),
-                             std::abs(v[2]));
+      int const g =
+          std::gcd(std::gcd(std::abs(v[0]), std::abs(v[1])), std::abs(v[2]));
       return Vector3i(v / g);
     }
   }
@@ -387,8 +389,8 @@ in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
 // Layer LAUE2M: unlike the 3D case the two-fold axis becomes axis a (its
 // position relative to the aperiodic axis distinguishes oblique vs. rectangular
 // monoclinic layers); the remaining two axes are chosen accordingly.
-[[nodiscard]] std::optional<AxisTriple>
-layer_laue2m(PointSymmetry const &ps, int aperiodic_axis) {
+[[nodiscard]] std::optional<AxisTriple> layer_laue2m(PointSymmetry const &ps,
+                                                     int aperiodic_axis) {
   auto const two_fold = principal_axis(ps, 2);
   if (!two_fold) {
     return std::nullopt;
@@ -398,13 +400,13 @@ layer_laue2m(PointSymmetry const &ps, int aperiodic_axis) {
     return std::nullopt;
   }
 
-  auto const pick = [&](std::optional<int> b, std::optional<int> c)
-      -> std::optional<AxisTriple> {
+  auto const pick = [&](std::optional<int> b,
+                        std::optional<int> c) -> std::optional<AxisTriple> {
     if (!b || !c) {
       return std::nullopt;
     }
-    return AxisTriple{{SignedAxis{two_fold->axis, 1}, SignedAxis{*b, 1},
-                       SignedAxis{*c, 1}}};
+    return AxisTriple{
+        {SignedAxis{two_fold->axis, 1}, SignedAxis{*b, 1}, SignedAxis{*c, 1}}};
   };
 
   int const a0 = aperiodic_component(two_fold->axis, aperiodic_axis);
@@ -498,7 +500,6 @@ get_axes(Laue laue, PointSymmetry const &ps,
 
 } // namespace
 
-
 template <GroupFamily F>
 Result<PointgroupTransform>
 identify_point_group(std::span<Matrix3i const> rotations,
@@ -529,10 +530,10 @@ identify_point_group(std::span<Matrix3i const> rotations,
 }
 
 template Result<PointgroupTransform>
-identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
-                                         std::optional<int>);
+    identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
+                                             std::optional<int>);
 template Result<PointgroupTransform>
-identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
-                                         std::optional<int>);
+    identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
+                                             std::optional<int>);
 
 } // namespace cppcrystal::symmetry

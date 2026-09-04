@@ -1,11 +1,11 @@
 // Oracle test for the symmetry -> space-group pipeline (the foundation the
 // magnetic determination builds on): OperationSet::spacegroup
 // (= prm_get_primitive_symmetry + spa_search_spacegroup_with_symmetry) must
-// reproduce spg_get_spacegroup_type_from_symmetry. The same operation set is fed
-// to both sides, so this tests the pipeline, not the symmetry search.
+// reproduce spg_get_spacegroup_type_from_symmetry. The same operation set is
+// fed to both sides, so this tests the pipeline, not the symmetry search.
 
-#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "spacegroup/spacegroup.hpp"
 
@@ -20,8 +20,8 @@ namespace {
 using cppcrystal::Cell;
 using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
-using cppcrystal::Positions;
 using cppcrystal::Operations;
+using cppcrystal::Positions;
 using cppcrystal::oracle::reference_symmetry;
 
 Cell make_cell(Matrix3d const &lattice,
@@ -60,8 +60,8 @@ void to_c_operations(std::vector<int> &rot, std::vector<double> &trans,
   for (std::size_t s = 0; s < ops.size(); ++s) {
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
-        rot[9 * s + 3 * static_cast<std::size_t>(i) + static_cast<std::size_t>(j)] =
-            ops[s].rotation(i, j);
+        rot[9 * s + 3 * static_cast<std::size_t>(i) +
+            static_cast<std::size_t>(j)] = ops[s].rotation(i, j);
       }
       trans[3 * s + static_cast<std::size_t>(i)] = ops[s].translation[i];
     }
@@ -74,8 +74,7 @@ void check_conventional(Cell const &cell, double symprec) {
   auto const ops = reference_symmetry(cell, symprec);
   REQUIRE(!ops.empty());
 
-  auto const got =
-      ops.spacegroup(cell.lattice().matrix(), {symprec});
+  auto const got = ops.spacegroup(cell.lattice().matrix(), {symprec});
   REQUIRE(got);
 
   std::vector<int> rot;
@@ -121,16 +120,15 @@ TEST_CASE("OperationSet::spacegroup matches reference (conventional)",
     check_conventional(make_cell(tetragonal(3.0, 5.0), {{0, 0, 0}}, {0}), s);
   }
   SECTION("rutile-like (tetragonal, 2 species)") {
-    check_conventional(
-        make_cell(tetragonal(4.6, 3.0),
-                  {{0, 0, 0},
-                   {0.5, 0.5, 0.5},
-                   {0.3, 0.3, 0.0},
-                   {0.7, 0.7, 0.0},
-                   {0.8, 0.2, 0.5},
-                   {0.2, 0.8, 0.5}},
-                  {0, 0, 1, 1, 1, 1}),
-        s);
+    check_conventional(make_cell(tetragonal(4.6, 3.0),
+                                 {{0, 0, 0},
+                                  {0.5, 0.5, 0.5},
+                                  {0.3, 0.3, 0.0},
+                                  {0.7, 0.7, 0.0},
+                                  {0.8, 0.2, 0.5},
+                                  {0.2, 0.8, 0.5}},
+                                 {0, 0, 1, 1, 1, 1}),
+                       s);
   }
 }
 
@@ -139,8 +137,7 @@ TEST_CASE("OperationSet::spacegroup matches reference (conventional)",
 TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
           "[oracle][spacegroup][from_symmetry]") {
   double const s = 1e-5;
-  Cell const cell =
-      make_cell(cubic(4.0), {{0, 0, 0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(cubic(4.0), {{0, 0, 0}, {0.5, 0.5, 0.5}}, {0, 0});
   auto const ops = reference_symmetry(cell, s);
   REQUIRE(!ops.empty());
 
@@ -152,9 +149,8 @@ TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
       reinterpret_cast<double(*)[3]>(trans.data()),
       static_cast<int>(ops.size()), s);
 
-  auto const got =
-      ops.spacegroup<cppcrystal::LatticeSetting::primitive>(
-          Matrix3d::Identity(), {s});
+  auto const got = ops.spacegroup<cppcrystal::LatticeSetting::primitive>(
+      Matrix3d::Identity(), {s});
 
   REQUIRE((ref_hall == 0) == (!got.has_value()));
   if (got) {

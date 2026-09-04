@@ -75,7 +75,8 @@ TEST_CASE("delaunay reduction preserves cell volume", "[lattice][reduce]") {
   CHECK(red->volume() == Approx(sheared().volume()));
 }
 
-TEST_CASE("delaunay reduction yields a right-handed cell", "[lattice][reduce]") {
+TEST_CASE("delaunay reduction yields a right-handed cell",
+          "[lattice][reduce]") {
   auto red = sheared().delaunay(1e-5);
   REQUIRE(red);
   CHECK(red->matrix().determinant() > 0.0);
@@ -97,7 +98,8 @@ TEST_CASE("2D delaunay reduction leaves the unique axis spanning the same line",
   REQUIRE(red);
   // The unique axis is kept (up to the sign flip that keeps the cell
   // right-handed); the other two are reduced within their plane.
-  CHECK(red->matrix().col(2).cwiseAbs().isApprox(in.matrix().col(2).cwiseAbs()));
+  CHECK(
+      red->matrix().col(2).cwiseAbs().isApprox(in.matrix().col(2).cwiseAbs()));
   CHECK(red->volume() == Approx(in.volume()));
 }
 

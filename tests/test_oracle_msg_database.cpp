@@ -3,8 +3,8 @@
 // the reference spglib (spg_get_magnetic_spacegroup_type /
 // spg_get_magnetic_symmetry_from_database) bit-for-bit.
 
-#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include <cppcrystal/data/msg_database.hpp>
 
@@ -18,8 +18,8 @@
 
 namespace {
 
-using cppcrystal::Matrix3i;
 using cppcrystal::MagneticOperations;
+using cppcrystal::Matrix3i;
 using cppcrystal::Vector3d;
 using cppcrystal::test::space_hall;
 using cppcrystal::test::uni_number;
@@ -27,7 +27,7 @@ using cppcrystal::test::uni_number;
 // Reference magnetic operations for (uni_number, hall_number) via spglib's
 // spg_get_magnetic_symmetry_from_database (max 384 operations).
 MagneticOperations reference_magnetic_operations(int uni_number,
-                                                         int hall_number) {
+                                                 int hall_number) {
   std::array<int, 384 * 9> rot{};
   std::array<double, 384 * 3> trans{};
   std::array<int, 384> timerev{};

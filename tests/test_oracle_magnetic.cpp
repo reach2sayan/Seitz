@@ -6,11 +6,11 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
 #include "magnetic/identify.hpp"
 #include "spin/search.hpp"
 #include "symmetry/search.hpp"
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,8 +20,8 @@
 namespace {
 
 using cppcrystal::Cell;
-using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
+using cppcrystal::Lattice;
 using cppcrystal::MagneticCell;
 using cppcrystal::MagneticOperations;
 using cppcrystal::Matrix3d;
@@ -42,8 +42,8 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
 
 // The magnetic symmetry of `mcell`, via the ported spin module.
 MagneticOperations magnetic_symmetry(MagneticCell const &input,
-                                             bool with_time_reversal,
-                                             bool is_axial, double symprec) {
+                                     bool with_time_reversal, bool is_axial,
+                                     double symprec) {
   MagneticCell const mcell(input.cell(), input.tensors(),
                            is_axial ? cppcrystal::TensorKind::axial
                                     : cppcrystal::TensorKind::polar);
@@ -52,7 +52,7 @@ MagneticOperations magnetic_symmetry(MagneticCell const &input,
   auto const sym_nonspin = spatial.operations();
   REQUIRE(sym_nonspin);
   cppcrystal::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
-                                                {{symprec}});
+                                                 {{symprec}});
   auto const search =
       with_time_reversal
           ? spin_search.operations<cppcrystal::TimeReversal::on>()
@@ -62,9 +62,8 @@ MagneticOperations magnetic_symmetry(MagneticCell const &input,
 }
 
 // Reference UNI number + MSG type via the magnetic symmetry directly.
-std::pair<int, int>
-reference_uni(MagneticOperations const &ops, Matrix3d const &lattice,
-              double symprec) {
+std::pair<int, int> reference_uni(MagneticOperations const &ops,
+                                  Matrix3d const &lattice, double symprec) {
   std::vector<int> rot(9 * ops.size());
   std::vector<double> trans(3 * ops.size());
   std::vector<int> timerev(ops.size());
@@ -74,7 +73,8 @@ reference_uni(MagneticOperations const &ops, Matrix3d const &lattice,
         rot[9 * s + 3 * static_cast<std::size_t>(i) +
             static_cast<std::size_t>(j)] = ops[s].spatial.rotation(i, j);
       }
-      trans[3 * s + static_cast<std::size_t>(i)] = ops[s].spatial.translation[i];
+      trans[3 * s + static_cast<std::size_t>(i)] =
+          ops[s].spatial.translation[i];
     }
     timerev[s] = ops[s].time_reversal ? 1 : 0;
   }
@@ -90,7 +90,8 @@ reference_uni(MagneticOperations const &ops, Matrix3d const &lattice,
 
 void check(MagneticCell const &mcell, bool with_time_reversal, bool is_axial,
            double symprec) {
-  auto const ops = magnetic_symmetry(mcell, with_time_reversal, is_axial, symprec);
+  auto const ops =
+      magnetic_symmetry(mcell, with_time_reversal, is_axial, symprec);
   cppcrystal::magnetic::MagneticIdentification const identification(
       mcell.cell().lattice(), ops, {symprec});
   auto const got = identification.identify();
@@ -114,8 +115,7 @@ TEST_CASE("magnetic space-group type: collinear ferromagnet",
 
 TEST_CASE("magnetic space-group type: collinear antiferromagnet",
           "[oracle][magnetic]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, -1.0}});
   SECTION("with time reversal") { check(mcell, true, true, 1e-5); }
   SECTION("without time reversal") { check(mcell, false, true, 1e-5); }
@@ -123,8 +123,7 @@ TEST_CASE("magnetic space-group type: collinear antiferromagnet",
 
 TEST_CASE("magnetic space-group type: non-collinear antiferromagnet",
           "[oracle][magnetic]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(
       cell, SiteTensors{noncollinear_tensors(
                 {Vector3d(0.0, 0.0, 1.0), Vector3d(0.0, 0.0, -1.0)})});
@@ -134,8 +133,7 @@ TEST_CASE("magnetic space-group type: non-collinear antiferromagnet",
 TEST_CASE("magnetic space-group type: non-magnetic (type II)",
           "[oracle][magnetic]") {
   // All-equal spins with time reversal -> a grey (type-II) group.
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, 1.0}});
   check(mcell, true, true, 1e-5);
 }

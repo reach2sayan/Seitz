@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/core/magnetic_symmetry_operation.hpp>
 #include <cppcrystal/core/mdspan.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/core/types.hpp>

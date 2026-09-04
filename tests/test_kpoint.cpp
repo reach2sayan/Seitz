@@ -20,7 +20,8 @@ TEST_CASE("Mesh index_of uses the a0-fastest encoding", "[kpoint]") {
   CHECK(mesh->index_of({1, 0, 0}) == 1U); // a0 fastest
   CHECK(mesh->index_of({0, 1, 0}) == 2U); // +d0
   CHECK(mesh->index_of({0, 0, 1}) == 6U); // +d0*d1
-  CHECK(mesh->index_of({1, 2, 3}) == static_cast<std::size_t>(3 * 6 + 2 * 2 + 1));
+  CHECK(mesh->index_of({1, 2, 3}) ==
+        static_cast<std::size_t>(3 * 6 + 2 * 2 + 1));
 }
 
 TEST_CASE("Mesh addresses round-trip through index_of", "[kpoint]") {
@@ -46,8 +47,8 @@ TEST_CASE("reciprocal point group: transpose, inversion, dedup", "[kpoint]") {
   REQUIRE(mesh);
   std::vector<Matrix3i> const rots{Matrix3i::Identity()};
 
-  auto const group =
-      ReciprocalMesh::from_rotations(*mesh, rots, cppcrystal::TimeReversal::off);
+  auto const group = ReciprocalMesh::from_rotations(
+      *mesh, rots, cppcrystal::TimeReversal::off);
   REQUIRE(group.rotations().size() == 1U);
   CHECK(group.rotations()[0] == Matrix3i::Identity());
 

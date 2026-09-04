@@ -58,10 +58,10 @@ void check_ir(Cell const &cell, Vector3i const &divisions,
               Vector3i const &is_shift, bool time_reversal, double symprec) {
   auto const analyzer =
       cppcrystal::analysis::SymmetryAnalyzer::from_cell(cell, {symprec});
-  auto const got = analyzer.reciprocal_mesh(
-      sampling(divisions, is_shift),
-      time_reversal ? cppcrystal::TimeReversal::on
-                    : cppcrystal::TimeReversal::off);
+  auto const got =
+      analyzer.reciprocal_mesh(sampling(divisions, is_shift),
+                               time_reversal ? cppcrystal::TimeReversal::on
+                                             : cppcrystal::TimeReversal::off);
   REQUIRE(got);
   auto const ref = cppcrystal::oracle::reference_ir_reciprocal_mesh(
       cell, divisions, is_shift, time_reversal, symprec);
@@ -84,23 +84,38 @@ TEST_CASE("ir reciprocal mesh matches reference (normal path)",
           "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const pm3m = make_cell(cubic(4.0), {{0, 0, 0}}, {0});
-  Cell const im3m =
-      make_cell(cubic(4.0), {{0, 0, 0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const im3m = make_cell(cubic(4.0), {{0, 0, 0}, {0.5, 0.5, 0.5}}, {0, 0});
 
-  SECTION("gamma-centred") { check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), true, s); }
-  SECTION("shifted") { check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(1, 1, 1), true, s); }
-  SECTION("odd mesh") { check_ir(pm3m, Vector3i(3, 3, 3), Vector3i(0, 0, 0), true, s); }
-  SECTION("no time reversal") { check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), false, s); }
-  SECTION("bcc") { check_ir(im3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), true, s); }
+  SECTION("gamma-centred") {
+    check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), true, s);
+  }
+  SECTION("shifted") {
+    check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(1, 1, 1), true, s);
+  }
+  SECTION("odd mesh") {
+    check_ir(pm3m, Vector3i(3, 3, 3), Vector3i(0, 0, 0), true, s);
+  }
+  SECTION("no time reversal") {
+    check_ir(pm3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), false, s);
+  }
+  SECTION("bcc") {
+    check_ir(im3m, Vector3i(4, 4, 4), Vector3i(0, 0, 0), true, s);
+  }
 }
 
 TEST_CASE("ir reciprocal mesh matches reference (distortion path)",
           "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const p6mmm = make_cell(hexagonal(3.0, 5.0), {{0, 0, 0}}, {0});
-  SECTION("gamma-centred") { check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 0), true, s); }
-  SECTION("shifted c") { check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 1), true, s); }
-  SECTION("no time reversal") { check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 0), false, s); }
+  SECTION("gamma-centred") {
+    check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 0), true, s);
+  }
+  SECTION("shifted c") {
+    check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 1), true, s);
+  }
+  SECTION("no time reversal") {
+    check_ir(p6mmm, Vector3i(6, 6, 4), Vector3i(0, 0, 0), false, s);
+  }
 }
 
 TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
@@ -128,9 +143,7 @@ TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
   SECTION("gamma only (full symmetry)") {
     compare({Vector3d(0.0, 0.0, 0.0)}, true);
   }
-  SECTION("q breaking symmetry") {
-    compare({Vector3d(0.5, 0.0, 0.0)}, true);
-  }
+  SECTION("q breaking symmetry") { compare({Vector3d(0.5, 0.0, 0.0)}, true); }
   SECTION("q set, no time reversal") {
     compare({Vector3d(0.5, 0.0, 0.0), Vector3d(0.0, 0.5, 0.0)}, false);
   }

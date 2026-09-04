@@ -94,13 +94,11 @@ SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
   operations_ = data::operations_from_database(hall);
 
   std::vector<data::WyckoffEntry> const entries = data::wyckoff_entries(hall);
-  positions_ = {std::from_range,
-                entries | std::views::transform(
-                              [&](data::WyckoffEntry const &entry) {
-                                return build_position(entry.global_index,
-                                                      entry.letter,
-                                                      operations_);
-                              })};
+  positions_ = {
+      std::from_range,
+      entries | std::views::transform([&](data::WyckoffEntry const &entry) {
+        return build_position(entry.global_index, entry.letter, operations_);
+      })};
 }
 
 // The Flyweight (Boost.Flyweight): one immutable SpaceGroup per HallNumber,

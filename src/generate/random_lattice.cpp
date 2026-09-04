@@ -69,7 +69,7 @@ Matrix3d random_lattice(CrystalSystem system, double target_volume,
   return raw * scale;
 }
 
-double estimated_cell_volume(std::map<int, int> const &composition,
+double estimated_cell_volume(Composition const &composition,
                              double fallback_volume) {
   // Representative atomic packing fraction: covalent-radius spheres fill
   // roughly this fraction of a real cell, so dividing the sphere-sum by it

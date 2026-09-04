@@ -1,5 +1,5 @@
-#include "oracle.hpp"
 #include "helpers.hpp"
+#include "oracle.hpp"
 
 #include <cppcrystal/data/spg_database.hpp>
 
@@ -8,8 +8,9 @@
 using namespace cppcrystal;
 using cppcrystal::test::space_hall;
 
-TEST_CASE("db ops match spg_get_symmetry_from_database for all 530 Hall numbers",
-          "[oracle][database]") {
+TEST_CASE(
+    "db ops match spg_get_symmetry_from_database for all 530 Hall numbers",
+    "[oracle][database]") {
   int mismatches = 0;
   int first_bad = 0;
   for (int index = 1; index <= kSpaceHallSettings; ++index) {

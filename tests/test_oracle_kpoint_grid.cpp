@@ -40,13 +40,12 @@ TEST_CASE("Mesh::index_of matches the reference encoding", "[oracle][kpoint]") {
 }
 
 TEST_CASE("Mesh addresses are self-consistent", "[oracle][kpoint]") {
-  for (Address const &divisions : {Address{4, 4, 4}, Address{3, 3, 3},
-                                   Address{2, 3, 4}}) {
+  for (Address const &divisions :
+       {Address{4, 4, 4}, Address{3, 3, 3}, Address{2, 3, 4}}) {
     auto const mesh = Mesh::of(divisions);
     REQUIRE(mesh);
-    REQUIRE(mesh->size() == static_cast<std::size_t>(divisions[0] *
-                                                     divisions[1] *
-                                                     divisions[2]));
+    REQUIRE(mesh->size() == static_cast<std::size_t>(
+                                divisions[0] * divisions[1] * divisions[2]));
     std::size_t index = 0;
     for (Address const address : mesh->addresses()) {
       INFO("grid point " << index);

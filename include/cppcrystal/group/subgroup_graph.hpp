@@ -28,12 +28,14 @@ namespace detail {
 // relation table. Both adjacency directions and the reachability closure below
 // are constant-initialised, so the runtime does no graph construction at all.
 inline constexpr std::size_t kNumRelations = data::kTSubgroupRelations.size();
-inline constexpr std::size_t kNumKeys = static_cast<std::size_t>(kNumSpaceGroups) + 1;
+inline constexpr std::size_t kNumKeys =
+    static_cast<std::size_t>(kNumSpaceGroups) + 1;
 
 using Adjacency =
     data::detail::BucketIndex<SubgroupRelation, kNumRelations, kNumKeys>;
 
-[[nodiscard]] constexpr data::TSubgroupRelation const &relation(int id) noexcept {
+[[nodiscard]] constexpr data::TSubgroupRelation const &
+relation(int id) noexcept {
   return data::kTSubgroupRelations[static_cast<std::size_t>(id) - 1];
 }
 

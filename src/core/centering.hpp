@@ -21,10 +21,10 @@
 //
 // M is the only transcribed table. M^-1 is *derived* from it at compile time as
 // adjugate(M) / det(M), which is exact for every centering, so there is no
-// second table to keep in sync and no M . M^-1 = I transcription check to run --
-// the identity holds by construction (a static_assert below pins that claim).
-// The table is a constexpr std::array proxy, row-major, because Eigen types are
-// literal for construction and access but not for arithmetic; Eigen
+// second table to keep in sync and no M . M^-1 = I transcription check to run
+// -- the identity holds by construction (a static_assert below pins that
+// claim). The table is a constexpr std::array proxy, row-major, because Eigen
+// types are literal for construction and access but not for arithmetic; Eigen
 // materialises once at first use.
 namespace cppcrystal {
 

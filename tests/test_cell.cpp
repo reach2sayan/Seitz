@@ -27,7 +27,8 @@ TEST_CASE("Cell atoms() pairs each position with its type", "[cell]") {
   std::vector<int> seen_types;
   for (auto const &[position, type] : c.atoms()) {
     seen_types.push_back(type);
-    CHECK(position.isApprox(c.position(static_cast<Index>(seen_types.size()) - 1)));
+    CHECK(position.isApprox(
+        c.position(static_cast<Index>(seen_types.size()) - 1)));
   }
   CHECK(seen_types == std::vector<int>{7, 9});
 }

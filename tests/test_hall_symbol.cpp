@@ -4,9 +4,9 @@
 // operations (the canonical setting) back through match_hall must
 // recognise that Hall number, with a zero origin shift.
 
+#include "spacegroup/spacegroup.hpp"
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/data/spg_database.hpp>
-#include "spacegroup/spacegroup.hpp"
 
 #include "helpers.hpp"
 
@@ -33,7 +33,7 @@ TEST_CASE(
     auto const centering = data::spacegroup_type(hall).centering;
     auto const shift =
         spacegroup::SpacegroupMatcher<GroupFamily::space>::match_hall(
-              bravais, hall, centering, ops, 1e-5);
+            bravais, hall, centering, ops, 1e-5);
     if (!shift) {
       ++not_matched;
       if (first_unmatched == 0)
@@ -111,7 +111,7 @@ TEST_CASE("a corrupted operation is rejected", "[hall]") {
     ops.back().translation += Vector3d(0.13, 0.13, 0.13);
     INFO("hall " << index);
     CHECK_FALSE(spacegroup::SpacegroupMatcher<GroupFamily::space>::match_hall(
-              bravais, hall, centering, Operations{ops}, 1e-5));
+        bravais, hall, centering, Operations{ops}, 1e-5));
   }
 }
 
@@ -121,12 +121,12 @@ TEST_CASE("match_hall over the cubic settings", "[!benchmark]") {
     HallNumber const hall = space_hall(530);
     auto const &ops = data::operations_from_database(hall);
     return spacegroup::SpacegroupMatcher<GroupFamily::space>::match_hall(
-              bravais, hall, data::spacegroup_type(hall).centering, ops, 1e-5);
+        bravais, hall, data::spacegroup_type(hall).centering, ops, 1e-5);
   };
   BENCHMARK("Fm-3m (hall 523, 192 ops)") {
     HallNumber const hall = space_hall(523);
     auto const &ops = data::operations_from_database(hall);
     return spacegroup::SpacegroupMatcher<GroupFamily::space>::match_hall(
-              bravais, hall, data::spacegroup_type(hall).centering, ops, 1e-5);
+        bravais, hall, data::spacegroup_type(hall).centering, ops, 1e-5);
   };
 }

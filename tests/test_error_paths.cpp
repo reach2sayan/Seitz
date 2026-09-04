@@ -2,12 +2,12 @@
 // right tag) rather than UB. No reference spglib needed — this exercises the
 // port's own validation/guards.
 
+#include "symmetry/search.hpp"
+#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
-#include "symmetry/search.hpp"
 
 #include "helpers.hpp"
 
@@ -63,7 +63,8 @@ Cell valid_cell() {
 } // namespace
 
 TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {
-  CHECK(classify([] { return test::dataset_of(empty_cell(), {1e-5}); }) == Err::empty);
+  CHECK(classify([] { return test::dataset_of(empty_cell(), {1e-5}); }) ==
+        Err::empty);
   CHECK(classify([] {
           Cell const cell = empty_cell();
           return symmetry::SymmetrySearch<GroupFamily::space>{cell, {1e-5}}
@@ -88,7 +89,6 @@ TEST_CASE("singular lattice is rejected with e_invalid_lattice", "[error]") {
   CHECK(classify([&] { return test::magnetic_dataset_of(m, {1e-5}); }) ==
         Err::invalid_lattice);
 }
-
 
 // A bad mesh is now unrepresentable rather than something every grid function
 // has to guard: Mesh::of rejects it once, at the only entry point. Covered by

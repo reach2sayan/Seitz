@@ -65,9 +65,12 @@ TEST_CASE("a (uni, hall) pairing outside the uni's settings yields nothing",
   // UNI 1 (P1) has a single Hall setting (1); any other Hall number is not
   // one of its settings, and the query must not read past that row.
   CHECK_FALSE(
-      data::magnetic_operations_from_database(uni_number(1), space_hall(1)).empty());
-  CHECK(data::magnetic_operations_from_database(uni_number(1), space_hall(2)).empty());
+      data::magnetic_operations_from_database(uni_number(1), space_hall(1))
+          .empty());
+  CHECK(data::magnetic_operations_from_database(uni_number(1), space_hall(2))
+            .empty());
+  CHECK(data::magnetic_operations_from_database(uni_number(1), space_hall(530))
+            .empty());
   CHECK(
-      data::magnetic_operations_from_database(uni_number(1), space_hall(530)).empty());
-  CHECK(data::magnetic_std_transformations(uni_number(1), space_hall(2)).empty());
+      data::magnetic_std_transformations(uni_number(1), space_hall(2)).empty());
 }

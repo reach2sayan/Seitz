@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include <cppcrystal/core/point_group.hpp> // Holohedry
 
 #include <array>
@@ -53,44 +55,26 @@ struct HallClass {
   return Holohedry::cubic;
 }
 
-// R-centered (rhombohedral) subset of the trigonal range
+// R-centered (rhombohedral) subset of the trigonal range. A sorted table plus a
+// membership test, not control flow: these are data, and a switch only made
+// them look like branches.
+inline constexpr std::array kRhombohedralHalls{
+    433, 434, 436, 437, 444, 445, 450, 451, 452, 453, 458, 459, 460, 461};
 [[nodiscard]] constexpr bool is_rhombohedral_hall(int h) noexcept {
-  switch (h) {
-  case 433:
-  case 434:
-  case 436:
-  case 437:
-  case 444:
-  case 445:
-  case 450:
-  case 451:
-  case 452:
-  case 453:
-  case 458:
-  case 459:
-  case 460:
-  case 461:
-    return true;
-  default:
-    return false;
-  }
+  return std::ranges::contains(kRhombohedralHalls, h);
 }
 
 // The hexagonal (hP) setting within the rhombohedral subset
+inline constexpr std::array kRhombohedralHexHalls{433, 436, 444, 450,
+                                                  452, 458, 460};
 [[nodiscard]] constexpr bool is_rhombo_hex_setting(int h) noexcept {
-  switch (h) {
-  case 433:
-  case 436:
-  case 444:
-  case 450:
-  case 452:
-  case 458:
-  case 460:
-    return true;
-  default:
-    return false;
-  }
+  return std::ranges::contains(kRhombohedralHexHalls, h);
 }
+static_assert(std::ranges::all_of(kRhombohedralHexHalls,
+                                  [](int h) {
+                                    return is_rhombohedral_hall(h);
+                                  }),
+              "the hexagonal settings are a subset of the rhombohedral Halls");
 
 // All 530 Hall numbers classified once at compile time.
 inline constexpr std::array<HallClass, 531> kHallClass = [] {

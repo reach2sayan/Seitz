@@ -39,7 +39,8 @@ using math::metric_length;
   // unique axis (the leading '-' is a sign convention, skipped).
   std::size_t const pos = (!choice.empty() && choice[0] == '-') ? 1 : 0;
   char const axis = pos < choice.size() ? choice[pos] : 'b';
-  double const a = metric_length(g, 0), b = metric_length(g, 1), c = metric_length(g, 2);
+  double const a = metric_length(g, 0), b = metric_length(g, 1),
+               c = metric_length(g, 2);
 
   Matrix3d m = Matrix3d::Zero();
   switch (axis) {
@@ -101,7 +102,8 @@ using math::metric_length;
 }
 
 [[nodiscard]] Matrix3d set_rhomb(Matrix3d const &g) {
-  double const a = metric_length(g, 0), b = metric_length(g, 1), c = metric_length(g, 2);
+  double const a = metric_length(g, 0), b = metric_length(g, 1),
+               c = metric_length(g, 2);
   double const angle =
       std::acos((g(0, 1) / a / b + g(0, 2) / a / c + g(1, 2) / b / c) / 3);
   double const ahex = 2 * (a + b + c) / 3 * std::sin(angle / 2);
@@ -122,7 +124,8 @@ using math::metric_length;
 }
 
 [[nodiscard]] Matrix3d set_cubic(Matrix3d const &g) {
-  double const a = (metric_length(g, 0) + metric_length(g, 1) + metric_length(g, 2)) / 3;
+  double const a =
+      (metric_length(g, 0) + metric_length(g, 1) + metric_length(g, 2)) / 3;
   Matrix3d m = Matrix3d::Zero();
   m(0, 0) = a;
   m(1, 1) = a;

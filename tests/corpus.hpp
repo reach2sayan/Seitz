@@ -32,9 +32,8 @@ inline std::vector<double> extract_numbers(std::string const &s) {
   std::size_t i = 0;
   while (i < s.size()) {
     char const c = s[i];
-    bool const starts =
-        c == '-' || c == '+' || c == '.' ||
-        std::isdigit(static_cast<unsigned char>(c)) != 0;
+    bool const starts = c == '-' || c == '+' || c == '.' ||
+                        std::isdigit(static_cast<unsigned char>(c)) != 0;
     if (!starts) {
       ++i;
       continue;
@@ -70,7 +69,12 @@ parse_unitcell(std::filesystem::path const &path) {
   std::vector<int> types;
   std::vector<Vector3d> coordinates;
 
-  enum class Section { none, space_group, lattice, points } section = Section::none;
+  enum class Section {
+    none,
+    space_group,
+    lattice,
+    points
+  } section = Section::none;
   for (std::string line; std::getline(file, line);) {
     auto const has = [&](char const *key) {
       return line.find(key) != std::string::npos;
@@ -131,8 +135,8 @@ parse_unitcell(std::filesystem::path const &path) {
 
   Matrix3d lattice;
   for (int c = 0; c < 3; ++c) {
-    // YAML lattice row i is basis vector i; our Matrix3d stores basis vectors as
-    // columns.
+    // YAML lattice row i is basis vector i; our Matrix3d stores basis vectors
+    // as columns.
     lattice.col(c) = lattice_rows[static_cast<std::size_t>(c)];
   }
   Positions positions(static_cast<Index>(coordinates.size()), 3);
@@ -147,9 +151,8 @@ parse_unitcell(std::filesystem::path const &path) {
 inline std::vector<CorpusEntry> load_corpus() {
   std::vector<CorpusEntry> out;
   std::filesystem::path const base(SPGLIB_REF_DATA_DIR);
-  for (char const *system :
-       {"triclinic", "monoclinic", "orthorhombic", "tetragonal", "trigonal",
-        "hexagonal", "cubic"}) {
+  for (char const *system : {"triclinic", "monoclinic", "orthorhombic",
+                             "tetragonal", "trigonal", "hexagonal", "cubic"}) {
     std::filesystem::path const dir = base / system;
     std::error_code ec;
     if (!std::filesystem::is_directory(dir, ec)) {

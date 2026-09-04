@@ -1,13 +1,13 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "core/overlap.hpp"
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include "refine/refinement.hpp"
 #include "refine/standardize.hpp"
 #include "spacegroup/spacegroup.hpp"
-#include "symmetry/search.hpp"
 #include "symmetry/primitive.hpp"
+#include "symmetry/search.hpp"
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
 
@@ -140,7 +140,8 @@ Cell diamond(double a) { // -> Fd-3m (cubic F, non-symmorphic)
 
 Cell zincblende(double a) { // -> F-43m
   Cell d = diamond(a);
-  return Cell(Lattice{d.lattice().matrix()}, d.positions(), {0, 0, 0, 0, 1, 1, 1, 1});
+  return Cell(Lattice{d.lattice().matrix()}, d.positions(),
+              {0, 0, 0, 0, 1, 1, 1, 1});
 }
 
 Cell bcc(double a) { // -> Im-3m
@@ -246,13 +247,16 @@ TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
     REQUIRE(ours);
 
     INFO("ours: SG " << data::spacegroup_type(ours->hall).number << " hall "
-                     << ours->hall.index() << " (" << data::spacegroup_type(ours->hall).international_short
+                     << ours->hall.index() << " ("
+                     << data::spacegroup_type(ours->hall).international_short
                      << "); ref: SG " << ref.number << " hall "
                      << ref.hall_number << " (" << ref.international << ")");
     CHECK(data::spacegroup_type(ours->hall).number == ref.number);
     CHECK(ours->hall == space_hall(ref.hall_number));
-    CHECK(std::string(data::spacegroup_type(ours->hall).international_short) == ref.international);
-    CHECK(std::string(data::spacegroup_type(ours->hall).hall_symbol) == ref.hall_symbol);
+    CHECK(std::string(data::spacegroup_type(ours->hall).international_short) ==
+          ref.international);
+    CHECK(std::string(data::spacegroup_type(ours->hall).hall_symbol) ==
+          ref.hall_symbol);
     CHECK(std::string(data::spacegroup_type(ours->hall).choice) == ref.choice);
   }
 }
@@ -268,8 +272,8 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
     auto const prim =
         symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim,
-                                                                 std::nullopt);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(
+        *prim, std::nullopt);
     auto const sg = matcher.search();
     REQUIRE(sg);
 
@@ -279,7 +283,8 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
     Matrix3d const std_lat = std_lattice.matrix();
     Matrix3d const std_rot =
         Lattice{sg2.bravais_lattice}.rigid_rotation_to(std_lattice);
-    Matrix3d const trans = sg2.bravais_lattice.inverse() * cell.lattice().matrix();
+    Matrix3d const trans =
+        sg2.bravais_lattice.inverse() * cell.lattice().matrix();
 
     CHECK((std_lat - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
     CHECK((std_rot - ref.std_rotation_matrix).cwiseAbs().maxCoeff() < 1e-4);
@@ -290,9 +295,10 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
 namespace {
 // True iff every reference std atom has a matching (same type, overlapping)
 // atom in ours.
-bool same_std_cell(Positions const &ours_pos, std::vector<int> const &ours_types,
-                   Positions const &ref_pos, std::vector<int> const &ref_types,
-                   Matrix3d const &lattice, double tol) {
+bool same_std_cell(Positions const &ours_pos,
+                   std::vector<int> const &ours_types, Positions const &ref_pos,
+                   std::vector<int> const &ref_types, Matrix3d const &lattice,
+                   double tol) {
   if (ours_types.size() != ref_types.size())
     return false;
   for (Eigen::Index r = 0; r < ref_pos.rows(); ++r) {
@@ -331,15 +337,19 @@ TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
     CHECK((d->setting.transformation - ref.transformation_matrix)
               .cwiseAbs()
               .maxCoeff() < 1e-4);
-    CHECK((d->standardized.lattice().matrix() - ref.std_lattice).cwiseAbs().maxCoeff() < 1e-4);
+    CHECK((d->standardized.lattice().matrix() - ref.std_lattice)
+              .cwiseAbs()
+              .maxCoeff() < 1e-4);
     CHECK((d->setting.rigid_rotation - ref.std_rotation_matrix)
               .cwiseAbs()
               .maxCoeff() < 1e-4);
 
     // Standardized cell + per-atom Wyckoff data.
-    CHECK(static_cast<int>(d->standardized.positions().rows()) == ref.n_std_atoms);
-    CHECK(same_std_cell(d->standardized.positions(), d->standardized.types(), ref.std_positions,
-                        ref.std_types, d->standardized.lattice().matrix(), 1e-4));
+    CHECK(static_cast<int>(d->standardized.positions().rows()) ==
+          ref.n_std_atoms);
+    CHECK(same_std_cell(d->standardized.positions(), d->standardized.types(),
+                        ref.std_positions, ref.std_types,
+                        d->standardized.lattice().matrix(), 1e-4));
     REQUIRE(d->sites.size() == ref.wyckoffs.size());
     for (std::size_t i = 0; i < d->sites.size(); ++i) {
       INFO("atom " << i);
@@ -361,12 +371,13 @@ TEST_CASE("standardized cell + Wyckoffs + equivalent atoms match the oracle",
     auto const prim =
         symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
     REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(*prim,
-                                                                 std::nullopt);
+    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(
+        *prim, std::nullopt);
     auto const sg = matcher.search();
     REQUIRE(sg);
-    auto const ops = symmetry::SymmetrySearch<GroupFamily::space>{
-        cell, prim->tolerance}.operations();
+    auto const ops =
+        symmetry::SymmetrySearch<GroupFamily::space>{cell, prim->tolerance}
+            .operations();
     REQUIRE(ops);
 
     refine::Refinement<GroupFamily::space> const refinement(

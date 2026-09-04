@@ -2,10 +2,10 @@
 #include <cppcrystal/group/point_group.hpp>
 
 #include "core/matrix_order.hpp"
-#include <cppcrystal/data/spg_database.hpp>
 #include "group/locus_arrangement.hpp"
 #include "math/subspace.hpp"
 #include "symmetry/pointgroup.hpp"
+#include <cppcrystal/data/spg_database.hpp>
 
 #include <Eigen/Dense>
 
@@ -85,9 +85,8 @@ struct PointGeometry {
   }
 
   [[nodiscard]] bool same_locus(Locus const &a, Locus const &b) const {
-    return a.dim() == b.dim() &&
-           approx_equal(math::projector(a.basis), math::projector(b.basis),
-                        kTol);
+    return a.dim() == b.dim() && approx_equal(math::projector(a.basis),
+                                              math::projector(b.basis), kTol);
   }
 
   // The image of a subspace under an operation (a new subspace of the same
@@ -97,7 +96,8 @@ struct PointGeometry {
     if (l.dim() == 0) {
       return Locus{Eigen::MatrixXd(3, 0)};
     }
-    return Locus{math::column_space(op.rotation.cast<double>() * l.basis, kTol)};
+    return Locus{
+        math::column_space(op.rotation.cast<double>() * l.basis, kTol)};
   }
 
   // Whether the subspace is fixed pointwise by `rot` (rot v == v for every v
@@ -116,15 +116,18 @@ struct PointGeometry {
   [[nodiscard]] detail::DerivedLocus derive(Locus const &l) const {
     Operations const site_symmetry{
         std::from_range,
-        ops | std::views::filter(
-                  [&](SymmetryOperation const &op) { return fixes(op.rotation, l); })};
+        ops | std::views::filter([&](SymmetryOperation const &op) {
+          return fixes(op.rotation, l);
+        })};
     Operations orbit_ops = coset_representatives(ops, site_symmetry);
 
     Matrix3d locus_basis = Matrix3d::Zero();
     locus_basis.leftCols(l.dim()) = l.basis;
 
-    return detail::DerivedLocus{static_cast<int>(orbit_ops.size()), l.dim(),
-                                Vector3d::Zero(), locus_basis,
+    return detail::DerivedLocus{static_cast<int>(orbit_ops.size()),
+                                l.dim(),
+                                Vector3d::Zero(),
+                                locus_basis,
                                 std::move(orbit_ops),
                                 std::move(site_symmetry)};
   }
@@ -134,9 +137,9 @@ struct PointGeometry {
 
 Result<PointGroup> PointGroup::from_number(int number) {
   if (number < 1 || number > 32) {
-    return leaf::new_error(e_message{
-        "PointGroup::from_number: point-group number out of range "
-        "(expected 1..32)"});
+    return leaf::new_error(
+        e_message{"PointGroup::from_number: point-group number out of range "
+                  "(expected 1..32)"});
   }
 
   auto const meta = pointgroup_by_number(number);

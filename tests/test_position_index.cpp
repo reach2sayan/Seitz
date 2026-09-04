@@ -25,8 +25,9 @@ struct Scenario {
   CellPeriodicity periodicity;
 };
 
-Matrix3d lattice_from_rows(double a0, double a1, double a2, double b0, double b1,
-                           double b2, double c0, double c1, double c2) {
+Matrix3d lattice_from_rows(double a0, double a1, double a2, double b0,
+                           double b1, double b2, double c0, double c1,
+                           double c2) {
   Matrix3d l;
   // Columns are the basis vectors.
   l.col(0) << a0, a1, a2;
@@ -91,7 +92,8 @@ std::vector<int> sorted(auto &&range) {
 
 } // namespace
 
-TEST_CASE("PositionIndex agrees with the brute-force scan", "[position_index]") {
+TEST_CASE("PositionIndex agrees with the brute-force scan",
+          "[position_index]") {
   auto const symprec = GENERATE(1e-8, 1e-5, 1e-2, 0.5, 10.0);
   for (auto const &s : scenarios()) {
     INFO(s.name << " symprec=" << symprec);

@@ -23,7 +23,8 @@ namespace cppcrystal::math {
   }
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeThinU);
   Eigen::VectorXd const sv = svd.singularValues();
-  auto const rank = std::ranges::count_if(sv, [=](double x) { return x > tol; });
+  auto const rank =
+      std::ranges::count_if(sv, [=](double x) { return x > tol; });
   return svd.matrixU().leftCols(rank);
 }
 
@@ -33,7 +34,8 @@ namespace cppcrystal::math {
                                                 double tol) {
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(m, Eigen::ComputeFullV);
   Eigen::VectorXd const sv = svd.singularValues();
-  auto const rank = std::ranges::count_if(sv, [=](double x) { return x > tol; });
+  auto const rank =
+      std::ranges::count_if(sv, [=](double x) { return x > tol; });
   // The last `nullity` columns of V correspond to the smallest singular values.
   return svd.matrixV().rightCols(m.cols() - rank);
 }

@@ -1,6 +1,7 @@
-// Oracle test for Brillouin-zone relocation (kpoint.c): relocate_BZ_grid_address
-// and BZ_grid_points_by_rotations must reproduce
-// spg_relocate_dense_BZ_grid_address / spg_get_dense_BZ_grid_points_by_rotations.
+// Oracle test for Brillouin-zone relocation (kpoint.c):
+// relocate_BZ_grid_address and BZ_grid_points_by_rotations must reproduce
+// spg_relocate_dense_BZ_grid_address /
+// spg_get_dense_BZ_grid_points_by_rotations.
 
 #include "oracle.hpp"
 
@@ -31,9 +32,9 @@ Matrix3d columns(Vector3d const &a, Vector3d const &b, Vector3d const &c) {
 
 // The identity rotation is enough: BZ relocation itself does not use the
 // reciprocal group, only its geometry.
-cppcrystal::kpoint::ReciprocalMesh reciprocal_of(Vector3i const &divisions,
-                                                 Vector3i const &is_shift,
-                                                 std::vector<Matrix3i> const &rots) {
+cppcrystal::kpoint::ReciprocalMesh
+reciprocal_of(Vector3i const &divisions, Vector3i const &is_shift,
+              std::vector<Matrix3i> const &rots) {
   auto const mesh = cppcrystal::kpoint::Mesh::of(
       {divisions[0], divisions[1], divisions[2]},
       {is_shift[0] != 0, is_shift[1] != 0, is_shift[2] != 0});
@@ -43,8 +44,8 @@ cppcrystal::kpoint::ReciprocalMesh reciprocal_of(Vector3i const &divisions,
 }
 
 std::vector<Vector3i> reference_grid(Vector3i const &divisions) {
-  auto const mesh = cppcrystal::kpoint::Mesh::of(
-      {divisions[0], divisions[1], divisions[2]});
+  auto const mesh =
+      cppcrystal::kpoint::Mesh::of({divisions[0], divisions[1], divisions[2]});
   std::vector<Vector3i> out;
   for (auto const a : mesh->addresses())
     out.emplace_back(a[0], a[1], a[2]);
@@ -91,21 +92,21 @@ TEST_CASE("BZ relocation matches reference", "[oracle][kpoint]") {
                    Vector3i(1, 1, 1));
   }
   SECTION("fcc primitive") {
-    Matrix3d const fcc = columns(Vector3d(0, 2, 2), Vector3d(2, 0, 2),
-                                 Vector3d(2, 2, 0));
+    Matrix3d const fcc =
+        columns(Vector3d(0, 2, 2), Vector3d(2, 0, 2), Vector3d(2, 2, 0));
     check_relocate(fcc, Vector3i(4, 4, 4), Vector3i(0, 0, 0));
   }
   SECTION("bcc primitive") {
-    Matrix3d const bcc = columns(Vector3d(-2, 2, 2), Vector3d(2, -2, 2),
-                                 Vector3d(2, 2, -2));
+    Matrix3d const bcc =
+        columns(Vector3d(-2, 2, 2), Vector3d(2, -2, 2), Vector3d(2, 2, -2));
     check_relocate(bcc, Vector3i(4, 4, 4), Vector3i(0, 0, 0));
   }
   SECTION("hexagonal") {
     double const a = 3.0;
     double const c = 5.0;
-    Matrix3d const hex = columns(Vector3d(a, 0, 0),
-                                 Vector3d(-a / 2, a * std::sqrt(3.0) / 2, 0),
-                                 Vector3d(0, 0, c));
+    Matrix3d const hex =
+        columns(Vector3d(a, 0, 0), Vector3d(-a / 2, a * std::sqrt(3.0) / 2, 0),
+                Vector3d(0, 0, c));
     check_relocate(hex, Vector3i(4, 4, 4), Vector3i(0, 0, 0));
   }
 }

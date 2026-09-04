@@ -11,8 +11,8 @@
 // `Eigen::Map<Matrix3d>(&L[0][0])` (column-major map of row-major data silently
 // transposes).
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/cell.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 
 extern "C" {
@@ -213,9 +213,9 @@ inline RefDataset convert_dataset(SpglibDataset *ds) {
     for (int i = 0; i < 3; ++i)
       for (int j = 0; j < 3; ++j)
         r(i, j) = ds->rotations[s][i][j];
-    out.operations.push_back({r, Vector3d(ds->translations[s][0],
-                                          ds->translations[s][1],
-                                          ds->translations[s][2])});
+    out.operations.push_back(
+        {r, Vector3d(ds->translations[s][0], ds->translations[s][1],
+                     ds->translations[s][2])});
   }
   from_c_lattice(out.std_lattice, ds->std_lattice);
   from_c_lattice(out.std_rotation_matrix, ds->std_rotation_matrix);
@@ -242,8 +242,8 @@ inline RefDataset convert_dataset(SpglibDataset *ds) {
 
 inline RefDataset reference_dataset(Cell const &cell, double symprec) {
   CCell c(cell);
-  return convert_dataset(spg_get_dataset(c.lattice, c.pos_mut(),
-                                         c.types.data(), c.num_atom(), symprec));
+  return convert_dataset(spg_get_dataset(c.lattice, c.pos_mut(), c.types.data(),
+                                         c.num_atom(), symprec));
 }
 
 // Reference layer-group determination (spg_get_layer_dataset), returning the
@@ -268,10 +268,10 @@ inline Cell reference_standardize_cell(Cell const &cell, bool to_primitive,
   std::vector<std::array<double, 3>> position(static_cast<std::size_t>(4 * n));
   std::vector<int> types(static_cast<std::size_t>(4 * n));
   for (int i = 0; i < n; ++i) {
-    position[static_cast<std::size_t>(i)] = {cell.positions()(i, 0),
-                                             cell.positions()(i, 1),
-                                             cell.positions()(i, 2)};
-    types[static_cast<std::size_t>(i)] = cell.types()[static_cast<std::size_t>(i)];
+    position[static_cast<std::size_t>(i)] = {
+        cell.positions()(i, 0), cell.positions()(i, 1), cell.positions()(i, 2)};
+    types[static_cast<std::size_t>(i)] =
+        cell.types()[static_cast<std::size_t>(i)];
   }
   int const new_n = spg_standardize_cell(
       lattice, reinterpret_cast<double(*)[3]>(position.data()), types.data(), n,
@@ -419,17 +419,17 @@ inline std::vector<std::size_t> reference_grid_points_by_rotations(
 
 struct RefBzGrid {
   std::size_t num_bzgp = 0;
-  std::vector<Vector3i> bz_grid_address;     // size num_bzgp
-  std::vector<std::size_t> bz_map;           // size 8*prod(mesh), num_bzmesh = unmapped
-  std::size_t num_bzmesh = 0;                // the "unmapped" sentinel value
+  std::vector<Vector3i> bz_grid_address; // size num_bzgp
+  std::vector<std::size_t> bz_map; // size 8*prod(mesh), num_bzmesh = unmapped
+  std::size_t num_bzmesh = 0;      // the "unmapped" sentinel value
 };
 
 // Reference BZ relocation (spg_relocate_dense_BZ_grid_address). bz_grid_address
 // is allocated to the worst case (8*prod(mesh)) and trimmed to num_bzgp.
-inline RefBzGrid reference_relocate_BZ(std::vector<Vector3i> const &grid_address,
-                                       Vector3i const &mesh,
-                                       Matrix3d const &rec_lattice,
-                                       Vector3i const &is_shift) {
+inline RefBzGrid
+reference_relocate_BZ(std::vector<Vector3i> const &grid_address,
+                      Vector3i const &mesh, Matrix3d const &rec_lattice,
+                      Vector3i const &is_shift) {
   auto const num_bzmesh = static_cast<std::size_t>(2 * mesh[0]) *
                           static_cast<std::size_t>(2 * mesh[1]) *
                           static_cast<std::size_t>(2 * mesh[2]);

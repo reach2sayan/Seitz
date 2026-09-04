@@ -91,7 +91,8 @@ struct RodGeometry {
     int const ka = a.dim();
     int const kb = b.dim();
     for (int shift = -1; shift <= 1; ++shift) {
-      Vector3d const p2 = b.point + static_cast<double>(shift) * unit_axis(axis);
+      Vector3d const p2 =
+          b.point + static_cast<double>(shift) * unit_axis(axis);
       Vector3d const rhs = p2 - a.point;
       if (ka + kb == 0) {
         if (approx_zero(rhs, kTol)) {
@@ -164,11 +165,11 @@ struct RodGeometry {
   // in-plane vectors; this canonical form lets the generator sample each free
   // coordinate correctly (full repeat along the periodic axis, a centred band
   // across the section).
-  [[nodiscard]] Eigen::MatrixXd canonicalize_dir(Eigen::MatrixXd const &dir) const {
+  [[nodiscard]] Eigen::MatrixXd
+  canonicalize_dir(Eigen::MatrixXd const &dir) const {
     Vector3d const e = unit_axis(axis);
     bool const has_periodic =
-        dir.cols() > 0 &&
-        approx_equal(dir * (dir.transpose() * e), e, kTol);
+        dir.cols() > 0 && approx_equal(dir * (dir.transpose() * e), e, kTol);
 
     // In-plane part: zero the periodic component of every direction, then
     // take a basis of what remains.
@@ -205,7 +206,9 @@ struct RodGeometry {
       locus_basis.leftCols(cdir.cols()) = cdir;
     }
     return detail::DerivedLocus{static_cast<int>(partition.points.size()),
-                                locus.dim(), reduce(locus.point), locus_basis,
+                                locus.dim(),
+                                reduce(locus.point),
+                                locus_basis,
                                 std::move(partition.orbit_ops),
                                 std::move(partition.site_symmetry)};
   }
@@ -215,9 +218,9 @@ struct RodGeometry {
 
 Result<RodGroup> RodGroup::from_number(int number) {
   if (number < 1 || number > data::num_rod_groups()) {
-    return leaf::new_error(e_message{
-        "RodGroup::from_number: rod-group number out of range "
-        "(expected 1..75)"});
+    return leaf::new_error(
+        e_message{"RodGroup::from_number: rod-group number out of range "
+                  "(expected 1..75)"});
   }
 
   Operations ops = data::rod_operations_from_database(number);

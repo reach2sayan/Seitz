@@ -5,10 +5,10 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
 #include "spin/search.hpp"
 #include "symmetry/search.hpp"
+#include <cppcrystal/core/magnetic_cell.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "math/integer_matrix.hpp"
 
@@ -21,8 +21,8 @@
 namespace {
 
 using cppcrystal::Cell;
-using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
+using cppcrystal::Lattice;
 using cppcrystal::MagneticCell;
 using cppcrystal::MagneticOperations;
 using cppcrystal::Matrix3d;
@@ -53,7 +53,8 @@ struct Reference {
   Matrix3d primitive_lattice;
 };
 
-Reference reference_magnetic(Cell const &cell, std::vector<double> const &tensors,
+Reference reference_magnetic(Cell const &cell,
+                             std::vector<double> const &tensors,
                              int tensor_rank, bool with_time_reversal,
                              bool is_axial, double symprec) {
   cppcrystal::oracle::CCell c(cell);
@@ -130,7 +131,7 @@ void check(MagneticCell const &input, std::vector<double> const &tensors,
   REQUIRE(sym_nonspin);
 
   cppcrystal::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
-                                                {{symprec}});
+                                                 {{symprec}});
   auto const got =
       with_time_reversal
           ? spin_search.operations<cppcrystal::TimeReversal::on>()
@@ -160,8 +161,7 @@ TEST_CASE("collinear ferromagnet magnetic symmetry", "[oracle][spin]") {
 }
 
 TEST_CASE("collinear antiferromagnet magnetic symmetry", "[oracle][spin]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   CollinearTensors const spins{1.0, -1.0};
   MagneticCell const mcell(cell, SiteTensors{spins});
   SECTION("with time reversal (family group)") {
@@ -173,10 +173,9 @@ TEST_CASE("collinear antiferromagnet magnetic symmetry", "[oracle][spin]") {
 }
 
 TEST_CASE("non-collinear antiferromagnet magnetic symmetry", "[oracle][spin]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
-  auto const spins = noncollinear_tensors(
-      {Vector3d(0.0, 0.0, 1.0), Vector3d(0.0, 0.0, -1.0)});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  auto const spins =
+      noncollinear_tensors({Vector3d(0.0, 0.0, 1.0), Vector3d(0.0, 0.0, -1.0)});
   MagneticCell const mcell(cell, SiteTensors{spins});
   check(mcell, {0.0, 0.0, 1.0, 0.0, 0.0, -1.0}, 1, true, true, 1e-5);
 }

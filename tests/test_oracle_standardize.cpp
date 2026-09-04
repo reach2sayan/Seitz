@@ -151,7 +151,8 @@ TEST_CASE("standardize: C-centered orthorhombic", "[oracle][standardize]") {
 
 TEST_CASE("standardize: a primitive input expands to its conventional cell",
           "[oracle][standardize]") {
-  // Primitive bcc cell (rhombohedral primitive of Im-3m) -> conventional 2-atom.
+  // Primitive bcc cell (rhombohedral primitive of Im-3m) -> conventional
+  // 2-atom.
   Matrix3d P;
   P.col(0) = Vector3d(-1.435, 1.435, 1.435);
   P.col(1) = Vector3d(1.435, -1.435, 1.435);
@@ -200,15 +201,20 @@ TEST_CASE("standardize: the to_primitive / idealized option pairs",
 
   auto const same_cell = [](Cell const &a, Cell const &b) {
     return a.size() == b.size() &&
-           (a.lattice().matrix() - b.lattice().matrix()).cwiseAbs().maxCoeff() < 1e-12 &&
+           (a.lattice().matrix() - b.lattice().matrix()).cwiseAbs().maxCoeff() <
+               1e-12 &&
            (a.positions() - b.positions()).cwiseAbs().maxCoeff() < 1e-12 &&
            a.types() == b.types();
   };
 
-  Cell const prim = must(
-      cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<cppcrystal::analysis::CellSetting::primitive, cppcrystal::analysis::Idealize::yes>());
-  Cell const prim_ref = must(
-      cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl).standardized_cell<cppcrystal::analysis::CellSetting::primitive, cppcrystal::analysis::Idealize::yes>());
+  Cell const prim =
+      must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl)
+               .standardized_cell<cppcrystal::analysis::CellSetting::primitive,
+                                  cppcrystal::analysis::Idealize::yes>());
+  Cell const prim_ref =
+      must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl)
+               .standardized_cell<cppcrystal::analysis::CellSetting::primitive,
+                                  cppcrystal::analysis::Idealize::yes>());
   CHECK(same_cell(prim, prim_ref));
 
   auto const analyzer = cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl);

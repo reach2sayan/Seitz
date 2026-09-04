@@ -127,9 +127,9 @@ inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
   return table;
 }();
 static_assert(kBzSearchSpace.front() == Address{0, 0, 0});
-static_assert(kBzSearchSpace[1] == Address{0, 0, 1});   // z varies fastest
-static_assert(kBzSearchSpace[5] == Address{0, 1, 0});   // then y
-static_assert(kBzSearchSpace[25] == Address{1, 0, 0});  // x is outermost
+static_assert(kBzSearchSpace[1] == Address{0, 0, 1});  // z varies fastest
+static_assert(kBzSearchSpace[5] == Address{0, 1, 0});  // then y
+static_assert(kBzSearchSpace[25] == Address{1, 0, 0}); // x is outermost
 static_assert(kBzSearchSpace.back() == Address{-1, -1, -1});
 
 // Adaptive tolerance for merging BZ-boundary points: 0.01 * max over axes of
@@ -169,7 +169,7 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
   }
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
       mapping_ | std::views::enumerate, [](auto const &e) {
-        const auto& [lindex, rindex] = e;
+        const auto &[lindex, rindex] = e;
         return rindex == static_cast<std::size_t>(lindex);
       }));
 }
@@ -181,9 +181,10 @@ ReciprocalMesh::from_rotations(Mesh mesh,
   // All transposes first, then (with time reversal) all inversion partners
   // (-transpose); de-duplication keeps first occurrence, so order matters.
   std::vector<Matrix3i> candidates(
-      std::from_range, real_rotations | std::views::transform([](Matrix3i const &r) {
-                         return Matrix3i(r.transpose());
-                       }));
+      std::from_range,
+      real_rotations | std::views::transform([](Matrix3i const &r) {
+        return Matrix3i(r.transpose());
+      }));
   if (time_reversal == TimeReversal::on) {
     candidates.append_range(real_rotations |
                             std::views::transform([](Matrix3i const &r) {

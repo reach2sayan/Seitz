@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cppcrystal/core/error.hpp>
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
 #include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -41,8 +41,10 @@ dataset_of(Cell const &cell, Tolerance const &tol = {}) {
 }
 
 [[nodiscard]] inline Result<analysis::MagneticDataset>
-magnetic_dataset_of(MagneticCell const &cell, MagneticTolerance const &tol = {}) {
-  auto const analyzer = analysis::MagneticSymmetryAnalyzer::from_cell(cell, tol);
+magnetic_dataset_of(MagneticCell const &cell,
+                    MagneticTolerance const &tol = {}) {
+  auto const analyzer =
+      analysis::MagneticSymmetryAnalyzer::from_cell(cell, tol);
   BOOST_LEAF_AUTO(ds, analyzer.dataset());
   return ds;
 }
@@ -52,12 +54,11 @@ magnetic_dataset_of(MagneticCell const &cell, MagneticTolerance const &tol = {})
 // returning T unchanged would bind a reference to try_handle_all's temporary.
 template <class T> std::remove_cvref_t<T> must(Result<T> r) {
   using Value = std::remove_cvref_t<T>;
-  return leaf::try_handle_all(
-      [&]() -> Result<Value> { return std::move(r); },
-      [](leaf::error_info const &) -> Value {
-        FAIL("unexpected error result");
-        throw std::logic_error("unreachable");
-      });
+  return leaf::try_handle_all([&]() -> Result<Value> { return std::move(r); },
+                              [](leaf::error_info const &) -> Value {
+                                FAIL("unexpected error result");
+                                throw std::logic_error("unreachable");
+                              });
 }
 
 // Whether `make()` produced an error — the expected-failure counterpart of

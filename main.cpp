@@ -38,9 +38,8 @@ int main() {
                      sg.wyckoffs().back().multiplicity());
 
         // 3. Construction: a random structure with a prescribed symmetry.
-        BOOST_LEAF_AUTO(generated,
-                        generate::Generator(sg, {.seed = 20260903U})(
-                            generate::Composition{{26, 2}}));
+        BOOST_LEAF_AUTO(generated, generate::Generator(sg, {.seed = 20260903U})(
+                                       generate::Composition{{26, 2}}));
         std::println("  generated a {}-atom cell of volume {:.2f} A^3",
                      generated.cell.size(), generated.cell.lattice().volume());
         return 0;

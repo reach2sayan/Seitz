@@ -120,7 +120,7 @@ dw_candidates(MatchContext<F> const &s, Centering c, Matrix3i const &rot) {
                    c, s.symmetry[static_cast<std::size_t>(index)].translation) -
                reference),
         [](Vector3d const &a, Vector3d const &b) {
-          return (a - b).cwiseAbs().maxCoeff() < kZeroPrec;
+          return approx_equal(a, b, kZeroPrec);
         });
   }
   if (out.empty()) {

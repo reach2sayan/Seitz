@@ -1,5 +1,5 @@
-#include <cppcrystal/core/operation_set.hpp>
 #include "oracle.hpp"
+#include <cppcrystal/core/operation_set.hpp>
 
 #include "symmetry/search.hpp"
 
@@ -11,8 +11,7 @@ namespace {
 // Returns true iff the two operation collections are equal as sets (rotations
 // exact, translations modulo the lattice within tolerance). spg_get_symmetry
 // returns operations in a different order than we discover them.
-bool same_operation_set(Operations const &a,
-                        Operations const &b, double tol) {
+bool same_operation_set(Operations const &a, Operations const &b, double tol) {
   if (a.size() != b.size())
     return false;
   for (auto const &oa : a) {

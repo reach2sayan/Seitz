@@ -48,8 +48,8 @@ using Row3 = std::array<int, 3>;
   Row3 const c0 = cross(row_of(m, 1), row_of(m, 2));
   Row3 const c1 = cross(row_of(m, 2), row_of(m, 0));
   Row3 const c2 = cross(row_of(m, 0), row_of(m, 1));
-  return {c0[0], c1[0], c2[0],  //
-          c0[1], c1[1], c2[1],  //
+  return {c0[0], c1[0], c2[0], //
+          c0[1], c1[1], c2[1], //
           c0[2], c1[2], c2[2]};
 }
 

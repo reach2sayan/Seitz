@@ -3,10 +3,10 @@
 // original direct constexpr-array indexing for every Hall number. This is
 // independent of the reference oracle, so it runs in the standalone suite.
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/data/spacegroup_metadata_tables.hpp>  // raw metadata (old indexing)
 #include "data/spacegroup_operation_tables.hpp" // raw ops (old indexing)
-#include <cppcrystal/data/spg_database.hpp>                // accessors (new indexing)
+#include <cppcrystal/core/operation_set.hpp>
+#include <cppcrystal/data/spacegroup_metadata_tables.hpp> // raw metadata (old indexing)
+#include <cppcrystal/data/spg_database.hpp> // accessors (new indexing)
 
 #include "helpers.hpp"
 

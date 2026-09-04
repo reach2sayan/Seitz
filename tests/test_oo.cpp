@@ -3,9 +3,9 @@
 // generation. The group tests assert the orbit-stabilizer invariant across all
 // 230 space groups; the generation test round-trips a generated cell back
 // through the analyzer.
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include "core/overlap.hpp"
 #include "data/rod_database.hpp"
+#include <cppcrystal/analysis/symmetry_analyzer.hpp>
 #include <cppcrystal/generate/distance_check.hpp>
 #include <cppcrystal/generate/generator.hpp>
 #include <cppcrystal/group/point_group.hpp>
@@ -44,7 +44,8 @@ using cppcrystal::test::must;
 // is one of the 32 point-group symbols.
 [[nodiscard]] int site_symmetry_order(std::string_view symbol) {
   std::string key;
-  std::ranges::copy(symbol | std::views::filter([](char c) { return c != '.'; }),
+  std::ranges::copy(symbol |
+                        std::views::filter([](char c) { return c != '.'; }),
                     std::back_inserter(key));
   static std::map<std::string_view, std::string_view> const kPermuted{
       {"2mm", "mm2"}, {"m2m", "mm2"}, {"-4m2", "-42m"}, {"-6m2", "-62m"}};
@@ -52,12 +53,12 @@ using cppcrystal::test::must;
     key = it->second;
   }
   static std::map<std::string_view, int> const kOrder{
-      {"1", 1},     {"-1", 2},   {"2", 2},     {"m", 2},     {"2/m", 4},
-      {"222", 4},   {"mm2", 4},  {"mmm", 8},   {"4", 4},     {"-4", 4},
-      {"4/m", 8},   {"422", 8},  {"4mm", 8},   {"-42m", 8},  {"4/mmm", 16},
-      {"3", 3},     {"-3", 6},   {"32", 6},    {"3m", 6},    {"-3m", 12},
-      {"6", 6},     {"-6", 6},   {"6/m", 12},  {"622", 12},  {"6mm", 12},
-      {"-62m", 12}, {"6/mmm", 24}, {"23", 12}, {"m-3", 24},  {"432", 24},
+      {"1", 1},     {"-1", 2},     {"2", 2},    {"m", 2},    {"2/m", 4},
+      {"222", 4},   {"mm2", 4},    {"mmm", 8},  {"4", 4},    {"-4", 4},
+      {"4/m", 8},   {"422", 8},    {"4mm", 8},  {"-42m", 8}, {"4/mmm", 16},
+      {"3", 3},     {"-3", 6},     {"32", 6},   {"3m", 6},   {"-3m", 12},
+      {"6", 6},     {"-6", 6},     {"6/m", 12}, {"622", 12}, {"6mm", 12},
+      {"-62m", 12}, {"6/mmm", 24}, {"23", 12},  {"m-3", 24}, {"432", 24},
       {"-43m", 24}, {"m-3m", 48}};
   auto const it = kOrder.find(key);
   REQUIRE(it != kOrder.end());
@@ -76,7 +77,8 @@ TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
   Vector3d const seed{0.1234, 0.2718, 0.3142};
   int checked = 0;
   for (int number = 1; number <= 230; ++number) {
-    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, number));
+    auto const *sg =
+        must(group::SpaceGroup::from_number(GroupFamily::space, number));
     auto const nops = static_cast<int>(sg->operations().size());
     REQUIRE(nops > 0);
     for (auto const &wp : sg->wyckoffs()) {
@@ -100,7 +102,8 @@ TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
 }
 
 TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 221));
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 221));
   REQUIRE(sg->number() == 221);
   REQUIRE(sg->operations().size() == 48);
 
@@ -119,18 +122,21 @@ TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
 }
 
 TEST_CASE("Wyckoff orbit expansion respects multiplicity", "[group]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
   auto const &general = sg->wyckoffs().back();
   Positions const orbit = general.orbit(Vector3d{0.11, 0.23, 0.37});
   REQUIRE(orbit.rows() == general.multiplicity());
 }
 
 TEST_CASE("from_number rejects out-of-range numbers", "[group]") {
-  REQUIRE(errored([] { return group::SpaceGroup::from_number(GroupFamily::space, 231); }));
+  REQUIRE(errored(
+      [] { return group::SpaceGroup::from_number(GroupFamily::space, 231); }));
 }
 
 TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
   // NaCl: Na (type 11) and Cl (type 17), four of each (the 4a / 4b orbits).
   generate::Composition const comp{{11, 4}, {17, 4}};
   REQUIRE(generate::Generator{*sg}.compatible(comp));
@@ -145,7 +151,8 @@ TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
   REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == 225);
 }
 
-TEST_CASE("generated structures recover their target space group", "[generate]") {
+TEST_CASE("generated structures recover their target space group",
+          "[generate]") {
   // A spread of targets with fixed-position orbits, each round-tripped through
   // the determination pipeline (self-validation, no external oracle).
   struct Case {
@@ -158,15 +165,18 @@ TEST_CASE("generated structures recover their target space group", "[generate]")
       Case{225, {{11, 4}, {17, 4}}} // Fm-3m (NaCl)
   };
   for (auto const &c : cases) {
-    auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+    auto const *sg =
+        must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
     auto gen = must(generate::Generator{*sg, {.seed = 7u}}(c.comp));
     auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
     REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == c.number);
   }
 }
 
-TEST_CASE("generated structures are free of interatomic clashes", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+TEST_CASE("generated structures are free of interatomic clashes",
+          "[generate]") {
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
   auto gen = must(generate::Generator{*sg, {.seed = 99u}}(comp));
   // The builder only returns distance-valid cells; confirm independently.
@@ -174,7 +184,8 @@ TEST_CASE("generated structures are free of interatomic clashes", "[generate]") 
 }
 
 TEST_CASE("generation is deterministic in the seed", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
   generate::Composition const comp{{11, 4}, {17, 4}};
   generate::Generator const gen{*sg, {.seed = 123u}};
   auto a = must(gen(comp));
@@ -184,9 +195,11 @@ TEST_CASE("generation is deterministic in the seed", "[generate]") {
 }
 
 TEST_CASE("incompatible composition is rejected", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m, smallest mult 4
+  auto const *sg = must(group::SpaceGroup::from_number(
+      GroupFamily::space, 225)); // Fm-3m, smallest mult 4
   // Three atoms cannot fill any combination of multiplicity-4-or-more orbits.
-  REQUIRE_FALSE(generate::Generator{*sg}.compatible(generate::Composition{{1, 3}}));
+  REQUIRE_FALSE(
+      generate::Generator{*sg}.compatible(generate::Composition{{1, 3}}));
 }
 
 TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
@@ -195,7 +208,8 @@ TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
   // the periodic plane, so a c-flipped image stays at -z rather than 1-z.
   Vector3d const seed{0.1234, 0.2718, 0.3142};
   for (int number = 1; number <= 80; ++number) {
-    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    auto const *lg =
+        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
     REQUIRE(lg->number() == number);
     REQUIRE(lg->hall().family() == GroupFamily::layer);
     auto const nops = static_cast<int>(lg->operations().size());
@@ -214,13 +228,14 @@ TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
 TEST_CASE("generated layer structures carry their full layer symmetry",
           "[layergen]") {
   // The direct self-validation: a generated 2D-periodic structure must be
-  // invariant under EVERY operation of its layer group (aperiodic-aware overlap).
-  // This covers all crystal systems and the c-flipping groups (inversion,
-  // in-plane 2-folds/mirrors, horizontal mirrors), which the orbit must build
-  // without folding the non-periodic axis.
+  // invariant under EVERY operation of its layer group (aperiodic-aware
+  // overlap). This covers all crystal systems and the c-flipping groups
+  // (inversion, in-plane 2-folds/mirrors, horizontal mirrors), which the orbit
+  // must build without folding the non-periodic axis.
   for (int number : {1, 2, 19, 49, 61, 65}) {
     INFO("layer group " << number);
-    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    auto const *lg =
+        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
@@ -228,10 +243,11 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
     // limit that a 50-attempt budget clears it only about three times in four;
     // the budget, not the metric, is what this test needs raised.
     auto gen = must(generate::Generator{
-        *lg, {.scale = 4.0,
-              .seed = 13u,
-              .attempts_per_combination = 400,
-              .placement = generate::Placement::general_only}}(comp));
+        *lg,
+        {.scale = 4.0,
+         .seed = 13u,
+         .attempts_per_combination = 400,
+         .placement = generate::Placement::general_only}}(comp));
     REQUIRE(aperiodic_axis(gen.cell.periodicity()) == 2);
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
@@ -250,25 +266,30 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
   // the direct op-invariance test above rather than a determination round-trip.
   for (int number : {1, 49, 55, 65}) {
     INFO("layer group " << number);
-    auto const *lg = must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    auto const *lg =
+        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
     auto gen = must(generate::Generator{
-        *lg, {.scale = 4.0,
-              .seed = 13u,
-              .attempts_per_combination = 400,
-              .placement = generate::Placement::general_only}}(comp));
-    auto ds = must(test::dataset_of(gen.cell.with_periodicity(aperiodic_along(2)),
-                               {1e-4}));
-    REQUIRE(data::spacegroup_type(ds.hall).number == number); // exact layer-group recovery
+        *lg,
+        {.scale = 4.0,
+         .seed = 13u,
+         .attempts_per_combination = 400,
+         .placement = generate::Placement::general_only}}(comp));
+    auto ds = must(test::dataset_of(
+        gen.cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+    REQUIRE(data::spacegroup_type(ds.hall).number ==
+            number); // exact layer-group recovery
   }
 }
 
 namespace {
-// Point-group order of a space group: distinct rotation parts of its operations.
+// Point-group order of a space group: distinct rotation parts of its
+// operations.
 int pg_order(int number) {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, number));
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, number));
   std::vector<Matrix3i> rots;
   for (auto const &op : sg->operations()) {
     if (std::ranges::none_of(
@@ -333,7 +354,8 @@ TEST_CASE("every t-subgroup edge is order-consistent", "[subgroup]") {
 
 TEST_CASE("reachability and symmetry-breaking paths", "[subgroup]") {
   REQUIRE(group::SubgroupGraph::is_subgroup(221, 221)); // reflexive
-  REQUIRE(group::SubgroupGraph::is_subgroup(1, 221));   // P1 is a t-subgroup of Pm-3m
+  REQUIRE(
+      group::SubgroupGraph::is_subgroup(1, 221)); // P1 is a t-subgroup of Pm-3m
   REQUIRE_FALSE(group::SubgroupGraph::is_subgroup(221, 1));
 
   auto chain = group::SubgroupGraph::path(221, 1);
@@ -414,8 +436,7 @@ TEST_CASE("orbit-stabilizer invariant holds for all 32 point groups",
     REQUIRE(pg.wyckoffs().back().degrees_of_freedom() == 3);
 
     for (auto const &wp : pg.wyckoffs()) {
-      REQUIRE(wp.multiplicity() *
-                  static_cast<int>(wp.operations().size()) ==
+      REQUIRE(wp.multiplicity() * static_cast<int>(wp.operations().size()) ==
               order);
     }
   }
@@ -458,9 +479,10 @@ TEST_CASE("generated clusters carry their full point-group symmetry",
     generate::Composition const comp{{6, m}, {7, m}};
 
     auto gen = must(generate::Generator{
-        pg, {.scale = 3.0,
-             .seed = 17u,
-             .placement = generate::Placement::general_only}}(comp));
+        pg,
+        {.scale = 3.0,
+         .seed = 17u,
+         .placement = generate::Placement::general_only}}(comp));
     REQUIRE(gen.cell.periodicity() == none_periodic());
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(generate::distances_valid(gen.cell));
@@ -501,8 +523,7 @@ TEST_CASE("orbit-stabilizer invariant holds for all 75 rod groups", "[rod]") {
     REQUIRE(rg.wyckoffs().back().multiplicity() == order);
     REQUIRE(rg.wyckoffs().back().degrees_of_freedom() == 3);
     for (auto const &wp : rg.wyckoffs()) {
-      REQUIRE(wp.multiplicity() *
-                  static_cast<int>(wp.operations().size()) ==
+      REQUIRE(wp.multiplicity() * static_cast<int>(wp.operations().size()) ==
               order);
     }
   }
@@ -511,8 +532,8 @@ TEST_CASE("orbit-stabilizer invariant holds for all 75 rod groups", "[rod]") {
 TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
   // Direct self-validation of the general-position path: the generated 1D
   // structure must be invariant under EVERY rod operation, folding only the
-  // periodic axis. Spans the trivial group, a perpendicular 2-fold (c-flipping),
-  // a screw axis, and the higher-symmetry axial groups.
+  // periodic axis. Spans the trivial group, a perpendicular 2-fold
+  // (c-flipping), a screw axis, and the higher-symmetry axial groups.
   for (int number : {1, 3, 13, 23, 24, 53}) {
     INFO("rod group " << number);
     auto rg = must(group::RodGroup::from_number(number));
@@ -520,9 +541,10 @@ TEST_CASE("generated rod structures carry their full rod symmetry", "[rod]") {
     generate::Composition const comp{{6, m}, {7, m}};
 
     auto gen = must(generate::Generator{
-        rg, {.scale = 2.0,
-             .seed = 31u,
-             .placement = generate::Placement::general_only}}(comp));
+        rg,
+        {.scale = 2.0,
+         .seed = 31u,
+         .placement = generate::Placement::general_only}}(comp));
     REQUIRE(gen.cell.periodicity() == periodic_along(2));
     REQUIRE(gen.cell.size() == static_cast<Index>(2 * m));
     REQUIRE(is_invariant(gen.cell, rg.operations()));

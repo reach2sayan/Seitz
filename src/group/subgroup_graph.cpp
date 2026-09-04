@@ -1,13 +1,13 @@
 #include <cppcrystal/group/subgroup_graph.hpp>
 
 #include "core/matrix_order.hpp"
+#include "generate/random_lattice.hpp"
+#include "spacegroup/spacegroup.hpp"
 #include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/tolerance.hpp>
 #include <cppcrystal/data/spg_database.hpp>
 #include <cppcrystal/data/subgroup_relations.hpp>
-#include "generate/random_lattice.hpp"
-#include "spacegroup/spacegroup.hpp"
 
 #include <boost/leaf.hpp>
 
@@ -112,8 +112,8 @@ maximal_point_subgroups(std::vector<Matrix3i> const &pg) {
     }
   }
   std::vector<RotationSet> maximal;
-  // A proper subgroup is maximal when no other proper subgroup strictly contains
-  // it (strict size comparison also excludes the candidate itself).
+  // A proper subgroup is maximal when no other proper subgroup strictly
+  // contains it (strict size comparison also excludes the candidate itself).
   for (RotationSet const &candidate : proper) {
     bool const is_maximal =
         std::ranges::none_of(proper, [&](RotationSet const &other) {
@@ -156,7 +156,8 @@ std::optional<std::vector<int>> SubgroupGraph::path(int super, int sub) {
     return std::vector<int>{super};
   }
 
-  // predecessor[v] == 0 marks "not yet reached"; space-group numbers start at 1.
+  // predecessor[v] == 0 marks "not yet reached"; space-group numbers start
+  // at 1.
   std::array<int, kNumSpaceGroups + 1> predecessor{};
   std::vector<int> queue{super};
   queue.reserve(kNumSpaceGroups);
@@ -170,7 +171,8 @@ std::optional<std::vector<int>> SubgroupGraph::path(int super, int sub) {
       parent = current;
       if (rel.number == sub) {
         std::vector<int> chain;
-        for (int v = sub; v != super; v = predecessor[static_cast<std::size_t>(v)]) {
+        for (int v = sub; v != super;
+             v = predecessor[static_cast<std::size_t>(v)]) {
           chain.push_back(v);
         }
         chain.push_back(super);

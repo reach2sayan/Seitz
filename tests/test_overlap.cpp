@@ -154,8 +154,8 @@ TEST_CASE("the indexed checker agrees with the greedy scan it replaced",
           if (trial % 2 == 0) {
             Index const target =
                 static_cast<Index>(rng() % static_cast<unsigned>(cell.size()));
-            trans = cell.position(target) -
-                    rot.cast<double>() * cell.position(0);
+            trans =
+                cell.position(target) - rot.cast<double>() * cell.position(0);
           } else {
             trans = Vector3d(unit(rng), unit(rng), unit(rng));
           }

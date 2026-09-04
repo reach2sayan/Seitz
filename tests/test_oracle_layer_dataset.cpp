@@ -1,6 +1,6 @@
 // Oracle test for the layer-group dataset (spglib.c get_layer_dataset):
-// the cppcrystal layer path must reproduce the reference spg_get_layer_dataset —
-// the layer-group identity (negative hall number, layer-group number 1..80,
+// the cppcrystal layer path must reproduce the reference spg_get_layer_dataset
+// — the layer-group identity (negative hall number, layer-group number 1..80,
 // symbol, point group), the symmetry operations, the per-atom Wyckoff /
 // site-symmetry / equivalence data, and the standardized layer cell.
 //
@@ -30,13 +30,13 @@
 namespace {
 
 using cppcrystal::Cell;
-using cppcrystal::test::layer_hall;
 using cppcrystal::Lattice;
 using cppcrystal::Matrix3d;
 using cppcrystal::Positions;
 using cppcrystal::Result;
 using cppcrystal::Types;
 using cppcrystal::Vector3d;
+using cppcrystal::test::layer_hall;
 
 Cell make_layer_cell(Matrix3d const &lattice,
                      std::vector<std::array<double, 3>> const &pos,
@@ -105,18 +105,23 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
   auto const got = must(cppcrystal::test::dataset_of(
       cell.with_periodicity(cppcrystal::aperiodic_along(aperiodic_axis)),
       {symprec}));
-  auto const ref =
-      cppcrystal::oracle::reference_layer_dataset(cell, aperiodic_axis, symprec);
+  auto const ref = cppcrystal::oracle::reference_layer_dataset(
+      cell, aperiodic_axis, symprec);
   REQUIRE(ref.number != 0); // reference succeeded
 
   // Layer-group identity.
   CHECK(cppcrystal::data::spacegroup_type(got.hall).number == ref.number);
   CHECK(got.hall == layer_hall(-ref.hall_number));
-  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).international_short) == ref.international);
-  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).hall_symbol) == ref.hall_symbol);
-  CHECK(std::string(cppcrystal::pointgroup_by_number(cppcrystal::data::spacegroup_type(got.hall).pointgroup_number).symbol) == ref.pointgroup);
-  CHECK(cppcrystal::aperiodic_axis(got.standardized.periodicity())
-            .has_value());
+  CHECK(std::string(
+            cppcrystal::data::spacegroup_type(got.hall).international_short) ==
+        ref.international);
+  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).hall_symbol) ==
+        ref.hall_symbol);
+  CHECK(std::string(
+            cppcrystal::pointgroup_by_number(
+                cppcrystal::data::spacegroup_type(got.hall).pointgroup_number)
+                .symbol) == ref.pointgroup);
+  CHECK(cppcrystal::aperiodic_axis(got.standardized.periodicity()).has_value());
 
   // Per input-atom Wyckoff / site-symmetry / equivalence data.
   REQUIRE(got.sites.size() == ref.wyckoffs.size());
@@ -127,7 +132,8 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
     CHECK(got.sites[i].equivalent_atom == ref.equivalent_atoms[i]);
   }
 
-  // Symmetry operations, matched as a set (aperiodic-aware translation compare).
+  // Symmetry operations, matched as a set (aperiodic-aware translation
+  // compare).
   REQUIRE(static_cast<int>(got.operations.size()) == ref.n_operations);
   for (auto const &rop : ref.operations) {
     bool found = false;
@@ -149,14 +155,17 @@ void check(Cell const &cell, int aperiodic_axis, double symprec) {
   for (int r = 0; r < ref.n_std_atoms; ++r) {
     Vector3d const ref_pos = ref.std_positions.row(r).transpose();
     bool found = false;
-    for (int g = 0; g < static_cast<int>(got.standardized.types().size()) && !found; ++g) {
+    for (int g = 0;
+         g < static_cast<int>(got.standardized.types().size()) && !found; ++g) {
       auto const ug = static_cast<std::size_t>(g);
-      if (got.standardized.types()[ug] != ref.std_types[static_cast<std::size_t>(r)]) {
+      if (got.standardized.types()[ug] !=
+          ref.std_types[static_cast<std::size_t>(r)]) {
         continue;
       }
       // Standardized positions are stored folded into [0, 1) on every axis; the
       // aperiodic axis is c = 2 in the standardized setting.
-      found = overlap_layer(got.standardized.positions().row(g).transpose(), ref_pos,
+      found = overlap_layer(got.standardized.positions().row(g).transpose(),
+                            ref_pos,
                             /*aperiodic_axis=*/2, symprec);
     }
     INFO("standardized atom " << r << " not matched");
@@ -190,9 +199,8 @@ TEST_CASE("layer dataset: hexagonal BN p-6m2", "[oracle][layer]") {
 }
 
 TEST_CASE("layer dataset: square lattice p4/mmm", "[oracle][layer]") {
-  Cell const cell =
-      make_layer_cell(orthorhombic_layer(3.0, 3.0, 12.0), {{0.0, 0.0, 0.0}},
-                      {1});
+  Cell const cell = make_layer_cell(orthorhombic_layer(3.0, 3.0, 12.0),
+                                    {{0.0, 0.0, 0.0}}, {1});
   check(cell, 2, 1e-5);
 }
 

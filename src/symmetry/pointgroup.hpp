@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/error.hpp>
 #include <cppcrystal/core/keys.hpp>
+#include <cppcrystal/core/operation_set.hpp>
 #include <cppcrystal/core/point_group.hpp>
 #include <cppcrystal/core/symmetry_operation.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -11,7 +11,6 @@
 #include <span>
 
 namespace cppcrystal::symmetry {
-
 
 // Point group together with the integer change-of-basis matrix that brings the
 // rotations into the conventional setting (columns are the chosen axes). With
@@ -32,10 +31,10 @@ identify_point_group(std::span<Matrix3i const> rotations,
                      std::optional<int> layer_axis = std::nullopt);
 
 extern template Result<PointgroupTransform>
-identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
-                                         std::optional<int>);
+    identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
+                                             std::optional<int>);
 extern template Result<PointgroupTransform>
-identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
-                                         std::optional<int>);
+    identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
+                                             std::optional<int>);
 
 } // namespace cppcrystal::symmetry

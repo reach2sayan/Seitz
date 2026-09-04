@@ -13,10 +13,11 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# GCC 15 / Clang with libstdc++ only. The library needs <generator> and
-# std::ranges::to, compiles as gnu++23, and the constexpr-budget flag below has
-# no portable spelling — so rather than carry untested branches for other
-# toolchains, say so once, here.
+# GCC 15 / Clang with libstdc++ only. The library needs <generator>, compiles as
+# gnu++23, and the constexpr-budget flag below has no portable spelling — so
+# rather than carry untested branches for other toolchains, say so once, here.
+# The source itself is platform-neutral (no POSIX headers, no _WIN32), so
+# relaxing this is a toolchain question, not a porting one.
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     message(FATAL_ERROR
             "CppCrystal builds with GCC 15+ or Clang only (got ${CMAKE_CXX_COMPILER_ID}).")

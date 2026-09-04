@@ -1,13 +1,13 @@
 // Oracle test for the full magnetic dataset (spglib.c get_magnetic_dataset):
-// cppcrystal::get_magnetic_dataset must reproduce spg_get_magnetic_dataset — the
-// magnetic space-group identity, the standardized cell (lattice + positions +
-// site tensors), equivalent atoms, and the transformation to the standardized
+// cppcrystal::get_magnetic_dataset must reproduce spg_get_magnetic_dataset —
+// the magnetic space-group identity, the standardized cell (lattice + positions
+// + site tensors), equivalent atoms, and the transformation to the standardized
 // setting.
 
 #include "oracle.hpp"
 
-#include <cppcrystal/core/magnetic_cell.hpp>
 #include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
+#include <cppcrystal/core/magnetic_cell.hpp>
 
 #include "math/integer_matrix.hpp"
 
@@ -22,17 +22,17 @@
 namespace {
 
 using cppcrystal::Cell;
-using cppcrystal::Lattice;
 using cppcrystal::CollinearTensors;
+using cppcrystal::Lattice;
 using cppcrystal::MagneticCell;
 using cppcrystal::Matrix3d;
 using cppcrystal::Matrix3i;
-using cppcrystal::NoncollinearTensors;
 using cppcrystal::noncollinear_tensors;
+using cppcrystal::NoncollinearTensors;
 using cppcrystal::Positions;
 using cppcrystal::SiteTensor;
-using cppcrystal::TensorKind;
 using cppcrystal::SiteTensors;
+using cppcrystal::TensorKind;
 using cppcrystal::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
@@ -92,7 +92,8 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   CHECK(got->uni.value() == ref->uni_number);
   CHECK(static_cast<int>(got->type) == ref->msg_type);
   CHECK(got->hall.index() == ref->hall_number);
-  CHECK(static_cast<int>(got->standardized.cell().types().size()) == ref->n_std_atoms);
+  CHECK(static_cast<int>(got->standardized.cell().types().size()) ==
+        ref->n_std_atoms);
 
   // Transformation to the standardized setting.
   Matrix3d ref_tmat;
@@ -103,12 +104,15 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   CHECK((got->setting.origin_shift - ref_shift).cwiseAbs().maxCoeff() < 1e-5);
   Matrix3d ref_std_rot;
   cppcrystal::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
-  CHECK((got->setting.rigid_rotation - ref_std_rot).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->setting.rigid_rotation - ref_std_rot).cwiseAbs().maxCoeff() <
+        1e-5);
 
   // Standardized lattice.
   Matrix3d ref_std_lat;
   cppcrystal::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
-  CHECK((got->standardized.cell().lattice().matrix() - ref_std_lat).cwiseAbs().maxCoeff() < 1e-5);
+  CHECK((got->standardized.cell().lattice().matrix() - ref_std_lat)
+            .cwiseAbs()
+            .maxCoeff() < 1e-5);
 
   // Equivalent atoms (per input atom).
   REQUIRE(static_cast<int>(got->equivalent_atoms.size()) == ref->n_atoms);
@@ -127,18 +131,21 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
       auto const ug = static_cast<std::size_t>(g);
       if (got->standardized.cell().types()[ug] != ref->std_types[r])
         continue;
-      if (!fractional_overlap(got->standardized.cell().positions().row(g).transpose(), ref_pos,
-                              symprec))
+      if (!fractional_overlap(
+              got->standardized.cell().positions().row(g).transpose(), ref_pos,
+              symprec))
         continue;
       bool tensor_ok = true;
       if (collinear) {
-        tensor_ok = std::abs(std::get<CollinearTensors>(got->standardized.tensors())[ug] -
+        tensor_ok = std::abs(std::get<CollinearTensors>(
+                                 got->standardized.tensors())[ug] -
                              ref->std_tensors[r]) < 1e-4;
       } else {
-        auto const v = std::get<NoncollinearTensors>(got->standardized.tensors()).row(ug);
+        auto const v =
+            std::get<NoncollinearTensors>(got->standardized.tensors()).row(ug);
         for (int s = 0; s < 3; ++s)
-          tensor_ok = tensor_ok &&
-                      std::abs(v[s] - ref->std_tensors[3 * r + s]) < 1e-4;
+          tensor_ok =
+              tensor_ok && std::abs(v[s] - ref->std_tensors[3 * r + s]) < 1e-4;
       }
       found = tensor_ok;
     }
@@ -184,16 +191,14 @@ TEST_CASE("magnetic dataset: collinear ferromagnet", "[oracle][magnetic]") {
 }
 
 TEST_CASE("magnetic dataset: collinear antiferromagnet", "[oracle][magnetic]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, -1.0}});
   check(mcell, TensorKind::axial, 1e-5);
 }
 
 TEST_CASE("magnetic dataset: non-collinear antiferromagnet",
           "[oracle][magnetic]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(
       cell, SiteTensors{noncollinear_tensors(
                 {Vector3d(0.0, 0.0, 1.0), Vector3d(0.0, 0.0, -1.0)})});
@@ -201,8 +206,7 @@ TEST_CASE("magnetic dataset: non-collinear antiferromagnet",
 }
 
 TEST_CASE("magnetic dataset: type-II grey group", "[oracle][magnetic]") {
-  Cell const cell =
-      make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
+  Cell const cell = make_cell(4.0, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, {0, 0});
   MagneticCell const mcell(cell, SiteTensors{CollinearTensors{1.0, 1.0}});
   check(mcell, TensorKind::axial, 1e-5);
 }

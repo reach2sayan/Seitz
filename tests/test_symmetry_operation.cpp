@@ -57,7 +57,8 @@ TEST_CASE("index_by_rotation keeps original order within a rotation",
   SymmetryOperation const id{Matrix3i::Identity(), Vector3d::Zero()};
   SymmetryOperation const id_shifted{Matrix3i::Identity(),
                                      Vector3d(0.5, 0.5, 0.5)};
-  Operations const ops{std::vector<SymmetryOperation>{rot_z_90(), id, id_shifted}};
+  Operations const ops{
+      std::vector<SymmetryOperation>{rot_z_90(), id, id_shifted}};
 
   auto const by_rot = index_by_rotation(ops, &SymmetryOperation::rotation);
   REQUIRE(by_rot.size() == 3);

@@ -36,9 +36,10 @@ namespace cppcrystal::math {
 // RADIANS. The result is upper triangular, which is the same thing as saying
 // it is the unique Cholesky factor U of the metric with U^T U = G and a
 // positive diagonal.
-[[nodiscard]] inline Matrix3d
-lattice_from_parameters(double a, double b, double c, double alpha, double beta,
-                        double gamma) {
+[[nodiscard]] inline Matrix3d lattice_from_parameters(double a, double b,
+                                                      double c, double alpha,
+                                                      double beta,
+                                                      double gamma) {
   double const ca = std::cos(alpha);
   double const cb = std::cos(beta);
   double const cg = std::cos(gamma);
@@ -47,11 +48,10 @@ lattice_from_parameters(double a, double b, double c, double alpha, double beta,
   // The discriminant is non-negative for any realisable cell; the clamp only
   // catches a rounding-negative value for a near-degenerate one, where the
   // bare sqrt would be NaN.
-  double const cz =
-      c *
-      std::sqrt(std::max(
-          0.0, 1.0 - ca * ca - cb * cb - cg * cg + 2.0 * ca * cb * cg)) /
-      sg;
+  double const cz = c *
+                    std::sqrt(std::max(0.0, 1.0 - ca * ca - cb * cb - cg * cg +
+                                                2.0 * ca * cb * cg)) /
+                    sg;
 
   Matrix3d m;
   m.col(0) = Vector3d{a, 0.0, 0.0};

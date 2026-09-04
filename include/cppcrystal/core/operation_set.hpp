@@ -97,8 +97,8 @@ public:
   // caller's business (the point-group identification does its own).
   [[nodiscard]] std::vector<Matrix3i> rotations() const {
     return {std::from_range, ops_ | std::views::transform([](Op const &op) {
-              return Traits::spatial(op).rotation;
-            })};
+                               return Traits::spatial(op).rotation;
+                             })};
   }
 
   // The pure translations: the identity-rotation operations' translations,
@@ -140,8 +140,8 @@ public:
   {
     return OperationSet<SymmetryOperation>{
         std::from_range, ops_ | std::views::transform([](Op const &op) {
-          return Traits::spatial(op);
-        })};
+                           return Traits::spatial(op);
+                         })};
   }
 
   // The primitive operations implied by these (typically conventional) ones,

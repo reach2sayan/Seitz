@@ -19,11 +19,11 @@ using namespace cppcrystal;
 
 namespace {
 using cppcrystal::test::layer_hall;
-using cppcrystal::test::space_hall;
 using cppcrystal::test::must;
+using cppcrystal::test::space_hall;
 
-// A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along c,
-// the aperiodic axis. Columns are basis vectors.
+// A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along
+// c, the aperiodic axis. Columns are basis vectors.
 Matrix3d hexagonal_layer(double a, double c) {
   Matrix3d m;
   m.col(0) = Vector3d(a, 0, 0);
@@ -37,12 +37,16 @@ TEST_CASE("layer database: negative-hall metadata + ops", "[layer][database]") {
   // constexpr metadata works at compile time for layer settings.
   STATIC_REQUIRE(data::spacegroup_type(layer_hall(1)).number == 1);
   STATIC_REQUIRE(data::spacegroup_type(layer_hall(116)).number == 80);
-  STATIC_REQUIRE(data::spacegroup_type(layer_hall(116)).pointgroup_number == 27);
-  STATIC_REQUIRE(data::spacegroup_type(space_hall(1)).number == 1); // 3D path intact
+  STATIC_REQUIRE(data::spacegroup_type(layer_hall(116)).pointgroup_number ==
+                 27);
+  STATIC_REQUIRE(data::spacegroup_type(space_hall(1)).number ==
+                 1); // 3D path intact
 
   // Layer operations are capped at 24 (vs 48 for 3D point groups).
-  REQUIRE(data::operations_from_database(layer_hall(116)).size() == 24); // p6/mmm layer
-  REQUIRE(data::operations_from_database(layer_hall(1)).size() == 1);     // p1 layer
+  REQUIRE(data::operations_from_database(layer_hall(116)).size() ==
+          24); // p6/mmm layer
+  REQUIRE(data::operations_from_database(layer_hall(1)).size() ==
+          1); // p1 layer
 }
 
 TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
@@ -52,9 +56,10 @@ TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;
   Cell const cell{Lattice{lat}, pos, Types{6, 6}};
 
-  auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
-  REQUIRE(data::spacegroup_type(ds.hall).number == 80);  // layer-group number
-  REQUIRE(ds.hall == layer_hall(116));      // negative-hall convention
+  auto ds =
+      must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+  REQUIRE(data::spacegroup_type(ds.hall).number == 80); // layer-group number
+  REQUIRE(ds.hall == layer_hall(116)); // negative-hall convention
   REQUIRE(data::spacegroup_type(ds.hall).international_short == "p6/mmm");
   REQUIRE(aperiodic_axis(ds.standardized.periodicity()) == 2);
   REQUIRE(ds.operations.size() == 24);
@@ -64,7 +69,8 @@ TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
   REQUIRE(ds.sites[0].site_symmetry == "-6m2");
 }
 
-TEST_CASE("graphene offset along the aperiodic axis still resolves", "[layer]") {
+TEST_CASE("graphene offset along the aperiodic axis still resolves",
+          "[layer]") {
   // The layer sits at an arbitrary z (not the database's z=0 plane). The
   // origin-shift aperiodic (c) component must re-center it; the result is
   // independent of the offset.
@@ -74,7 +80,8 @@ TEST_CASE("graphene offset along the aperiodic axis still resolves", "[layer]") 
     pos.row(0) << 1.0 / 3, 2.0 / 3, z;
     pos.row(1) << 2.0 / 3, 1.0 / 3, z;
     Cell const cell{Lattice{lat}, pos, Types{6, 6}};
-    auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+    auto ds = must(
+        test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
     INFO("z offset = " << z);
     REQUIRE(data::spacegroup_type(ds.hall).number == 80);
     REQUIRE(data::spacegroup_type(ds.hall).international_short == "p6/mmm");
@@ -91,7 +98,8 @@ TEST_CASE("square lattice single atom is p4/mmm (LG 61)", "[layer]") {
   pos.row(0) << 0, 0, 0;
   Cell const cell{Lattice{lat}, pos, Types{1}};
 
-  auto ds = must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
+  auto ds =
+      must(test::dataset_of(cell.with_periodicity(aperiodic_along(2)), {1e-4}));
   REQUIRE(data::spacegroup_type(ds.hall).number == 61);
   REQUIRE(data::spacegroup_type(ds.hall).international_short == "p4/mmm");
   REQUIRE(ds.sites[0].site_symmetry == "4/mmm");

@@ -38,8 +38,8 @@ template <class T, std::size_t N, std::size_t K> struct BucketIndex {
 // key outside [0, K) is a compile-time error.
 template <std::size_t N, std::size_t K, class T = int, class KeyOf,
           class ValueOf = std::identity>
-[[nodiscard]] consteval BucketIndex<T, N, K> bucket_index(KeyOf key_of,
-                                                          ValueOf value_of = {}) {
+[[nodiscard]] consteval BucketIndex<T, N, K>
+bucket_index(KeyOf key_of, ValueOf value_of = {}) {
   BucketIndex<T, N, K> out{};
   for (int id = 1; id <= static_cast<int>(N); ++id) {
     ++out.offsets[static_cast<std::size_t>(key_of(id)) + 1];
