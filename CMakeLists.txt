@@ -23,10 +23,26 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             "CppCrystal builds with GCC 15+ or Clang only (got ${CMAKE_CXX_COMPILER_ID}).")
 endif ()
 
+# The version, not just the vendor. GCC 14 and earlier accept -std=gnu++23 and
+# then fail deep inside operation_set.hpp on std::from_range, which reads as a
+# library bug rather than as "wrong compiler" -- and it is reachable, because a
+# path that does not go through CMakePresets (pip install ., an IDE default,
+# plain `cmake ..`) picks up whatever `c++` happens to be. Say it here instead.
+# Clang gets no version floor: its constraint is the libstdc++ it is paired
+# with, which is not what CMAKE_CXX_COMPILER_VERSION reports.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+    message(FATAL_ERROR
+            "CppCrystal needs GCC 15+ for <generator> and std::from_range "
+            "(got ${CMAKE_CXX_COMPILER_VERSION} at ${CMAKE_CXX_COMPILER}).\n"
+            "Select one explicitly, e.g. CXX=g++-15 for a pip/uv build, or "
+            "-DCMAKE_CXX_COMPILER=g++-15 for a direct cmake invocation.")
+endif ()
+
 option(CPPCRYSTAL_BUILD_TESTS "Build the test suite" ON)
 option(CPPCRYSTAL_BUILD_DEMO "Build the demo executable" ON)
 option(CPPCRYSTAL_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
 option(CPPCRYSTAL_BUILD_TOOLS "Build offline data generators" OFF)
+option(CPPCRYSTAL_BUILD_PYTHON "Build the pybind11 extension module" OFF)
 option(CPPCRYSTAL_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 option(CPPCRYSTAL_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 
@@ -226,6 +242,16 @@ endif ()
 if (CPPCRYSTAL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif ()
+
+# The Python extension. Its own subdirectory because the deliverable is two
+# things that have to sit next to each other -- a set of translation units and a
+# Python package -- and because src/ is the never-installed pipeline.
+# enable_testing() above also registers the pytest suite, so the ordering
+# matters when tests are on.
+if (CPPCRYSTAL_BUILD_PYTHON)
+    enable_testing()
+    add_subdirectory(python)
 endif ()
 
 # ---- install ----

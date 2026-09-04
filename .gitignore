@@ -600,3 +600,21 @@ FodyWeavers.xsd
 
 .idea/
 build/*
+
+# ---- CppCrystal Python bindings ----
+# `build/*` above already covers the scikit-build-core tree
+# (build/cp312-cp312-linux_x86_64/...), and `.venv`, `__pycache__/` and `*.pyc`
+# are covered further up. These are the rest of what the Python path leaves
+# behind.
+.pytest_cache/
+*.egg-info/
+_skbuild/
+
+# Deliberately NOT ignored -- these are inputs, and CI depends on them:
+#   uv.lock                        the pinned dev environment
+#   .python-version                which interpreter uv should use
+#   pyproject.toml                 the scikit-build-core build definition
+#   python/cppcrystal/py.typed     marks the package as typed for downstreams
+#   python/cppcrystal/_core/*.pyi  committed stubs; CI regenerates them with
+#                                  `uv run python tools/fix_core_stubs.py` and
+#                                  fails on a diff, so a stale commit breaks it

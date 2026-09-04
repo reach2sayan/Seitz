@@ -193,6 +193,7 @@ ctest --test-dir cmake-build-debug  # run the unit tests
 | `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 |
 | `CPPCRYSTAL_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
 | `CPPCRYSTAL_BUILD_TOOLS` | OFF | offline data generators |
+| `CPPCRYSTAL_BUILD_PYTHON` | OFF | pybind11 extension module |
 
 The `oracle` preset builds reference spglib via `FetchContent` and links it only
 into the oracle tests — never into the library — to cross-check every result
@@ -228,6 +229,91 @@ public dependencies, and because this project fetches them rather than taking
 them from the system, `cmake --install` writes their CMake packages into the
 same prefix — the result is self-contained and needs nothing installed
 system-wide.
+
+---
+
+## Python
+
+The bindings expose the public API as a NumPy-first Python package. The C++
+library does the work; the Python layer adds validated inputs and serializable
+records via **pydantic**, and turns the `Result<T>` error model into a real
+exception hierarchy.
+
+```python
+import numpy as np
+import cppcrystal as cc
+
+cell = cc.Cell(
+    cc.Lattice(3.0 * np.eye(3)),          # columns are the basis vectors
+    [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],
+    [26, 26],
+)
+
+analyzer = cc.analyze(cell)               # nothing computed yet
+print(analyzer.spacegroup_type.international_short)   # Im-3m
+print(len(analyzer.operations))                       # 96
+
+group = cc.SpaceGroup.of(analyzer.hall)
+print(group.wyckoffs[-1].multiplicity)                # general position
+
+print(cc.DatasetRecord.from_analyzer(analyzer).model_dump_json(indent=2))
+```
+
+The analyzer memoizes, so it is the object you keep rather than a call you
+repeat, and every query on it is thread-safe. Errors are never sentinels:
+"absent" is `None`, and a failure raises a `cppcrystal.errors.CppCrystalError`
+subclass — `InvalidLatticeError` carries `.determinant`, `AtomsTooCloseError`
+carries `.distance`. Layer groups are not a separate entry point: a cell built
+with `periodicity=cc.aperiodic_along(2)` goes through the same analyzer.
+
+### Building the bindings
+
+Two paths onto the same CMake target, so they cannot drift:
+
+```bash
+cmake --preset python                  # configure with CPPCRYSTAL_BUILD_PYTHON=ON
+cmake --build cmake-build-debug
+ctest --test-dir cmake-build-debug     # Catch2 suites + the pytest suite
+```
+
+or, with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync                                              # environment + dev tools
+CXX=g++-15 uv pip install -e . --no-build-isolation  # editable, rebuilds on import
+uv run pytest python/tests -q
+```
+
+`CXX=g++-15` matters: this path does not read `CMakePresets.json`, so without it
+CMake picks up whatever `c++` is on `PATH` — on Ubuntu 24.04 that is GCC 13, and
+configuring stops with a message telling you so.
+
+`--no-build-isolation` is required for the editable install: scikit-build-core
+re-runs `cmake --build` from an import hook that executes in the *runtime*
+environment, so `scikit-build-core`, `cmake` and `ninja` have to be importable
+there. They are in the `dev` dependency group for exactly that reason.
+
+**There are no manylinux wheels, deliberately.** The library hard-errors below
+GCC 15 and compiles as `gnu++23`, while the manylinux images top out several
+major versions earlier; even if one built, the result would need a GCC 15
+`libstdc++` on the user's machine, which auditwheel cannot vendor safely. A
+wheel that fails at import is worse than no wheel, so `pip install .` builds
+from source. conda-forge ships the toolchain if a binary channel is ever wanted.
+
+Type stubs for the private `_core` extension are generated and committed; CI
+regenerates them and fails on a diff:
+
+```bash
+uv run python tools/fix_core_stubs.py
+```
+
+Through `uv run`, always: stubgen's output depends on the interpreter (3.10
+renders an enum default as `...` where 3.12 renders `Warm.all`), and CI
+regenerates under uv and fails on a diff.
+
+(`_core` has submodules, so the stubs are a package — `python/cppcrystal/_core/`
+— sitting beside the extension. A real module wins over a directory with no
+`__init__.py`, so it does not shadow the `.so`; `test_stubs.py` pins that.)
 
 ---
 

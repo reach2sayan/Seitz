@@ -1,0 +1,61 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cppcrystal"
+version = "0.1.0"
+description = "Modern C++23 crystallography and symmetry analysis"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+dependencies = ["numpy>=1.24", "pydantic>=2.7"]
+
+[project.urls]
+Homepage = "https://github.com/reach2sayan/CppCrystal"
+
+# Source installs only -- there are deliberately no manylinux wheels. The
+# library hard-errors below GCC 15 and compiles as gnu++23, while the manylinux
+# images top out several major versions earlier; even if one built, the result
+# would need a GCC 15 libstdc++ on the user's machine, which auditwheel cannot
+# vendor safely. A wheel that fails at import is worse than no wheel. If a
+# binary channel is ever wanted, conda-forge ships the toolchain to do it.
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.28"
+# The only knobs pyproject sets. Everything else -- the compiler gate, the
+# warning set, the constexpr budget, IPO, visibility -- stays in CMakeLists.txt,
+# so `cmake --preset python` and `pip install .` build the same target from the
+# same source of truth and cannot drift.
+# NOTE: this path does not read CMakePresets.json, so it picks up whatever `c++`
+# is on PATH. The library needs GCC 15+; export CXX=g++-15 (as .github/workflows
+# does) or the configure step stops with a message saying so.
+cmake.define.CPPCRYSTAL_BUILD_PYTHON = "ON"
+cmake.define.CPPCRYSTAL_BUILD_TESTS = "OFF"
+cmake.define.CPPCRYSTAL_BUILD_DEMO = "OFF"
+install.components = ["python"]
+wheel.packages = ["python/cppcrystal"]
+build-dir = "build/{wheel_tag}"
+sdist.exclude = ["cmake-build-*", ".deps", "build"]
+
+[tool.scikit-build.editable]
+# Re-runs `cmake --build` on `import cppcrystal`. The hook executes in the
+# RUNTIME environment, which is why scikit-build-core, cmake and ninja are dev
+# dependencies below and why the editable install needs --no-build-isolation.
+mode = "redirect"
+rebuild = true
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "numpy>=1.24",
+  "pydantic>=2.7",
+  "pybind11-stubgen>=2.5",
+  # Needed at runtime, not just at build time, for the editable rebuild above.
+  "scikit-build-core>=0.10",
+  "cmake>=3.28",
+  "ninja",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]

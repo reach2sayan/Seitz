@@ -42,6 +42,14 @@
       "cacheVariables": {
         "CPPCRYSTAL_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "python",
+      "displayName": "Debug + Python bindings",
+      "inherits": "default",
+      "cacheVariables": {
+        "CPPCRYSTAL_BUILD_PYTHON": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -60,6 +68,10 @@
     {
       "name": "oracle-asan",
       "configurePreset": "oracle-asan"
+    },
+    {
+      "name": "python",
+      "configurePreset": "python"
     }
   ],
   "testPresets": [
@@ -87,6 +99,13 @@
     {
       "name": "oracle-asan",
       "configurePreset": "oracle-asan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "python",
+      "configurePreset": "python",
       "output": {
         "outputOnFailure": true
       }

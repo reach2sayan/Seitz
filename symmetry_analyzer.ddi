@@ -1,0 +1,11 @@
+{
+"rules": [
+{
+"primary-output": "symmetry_analyzer.o",
+"requires": [
+]
+}
+],
+"version": 0,
+"revision": 0
+}

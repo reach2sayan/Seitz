@@ -194,6 +194,43 @@ jobs:
 
       - name: Check formatting
         run: |
-          find src include tests tools -type f \( -name '*.cpp' -o -name '*.hpp' \) \
+          find src include tests tools python -type f \( -name '*.cpp' -o -name '*.hpp' \) \
             ! -path 'include/cppcrystal/third_party/*' \
             -print0 | xargs -0 clang-format --dry-run -Werror
+
+  # Python bindings. Builds the extension, runs pytest, and checks that the
+  # committed stubs still match the built module -- the same shape of gate as
+  # clang-format above: regenerating is mechanical, and a stale stub should fail
+  # the build rather than rot.
+  #
+  python:
+    name: python bindings
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GCC 15
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-15 g++-15
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync the environment
+        run: uv sync
+
+      - name: Build and install the extension
+        env:
+          CC: gcc-15
+          CXX: g++-15
+        run: uv pip install -e . --no-build-isolation
+
+      - name: Run pytest
+        run: uv run pytest python/tests -q
+
+      - name: Check the committed stubs are current
+        run: |
+          uv run python tools/fix_core_stubs.py
+          git diff --exit-code python/cppcrystal/_core

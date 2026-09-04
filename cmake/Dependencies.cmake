@@ -71,3 +71,33 @@ if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
             GIT_SHALLOW TRUE)
     FetchContent_MakeAvailable(spglib_reference)
 endif ()
+
+# pybind11 3.x — the Python binding layer. Fetched here like everything else
+# rather than taken from PyPI as a build requirement, so that
+# `cmake -DCPPCRYSTAL_BUILD_PYTHON=ON` and `pip install .` compile against
+# byte-identical headers; pyproject.toml therefore names only scikit-build-core
+# in build-system.requires and says nothing about pybind11. 3.x specifically,
+# for py::native_enum — it hands Python a real enum.IntEnum instead of a
+# pybind11-private enum type, so the bound enums pickle and pattern-match like
+# any other.
+#
+# PYBIND11_FINDPYTHON so pybind11 uses FindPython rather than the deprecated
+# FindPythonInterp, which is what lets scikit-build-core's injected
+# Python_EXECUTABLE hint select the interpreter the wheel is being built for.
+# FindPython is a toolchain query, not a library we vendor — the same exception
+# this file already makes for Threads.
+#
+# No network at configure time? FETCHCONTENT_SOURCE_DIR_PYBIND11=/path/to/checkout
+# points this at a local clone, which matters now that a FetchContent configure
+# can happen inside `pip install`.
+if (CPPCRYSTAL_BUILD_PYTHON)
+    set(PYBIND11_FINDPYTHON ON CACHE BOOL "" FORCE)
+    set(PYBIND11_INSTALL OFF CACHE BOOL "" FORCE)
+    set(PYBIND11_TEST OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(pybind11
+            GIT_REPOSITORY https://github.com/pybind/pybind11.git
+            GIT_TAG v3.0.1
+            GIT_SHALLOW TRUE
+            SYSTEM)
+    FetchContent_MakeAvailable(pybind11)
+endif ()
