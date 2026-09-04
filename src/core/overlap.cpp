@@ -47,8 +47,7 @@ namespace {
 
 OverlapChecker::OverlapChecker(Cell const &cell, double symprec)
     : sorted_{sorted_by_distance(cell)}, symprec_{symprec},
-      index_{sorted_, symprec},
-      rotated_(sorted_.size(), 3),
+      index_{sorted_, symprec}, rotated_(sorted_.size(), 3),
       images_(static_cast<std::size_t>(sorted_.size())),
       taken_(static_cast<std::size_t>(sorted_.size()), 0) {}
 
@@ -86,8 +85,8 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   }
   for (Index ir = 0; ir < sorted_.size(); ++ir) {
     bool mapped = false;
-    for (int io : index_.matches(rotated_.row(ir).transpose(),
-                                 sorted_.type(ir), scratch_)) {
+    for (int io : index_.matches(rotated_.row(ir).transpose(), sorted_.type(ir),
+                                 scratch_)) {
       images_[static_cast<std::size_t>(io)].push_back(static_cast<int>(ir));
       mapped = true;
     }

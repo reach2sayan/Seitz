@@ -31,8 +31,7 @@ conventional_lattice(SpacegroupMatch const &sg);
 // proper-rotation setting whose basis vectors are closest (Frobenius) to the
 // idealized conventional lattice.
 [[nodiscard]] CPPCRYSTAL_TESTABLE SpacegroupMatch
-find_similar_bravais_lattice(SpacegroupMatch sg,
-                                                           double symprec);
+find_similar_bravais_lattice(SpacegroupMatch sg, double symprec);
 
 // Turns a matched space group plus the cell it was matched from into the
 // standardized result. The family is a compile-time parameter: only the layer

@@ -22,7 +22,8 @@ struct WyckoffCoordinate {
   int multiplicity;
 };
 
-[[nodiscard]] CPPCRYSTAL_TESTABLE WyckoffCoordinate wyckoff_coordinate(int index);
+[[nodiscard]] CPPCRYSTAL_TESTABLE WyckoffCoordinate
+wyckoff_coordinate(int index);
 
 // The half-open range [start, start + count) of global Wyckoff-position indices
 // belonging to a Hall number.
@@ -35,7 +36,8 @@ struct WyckoffRange {
 
 // Site-symmetry symbol of a Wyckoff position. The trailing space padding is
 // removed at generation time, so the view points straight into static storage.
-[[nodiscard]] CPPCRYSTAL_TESTABLE std::string_view site_symmetry_symbol(int index);
+[[nodiscard]] CPPCRYSTAL_TESTABLE std::string_view
+site_symmetry_symbol(int index);
 
 // One Wyckoff position of a Hall setting: its global database index (the key
 // for wyckoff_coordinate / site_symmetry_symbol) paired with its Wyckoff

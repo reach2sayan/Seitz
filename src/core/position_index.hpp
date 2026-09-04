@@ -160,7 +160,7 @@ private:
   Matrix3d lattice_;
   Matrix3d lattice_inv_;
   double symprec_;
-  double half_width_; // of the query box: symprec plus a rounding margin
+  double half_width_;  // of the query box: symprec plus a rounding margin
   double image_reach_; // half_width_ expressed as a fractional coordinate
   CellPeriodicity periodicity_;
   Positions const *positions_;

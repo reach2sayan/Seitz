@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/testable.hpp"
 #include "core/position_index.hpp"
+#include "core/testable.hpp"
 #include <cppcrystal/core/cell.hpp>
 #include <cppcrystal/core/periodicity.hpp>
 #include <cppcrystal/core/types.hpp>
@@ -43,7 +43,7 @@ private:
   double symprec_;
   PositionIndex index_; // over sorted_; ties the checker to its address
 
-  mutable Positions rotated_;                                 // n x 3 images
+  mutable Positions rotated_; // n x 3 images
   mutable std::vector<boost::container::small_vector<int, 2>> images_;
   mutable std::vector<std::uint8_t> taken_;
   mutable PositionIndex::Scratch scratch_;

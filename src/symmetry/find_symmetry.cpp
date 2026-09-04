@@ -130,13 +130,14 @@ struct AxisMetrics {
 // in a pass: three sqrt and (on the angle path) three acos that used to be
 // recomputed 17576 times.
 struct MetricReference {
-  Eigen::Array3d length;            // sqrt of the metric diagonal
-  std::array<double, 3> cosine{};   // pairs (0,1), (0,2), (1,2)
+  Eigen::Array3d length;          // sqrt of the metric diagonal
+  std::array<double, 3> cosine{}; // pairs (0,1), (0,2), (1,2)
   std::array<double, 3> angle_deg{};
 };
 
 // The pairs of basis vectors whose angles the metric comparison tests.
-constexpr std::array<std::pair<int, int>, 3> kElemSets{{{0, 1}, {0, 2}, {1, 2}}};
+constexpr std::array<std::pair<int, int>, 3> kElemSets{
+    {{0, 1}, {0, 2}, {1, 2}}};
 
 // The degree conversion keeps the original `/ pi * 180` spelling rather than
 // folding a 180/pi constant, so the result stays bit-identical to what the
@@ -200,9 +201,9 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{{{0, 1}, {0, 2}, {1, 2}}}
       double const x =
           cos1 * cos2 + std::sqrt(1 - cos1 * cos1) * std::sqrt(1 - cos2 * cos2);
       double const sin_dtheta2 = 1 - x * x;
-      double const length_ave2 =
-          ((orig.length[j] + length_rot[j]) * (orig.length[k] + length_rot[k])) /
-          4;
+      double const length_ave2 = ((orig.length[j] + length_rot[j]) *
+                                  (orig.length[k] + length_rot[k])) /
+                                 4;
       if (sin_dtheta2 > kSinDtheta2Cutoff &&
           sin_dtheta2 * length_ave2 > symprec * symprec) {
         return false;
@@ -252,8 +253,7 @@ template <GroupFamily F>
                                a[static_cast<std::size_t>(q)]);
       }
     }
-    if (angles_agree(metric, length_rot, reference, symprec,
-                     angle_tolerance)) {
+    if (angles_agree(metric, length_rot, reference, symprec, angle_tolerance)) {
       if (found.size() >= cap) {
         return std::nullopt;
       }

@@ -92,8 +92,7 @@ struct PointGeometry {
   }
 
   [[nodiscard]] bool same_locus(Locus const &a, Locus const &b) const {
-    return a.dim() == b.dim() &&
-           approx_equal(a.projector, b.projector, kTol);
+    return a.dim() == b.dim() && approx_equal(a.projector, b.projector, kTol);
   }
 
   // The image of a subspace under an operation (a new subspace of the same

@@ -106,8 +106,8 @@ radius_of(int type, DistanceTolerance const &tol) noexcept {
 
   // Self-images: the nearest non-trivial image of any point is the same
   // lattice vector for every atom (infinite with no periodic axis).
-  double const self_image = metric.distance(Vector3d::Zero(), Vector3d::Zero(),
-                                            Images::nontrivial);
+  double const self_image =
+      metric.distance(Vector3d::Zero(), Vector3d::Zero(), Images::nontrivial);
   if (std::ranges::any_of(
           radius, [&](double r) { return self_image < 2.0 * tol.scale * r; })) {
     return false;
@@ -121,9 +121,8 @@ radius_of(int type, DistanceTolerance const &tol) noexcept {
     auto later = index.candidates(from, scratch) |
                  std::views::filter([i](int j) { return j > i; });
     for (int const j : later) {
-      double const min_dist =
-          tol.scale * (radius[static_cast<std::size_t>(i)] +
-                       radius[static_cast<std::size_t>(j)]);
+      double const min_dist = tol.scale * (radius[static_cast<std::size_t>(i)] +
+                                           radius[static_cast<std::size_t>(j)]);
       if (metric.distance(from, row(j), Images::all) < min_dist) {
         return false;
       }

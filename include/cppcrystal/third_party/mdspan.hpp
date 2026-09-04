@@ -4411,9 +4411,9 @@ MDSPAN_TEMPLATE_REQUIRES(
     MDSPAN_IMPL_FOLD_AND(MDSPAN_IMPL_TRAIT(std::is_convertible, SizeTypes,
                                            size_t) /* && ... */) &&
         (sizeof...(SizeTypes) > 0))
-MDSPAN_DEDUCTION_GUIDE explicit mdspan(ElementType *, SizeTypes...) -> mdspan<
-    ElementType,
-    ::MDSPAN_IMPL_STANDARD_NAMESPACE::dextents<size_t, sizeof...(SizeTypes)>>;
+MDSPAN_DEDUCTION_GUIDE explicit mdspan(ElementType *, SizeTypes...)
+    -> mdspan<ElementType, ::MDSPAN_IMPL_STANDARD_NAMESPACE::dextents<
+                               size_t, sizeof...(SizeTypes)>>;
 
 MDSPAN_TEMPLATE_REQUIRES(class Pointer,
                          (MDSPAN_IMPL_TRAIT(std::is_pointer,
@@ -4425,9 +4425,9 @@ MDSPAN_DEDUCTION_GUIDE mdspan(Pointer &&)
 MDSPAN_TEMPLATE_REQUIRES(class CArray,
                          (MDSPAN_IMPL_TRAIT(std::is_array, CArray) &&
                           (std::rank_v<CArray> == 1)))
-MDSPAN_DEDUCTION_GUIDE mdspan(CArray &)
-    -> mdspan<std::remove_all_extents_t<CArray>,
-              extents<size_t, ::std::extent_v<CArray, 0>>>;
+MDSPAN_DEDUCTION_GUIDE
+mdspan(CArray &) -> mdspan<std::remove_all_extents_t<CArray>,
+                           extents<size_t, ::std::extent_v<CArray, 0>>>;
 
 template <class ElementType, class SizeType, size_t N>
 MDSPAN_DEDUCTION_GUIDE mdspan(ElementType *, const ::std::array<SizeType, N> &)
@@ -6004,7 +6004,7 @@ divide(const std::integral_constant<T0, v0> &,
        const std::integral_constant<T1, v1> &) {
   // Short-circuit division by zero
   // (used for strided_slice with zero extent/stride)
-  return integral_constant<IndexT, v0 == 0 ? 0 : v0 / v1>();
+  return integral_constant < IndexT, v0 == 0 ? 0 : v0 / v1 > ();
 }
 
 template <class IndexT, class T0, T0 v0, class T1, T1 v1>
@@ -6041,7 +6041,7 @@ MDSPAN_INLINE_FUNCTION constexpr auto multiply(const constant_wrapper<v0> &,
 template <class IndexT, class T0, T0 v0, class T1, T1 v1>
 MDSPAN_INLINE_FUNCTION constexpr auto divide(const constant_wrapper<v0, T0> &,
                                              const constant_wrapper<v1, T1> &) {
-  return integral_constant<IndexT, v0 == 0 ? 0 : v0 / v1>();
+  return integral_constant < IndexT, v0 == 0 ? 0 : v0 / v1 > ();
 }
 
 template <class IndexT, class T0, T0 v0, class T1, T1 v1>

@@ -97,19 +97,13 @@ bool determine(Cell const &cell) {
 
 TEST_CASE("determine() over supercells", "[!benchmark]") {
   std::mt19937 rng(7);
-  Cell const small = supercell(2, 1e-4, rng);   // 16 atoms
-  Cell const medium = supercell(4, 1e-4, rng);  // 128 atoms
-  Cell const large = supercell(6, 1e-4, rng);   // 432 atoms
+  Cell const small = supercell(2, 1e-4, rng);  // 16 atoms
+  Cell const medium = supercell(4, 1e-4, rng); // 128 atoms
+  Cell const large = supercell(6, 1e-4, rng);  // 432 atoms
 
-  BENCHMARK("cubic supercell, 16 atoms") {
-    return determine(small);
-  };
-  BENCHMARK("cubic supercell, 128 atoms") {
-    return determine(medium);
-  };
-  BENCHMARK("cubic supercell, 432 atoms") {
-    return determine(large);
-  };
+  BENCHMARK("cubic supercell, 16 atoms") { return determine(small); };
+  BENCHMARK("cubic supercell, 128 atoms") { return determine(medium); };
+  BENCHMARK("cubic supercell, 432 atoms") { return determine(large); };
 }
 
 TEST_CASE("determine() on a low-symmetry cell", "[!benchmark]") {
@@ -118,9 +112,7 @@ TEST_CASE("determine() on a low-symmetry cell", "[!benchmark]") {
   // the candidate list instead of hitting early.
   Cell const triclinic = triclinic_cell(48, rng);
 
-  BENCHMARK("triclinic, 48 atoms") {
-    return determine(triclinic);
-  };
+  BENCHMARK("triclinic, 48 atoms") { return determine(triclinic); };
 }
 
 TEST_CASE("reciprocal-mesh reduction", "[!benchmark]") {
@@ -161,8 +153,10 @@ TEST_CASE("random structure generation", "[!benchmark]") {
   // Fm-3m (hall 523) and P2_1/c (hall 81): a high-symmetry cubic setting where
   // orbits are large and few placements are needed, and a common low-symmetry
   // one where the attempt loop runs longer.
-  auto const &cubic = group::SpaceGroup::of(*HallNumber::of(GroupFamily::space, 523));
-  auto const &monoclinic = group::SpaceGroup::of(*HallNumber::of(GroupFamily::space, 81));
+  auto const &cubic =
+      group::SpaceGroup::of(*HallNumber::of(GroupFamily::space, 523));
+  auto const &monoclinic =
+      group::SpaceGroup::of(*HallNumber::of(GroupFamily::space, 81));
 
   generate::Composition const comp{{8, 4}, {14, 8}}; // O4 Si8
   generate::GenerateOptions options;

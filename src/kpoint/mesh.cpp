@@ -2,9 +2,9 @@
 
 #include <cppcrystal/core/tolerance.hpp> // approx_equal
 
-#include "core/matrix_order.hpp"  // unique_by_rotation
-#include "core/parallel_for.hpp"   // the mapping loop is the one hot parallel loop
-#include "math/fractional.hpp"     // math::round_to_int
+#include "core/matrix_order.hpp" // unique_by_rotation
+#include "core/parallel_for.hpp" // the mapping loop is the one hot parallel loop
+#include "math/fractional.hpp"   // math::round_to_int
 
 #include <boost/container/small_vector.hpp>
 
@@ -174,10 +174,9 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
   parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
     auto const i = static_cast<std::size_t>(index);
     Address const doubled = mesh_.doubled_address(mesh_.address_of(i));
-    mapping_[i] = normal
-                      ? normal_representative(doubled, mesh_, i, rotations_)
-                      : distortion_representative(doubled, mesh_, i, divisor,
-                                                  rotations_);
+    mapping_[i] = normal ? normal_representative(doubled, mesh_, i, rotations_)
+                         : distortion_representative(doubled, mesh_, i, divisor,
+                                                     rotations_);
   });
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
       mapping_ | std::views::enumerate, [](auto const &e) {
@@ -262,35 +261,34 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   };
   std::vector<Candidates> candidates(mesh_.size());
 
-  parallel_for(
-      static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
-        auto const i = static_cast<std::size_t>(index);
-        Address const address = mesh_.address_of(i);
-        // Squared distance to the origin of each candidate image.
-        std::array<double, kBzSearchSpace.size()> distance{};
-        std::ranges::transform(
-            kBzSearchSpace, distance.begin(), [&](Address const &offset) {
-              Vector3d q;
-              for (std::size_t k = 0; k < 3; ++k) {
-                auto const dk = static_cast<double>(d[k]);
-                q[static_cast<int>(k)] = (static_cast<double>(address[k]) +
-                                          static_cast<double>(offset[k]) * dk +
-                                          (shift[k] ? 0.5 : 0.0)) /
-                                         dk;
-              }
-              return (rec * q).squaredNorm();
-            });
-
-        auto const min_it = std::ranges::min_element(distance);
-        double const min_distance = *min_it;
-        Candidates &c = candidates[i];
-        c.closest = static_cast<std::uint8_t>(min_it - distance.begin());
-        for (auto const [slot, dist] : distance | std::views::enumerate) {
-          if (dist < min_distance + tolerance) {
-            c.qualifying.push_back(static_cast<std::uint8_t>(slot));
+  parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
+    auto const i = static_cast<std::size_t>(index);
+    Address const address = mesh_.address_of(i);
+    // Squared distance to the origin of each candidate image.
+    std::array<double, kBzSearchSpace.size()> distance{};
+    std::ranges::transform(
+        kBzSearchSpace, distance.begin(), [&](Address const &offset) {
+          Vector3d q;
+          for (std::size_t k = 0; k < 3; ++k) {
+            auto const dk = static_cast<double>(d[k]);
+            q[static_cast<int>(k)] =
+                (static_cast<double>(address[k]) +
+                 static_cast<double>(offset[k]) * dk + (shift[k] ? 0.5 : 0.0)) /
+                dk;
           }
-        }
-      });
+          return (rec * q).squaredNorm();
+        });
+
+    auto const min_it = std::ranges::min_element(distance);
+    double const min_distance = *min_it;
+    Candidates &c = candidates[i];
+    c.closest = static_cast<std::uint8_t>(min_it - distance.begin());
+    for (auto const [slot, dist] : distance | std::views::enumerate) {
+      if (dist < min_distance + tolerance) {
+        c.qualifying.push_back(static_cast<std::uint8_t>(slot));
+      }
+    }
+  });
 
   // Every image within tolerance of the closest is a BZ point: the closest
   // keeps the input index, the ties are appended.
