@@ -2,21 +2,28 @@
 
 from __future__ import annotations
 
+import importlib.machinery
 import pathlib
 
 import cppcrystal as cc
 
 
 def test_the_stub_package_does_not_shadow_the_extension() -> None:
-    """`_core` stubs are a directory sitting next to `_core.cpython-*.so`.
+    """`_core` stubs are a directory sitting next to the built `_core` module.
 
     Python resolves a real module in a directory ahead of a same-named
     subdirectory with no ``__init__.py``, so the extension wins -- but that is
     a rule worth pinning rather than trusting, because if it ever went the other
     way ``import cppcrystal`` would start returning an empty namespace package
     and every symbol would vanish at once.
+
+    The suffix is asked of the interpreter rather than spelled out: it is
+    ``.so`` on Linux and macOS but ``.pyd`` on Windows, and what the assertion
+    means is "a compiled extension won", not "this one platform's suffix".
     """
-    assert cc._core.__file__.endswith(".so")
+    assert cc._core.__file__.endswith(
+        tuple(importlib.machinery.EXTENSION_SUFFIXES)
+    )
     assert cc.version_string()
 
 
