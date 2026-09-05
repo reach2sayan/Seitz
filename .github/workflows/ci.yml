@@ -39,8 +39,8 @@ concurrency:
 jobs:
   #
   # Build, test and install across the supported toolchains. MSVC has its own
-  # job below rather than a matrix entry here: it is advisory, and its runner,
-  # compiler launcher and dependency cache all differ from these.
+  # job below rather than a matrix entry here: its runner, compiler launcher
+  # and dependency cache all differ from these.
   #
   build:
     name: ${{ matrix.name }}
@@ -293,15 +293,16 @@ jobs:
           git diff --exit-code python/seitz/_core
 
   #
-  # MSVC, advisory. Everything portable: library, unit tests, the reference
+  # MSVC, required. Everything portable: library, unit tests, the reference
   # spglib oracle, the benchmark smoke run and install -- the same `release`
   # preset the Linux jobs use, with no Windows-specific project configuration.
   #
-  # continue-on-error because nothing here had ever been compiled with cl.exe
-  # before this job existed, and its first failures are expected to be
-  # library-maturity ones (<generator>, the constexpr budget) rather than
-  # defects in this tree. Promoting it to a required job is a separate,
-  # deliberate change once it has been green for a while.
+  # This landed advisory (continue-on-error) because nothing here had ever been
+  # compiled by cl.exe. It first went green at 0ae8cac and has stayed green, so
+  # the flag is gone. Ending that period had to be deliberate: continue-on-error
+  # masks a job's conclusion to `success` whether its steps passed or failed, so
+  # a working MSVC job and a broken one are indistinguishable in the run list --
+  # only the step-level conclusions tell them apart.
   #
   # Release only. MSVC Debug turns on _ITERATOR_DEBUG_LEVEL=2, which would make
   # the benchmark smoke run meaningless and surface MSVC-STL debug assertions
@@ -309,9 +310,8 @@ jobs:
   # the bulk of the build, would be paid for twice.
   #
   windows:
-    name: MSVC 2022 (release, advisory)
+    name: MSVC 2022 (release)
     runs-on: windows-2022
-    continue-on-error: true
     # The default is 360. What wants bounding here is a runaway constant
     # evaluation: msg_database.cpp decodes 76683 operations at compile time with
     # the budget raised to 10^8, on an evaluator slower and hungrier than GCC's.
@@ -411,15 +411,14 @@ jobs:
         run: cmake --install build/release
 
   #
-  # Python bindings on Windows, also advisory. Its own job rather than steps in
+  # Python bindings on Windows, likewise required. Its own job rather than steps in
   # the one above because the two fail for unrelated reasons -- compiler and
   # library maturity there, extension-loading and interpreter plumbing here --
   # and a combined job would need triage on every red run to tell which.
   #
   windows-python:
-    name: python bindings (Windows, advisory)
+    name: python bindings (Windows)
     runs-on: windows-2022
-    continue-on-error: true
     timeout-minutes: 90
     steps:
       - name: Checkout
