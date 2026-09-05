@@ -40,7 +40,6 @@ private:
                                       Vector3d const &trans) const;
 
   Cell sorted_; // the input cell with atoms sorted as described above
-  double symprec_;
   PositionIndex index_; // over sorted_; ties the checker to its address
 
   mutable Positions rotated_; // n x 3 images

@@ -24,7 +24,15 @@ namespace cppcrystal::math {
 // and lets GCC do four lanes at a time (cvttpd2dq). Bit-identical to the
 // ternary for every double, -0.0 included: copysign(0.5, -0.0) is -0.5, and
 // the conversion truncates toward zero either way.
+//
+// std::copysign is only constexpr from C++23 (P0533) and MSVC has not
+// implemented that yet, so constant evaluation takes the ternary form -- which
+// agrees with copysign on every double for this use, including -0.0, where
+// both -0.5 and +0.5 truncate to 0. Runtime keeps the vectorizable form.
 [[nodiscard]] constexpr int nint(double a) noexcept {
+  if consteval {
+    return static_cast<int>(a + (a < 0.0 ? -0.5 : 0.5));
+  }
   return static_cast<int>(a + std::copysign(0.5, a));
 }
 

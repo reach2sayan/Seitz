@@ -73,7 +73,7 @@ constexpr auto kDecodedAltTransformations = [] {
 [[nodiscard]] MagneticSymmetryOperation
 make_magnetic(DecodedMagneticOp const &d) noexcept {
   SymmetryOperation const op = make_operation(d.op);
-  return {op.rotation, op.translation, d.time_reversal};
+  return {op, d.time_reversal};
 }
 
 // Offset from a UNI number's smallest Hall setting to `hall_number`; the

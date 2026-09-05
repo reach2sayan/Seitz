@@ -46,8 +46,8 @@ namespace {
 } // namespace
 
 OverlapChecker::OverlapChecker(Cell const &cell, double symprec)
-    : sorted_{sorted_by_distance(cell)}, symprec_{symprec},
-      index_{sorted_, symprec}, rotated_(sorted_.size(), 3),
+    : sorted_{sorted_by_distance(cell)}, index_{sorted_, symprec},
+      rotated_(sorted_.size(), 3),
       images_(static_cast<std::size_t>(sorted_.size())),
       taken_(static_cast<std::size_t>(sorted_.size()), 0) {}
 
