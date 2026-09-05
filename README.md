@@ -168,20 +168,48 @@ for the group theory [`docs/MATHEMATICS.md`](docs/MATHEMATICS.md).
 
 ## Building
 
-Requires **GCC 15+ or Clang** with libstdc++ (the presets use `g++-15`) and
-CMake ≥ 3.28; configuring with any other compiler is a hard error rather than an
-untested branch. Everything else is fetched, unconditionally — there is no
-system lookup and no `find_package` fallback to go stale: **Eigen 5.0.0**,
-**Boost 1.88** (`container`, `flyweight`, `geometry`, `leaf`) and **Catch2 3**
-for the tests. Nothing needs to be installed on the system.
+Requires **GCC 15+**, **Clang** with libstdc++, or **MSVC 19.43+** (Visual
+Studio 17.13+), CMake ≥ 3.28, and a **Python 3.9+** interpreter. The compiler
+requirements are version floors, not vendor gates: each is enforced because the
+failure without it is a wall of template errors inside a header rather than
+"your toolchain is too old". Python is a build-time tool rather than a
+dependency: the symmetry tables are transcriptions of spglib's C arrays,
+generated at build time by the stdlib-only scripts in `tools/` instead of being
+committed, so any system interpreter will do — no virtualenv, and nothing to
+`pip install`, to build C++. Everything else is fetched, unconditionally —
+there is no system lookup and no `find_package` fallback to go stale: **Eigen
+5.0.0**, **Boost 1.88** (`container`, `flyweight`, `geometry`, `leaf`) and
+**Catch2 3** for the tests. No library needs to be installed on the system.
 
 `cppcrystal` builds as a **shared library**, versioned `0.1.0` with
-`SONAME 0.1` — while the API is pre-1.0, every minor version may break ABI.
+`SONAME 0.1` — while the API is pre-1.0, every minor version may break ABI. It
+builds as a **static archive** in the two cases where a shared object is not the
+deliverable: on Windows, and when `CPPCRYSTAL_BUILD_PYTHON` is on, where it is
+absorbed into the extension module so a wheel is a single binary.
+
+Four presets, and CI runs exactly these — a green pipeline means the
+configuration you get locally is the configuration that was tested:
+
+| Preset | What it is |
+|---|---|
+| `debug` | Debug, unit tests + oracle |
+| `release` | Release, unit tests + oracle |
+| `asan` | Debug, oracle, Address + UndefinedBehavior sanitizers |
+| `python` | Release, pybind11 extension module |
 
 ```bash
-cmake --preset default              # configure (Debug)
-cmake --build cmake-build-debug     # build the library + demo
-ctest --test-dir cmake-build-debug  # run the unit tests
+cmake --preset debug                # configure into build/debug
+cmake --build --preset debug        # build the library + demo
+ctest --preset debug                # run the unit tests
+```
+
+They default to `gcc-15`/`g++-15`, so a bare `cmake --preset debug` works with
+no arguments and CLion picks them up directly. Override on the command line for
+any other toolchain — this is what CI does:
+
+```bash
+cmake --preset debug -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
+cmake --preset release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl   # MSVC
 ```
 
 ### Options
@@ -190,17 +218,21 @@ ctest --test-dir cmake-build-debug  # run the unit tests
 |---|---|---|
 | `CPPCRYSTAL_BUILD_TESTS` | ON | unit test suite |
 | `CPPCRYSTAL_BUILD_DEMO` | ON | `cppcrystal_demo` executable |
-| `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 |
+| `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 (every preset turns this ON) |
 | `CPPCRYSTAL_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
-| `CPPCRYSTAL_BUILD_TOOLS` | OFF | offline data generators |
+| `CPPCRYSTAL_BUILD_TOOLS` | OFF | the offline t-subgroup table generator (the transcribers run as part of every build) |
 | `CPPCRYSTAL_BUILD_PYTHON` | OFF | pybind11 extension module |
 
-The `oracle` preset builds reference spglib via `FetchContent` and links it only
-into the oracle tests — never into the library — to cross-check every result
-(space groups, magnetic groups, reductions, k-point meshes) against it:
+Every preset turns the oracle on. It builds reference spglib via `FetchContent`
+and links it only into the oracle tests — never into the library — to
+cross-check every result (space groups, magnetic groups, reductions, k-point
+meshes) against it. Turning it off skips that build but not the download: the
+same pinned v2.7.0 checkout is what the data tables are transcribed from, so one
+tag feeds both the tables and the oracle and the two cannot drift apart. Turn it
+off for a faster loop:
 
 ```bash
-cmake --preset oracle && ctest --test-dir cmake-build-debug
+cmake --preset debug -DCPPCRYSTAL_BUILD_ORACLE_TESTS=OFF
 ```
 
 ### Use it in your project
@@ -215,7 +247,7 @@ target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
 Or installed:
 
 ```bash
-cmake --install cmake-build-release --prefix /your/prefix
+cmake --install build/release --prefix /your/prefix
 ```
 
 ```cmake
@@ -272,8 +304,8 @@ Two paths onto the same CMake target, so they cannot drift:
 
 ```bash
 cmake --preset python                  # configure with CPPCRYSTAL_BUILD_PYTHON=ON
-cmake --build cmake-build-debug
-ctest --test-dir cmake-build-debug     # Catch2 suites + the pytest suite
+cmake --build --preset python
+ctest --preset python                  # the pytest suite
 ```
 
 `ctest` sets `PYTHONPATH` to the build tree itself, so nothing needs installing
@@ -281,7 +313,7 @@ first. To run pytest by hand against that same tree:
 
 ```bash
 uv sync                                   # dev tools (does not install the project)
-PYTHONPATH=cmake-build-debug/python uv run pytest python/tests -q
+PYTHONPATH=build/python/python uv run pytest python/tests -q
 ```
 
 **Do not `pip install -e .` this project.** scikit-build-core's editable install

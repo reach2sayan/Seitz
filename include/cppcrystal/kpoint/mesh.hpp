@@ -16,9 +16,7 @@
 // mapping between integer addresses and linear grid-point indices — and is
 // constexpr on std::array<int, 3>, with Eigen only at the boundary. The
 // double-mesh convention is q = (address * 2 + shift) / (divisions * 2).
-// Everything declared below is the installed ABI: the library is compiled
-// with hidden visibility (see CMakeLists.txt), so a public header opens the
-// window and closes it again at the end of the file.
+
 #pragma GCC visibility push(default)
 
 namespace cppcrystal::kpoint {

@@ -45,6 +45,29 @@ FetchContent_Declare(Boost
 
 FetchContent_MakeAvailable(Eigen3 Boost)
 
+# Boost.Container compiles Doug Lea's dlmalloc as C (libs/container/src/alloc_lib.c,
+# which #includes dlmalloc_ext_2_8_6.c), and at -O2 GCC reports the split-out loop
+# in internal_multialloc_arrays as "iteration 2305843009213693951 invokes
+# undefined behavior".
+#
+# It is a false positive, and the number is the tell: 2^61-1 is how many times
+# `sizes[i]` could be indexed before running off any conceivable object, so what
+# GCC is really saying is "I cannot prove this loop terminates before that". It
+# cannot, because the bound is `for(++i; i != next_i; ++i)` with size_t
+# operands — an inequality rather than a `<`, so GCC has to consider `i` wrapping
+# past `next_i`. The callers do establish next_i > i, but not visibly enough to
+# the optimizer.
+#
+# SYSTEM on the FetchContent_Declare above does not cover this: SYSTEM demotes
+# third-party *include directories* in OUR translation units, and this is Boost
+# compiling its own source in its own target. Hence a flag on that target,
+# PRIVATE so it stops there, and gated on GNU because Clang has no such warning
+# group and would object to being handed -Wno- for one.
+if (TARGET boost_container)
+    target_compile_options(boost_container PRIVATE
+            $<$<AND:$<COMPILE_LANGUAGE:C>,$<C_COMPILER_ID:GNU>>:-Wno-aggressive-loop-optimizations>)
+endif ()
+
 # Catch2 v3. extras/ holds the Catch.cmake module providing
 # catch_discover_tests(); FetchContent does not add it to CMAKE_MODULE_PATH.
 if (CPPCRYSTAL_BUILD_TESTS)

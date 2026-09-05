@@ -208,8 +208,6 @@ def main():
         w("// constexpr catalog in the public spg_database.hpp without leaking the\n")
         w("// operation encoding to clients.\n\n")
         w("#include <array>\n\n")
-        w("// Public header: opens the exported-ABI visibility window, closed at\n")
-        w("// the end of the file. The library compiles with hidden visibility.\n")
         w("#pragma GCC visibility push(default)\n\n")
         w("namespace cppcrystal::data {\n\n")
         w("struct SpacegroupTypeRaw {\n")

@@ -211,8 +211,6 @@ def main():
         w("// encoded operations) so they can back the constexpr catalog in the\n")
         w("// public msg_database.hpp without leaking the operation encoding.\n\n")
         w("#include <array>\n\n")
-        w("// Public header: opens the exported-ABI visibility window, closed at\n")
-        w("// the end of the file. The library compiles with hidden visibility.\n")
         w("#pragma GCC visibility push(default)\n\n")
         w("namespace cppcrystal::data {\n\n")
         w("struct MagneticSpacegroupTypeRaw {\n")
