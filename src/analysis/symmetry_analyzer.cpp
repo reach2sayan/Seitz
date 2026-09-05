@@ -136,27 +136,21 @@ Result<Cell> SymmetryAnalyzer::standardized_cell() const {
           if constexpr (S == CellSetting::primitive) {
             return primitive;
           } else {
-            if (match.type().centering == data::Centering::primitive) {
-              return primitive;
-            }
-            return refinement.from_primitive(primitive);
+            return (match.type().centering == data::Centering::primitive)
+                       ? primitive
+                       : refinement.from_primitive(primitive);
           }
         }
       });
 }
 
-template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::yes>()
-    const;
-template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::no>()
-    const;
-template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::yes>()
-    const;
-template Result<Cell>
-SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>()
-    const;
+// clang-format off
+template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::yes>() const;
+template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::conventional, Idealize::no>() const;
+template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::yes>() const;
+template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>() const;
+// clang-format on
+
 
 Result<Operations const &> SymmetryAnalyzer::cell_operations() const & {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {

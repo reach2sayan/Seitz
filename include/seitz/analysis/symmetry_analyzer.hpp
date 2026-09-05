@@ -74,10 +74,6 @@ public:
   template <CellSetting S, Idealize I>
   [[nodiscard]] Result<Cell> standardized_cell() const;
 
-  // All space-group operations of the input cell exactly as given, including
-  // the centering translations of a non-primitive cell. Distinct from
-  // operations(), which are the dataset's operations in the input basis.
-  //
   // A reference into the memo, and &-qualified for it, like the dataset
   // projections above: these three used to copy their cache on every call, and
   // for lattice_symmetry() that copy is a static_vector<Matrix3i, 48>.
@@ -89,15 +85,13 @@ public:
   [[nodiscard]] Result<PointSymmetry const &> lattice_symmetry() const &;
   Result<PointSymmetry const &> lattice_symmetry() const && = delete;
 
-  // The primitive cell, cached independently of the full dataset so a caller
-  // that only wants it does not pay for standardization.
+  // The primitive cell, cached independently of the full dataset
   [[nodiscard]] Result<Cell const &> primitive_cell() const &;
   Result<Cell const &> primitive_cell() const && = delete;
 
   // The irreducible reciprocal mesh of this crystal: the determination's
   // rotations, made reciprocal (adding the inversion partner with time
-  // reversal), reducing `mesh`. The Builder that replaces
-  // ReciprocalMeshBuilder — the analyzer already owns the cell and tolerance.
+  // reversal), reducing `mesh`
   [[nodiscard]] Result<kpoint::ReciprocalMesh>
   reciprocal_mesh(kpoint::Mesh mesh, TimeReversal time_reversal) const;
 
@@ -106,10 +100,7 @@ private:
   SymmetryAnalyzer(Cell cell, Tolerance tol, std::optional<HallNumber> setting)
       : Analyzer(std::move(cell), tol), setting_(setting) {}
 
-  // The pipeline itself: find primitive -> match Hall setting -> refine, at
-  // progressively tighter tolerances until one attempt yields a consistent
-  // cell. One runtime branch on the family at the top; everything below it is
-  // compile-time specialised.
+  // The pipeline itself: find primitive -> match Hall setting -> refine
   [[nodiscard]] Result<Dataset> determine() const;
 
   std::optional<HallNumber> setting_;

@@ -45,32 +45,30 @@ template <WyckoffLike W> struct Placed {
 // One complete Wyckoff assignment of a composition.
 template <WyckoffLike W> using Assignment = std::vector<Placed<W>>;
 
-// Which Wyckoff positions a structure may be built on. `general_only` keeps
-// generic coordinates only, so the exact target group is realized without the
-// accidental extra symmetry a special (fixed/high-symmetry) site can introduce
-// — notably for layer groups, where atoms confined to a special site in one
-// plane gain a horizontal mirror. It requires the total atom count to be a
-// multiple of the general-position multiplicity.
+// Which Wyckoff positions a structure may be built on.
+// (a) `general_only` keeps generic coordinates only, so the exact target group
+// is realized without the accidental extra symmetry a special
+// (fixed/high-symmetry) site can introduce — notably for layer groups, where
+// atoms confined to a special site in one plane gain a horizontal mirror. It
+// requires the total atom count to be a multiple of the general-position
+// multiplicity.
 enum class Placement { any, general_only };
 
 // What a Generator may vary while searching for a structure.
 struct GenerateOptions {
-  // Multiplies the element-aware size estimate (cell volume, cluster metric,
-  // or rod repeat length — whichever the family uses).
+  // Multiplies the element-aware size estimate.
   double scale = 1.0;
   std::optional<std::uint64_t> seed = std::nullopt;
   // Free-coordinate / lattice resampling attempts per Wyckoff assignment.
   int attempts_per_combination = 50;
-  // Minimum-distance acceptance criterion for a generated structure.
-  DistanceTolerance distance = {};
+  DistanceTolerance distance = {}; // min-distance acceptance limit
   Placement placement = Placement::any;
 };
 
 namespace detail {
 
 // A structure never has more Wyckoff positions than this (27 in 3D, fewer
-// for layer and rod groups); the once-only bookkeeping of fixed positions is a
-// bitset of that width, passed by value down the search.
+// for layer and rod groups);
 constexpr std::size_t kMaxPositions = 64;
 using UsedSpecial = std::bitset<kMaxPositions>;
 
@@ -109,8 +107,6 @@ template <WyckoffLike W> struct AssignmentContext {
                                         static_cast<Index>(rows),
                                         static_cast<Index>(cols));
     table[last, 0] = 1;
-    // Backwards over the positions: take zero copies of p, or one copy and
-    // stay on p (free coordinates) / move past it (fixed position).
     for (auto p = last; p-- > 0;) {
       auto const &wp = positions[static_cast<std::size_t>(p)];
       auto const mult = static_cast<Index>(wp.multiplicity());

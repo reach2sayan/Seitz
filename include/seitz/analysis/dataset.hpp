@@ -40,9 +40,7 @@ struct Site {
   int primitive_atom = 0;         // this atom's primitive-cell atom
 };
 
-// The result of a space-group determination. The group's identity is the Hall
-// setting alone: number, symbols and point group  are one lookup away through
-// data::spacegroup_type(hall).
+// The result of a space-group determination.
 struct Dataset {
   HallNumber hall;
   Lattice bravais;

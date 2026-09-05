@@ -15,17 +15,8 @@ namespace seitz::analysis {
 
 namespace detail {
 
-// A memoized Result-producing computation: `get(compute)` runs `compute` on
-// the first call, caches the success value, and hands back a pointer into the
-// cache. On error nothing is cached and the next call re-runs —
-// boost::leaf::result is move-only, so the cache stores the success value,
-// never the Result.
-//
+// A memoized Result-producing computation:
 // Race-free: a populated cache is read lock-free through the acquire flag;
-// first calls serialise on the mutex, so concurrent callers of a shared const
-// analyzer see exactly one computation. Moving a Lazy moves the value and
-// starts a fresh guard (moving while another thread reads is a caller bug,
-// as for any object).
 template <class T> class Lazy {
 public:
   Lazy() = default;
@@ -64,7 +55,7 @@ private:
 
 // What an analyzer's Traits names: the cell it takes, the dataset its
 // determination produces, and the tolerance that drives it.
-template <class T>
+template <typename T>
 concept AnalyzerTraits = requires {
   typename T::CellType;
   typename T::DatasetType;
@@ -72,17 +63,12 @@ concept AnalyzerTraits = requires {
 };
 
 // A persistent, stateful view over a cell + tolerances that lazily computes
-// and memoizes its determination. Facade over the pipeline, Template Method
-// over the determination: this owns the inputs, the cache and the projection
+// and memoizes its determination.
+// Facade over the pipeline, Template Method over the determination:
+// owns the inputs, the cache and the projection
 // machinery; `Derived` supplies only `determine()` (the actual pipeline).
-//
-// Static polymorphism only — Derived is a concrete type, there is no runtime
-// hierarchy and no virtual dispatch.
-//
-// Thread-safety: every memo is race-free (detail::Lazy), so a const analyzer
-// may be shared across threads from the moment it is built; the first caller
-// of each query pays for it, the rest read the cache.
-template <class Derived, AnalyzerTraits Traits> class Analyzer {
+// Thread-safety: every memo is race-free (detail::Lazy)
+template <typename Derived, AnalyzerTraits Traits> class Analyzer {
 public:
   using CellType = typename Traits::CellType;
   using DatasetType = typename Traits::DatasetType;
@@ -96,8 +82,7 @@ public:
   // caller that wants ownership copies for itself.
   //
   // Ref-qualified, so a reference into a temporary analyzer is a compile error
-  // rather than a dangling read. An analyzer exists to be held anyway --
-  // `from_cell(cell).dataset()` throws the memo away with the temporary.
+  // rather than a dangling read.
   [[nodiscard]] Result<DatasetType const &> dataset() const & {
     BOOST_LEAF_AUTO(ds, cached_dataset());
     return *ds;

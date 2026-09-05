@@ -20,12 +20,7 @@
 
 namespace seitz::generate {
 
-// One generated structure: a cell that describes itself, plus the Wyckoff
-// assignment it realizes. The cell's periodicity says which family produced it
-// — all-periodic for a 3D crystal, one aperiodic axis for a layer, one periodic
-// axis for a rod, none for a cluster — so a cluster is a Cell like any other:
-// its "lattice" is the metric its point group is isometric in and its positions
-// are fractional in that metric. There is no second, Cartesian shape.
+// One generated structure:
 struct Generated {
   Cell cell;
   Assignment<group::Wyckoff> assignment;
@@ -106,17 +101,11 @@ concept GeneratableGroup = requires(G const &g, Composition const &comp,
 // for pathological ones.
 inline constexpr std::size_t kMaxAssignments = 1000;
 
-// The random-structure generator, over any group family that offers Wyckoff
-// positions. `G` picks the geometry through GroupTraits<G>; the search itself
-// is the same for a 3D crystal, a layer, a rod and a cluster.
-//
-// Non-owning: the group must outlive the generator (SpaceGroup::of hands back a
-// shared flyweight, the others are owned by the caller).
+// The random-structure generator
 template <GeneratableGroup G> class Generator {
 public:
   explicit Generator(G const &group, GenerateOptions options = {}) noexcept
       : group_{&group}, options_{options} {}
-
   // Whether `comp` can be placed on this group at all.
   [[nodiscard]] bool compatible(Composition const &comp) const {
     return assignable(group_->wyckoffs(), comp);
@@ -133,9 +122,10 @@ public:
   }
 
   // A random structure with this group's symmetry and `comp`'s composition,
-  // deterministic in options.seed. Errors when the composition has no Wyckoff
-  // assignment here, when Placement::general_only cannot be met, or when no
-  // distance-valid structure turns up within the attempt budget.
+  // deterministic in options.seed.
+  // Errors : (1) the composition has no Wyckoff assignment here,
+  //          (2) Placement::general_only cannot be met,
+  //          (3) or when no distance-valid structure turns up within the attempt budget.
   [[nodiscard]] Result<Generated> operator()(Composition const &comp) const;
 
 private:
