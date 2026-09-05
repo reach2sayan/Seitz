@@ -23,7 +23,7 @@ enum class Err { none, empty, invalid_lattice, other };
 
 // Run `f` (returning a Result) inside a LEAF handling scope and report which
 // error tag, if any, it produced.
-template <class F> Err classify(F f) {
+template <ResultProducer F> Err classify(F f) {
   Err err = Err::none;
   leaf::try_handle_all(
       [&]() -> leaf::result<void> {

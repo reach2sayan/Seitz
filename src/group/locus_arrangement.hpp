@@ -11,6 +11,7 @@
 #include <concepts>
 #include <ranges>
 #include <span>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -74,6 +75,9 @@ struct OrbitPartition {
 };
 
 template <class Fold, class SamePoint>
+  requires std::convertible_to<std::invoke_result_t<Fold &, Vector3d>,
+                               Vector3d> &&
+           std::predicate<SamePoint &, Vector3d const &, Vector3d const &>
 [[nodiscard]] OrbitPartition
 partition_orbit(std::span<SymmetryOperation const> ops, Vector3d const &p0,
                 Fold &&fold, SamePoint &&same_point) {

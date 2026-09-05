@@ -62,6 +62,15 @@ private:
 
 } // namespace detail
 
+// What an analyzer's Traits names: the cell it takes, the dataset its
+// determination produces, and the tolerance that drives it.
+template <class T>
+concept AnalyzerTraits = requires {
+  typename T::CellType;
+  typename T::DatasetType;
+  typename T::ToleranceType;
+};
+
 // A persistent, stateful view over a cell + tolerances that lazily computes
 // and memoizes its determination. Facade over the pipeline, Template Method
 // over the determination: this owns the inputs, the cache and the projection
@@ -73,7 +82,7 @@ private:
 // Thread-safety: every memo is race-free (detail::Lazy), so a const analyzer
 // may be shared across threads from the moment it is built; the first caller
 // of each query pays for it, the rest read the cache.
-template <class Derived, class Traits> class Analyzer {
+template <class Derived, AnalyzerTraits Traits> class Analyzer {
 public:
   using CellType = typename Traits::CellType;
   using DatasetType = typename Traits::DatasetType;

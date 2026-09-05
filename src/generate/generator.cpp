@@ -184,7 +184,7 @@ Matrix3d GroupTraits<group::RodGroup>::lattice(group::RodGroup const &g,
   return random_layer_lattice(g.operations(), kVacuum * kVacuum, repeat, rng());
 }
 
-template <class G>
+template <GeneratableGroup G>
 Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   using Traits = GroupTraits<G>;
   auto const positions = group_->wyckoffs();

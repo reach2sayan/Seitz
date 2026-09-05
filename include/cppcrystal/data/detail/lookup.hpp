@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <numeric>
 #include <span>
+#include <type_traits>
 
 // The inverted index the data catalogs are queried through: a compile-time map
 // from a small integer key to the values that carry it, built by counting sort
@@ -41,6 +43,8 @@ template <class T, std::size_t N, std::size_t K> struct BucketIndex {
 // key outside [0, K) is a compile-time error.
 template <std::size_t N, std::size_t K, class T = int, class KeyOf,
           class ValueOf = std::identity>
+  requires std::integral<std::invoke_result_t<KeyOf &, int>> &&
+           std::convertible_to<std::invoke_result_t<ValueOf &, int>, T>
 [[nodiscard]] consteval BucketIndex<T, N, K>
 bucket_index(KeyOf key_of, ValueOf value_of = {}) {
   BucketIndex<T, N, K> out{};

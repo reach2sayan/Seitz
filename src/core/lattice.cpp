@@ -23,8 +23,7 @@ namespace {
 } // namespace
 
 Matrix3d Lattice::rigid_rotation_to(Lattice const &ideal) const noexcept {
-  // The frames are orthonormal, so the inverse is the transpose -- exact, and
-  // without running a 3x3 cofactor inversion to arrive at the same thing.
+  // The frames are orthonormal, inverse == transpose
   return orthonormal_basis(ideal.basis_) *
          orthonormal_basis(basis_).transpose();
 }

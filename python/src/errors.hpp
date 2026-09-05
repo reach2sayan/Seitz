@@ -4,6 +4,7 @@
 
 #include <pybind11/pybind11.h>
 
+#include <concepts>
 #include <type_traits>
 #include <utility>
 
@@ -80,7 +81,7 @@ namespace detail {
 // a tag at several error roots (group/wyckoff.hpp is one), and this way the
 // specific class and the specific sentence both survive instead of one
 // shadowing the other.
-template <class F> [[nodiscard]] auto unwrap(F &&make) {
+template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
   using Value =
       std::remove_cvref_t<typename std::invoke_result_t<F &>::value_type>;
   using detail::message_or;
@@ -189,9 +190,8 @@ template <class Self, class T>
 // have been fine: class_::def runs method_adaptor over one of those. A lambda
 // gets no such help, so the derived type is named here instead.)
 template <class Derived, class Base, class T>
+  requires std::derived_from<Derived, Base>
 [[nodiscard]] auto memo_as(Result<T const &> (Base::*accessor)() const &) {
-  static_assert(std::is_base_of_v<Base, Derived>,
-                "memo_as binds a base-class projection onto its derived type");
   return [accessor](Derived const &self) -> T {
     return unwrap([&]() -> Result<T> {
       // Released around the call itself, inside the LEAF context. The handlers

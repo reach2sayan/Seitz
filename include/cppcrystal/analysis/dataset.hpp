@@ -22,18 +22,16 @@ enum class MagneticType { type_i = 1, type_ii = 2, type_iii = 3, type_iv = 4 };
 
 namespace cppcrystal::analysis {
 
-// How the input cell maps onto the standardized setting: the change of basis
-// and origin shift that align its operations with the database, and the rigid
-// rotation that orients the idealized standardized lattice. Shared by both
-// determinations.
+// input cell <--> standardized setting:
+// (a) the change of basis + origin shift to align ops with the database,
+// (b) rigid rotation to the idealized standardized lattice.
 struct Setting {
   Matrix3d transformation{Matrix3d::Identity()};
   Vector3d origin_shift{Vector3d::Zero()};
   Matrix3d rigid_rotation{Matrix3d::Identity()};
 };
 
-// The per-atom result of a determination, one Site per input-cell atom. These
-// were five parallel vectors; an atom's five answers now travel together.
+// The per-atom result of a determination, one Site per input-cell atom.
 struct Site {
   int wyckoff = 0;                // Wyckoff letter index, 0 = 'a'
   std::string_view site_symmetry; // tabulated site-symmetry symbol
@@ -43,8 +41,8 @@ struct Site {
 };
 
 // The result of a space-group determination. The group's identity is the Hall
-// setting alone: number, symbols and point group are NOT stored, because they
-// are one lookup away through data::spacegroup_type(hall).
+// setting alone: number, symbols and point group  are one lookup away through
+// data::spacegroup_type(hall).
 struct Dataset {
   HallNumber hall;
   Lattice bravais;

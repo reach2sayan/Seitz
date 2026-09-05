@@ -2,7 +2,9 @@
 
 #include <boost/leaf.hpp>
 
+#include <concepts>
 #include <string>
+#include <type_traits>
 
 #pragma GCC visibility push(default)
 
@@ -10,6 +12,14 @@ namespace cppcrystal {
 
 namespace leaf = boost::leaf;
 template <class T> using Result = boost::leaf::result<T>;
+
+// A nullary callable that produces a Result. What the LEAF handling scopes
+// take instead of a finished Result -- taking the call rather than its value
+// is what lets a BOOST_LEAF_AUTO chain be written inline at the call site.
+template <class F>
+concept ResultProducer =
+    std::invocable<F &> &&
+    requires { typename std::invoke_result_t<F &>::value_type; };
 
 struct e_spacegroup_search_failed {};
 struct e_cell_standardization_failed {};

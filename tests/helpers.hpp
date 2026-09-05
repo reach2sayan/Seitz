@@ -64,7 +64,7 @@ template <class T> std::remove_cvref_t<T> must(Result<T> r) {
 // Whether `make()` produced an error — the expected-failure counterpart of
 // must(). Takes the call rather than the Result so a BOOST_LEAF_AUTO chain can
 // be written inline.
-template <class F> [[nodiscard]] bool errored(F &&make) {
+template <ResultProducer F> [[nodiscard]] bool errored(F &&make) {
   return leaf::try_handle_all(
       [&]() -> Result<bool> {
         if (auto r = std::forward<F>(make)(); !r) {

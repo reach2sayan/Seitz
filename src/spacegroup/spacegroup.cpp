@@ -513,6 +513,10 @@ try_hall(Matrix3d const &conv_lattice, HallNumber hall, Centering centering,
 // basis matching the input wins), then retry unconstrained.
 // `attempt(choice, orig_lattice_or_null)` produces the candidate result.
 template <std::ranges::input_range R, class Try>
+  requires std::convertible_to<
+      std::invoke_result_t<Try &, std::ranges::range_reference_t<R>,
+                           Matrix3d const *>,
+      std::optional<MatchResult>>
 [[nodiscard]] std::optional<MatchResult>
 first_match(R &&choices, Matrix3d const *orig_lattice, double symprec,
             Try &&attempt) {

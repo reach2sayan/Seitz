@@ -10,6 +10,7 @@
 #include <functional>
 #include <ranges>
 #include <span>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -37,20 +38,28 @@ template <class T>
 using RotationMultimap =
     boost::container::flat_multimap<Matrix3i, T, Matrix3iLess>;
 
+// A projection from an element of `R` to the rotation it is keyed by:
+// std::identity for a range of rotations, &SymmetryOperation::rotation (or a
+// lambda) for anything that carries one.
+// (same_as, not convertible_to: every Eigen expression converts to every
+// other, so a projection to the wrong quantity would slip through.)
+template <class Proj, class R>
+concept RotationProjection = std::same_as<
+    std::remove_cvref_t<
+        std::invoke_result_t<Proj &, std::ranges::range_reference_t<R>>>,
+    Matrix3i>;
+
 // The distinct rotations of a range. `proj` maps an element to its Matrix3i
 // key (identity for ranges of rotations, &SymmetryOperation::rotation for
 // operation lists). O(n log n).
-template <std::ranges::input_range R, class Proj = std::identity>
+template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
 [[nodiscard]] RotationSet rotation_set(R &&range, Proj proj = {}) {
-  RotationSet out;
-  for (auto const &item : range) {
-    out.insert(std::invoke(proj, item));
-  }
-  return out;
+  auto v = range | std::views::transform(proj);
+  return RotationSet(std::ranges::begin(v), std::ranges::end(v));
 }
 
 // Whether any rotation occurs twice; stops at the first repeat.
-template <std::ranges::input_range R, class Proj = std::identity>
+template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
 [[nodiscard]] bool has_duplicate_rotation(R &&range, Proj proj = {}) {
   RotationSet seen;
   return std::ranges::any_of(range, [&](auto const &item) {
@@ -59,7 +68,7 @@ template <std::ranges::input_range R, class Proj = std::identity>
 }
 
 // Keep the first element per distinct rotation, preserving encounter order.
-template <std::ranges::input_range R, class Proj = std::identity>
+template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
 [[nodiscard]] auto unique_by_rotation(R &&range, Proj proj = {})
     -> std::vector<std::ranges::range_value_t<R>> {
   std::vector<std::ranges::range_value_t<R>> out;
@@ -76,7 +85,7 @@ namespace detail {
 // Sort (key, index) pairs by key, then index, and adopt them as a flat
 // multimap: equal_range(key) then walks the elements with that key in their
 // original order, and find(key) is the first of them.
-template <class Key, class Less>
+template <class Key, std::strict_weak_order<Key const &, Key const &> Less>
 [[nodiscard]] auto ordered_multimap(std::vector<std::pair<Key, int>> pairs,
                                     Less less) {
   std::ranges::sort(pairs, [&](auto const &a, auto const &b) {
@@ -92,7 +101,8 @@ template <class Key, class Less>
 
 // rotation -> indices of the elements carrying it, ascending within a
 // rotation. O(n log n) to build.
-template <std::ranges::random_access_range R, class Proj = std::identity>
+template <std::ranges::random_access_range R,
+          RotationProjection<R const &> Proj = std::identity>
 [[nodiscard]] RotationMultimap<int> index_by_rotation(R const &range,
                                                       Proj proj = {}) {
   std::vector<std::pair<Matrix3i, int>> pairs;
@@ -147,6 +157,8 @@ template <std::ranges::random_access_range R>
 // present; returns whether it was appended. The tolerance-aware analogue of
 // ranges::unique for an unsorted container — first occurrence wins.
 template <std::ranges::forward_range C, class Equiv>
+  requires std::predicate<Equiv &, std::ranges::range_value_t<C> const &,
+                          std::ranges::range_value_t<C> const &>
 bool push_unique(C &out, std::ranges::range_value_t<C> value, Equiv &&equiv) {
   if (std::ranges::any_of(out,
                           [&](auto const &e) { return equiv(e, value); })) {

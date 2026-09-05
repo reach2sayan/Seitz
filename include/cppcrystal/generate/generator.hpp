@@ -9,6 +9,7 @@
 #include <cppcrystal/group/rod_group.hpp>
 #include <cppcrystal/group/space_group.hpp>
 
+#include <concepts>
 #include <cstddef>
 #include <random>
 #include <ranges>
@@ -88,6 +89,19 @@ template <> struct GroupTraits<group::RodGroup> {
                                         int attempt, std::mt19937_64 &rng);
 };
 
+// A group the generator can place a composition on: it offers Wyckoff
+// positions, and GroupTraits<G> is specialized for its geometry.
+template <class G>
+concept GeneratableGroup = requires(G const &g, Composition const &comp,
+                                    GenerateOptions const &options,
+                                    std::mt19937_64 &rng) {
+  { g.wyckoffs() } -> std::ranges::input_range;
+  { GroupTraits<G>::kind(g) } -> std::convertible_to<std::string_view>;
+  { GroupTraits<G>::periodicity(g) } -> std::same_as<CellPeriodicity>;
+  { GroupTraits<G>::seed_box(g) } -> std::same_as<SeedBox>;
+  { GroupTraits<G>::lattice(g, comp, options, 0, rng) } -> std::same_as<Matrix3d>;
+};
+
 // Assignments considered per search: enough for any real composition, a bound
 // for pathological ones.
 inline constexpr std::size_t kMaxAssignments = 1000;
@@ -98,7 +112,7 @@ inline constexpr std::size_t kMaxAssignments = 1000;
 //
 // Non-owning: the group must outlive the generator (SpaceGroup::of hands back a
 // shared flyweight, the others are owned by the caller).
-template <class G> class Generator {
+template <GeneratableGroup G> class Generator {
 public:
   explicit Generator(G const &group, GenerateOptions options = {}) noexcept
       : group_{&group}, options_{options} {}

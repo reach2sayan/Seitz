@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <iterator>
 #include <optional>
@@ -86,9 +87,39 @@ template <> struct MomentOps<Vector3d> {
   }
 };
 
+// The moment types the search algorithms below are generic over: exactly the
+// ones MomentOps is specialized for.
+template <class M>
+concept MomentKind =
+    requires(M const &m, MagneticCell const &mcell, Matrix3d const &rot_cart) {
+      { MomentOps<M>::moment(mcell, Index{}) } -> std::same_as<M>;
+      {
+        MomentOps<M>::transform(m, rot_cart, true, TimeReversal::on,
+                                TensorKind::axial)
+      } -> std::same_as<M>;
+      { MomentOps<M>::close(m, m, 0.0) } -> std::convertible_to<bool>;
+      { MomentOps<M>::zero() } -> std::same_as<M>;
+      { MomentOps<M>::pack(std::vector<M>{}) } -> std::same_as<SiteTensors>;
+    };
+
+// A visitor for visit_moment_kind: callable with either moment kind as an
+// explicit template argument, and agreeing on the return type across the two
+// (std::visit requires one type from every alternative).
+template <class F, class M>
+using moment_call_result_t =
+    decltype(std::declval<F &>().template operator()<M>());
+
+template <class F>
+concept MomentKindVisitor =
+    requires(F &f) {
+      f.template operator()<double>();
+      f.template operator()<Vector3d>();
+    } && std::same_as<moment_call_result_t<F, double>,
+                      moment_call_result_t<F, Vector3d>>;
+
 // Run `f.operator()<M>()` for the moment kind matching the cell's active
 // tensor alternative — the single collinear/non-collinear dispatch point.
-template <class F>
+template <MomentKindVisitor F>
 [[nodiscard]] decltype(auto) visit_moment_kind(MagneticCell const &mcell,
                                                F &&f) {
   return std::visit(
@@ -105,7 +136,7 @@ template <class F>
 // Spin-flip sign in {-1, 0, 1} such that `sign * R(moment_j) == moment_k`; 0
 // when the two moments are not related by the operation. sign = 1 - 2*timerev
 // for the matching timerev.
-template <class M>
+template <MomentKind M>
 [[nodiscard]] int spin_sign(M const &m_j, M const &m_k,
                             Matrix3d const &rot_cart, TimeReversal mode,
                             TensorKind kind, double mag_symprec) {
@@ -139,7 +170,7 @@ cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
 // spin-flip sign. Undetermined operations (all touched moments zero) are kept
 // as ordinary, or — with time reversal — as both an ordinary and an
 // anti-operation.
-template <class M>
+template <MomentKind M>
 [[nodiscard]] MagneticOperations
 get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
                TimeReversal mode, double symprec, double mag_symprec) {
@@ -214,7 +245,7 @@ get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,
 // Flat permutation buffer: row p, entry i = image of atom i under operation p,
 // matching both overlap and transformed moment. nullopt is unreachable in
 // theory (every site must map somewhere).
-template <class M>
+template <MomentKind M>
 [[nodiscard]] std::optional<std::vector<int>>
 get_permutations(MagneticOperations const &operations,
                  MagneticCell const &mcell, TimeReversal mode, double symprec,
@@ -271,7 +302,7 @@ get_permutations(MagneticOperations const &operations,
   return out;
 }
 
-template <class M>
+template <MomentKind M>
 [[nodiscard]] MagneticCell
 idealized_cell_impl(MagneticSymmetrySearch const &search,
                     MagneticCell const &mcell, TimeReversal mode) {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <iterator>
 #include <limits>
@@ -30,7 +31,11 @@ template <class Buffer> struct IndexCollector {
 
   Buffer *out;
 
-  template <class Value> IndexCollector &operator=(Value const &value) {
+  template <class Value>
+    requires requires(Value const &v) {
+      { v.second } -> std::convertible_to<typename Buffer::value_type>;
+    }
+  IndexCollector &operator=(Value const &value) {
     out->push_back(value.second);
     return *this;
   }

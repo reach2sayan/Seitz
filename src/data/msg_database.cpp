@@ -99,6 +99,7 @@ hall_number_offset(UniNumber uni, std::optional<HallNumber> hall) noexcept {
 
 // Materialise `build(uni, offset)` for every valid setting once.
 template <class T, class Build>
+  requires std::convertible_to<std::invoke_result_t<Build &, int, int>, T>
 [[nodiscard]] std::vector<T> build_setting_table(Build build) {
   std::vector<T> table((kNumUniNumbers + 1) * kMaxHallsPerUni);
   for (int uni = 1; uni <= kNumUniNumbers; ++uni) {

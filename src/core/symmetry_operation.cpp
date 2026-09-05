@@ -9,7 +9,8 @@ std::optional<SymmetryOperation> SymmetryOperation::inverse() const noexcept {
   if (!rinv) {
     return std::nullopt;
   }
-  return SymmetryOperation{*rinv, -(rinv->cast<double>() * translation)};
+  return SymmetryOperation{
+      .rotation = *rinv, .translation = -(rinv->cast<double>() * translation)};
 }
 
 } // namespace cppcrystal

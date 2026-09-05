@@ -10,10 +10,8 @@ namespace cppcrystal {
 
 namespace {
 
-// The cell with atoms sorted by (type, squared Cartesian distance to the
-// nearest lattice point). The distance is invariant under lattice
-// translations, so it is a stable key for clustering coincident atoms; the
-// first few atoms in this order are the cheap-rejection probes.
+// The cell with atoms sorted by (type, r-nearest_lattice).
+// invariant under lattice translations, hence for clustering coincident atoms;
 [[nodiscard]] Cell sorted_by_distance(Cell const &cell) {
   struct Keyed {
     int type;
@@ -25,8 +23,10 @@ namespace {
   for (auto const [i, atom] : cell.atoms() | std::views::enumerate) {
     auto const &[position, type] = atom;
     Vector3d const image = minimal_image(position, cell.periodicity());
-    keyed.push_back({type, (cell.lattice().matrix() * image).squaredNorm(),
-                     static_cast<Index>(i)});
+    keyed.push_back(
+        {.type = type,
+         .distance_sq = (cell.lattice().matrix() * image).squaredNorm(),
+         .atom = static_cast<Index>(i)});
   }
   std::ranges::sort(keyed, {}, [](Keyed const &k) {
     return std::tie(k.type, k.distance_sq);
@@ -46,7 +46,7 @@ namespace {
 } // namespace
 
 OverlapChecker::OverlapChecker(Cell const &cell, double symprec)
-    : sorted_{sorted_by_distance(cell)}, index_{sorted_, symprec},
+    : sorted_(sorted_by_distance(cell)), index_(sorted_, symprec),
       rotated_(sorted_.size(), 3),
       images_(static_cast<std::size_t>(sorted_.size())),
       taken_(static_cast<std::size_t>(sorted_.size()), 0) {}

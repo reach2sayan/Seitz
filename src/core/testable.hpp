@@ -10,8 +10,6 @@
 // can even declare these. It says only "the test binary links this".
 //
 // Empty on MSVC, where the library is a static archive (see CMakeLists.txt):
-// the test executable contains these definitions rather than importing them,
-// so there is nothing to export.
 #if defined(_MSC_VER)
 #define CPPCRYSTAL_TESTABLE
 #else

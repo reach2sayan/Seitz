@@ -54,6 +54,10 @@ namespace cppcrystal::alloy::detail {
 // odometer that walks its decorations, its configurations or its subsets.
 // Materialized because detail::mixed_radix takes a contiguous span.
 template <class Bound>
+  requires std::convertible_to<
+      std::invoke_result_t<Bound &,
+                           std::ranges::range_reference_t<Cluster const &>>,
+      int>
 [[nodiscard]] std::vector<int> radix_of(Cluster const &c, Bound bound) {
   return std::vector<int>{std::from_range,
                           c | std::views::transform(bound)};
