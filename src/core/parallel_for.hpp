@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <algorithm>
 #include <concepts>
@@ -8,7 +8,7 @@
 #include <thread>
 #include <vector>
 
-namespace cppcrystal {
+namespace seitz {
 
 // Run `body(i)` for every i in [0, n), split into one contiguous chunk per
 // hardware thread.
@@ -54,4 +54,4 @@ void parallel_for(Index n, Index grain, F const &body) {
   // ~jthread joins.
 }
 
-} // namespace cppcrystal
+} // namespace seitz

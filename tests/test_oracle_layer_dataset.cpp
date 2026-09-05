@@ -1,5 +1,5 @@
 // Oracle test for the layer-group dataset (spglib.c get_layer_dataset):
-// the cppcrystal layer path must reproduce the reference spg_get_layer_dataset
+// the seitz layer path must reproduce the reference spg_get_layer_dataset
 // — the layer-group identity (negative hall number, layer-group number 1..80,
 // symbol, point group), the symmetry operations, the per-atom Wyckoff /
 // site-symmetry / equivalence data, and the standardized layer cell.
@@ -10,9 +10,9 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
 
@@ -29,14 +29,14 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::Lattice;
-using cppcrystal::Matrix3d;
-using cppcrystal::Positions;
-using cppcrystal::Result;
-using cppcrystal::Types;
-using cppcrystal::Vector3d;
-using cppcrystal::test::layer_hall;
+using seitz::Cell;
+using seitz::Lattice;
+using seitz::Matrix3d;
+using seitz::Positions;
+using seitz::Result;
+using seitz::Types;
+using seitz::Vector3d;
+using seitz::test::layer_hall;
 
 Cell make_layer_cell(Matrix3d const &lattice,
                      std::vector<std::array<double, 3>> const &pos,
@@ -99,29 +99,29 @@ bool same_metric(Matrix3d const &a, Matrix3d const &b) {
   return (ga - gb).cwiseAbs().maxCoeff() < 1e-3;
 }
 
-using cppcrystal::test::must;
+using seitz::test::must;
 
 void check(Cell const &cell, int aperiodic_axis, double symprec) {
-  auto const got = must(cppcrystal::test::dataset_of(
-      cell.with_periodicity(cppcrystal::aperiodic_along(aperiodic_axis)),
+  auto const got = must(seitz::test::dataset_of(
+      cell.with_periodicity(seitz::aperiodic_along(aperiodic_axis)),
       {symprec}));
-  auto const ref = cppcrystal::oracle::reference_layer_dataset(
+  auto const ref = seitz::oracle::reference_layer_dataset(
       cell, aperiodic_axis, symprec);
   REQUIRE(ref.number != 0); // reference succeeded
 
   // Layer-group identity.
-  CHECK(cppcrystal::data::spacegroup_type(got.hall).number == ref.number);
+  CHECK(seitz::data::spacegroup_type(got.hall).number == ref.number);
   CHECK(got.hall == layer_hall(-ref.hall_number));
   CHECK(std::string(
-            cppcrystal::data::spacegroup_type(got.hall).international_short) ==
+            seitz::data::spacegroup_type(got.hall).international_short) ==
         ref.international);
-  CHECK(std::string(cppcrystal::data::spacegroup_type(got.hall).hall_symbol) ==
+  CHECK(std::string(seitz::data::spacegroup_type(got.hall).hall_symbol) ==
         ref.hall_symbol);
   CHECK(std::string(
-            cppcrystal::pointgroup_by_number(
-                cppcrystal::data::spacegroup_type(got.hall).pointgroup_number)
+            seitz::pointgroup_by_number(
+                seitz::data::spacegroup_type(got.hall).pointgroup_number)
                 .symbol) == ref.pointgroup);
-  CHECK(cppcrystal::aperiodic_axis(got.standardized.periodicity()).has_value());
+  CHECK(seitz::aperiodic_axis(got.standardized.periodicity()).has_value());
 
   // Per input-atom Wyckoff / site-symmetry / equivalence data.
   REQUIRE(got.sites.size() == ref.wyckoffs.size());

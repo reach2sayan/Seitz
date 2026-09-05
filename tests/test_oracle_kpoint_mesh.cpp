@@ -6,8 +6,8 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -17,13 +17,13 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::Lattice;
-using cppcrystal::Matrix3d;
-using cppcrystal::Matrix3i;
-using cppcrystal::Positions;
-using cppcrystal::Vector3d;
-using cppcrystal::Vector3i;
+using seitz::Cell;
+using seitz::Lattice;
+using seitz::Matrix3d;
+using seitz::Matrix3i;
+using seitz::Positions;
+using seitz::Vector3d;
+using seitz::Vector3i;
 
 Cell make_cell(Matrix3d const &lattice,
                std::vector<std::array<double, 3>> const &pos,
@@ -45,9 +45,9 @@ Matrix3d hexagonal(double a, double c) {
   return l;
 }
 
-cppcrystal::kpoint::Mesh sampling(Vector3i const &divisions,
+seitz::kpoint::Mesh sampling(Vector3i const &divisions,
                                   Vector3i const &is_shift) {
-  auto const mesh = cppcrystal::kpoint::Mesh::of(
+  auto const mesh = seitz::kpoint::Mesh::of(
       {divisions[0], divisions[1], divisions[2]},
       {is_shift[0] != 0, is_shift[1] != 0, is_shift[2] != 0});
   REQUIRE(mesh);
@@ -57,13 +57,13 @@ cppcrystal::kpoint::Mesh sampling(Vector3i const &divisions,
 void check_ir(Cell const &cell, Vector3i const &divisions,
               Vector3i const &is_shift, bool time_reversal, double symprec) {
   auto const analyzer =
-      cppcrystal::analysis::SymmetryAnalyzer::from_cell(cell, {symprec});
+      seitz::analysis::SymmetryAnalyzer::from_cell(cell, {symprec});
   auto const got =
       analyzer.reciprocal_mesh(sampling(divisions, is_shift),
-                               time_reversal ? cppcrystal::TimeReversal::on
-                                             : cppcrystal::TimeReversal::off);
+                               time_reversal ? seitz::TimeReversal::on
+                                             : seitz::TimeReversal::off);
   REQUIRE(got);
-  auto const ref = cppcrystal::oracle::reference_ir_reciprocal_mesh(
+  auto const ref = seitz::oracle::reference_ir_reciprocal_mesh(
       cell, divisions, is_shift, time_reversal, symprec);
 
   CHECK(got->num_irreducible() == ref.num_ir);
@@ -122,17 +122,17 @@ TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const cell = make_cell(cubic(4.0), {{0, 0, 0}}, {0});
   auto const rotations =
-      cppcrystal::oracle::reference_symmetry(cell, s).rotations();
+      seitz::oracle::reference_symmetry(cell, s).rotations();
   Vector3i const mesh(4, 4, 4);
   Vector3i const shift(0, 0, 0);
 
   auto compare = [&](std::vector<Vector3d> const &qpoints, bool tr) {
     auto const got =
-        cppcrystal::kpoint::ReciprocalMesh::from_rotations(
+        seitz::kpoint::ReciprocalMesh::from_rotations(
             sampling(mesh, shift), rotations,
-            tr ? cppcrystal::TimeReversal::on : cppcrystal::TimeReversal::off)
+            tr ? seitz::TimeReversal::on : seitz::TimeReversal::off)
             .stabilized(qpoints);
-    auto const ref = cppcrystal::oracle::reference_stabilized_reciprocal_mesh(
+    auto const ref = seitz::oracle::reference_stabilized_reciprocal_mesh(
         mesh, shift, tr, rotations, qpoints);
     CHECK(got.num_irreducible() == ref.num_ir);
     REQUIRE(got.mapping().size() == ref.ir_mapping_table.size());
@@ -153,19 +153,19 @@ TEST_CASE("grid points by rotations match reference", "[oracle][kpoint]") {
   double const s = 1e-5;
   Cell const cell = make_cell(cubic(4.0), {{0, 0, 0}}, {0});
   auto const rotations =
-      cppcrystal::oracle::reference_symmetry(cell, s).rotations();
+      seitz::oracle::reference_symmetry(cell, s).rotations();
   Vector3i const mesh(4, 4, 4);
 
   for (Vector3i const &shift : {Vector3i(0, 0, 0), Vector3i(1, 1, 1)}) {
-    auto const reciprocal = cppcrystal::kpoint::ReciprocalMesh::from_rotations(
-        sampling(mesh, shift), rotations, cppcrystal::TimeReversal::off);
+    auto const reciprocal = seitz::kpoint::ReciprocalMesh::from_rotations(
+        sampling(mesh, shift), rotations, seitz::TimeReversal::off);
     std::vector<Matrix3i> const rot_reciprocal(reciprocal.rotations().begin(),
                                                reciprocal.rotations().end());
     for (Vector3i const &address : {Vector3i(1, 2, 0), Vector3i(2, 0, 1)}) {
       INFO("shift " << shift.transpose() << " address " << address.transpose());
       auto const got =
           reciprocal.images_of({address[0], address[1], address[2]});
-      auto const ref = cppcrystal::oracle::reference_grid_points_by_rotations(
+      auto const ref = seitz::oracle::reference_grid_points_by_rotations(
           address, rot_reciprocal, mesh, shift);
       CHECK(got == ref);
     }

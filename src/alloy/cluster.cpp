@@ -1,4 +1,4 @@
-#include <cppcrystal/alloy/cluster.hpp>
+#include <seitz/alloy/cluster.hpp>
 
 #include "alloy/geometry.hpp"
 
@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::alloy {
+namespace seitz::alloy {
 
 using detail::coincident;
 using detail::integral;
@@ -135,4 +135,4 @@ std::vector<int> point_permutation(Cluster const &c,
   return std::vector<int>{std::from_range, targets};
 }
 
-} // namespace cppcrystal::alloy
+} // namespace seitz::alloy

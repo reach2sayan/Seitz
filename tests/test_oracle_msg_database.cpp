@@ -4,9 +4,9 @@
 // spg_get_magnetic_symmetry_from_database) bit-for-bit.
 
 #include "oracle.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
-#include <cppcrystal/data/msg_database.hpp>
+#include <seitz/data/msg_database.hpp>
 
 #include "helpers.hpp"
 
@@ -18,11 +18,11 @@
 
 namespace {
 
-using cppcrystal::MagneticOperations;
-using cppcrystal::Matrix3i;
-using cppcrystal::Vector3d;
-using cppcrystal::test::space_hall;
-using cppcrystal::test::uni_number;
+using seitz::MagneticOperations;
+using seitz::Matrix3i;
+using seitz::Vector3d;
+using seitz::test::space_hall;
+using seitz::test::uni_number;
 
 // Reference magnetic operations for (uni_number, hall_number) via spglib's
 // spg_get_magnetic_symmetry_from_database (max 384 operations).
@@ -35,7 +35,7 @@ MagneticOperations reference_magnetic_operations(int uni_number,
       reinterpret_cast<int(*)[3][3]>(rot.data()),
       reinterpret_cast<double(*)[3]>(trans.data()), timerev.data(), uni_number,
       hall_number);
-  std::vector<cppcrystal::MagneticSymmetryOperation> ops;
+  std::vector<seitz::MagneticSymmetryOperation> ops;
   ops.reserve(static_cast<std::size_t>(n));
   for (int s = 0; s < n; ++s) {
     Matrix3i r;
@@ -67,10 +67,10 @@ void require_same_operations(MagneticOperations const &got,
 
 TEST_CASE("magnetic_spacegroup_type matches reference for all UNI numbers",
           "[oracle][msg_database]") {
-  for (int uni = 1; uni <= cppcrystal::data::kNumUniNumbers; ++uni) {
+  for (int uni = 1; uni <= seitz::data::kNumUniNumbers; ++uni) {
     INFO("UNI number " << uni);
     auto const &got =
-        cppcrystal::data::magnetic_spacegroup_type(uni_number(uni));
+        seitz::data::magnetic_spacegroup_type(uni_number(uni));
     SpglibMagneticSpacegroupType const ref =
         spg_get_magnetic_spacegroup_type(uni);
 
@@ -85,10 +85,10 @@ TEST_CASE("magnetic_spacegroup_type matches reference for all UNI numbers",
 
 TEST_CASE("magnetic operations match reference (default Hall setting)",
           "[oracle][msg_database]") {
-  for (int uni = 1; uni <= cppcrystal::data::kNumUniNumbers; ++uni) {
+  for (int uni = 1; uni <= seitz::data::kNumUniNumbers; ++uni) {
     INFO("UNI number " << uni);
     auto const &got =
-        cppcrystal::data::magnetic_operations_from_database(uni_number(uni));
+        seitz::data::magnetic_operations_from_database(uni_number(uni));
     auto const ref = reference_magnetic_operations(uni, 0);
     REQUIRE(!got.empty());
     require_same_operations(got, ref);
@@ -97,12 +97,12 @@ TEST_CASE("magnetic operations match reference (default Hall setting)",
 
 TEST_CASE("magnetic operations match reference across all Hall settings",
           "[oracle][msg_database]") {
-  for (int index = 1; index <= cppcrystal::kSpaceHallSettings; ++index) {
+  for (int index = 1; index <= seitz::kSpaceHallSettings; ++index) {
     auto const [first, last] =
-        cppcrystal::data::uni_candidates(space_hall(index));
+        seitz::data::uni_candidates(space_hall(index));
     for (int uni = first.value(); uni <= last.value(); ++uni) {
       INFO("UNI number " << uni << ", Hall number " << index);
-      auto const &got = cppcrystal::data::magnetic_operations_from_database(
+      auto const &got = seitz::data::magnetic_operations_from_database(
           uni_number(uni), space_hall(index));
       auto const ref = reference_magnetic_operations(uni, index);
       require_same_operations(got, ref);

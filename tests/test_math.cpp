@@ -4,7 +4,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
+using namespace seitz;
 using Catch::Approx;
 
 TEST_CASE("nint rounds half away from zero", "[math]") {

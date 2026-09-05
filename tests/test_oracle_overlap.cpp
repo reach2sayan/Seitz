@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 Cell bcc(double a) {

@@ -1,8 +1,8 @@
-#include <cppcrystal/generate/generator.hpp>
+#include <seitz/generate/generator.hpp>
 
 #include "generate/random_lattice.hpp"
-#include <cppcrystal/data/element_data.hpp>
-#include <cppcrystal/generate/distance_check.hpp>
+#include <seitz/data/element_data.hpp>
+#include <seitz/generate/distance_check.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::generate {
+namespace seitz::generate {
 
 namespace {
 
@@ -245,4 +245,4 @@ template class Generator<group::SpaceGroup>;
 template class Generator<group::PointGroup>;
 template class Generator<group::RodGroup>;
 
-} // namespace cppcrystal::generate
+} // namespace seitz::generate

@@ -5,12 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import cppcrystal as cc
+import seitz as sz
 
 
-def test_bcc_iron_is_im3m(bcc_fe: cc.Cell) -> None:
+def test_bcc_iron_is_im3m(bcc_fe: sz.Cell) -> None:
     """The round trip from main.cpp, which is the canonical smoke test."""
-    analyzer = cc.analyze(bcc_fe)
+    analyzer = sz.analyze(bcc_fe)
     spacegroup_type = analyzer.spacegroup_type
 
     assert spacegroup_type.number == 229
@@ -18,38 +18,38 @@ def test_bcc_iron_is_im3m(bcc_fe: cc.Cell) -> None:
     assert len(analyzer.operations) == 96
 
 
-def test_the_analyzer_memoizes_rather_than_recomputing(bcc_fe: cc.Cell) -> None:
-    analyzer = cc.analyze(bcc_fe)
+def test_the_analyzer_memoizes_rather_than_recomputing(bcc_fe: sz.Cell) -> None:
+    analyzer = sz.analyze(bcc_fe)
     assert analyzer.hall == analyzer.hall
     assert analyzer.dataset.hall == analyzer.hall
 
 
-def test_simple_cubic_is_pm3m(simple_cubic: cc.Cell) -> None:
-    assert cc.analyze(simple_cubic).spacegroup_type.number == 221
+def test_simple_cubic_is_pm3m(simple_cubic: sz.Cell) -> None:
+    assert sz.analyze(simple_cubic).spacegroup_type.number == 221
 
 
-def test_a_layer_cell_uses_the_same_analyzer(layer_cell: cc.Cell) -> None:
+def test_a_layer_cell_uses_the_same_analyzer(layer_cell: sz.Cell) -> None:
     """Layer groups are not a separate entry point -- the periodicity decides."""
-    analyzer = cc.analyze(layer_cell)
-    assert analyzer.hall.family == cc.GroupFamily.layer
+    analyzer = sz.analyze(layer_cell)
+    assert analyzer.hall.family == sz.GroupFamily.layer
     assert 1 <= analyzer.spacegroup_type.number <= 80
 
 
-def test_tolerance_accepts_a_model_a_dict_or_nothing(bcc_fe: cc.Cell) -> None:
-    loose = cc.Tolerance(symprec=1e-3)
-    assert cc.analyze(bcc_fe, loose).spacegroup_type.number == 229
-    assert cc.analyze(bcc_fe, {"symprec": 1e-3}).spacegroup_type.number == 229
-    assert cc.analyze(bcc_fe).spacegroup_type.number == 229
+def test_tolerance_accepts_a_model_a_dict_or_nothing(bcc_fe: sz.Cell) -> None:
+    loose = sz.Tolerance(symprec=1e-3)
+    assert sz.analyze(bcc_fe, loose).spacegroup_type.number == 229
+    assert sz.analyze(bcc_fe, {"symprec": 1e-3}).spacegroup_type.number == 229
+    assert sz.analyze(bcc_fe).spacegroup_type.number == 229
 
 
-def test_a_fixed_setting_is_honoured(bcc_fe: cc.Cell) -> None:
-    hall = cc.default_hall(cc.GroupFamily.space, 229)
+def test_a_fixed_setting_is_honoured(bcc_fe: sz.Cell) -> None:
+    hall = sz.default_hall(sz.GroupFamily.space, 229)
     assert hall is not None
-    assert cc.analyze(bcc_fe, setting=hall).hall == hall
+    assert sz.analyze(bcc_fe, setting=hall).hall == hall
 
 
-def test_sites_and_site_arrays_agree(bcc_fe: cc.Cell) -> None:
-    analyzer = cc.analyze(bcc_fe)
+def test_sites_and_site_arrays_agree(bcc_fe: sz.Cell) -> None:
+    analyzer = sz.analyze(bcc_fe)
     sites = analyzer.sites
     arrays = analyzer.site_arrays()
 
@@ -58,20 +58,20 @@ def test_sites_and_site_arrays_agree(bcc_fe: cc.Cell) -> None:
     assert arrays["site_symmetry"] == [s.site_symmetry for s in sites]
 
 
-def test_standardized_cell_in_each_setting(bcc_fe: cc.Cell) -> None:
-    analyzer = cc.analyze(bcc_fe)
-    conventional = analyzer.standardized_cell_in(cc.CellSetting.conventional)
-    primitive = analyzer.standardized_cell_in(cc.CellSetting.primitive)
+def test_standardized_cell_in_each_setting(bcc_fe: sz.Cell) -> None:
+    analyzer = sz.analyze(bcc_fe)
+    conventional = analyzer.standardized_cell_in(sz.CellSetting.conventional)
+    primitive = analyzer.standardized_cell_in(sz.CellSetting.primitive)
 
     # Im-3m is body-centred: the primitive cell holds half the atoms.
     assert len(conventional) == 2 * len(primitive)
     assert len(analyzer.standardized_cell) == len(conventional)
 
 
-def test_an_analyzer_refuses_to_be_copied(bcc_fe: cc.Cell) -> None:
+def test_an_analyzer_refuses_to_be_copied(bcc_fe: sz.Cell) -> None:
     """It owns a memo guarded by a mutex; sharing it is the supported move."""
     import copy
 
-    analyzer = cc.analyze(bcc_fe)
+    analyzer = sz.analyze(bcc_fe)
     with pytest.raises(TypeError, match="not copyable"):
         copy.deepcopy(analyzer)

@@ -1,10 +1,10 @@
-#include <cppcrystal/group/space_group.hpp>
+#include <seitz/group/space_group.hpp>
 
 #include "data/sitesym_database.hpp"
 #include "group/locus_arrangement.hpp"
 #include "math/fractional.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <Eigen/Dense>
 
@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::group {
+namespace seitz::group {
 
 namespace {
 
@@ -131,4 +131,4 @@ Result<SpaceGroup const *> SpaceGroup::from_number(GroupFamily family,
   return &of(*hall);
 }
 
-} // namespace cppcrystal::group
+} // namespace seitz::group

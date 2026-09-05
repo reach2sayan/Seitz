@@ -1,4 +1,4 @@
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "core/family_dispatch.hpp"
 #include "core/validation.hpp"
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::analysis {
+namespace seitz::analysis {
 
 namespace {
 
@@ -196,4 +196,4 @@ SymmetryAnalyzer::reciprocal_mesh(kpoint::Mesh mesh,
       mesh, ds->operations.rotations(), time_reversal);
 }
 
-} // namespace cppcrystal::analysis
+} // namespace seitz::analysis

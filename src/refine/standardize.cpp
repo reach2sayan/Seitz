@@ -1,12 +1,12 @@
 #include "refine/refinement.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "core/overlap.hpp"
 #include "core/position_index.hpp"
 #include "math/fractional.hpp"
 #include "refine/refinement.hpp"
 #include "refine/site_symmetry.hpp"
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -18,7 +18,7 @@
 //   conventional primitive cell -> exact Wyckoff positions -> expansion across
 //   the centering translations into the bravais cell -> per-input-atom Wyckoff
 //   / equivalence data (including the supercell broken-symmetry case).
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 using data::operations_from_database;
 
@@ -238,4 +238,4 @@ template std::optional<Standardized>
 Refinement<GroupFamily::layer>::standardize(Operations const &,
                                             std::vector<int> const &) const;
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

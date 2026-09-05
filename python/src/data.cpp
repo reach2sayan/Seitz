@@ -1,6 +1,6 @@
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/data/element_data.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/data/element_data.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "casters.hpp" // to_str
 
@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -161,4 +161,4 @@ void bind_data(py::module_ &m) {
   elements.attr("K_NUM_ELEMENTS") = data::kNumElements;
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

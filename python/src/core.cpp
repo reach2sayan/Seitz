@@ -1,11 +1,11 @@
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
-#include <cppcrystal/core/version.hpp>
-#include <cppcrystal/warmup.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/lattice.hpp>
+#include <seitz/core/periodicity.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
+#include <seitz/core/version.hpp>
+#include <seitz/warmup.hpp>
 
 #include "casters.hpp" // borrowed_list, types_array, to_str
 #include "errors.hpp"  // unwrap
@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -421,4 +421,4 @@ void bind_core(py::module_ &m) {
               "optimization, never a precondition."));
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

@@ -1,12 +1,12 @@
 #include "oracle.hpp"
 
 #include "symmetry/primitive.hpp"
-#include <cppcrystal/core/lattice.hpp>
+#include <seitz/core/lattice.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
+using namespace seitz;
 using Catch::Approx;
 
 namespace {

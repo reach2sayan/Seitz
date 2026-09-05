@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <cmath>
 
-namespace cppcrystal {
+namespace seitz {
 
 // Reject degenerate cells before the symmetry pipeline touches them: an empty
 // cell, or a (near-)singular lattice whose inverse would otherwise propagate
@@ -23,4 +23,4 @@ namespace cppcrystal {
   return {};
 }
 
-} // namespace cppcrystal
+} // namespace seitz

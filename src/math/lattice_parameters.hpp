@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +10,7 @@
 // right-handed set. Shared by the conventional-cell idealiser (refine) and the
 // random-lattice generator (generate), which previously transcribed the same
 // two expressions independently.
-namespace cppcrystal::math {
+namespace seitz::math {
 
 // sqrt of the i-th diagonal of a metric (Gram) matrix: |a_i|.
 [[nodiscard]] inline double metric_length(Matrix3d const &g, int i) {
@@ -60,4 +60,4 @@ namespace cppcrystal::math {
   return m;
 }
 
-} // namespace cppcrystal::math
+} // namespace seitz::math

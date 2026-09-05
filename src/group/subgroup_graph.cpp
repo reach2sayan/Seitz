@@ -1,13 +1,13 @@
-#include <cppcrystal/group/subgroup_graph.hpp>
+#include <seitz/group/subgroup_graph.hpp>
 
 #include "core/matrix_order.hpp"
 #include "generate/random_lattice.hpp"
 #include "spacegroup/spacegroup.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/data/subgroup_relations.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/data/spg_database.hpp>
+#include <seitz/data/subgroup_relations.hpp>
 
 #include <boost/leaf.hpp>
 
@@ -21,7 +21,7 @@
 #include <tuple>
 #include <vector>
 
-namespace cppcrystal::group {
+namespace seitz::group {
 
 namespace {
 
@@ -227,4 +227,4 @@ std::vector<TSubgroupEdge> derive_t_subgroup_edges() {
   return out;
 }
 
-} // namespace cppcrystal::group
+} // namespace seitz::group

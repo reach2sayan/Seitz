@@ -139,7 +139,7 @@ jobs:
       # to build, or throwing on a cell it used to handle.
       - name: Benchmarks (smoke)
         if: matrix.preset == 'release'
-        run: ./build/release/tests/cppcrystal_tests "[!benchmark]" --benchmark-samples 3
+        run: ./build/release/tests/seitz_tests "[!benchmark]" --benchmark-samples 3
 
       - name: Install
         run: cmake --install build/${{ matrix.preset }}
@@ -154,9 +154,9 @@ jobs:
         if: matrix.preset == 'debug' && matrix.cc == 'gcc-15'
         run: |
           tracked=$(git ls-files \
-            include/cppcrystal/data/element_tables.hpp \
-            include/cppcrystal/data/spacegroup_metadata_tables.hpp \
-            include/cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp \
+            include/seitz/data/element_tables.hpp \
+            include/seitz/data/spacegroup_metadata_tables.hpp \
+            include/seitz/data/magnetic_spacegroup_metadata_tables.hpp \
             src/data/spacegroup_operation_tables.hpp \
             src/data/magnetic_spacegroup_operation_tables.hpp \
             src/data/hall_generators.hpp \
@@ -230,7 +230,7 @@ jobs:
   # and a stale stub should fail the build rather than rot.
   #
   # This job carries a second, less obvious duty. The `python` preset is the
-  # only one that sets CPPCRYSTAL_BUILD_ORACLE_TESTS=OFF, which is what selects
+  # only one that sets SEITZ_BUILD_ORACLE_TESTS=OFF, which is what selects
   # the download-only branch of the spglib fetch in cmake/Dependencies.cmake
   # (SOURCE_SUBDIR naming a directory with no CMakeLists.txt, so the tables are
   # transcribed from the checkout without a second crystallography library
@@ -290,7 +290,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/build/python/python
         run: |
           uv run python tools/fix_core_stubs.py
-          git diff --exit-code python/cppcrystal/_core
+          git diff --exit-code python/seitz/_core
 
   #
   # MSVC, advisory. Everything portable: library, unit tests, the reference
@@ -378,7 +378,7 @@ jobs:
           max-size: 500M
 
       # C:/d because Boost 1.88's superproject nested under the default
-      # D:\a\CppCrystal\CppCrystal\build\release\_deps runs into MAX_PATH.
+      # D:\a\Seitz\Seitz\build\release\_deps runs into MAX_PATH.
       - name: Cache fetched dependencies
         uses: actions/cache@v6
         with:
@@ -405,7 +405,7 @@ jobs:
         run: ctest --preset release --parallel
 
       - name: Benchmarks (smoke)
-        run: ./build/release/tests/cppcrystal_tests.exe "[!benchmark]" --benchmark-samples 3
+        run: ./build/release/tests/seitz_tests.exe "[!benchmark]" --benchmark-samples 3
 
       - name: Install
         run: cmake --install build/release

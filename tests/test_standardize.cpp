@@ -1,6 +1,6 @@
 // Non-oracle tests for standardize_cell: round-trip checks against the
 // determination pipeline, without the reference spglib.
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
 
@@ -10,10 +10,10 @@
 #include <stdexcept>
 #include <utility>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
-using cppcrystal::test::must;
+using seitz::test::must;
 
 Cell nacl_conventional() {
   Matrix3d const L = 5.64 * Matrix3d::Identity();

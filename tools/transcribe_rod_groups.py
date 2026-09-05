@@ -3,7 +3,7 @@
 constexpr header.
 
 Rod groups are the 75 subperiodic groups periodic along ONE axis. They are NOT
-in spglib (unlike layer groups, which CppCrystal reaches through spglib's
+in spglib (unlike layer groups, which Seitz reaches through spglib's
 negative-Hall datasets), so the source of truth here is PyXtal — the same
 crystal-generation library this layer mirrors — read through its stable public
 API rather than its on-disk database format:
@@ -137,7 +137,7 @@ def emit(symbols, ops_per_group, out_path):
           "(Group(n, dim=1)).\n// Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
-        w("namespace cppcrystal::data {\n\n")
+        w("namespace seitz::data {\n\n")
 
         w("// Number of rod (1D-periodic subperiodic) groups.\n")
         w("inline constexpr int kNumRodGroups = %d;\n\n" % NUM_ROD_GROUPS)
@@ -184,7 +184,7 @@ def emit(symbols, ops_per_group, out_path):
             w("    " + ", ".join("%d" % o for o in offsets[i:i + 12]) + ",\n")
         w("}};\n\n")
 
-        w("} // namespace cppcrystal::data\n")
+        w("} // namespace seitz::data\n")
 
     return len(flat)
 

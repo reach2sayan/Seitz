@@ -5,7 +5,7 @@
 // fed to both sides, so this tests the pipeline, not the symmetry search.
 
 #include "oracle.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "spacegroup/spacegroup.hpp"
 
@@ -17,12 +17,12 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::Lattice;
-using cppcrystal::Matrix3d;
-using cppcrystal::Operations;
-using cppcrystal::Positions;
-using cppcrystal::oracle::reference_symmetry;
+using seitz::Cell;
+using seitz::Lattice;
+using seitz::Matrix3d;
+using seitz::Operations;
+using seitz::Positions;
+using seitz::oracle::reference_symmetry;
 
 Cell make_cell(Matrix3d const &lattice,
                std::vector<std::array<double, 3>> const &pos,
@@ -81,7 +81,7 @@ void check_conventional(Cell const &cell, double symprec) {
   std::vector<double> trans;
   to_c_operations(rot, trans, ops);
   double lat[3][3];
-  cppcrystal::oracle::to_c_lattice(lat, cell.lattice().matrix());
+  seitz::oracle::to_c_lattice(lat, cell.lattice().matrix());
   SpglibSpacegroupType const ref = spg_get_spacegroup_type_from_symmetry(
       reinterpret_cast<int(*)[3][3]>(rot.data()),
       reinterpret_cast<double(*)[3]>(trans.data()),
@@ -149,7 +149,7 @@ TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
       reinterpret_cast<double(*)[3]>(trans.data()),
       static_cast<int>(ops.size()), s);
 
-  auto const got = ops.spacegroup<cppcrystal::LatticeSetting::primitive>(
+  auto const got = ops.spacegroup<seitz::LatticeSetting::primitive>(
       Matrix3d::Identity(), {s});
 
   REQUIRE((ref_hall == 0) == (!got.has_value()));

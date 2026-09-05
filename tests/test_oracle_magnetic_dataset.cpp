@@ -1,13 +1,13 @@
 // Oracle test for the full magnetic dataset (spglib.c get_magnetic_dataset):
-// cppcrystal::get_magnetic_dataset must reproduce spg_get_magnetic_dataset —
+// seitz::get_magnetic_dataset must reproduce spg_get_magnetic_dataset —
 // the magnetic space-group identity, the standardized cell (lattice + positions
 // + site tensors), equivalent atoms, and the transformation to the standardized
 // setting.
 
 #include "oracle.hpp"
 
-#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
+#include <seitz/core/magnetic_cell.hpp>
 
 #include "math/integer_matrix.hpp"
 
@@ -21,19 +21,19 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::CollinearTensors;
-using cppcrystal::Lattice;
-using cppcrystal::MagneticCell;
-using cppcrystal::Matrix3d;
-using cppcrystal::Matrix3i;
-using cppcrystal::noncollinear_tensors;
-using cppcrystal::NoncollinearTensors;
-using cppcrystal::Positions;
-using cppcrystal::SiteTensor;
-using cppcrystal::SiteTensors;
-using cppcrystal::TensorKind;
-using cppcrystal::Vector3d;
+using seitz::Cell;
+using seitz::CollinearTensors;
+using seitz::Lattice;
+using seitz::MagneticCell;
+using seitz::Matrix3d;
+using seitz::Matrix3i;
+using seitz::noncollinear_tensors;
+using seitz::NoncollinearTensors;
+using seitz::Positions;
+using seitz::SiteTensor;
+using seitz::SiteTensors;
+using seitz::TensorKind;
+using seitz::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
                std::vector<int> const &types) {
@@ -68,7 +68,7 @@ bool fractional_overlap(Vector3d const &a, Vector3d const &b, double symprec) {
 
 bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
   Matrix3d const rel = a.inverse() * b;
-  Matrix3i const rounded = cppcrystal::math::round_to_int(rel);
+  Matrix3i const rounded = seitz::math::round_to_int(rel);
   return (rel - rounded.cast<double>()).cwiseAbs().maxCoeff() < 1e-6 &&
          std::abs(rounded.determinant()) == 1;
 }
@@ -76,11 +76,11 @@ bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
 void check(MagneticCell const &input, TensorKind kind, double symprec) {
   bool const is_axial = kind == TensorKind::axial;
   MagneticCell const mcell(input.cell(), input.tensors(), kind);
-  auto const got = cppcrystal::test::magnetic_dataset_of(mcell, {symprec});
+  auto const got = seitz::test::magnetic_dataset_of(mcell, {symprec});
   REQUIRE(got);
 
   // Reference dataset.
-  cppcrystal::oracle::CCell c(mcell.cell());
+  seitz::oracle::CCell c(mcell.cell());
   std::vector<double> const tensors = flat_tensors(mcell);
   int const rank = mcell.rank() == SiteTensor::collinear ? 0 : 1;
   SpglibMagneticDataset *ref = spg_get_magnetic_dataset(
@@ -97,19 +97,19 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
 
   // Transformation to the standardized setting.
   Matrix3d ref_tmat;
-  cppcrystal::oracle::from_c_lattice(ref_tmat, ref->transformation_matrix);
+  seitz::oracle::from_c_lattice(ref_tmat, ref->transformation_matrix);
   CHECK((got->setting.transformation - ref_tmat).cwiseAbs().maxCoeff() < 1e-5);
   Vector3d const ref_shift(ref->origin_shift[0], ref->origin_shift[1],
                            ref->origin_shift[2]);
   CHECK((got->setting.origin_shift - ref_shift).cwiseAbs().maxCoeff() < 1e-5);
   Matrix3d ref_std_rot;
-  cppcrystal::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
+  seitz::oracle::from_c_lattice(ref_std_rot, ref->std_rotation_matrix);
   CHECK((got->setting.rigid_rotation - ref_std_rot).cwiseAbs().maxCoeff() <
         1e-5);
 
   // Standardized lattice.
   Matrix3d ref_std_lat;
-  cppcrystal::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
+  seitz::oracle::from_c_lattice(ref_std_lat, ref->std_lattice);
   CHECK((got->standardized.cell().lattice().matrix() - ref_std_lat)
             .cwiseAbs()
             .maxCoeff() < 1e-5);
@@ -176,7 +176,7 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   }
 
   Matrix3d ref_prim;
-  cppcrystal::oracle::from_c_lattice(ref_prim, ref->primitive_lattice);
+  seitz::oracle::from_c_lattice(ref_prim, ref->primitive_lattice);
   CHECK(same_lattice(got->primitive.matrix(), ref_prim));
 
   spg_free_magnetic_dataset(ref);

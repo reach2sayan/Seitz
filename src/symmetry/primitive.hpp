@@ -1,21 +1,21 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/lattice.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 #include <optional>
 #include <span>
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::symmetry {
+namespace seitz::symmetry {
 
 struct Primitive {
   Cell cell;                      // primitive cell (Delaunay-reduced lattice)
@@ -35,7 +35,7 @@ struct Primitive {
 // `if constexpr` branch rather than a runtime test.
 //
 // Non-owning: `cell` must outlive the finder.
-template <GroupFamily F> class CPPCRYSTAL_TESTABLE PrimitiveFinder {
+template <GroupFamily F> class SEITZ_TESTABLE PrimitiveFinder {
 public:
   PrimitiveFinder(Cell const &cell, Tolerance const &tol) noexcept
       : cell_(cell), tol_(tol) {}
@@ -72,4 +72,4 @@ private:
 extern template class PrimitiveFinder<GroupFamily::space>;
 extern template class PrimitiveFinder<GroupFamily::layer>;
 
-} // namespace cppcrystal::symmetry
+} // namespace seitz::symmetry

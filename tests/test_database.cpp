@@ -1,14 +1,14 @@
-#include <cppcrystal/data/element_data.hpp>
-#include <cppcrystal/data/msg_database.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/element_data.hpp>
+#include <seitz/data/msg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
-using cppcrystal::test::space_hall;
-using cppcrystal::test::uni_number;
+using namespace seitz;
+using seitz::test::space_hall;
+using seitz::test::uni_number;
 
 TEST_CASE("operations_from_database returns identity and inversion",
           "[database]") {

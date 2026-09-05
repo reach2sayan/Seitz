@@ -11,7 +11,7 @@
 //
 // Empty on MSVC, where the library is a static archive (see CMakeLists.txt):
 #if defined(_MSC_VER)
-#define CPPCRYSTAL_TESTABLE
+#define SEITZ_TESTABLE
 #else
-#define CPPCRYSTAL_TESTABLE __attribute__((visibility("default")))
+#define SEITZ_TESTABLE __attribute__((visibility("default")))
 #endif

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(CppCrystal VERSION 0.1.0 LANGUAGES CXX
+project(Seitz VERSION 0.1.0 LANGUAGES CXX
         DESCRIPTION "Modern C++23 crystallography and symmetry-analysis library")
 
 set(CMAKE_CXX_STANDARD 23)
@@ -34,23 +34,23 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # is not what CMAKE_CXX_COMPILER_VERSION reports.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
     message(FATAL_ERROR
-            "CppCrystal needs GCC 15+ for <generator> and std::from_range "
+            "Seitz needs GCC 15+ for <generator> and std::from_range "
             "(got ${CMAKE_CXX_COMPILER_VERSION} at ${CMAKE_CXX_COMPILER}).\n"
             "Select one explicitly, e.g. CXX=g++-15 for a pip/uv build, or "
             "-DCMAKE_CXX_COMPILER=g++-15 for a direct cmake invocation.")
 elseif (MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.43)
     message(FATAL_ERROR
-            "CppCrystal needs MSVC 19.43 / Visual Studio 17.13+ for <generator> "
+            "Seitz needs MSVC 19.43 / Visual Studio 17.13+ for <generator> "
             "(got ${CMAKE_CXX_COMPILER_VERSION}).")
 endif ()
 
-option(CPPCRYSTAL_BUILD_TESTS "Build the test suite" ON)
-option(CPPCRYSTAL_BUILD_DEMO "Build the demo executable" ON)
-option(CPPCRYSTAL_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
-option(CPPCRYSTAL_BUILD_TOOLS "Build offline data generators" OFF)
-option(CPPCRYSTAL_BUILD_PYTHON "Build the pybind11 extension module" OFF)
-option(CPPCRYSTAL_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
-option(CPPCRYSTAL_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
+option(SEITZ_BUILD_TESTS "Build the test suite" ON)
+option(SEITZ_BUILD_DEMO "Build the demo executable" ON)
+option(SEITZ_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
+option(SEITZ_BUILD_TOOLS "Build offline data generators" OFF)
+option(SEITZ_BUILD_PYTHON "Build the pybind11 extension module" OFF)
+option(SEITZ_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
+option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 
 include(Dependencies)
 
@@ -73,11 +73,11 @@ include(Dependencies)
 # Deliberately NOT generated here, and still tracked in git:
 #   src/data/rod_group_tables.hpp — its source of truth is PyXtal, whose
 #       pymatgen dependency a C++ build has no business requiring.
-#   include/cppcrystal/data/subgroup_relations.hpp — produced by
+#   include/seitz/data/subgroup_relations.hpp — produced by
 #       tools/generate_subgroup_relations.cpp, which links this library, which
 #       includes that header. Only a two-stage build breaks that cycle, and the
 #       derivation is slow enough that it should not run per build anyway.
-#   python/cppcrystal/_core/*.pyi — they describe the built extension module,
+#   python/seitz/_core/*.pyi — they describe the built extension module,
 #       so they are downstream of the build, not upstream of it. CI already
 #       fails on a stale one.
 #
@@ -87,22 +87,22 @@ include(Dependencies)
 # pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
 find_package(Python 3.9 REQUIRED COMPONENTS Interpreter)
 
-set(CPPCRYSTAL_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
-set(CPPCRYSTAL_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/src")
+set(SEITZ_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
+set(SEITZ_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/src")
 
 # At configure time, not from inside the custom commands: two of the five
 # generators write into each of these directories, and having both race to
 # create the same path under `ninja -j` is a failure mode worth not having.
 file(MAKE_DIRECTORY
-        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data")
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data"
+        "${SEITZ_GENERATED_SRC_DIR}/data")
 
 # One custom command per generator. Every transcriber takes its inputs then its
 # outputs as positional arguments, which is what lets this be one function
 # rather than five near-identical add_custom_command() blocks. The script is a
 # DEPENDS as well as the data, so editing a transcriber regenerates its tables
 # and recompiles whatever includes them.
-function(cppcrystal_transcribe script)
+function(seitz_transcribe script)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "INPUTS;OUTPUTS")
     add_custom_command(
             OUTPUT ${arg_OUTPUTS}
@@ -114,42 +114,42 @@ function(cppcrystal_transcribe script)
             VERBATIM)
 endfunction()
 
-set(CPPCRYSTAL_SPGLIB_SOURCE "${spglib_reference_SOURCE_DIR}/src")
+set(SEITZ_SPGLIB_SOURCE "${spglib_reference_SOURCE_DIR}/src")
 
-# Public — installed, and reachable from <cppcrystal/cppcrystal.hpp>.
-set(CPPCRYSTAL_GENERATED_PUBLIC_HEADERS
-        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/element_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/spacegroup_metadata_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp")
+# Public — installed, and reachable from <seitz/seitz.hpp>.
+set(SEITZ_GENERATED_PUBLIC_HEADERS
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/element_tables.hpp"
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/spacegroup_metadata_tables.hpp"
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/magnetic_spacegroup_metadata_tables.hpp")
 # Private — the encoded-operation packing, decoded in the .cpp files. Never
 # installed, and a public header including one of these is a bug.
-set(CPPCRYSTAL_GENERATED_PRIVATE_HEADERS
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/hall_generators.hpp"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
+set(SEITZ_GENERATED_PRIVATE_HEADERS
+        "${SEITZ_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp"
+        "${SEITZ_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp"
+        "${SEITZ_GENERATED_SRC_DIR}/data/hall_generators.hpp"
+        "${SEITZ_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
 
-cppcrystal_transcribe(transcribe_elements.py
+seitz_transcribe(transcribe_elements.py
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/element_data.csv"
-        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/element_tables.hpp")
+        OUTPUTS "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/element_tables.hpp")
 
-cppcrystal_transcribe(transcribe_spg_database.py
-        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/spg_database.c"
-        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/spacegroup_metadata_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp")
+seitz_transcribe(transcribe_spg_database.py
+        INPUTS "${SEITZ_SPGLIB_SOURCE}/spg_database.c"
+        OUTPUTS "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/spacegroup_metadata_tables.hpp"
+        "${SEITZ_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp")
 
-cppcrystal_transcribe(transcribe_msg_database.py
-        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/msg_database.c"
-        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp"
-        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp")
+seitz_transcribe(transcribe_msg_database.py
+        INPUTS "${SEITZ_SPGLIB_SOURCE}/msg_database.c"
+        OUTPUTS "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/magnetic_spacegroup_metadata_tables.hpp"
+        "${SEITZ_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp")
 
-cppcrystal_transcribe(transcribe_hall_generators.py
-        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/hall_symbol.c"
-        OUTPUTS "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/hall_generators.hpp")
+seitz_transcribe(transcribe_hall_generators.py
+        INPUTS "${SEITZ_SPGLIB_SOURCE}/hall_symbol.c"
+        OUTPUTS "${SEITZ_GENERATED_SRC_DIR}/data/hall_generators.hpp")
 
-cppcrystal_transcribe(transcribe_sitesym_database.py
-        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/sitesym_database.c"
-        OUTPUTS "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
+seitz_transcribe(transcribe_sitesym_database.py
+        INPUTS "${SEITZ_SPGLIB_SOURCE}/sitesym_database.c"
+        OUTPUTS "${SEITZ_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
 
 # NOT MSVC: ccache's cl.exe support is narrow enough to be a liability (it
 # needs /Z7 rather than /Zi and misses on several common flag shapes). The
@@ -167,7 +167,7 @@ endif ()
 # consumer links against. Being shared is what makes the exported dependency set
 # below exact: PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the
 # interface, which a static archive cannot promise (see
-# cmake/CppCrystalConfig.cmake.in, which branches on exactly that).
+# cmake/SeitzConfig.cmake.in, which branches on exactly that).
 #
 # STATIC in the two cases where it is not, for reasons that are not about
 # packaging taste:
@@ -185,25 +185,25 @@ endif ()
 #   cannot help: the consumer's own COMDAT definition wins over any import.
 #   Linking one module is the only fix that does not fork Boost. It also makes
 #   the `#pragma GCC visibility` windows in the public headers and
-#   CPPCRYSTAL_TESTABLE genuinely inert rather than something to work around.
-if (CPPCRYSTAL_BUILD_PYTHON OR WIN32)
-    set(CPPCRYSTAL_LIBRARY_TYPE STATIC)
+#   SEITZ_TESTABLE genuinely inert rather than something to work around.
+if (SEITZ_BUILD_PYTHON OR WIN32)
+    set(SEITZ_LIBRARY_TYPE STATIC)
 else ()
-    set(CPPCRYSTAL_LIBRARY_TYPE SHARED)
+    set(SEITZ_LIBRARY_TYPE SHARED)
 endif ()
-add_library(cppcrystal ${CPPCRYSTAL_LIBRARY_TYPE})
-add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
+add_library(seitz ${SEITZ_LIBRARY_TYPE})
+add_library(seitz::seitz ALIAS seitz)
 # PIC unconditionally: as a static archive this library still gets linked into a
 # shared object (the Python extension), which needs its objects relocatable.
-set_target_properties(cppcrystal PROPERTIES POSITION_INDEPENDENT_CODE ON)
-if (CPPCRYSTAL_LIBRARY_TYPE STREQUAL "SHARED")
-    set_target_properties(cppcrystal PROPERTIES
+set_target_properties(seitz PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if (SEITZ_LIBRARY_TYPE STREQUAL "SHARED")
+    set_target_properties(seitz PROPERTIES
             # 0.x: SOVERSION tracks the minor, since every minor may break ABI
             # before 1.0. From 1.0 on this becomes ${PROJECT_VERSION_MAJOR}.
             VERSION ${PROJECT_VERSION}
             SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 endif ()
-target_sources(cppcrystal PRIVATE
+target_sources(seitz PRIVATE
         src/version.cpp
         src/warmup.cpp
         src/analysis/symmetry_analyzer.cpp
@@ -217,7 +217,7 @@ target_sources(cppcrystal PRIVATE
         src/generate/distance_check.cpp
         # Alloy configurational thermodynamics: symmetry-distinct cluster
         # enumeration and the Cluster Variation Method ingredients. The
-        # geometry is cppcrystal::Cell throughout; only the mathematics comes
+        # geometry is seitz::Cell throughout; only the mathematics comes
         # from ATAT.
         src/alloy/site_basis.cpp
         src/alloy/cluster.cpp
@@ -259,31 +259,31 @@ target_sources(cppcrystal PRIVATE
 # consumed here, so it schedules the transcription before the first translation
 # unit that includes one. Anything else that includes them (the tests, the
 # Python extension) links this library and is therefore ordered after it.
-target_sources(cppcrystal PRIVATE
-        ${CPPCRYSTAL_GENERATED_PUBLIC_HEADERS}
-        ${CPPCRYSTAL_GENERATED_PRIVATE_HEADERS})
+target_sources(seitz PRIVATE
+        ${SEITZ_GENERATED_PUBLIC_HEADERS}
+        ${SEITZ_GENERATED_PRIVATE_HEADERS})
 
 # The generated directories come FIRST, deliberately. A checkout made before the
 # tables stopped being tracked still has stale copies sitting in
-# include/cppcrystal/data and src/data, and a stale table quietly winning the
+# include/seitz/data and src/data, and a stale table quietly winning the
 # include search is the one failure mode here that yields wrong crystallography
 # rather than a build error. Searching the build tree first makes the leftovers
 # inert; `git rm --cached` plus a delete makes them gone.
-target_include_directories(cppcrystal PUBLIC
-        $<BUILD_INTERFACE:${CPPCRYSTAL_GENERATED_INCLUDE_DIR}>
+target_include_directories(seitz PUBLIC
+        $<BUILD_INTERFACE:${SEITZ_GENERATED_INCLUDE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 # The determination pipeline's headers live beside their .cpp files under src/
-# and are never installed: `#include <cppcrystal/...>` is the public API,
+# and are never installed: `#include <seitz/...>` is the public API,
 # `#include "module/x.hpp"` is internal.
-target_include_directories(cppcrystal PRIVATE
-        ${CPPCRYSTAL_GENERATED_SRC_DIR}
+target_include_directories(seitz PRIVATE
+        ${SEITZ_GENERATED_SRC_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_compile_features(cppcrystal PUBLIC cxx_std_23)
+target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
-target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
+target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
         Boost::leaf Threads::Threads)
-target_link_libraries(cppcrystal PRIVATE Boost::flyweight Boost::geometry)
+target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry)
 
 # The conversion warnings are applied to the library only — the oracle tests
 # bridge to the reference C API (reinterpret_cast, size_t<->int), which would
@@ -291,7 +291,7 @@ target_link_libraries(cppcrystal PRIVATE Boost::flyweight Boost::geometry)
 # middle-end warning GCC reports at the inlined callee, so SYSTEM include
 # marking cannot keep Eigen's evaluators and libstdc++'s <generator> out of it
 # at -O2.
-target_compile_options(cppcrystal PRIVATE
+target_compile_options(seitz PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wshadow;-Wcast-align;-Wdouble-promotion;-Wimplicit-fallthrough;-Wconversion;-Wsign-conversion>)
 
 # The magnetic database decodes all 76683 operations + the alternative
@@ -306,7 +306,7 @@ target_compile_options(cppcrystal PRIVATE
 # /constexpr:depth). The MSVC spelling appends the number with no separator.
 # PUBLIC, not per-source: the subgroup tables live in an installed header, so
 # consumers evaluate them too.
-target_compile_options(cppcrystal PUBLIC
+target_compile_options(seitz PUBLIC
         $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=100000000>
         $<$<CXX_COMPILER_ID:Clang,AppleClang>:-fconstexpr-steps=100000000>
         $<$<CXX_COMPILER_ID:MSVC>:/constexpr:steps100000000;/constexpr:depth2048>)
@@ -334,7 +334,7 @@ target_compile_options(cppcrystal PUBLIC
 # which CMake or the standard level already supplies; and /Zc:preprocessor,
 # which nothing here needs (no __VA_ARGS__ outside third_party) and which would
 # switch the vendored mdspan off its purpose-built _MSVC_TRADITIONAL path.
-target_compile_options(cppcrystal PUBLIC
+target_compile_options(seitz PUBLIC
         $<$<CXX_COMPILER_ID:MSVC>:/bigobj;/utf-8;/Zc:__cplusplus;/wd4068>)
 
 # Interprocedural optimization, optimized configurations only.
@@ -356,33 +356,33 @@ target_compile_options(cppcrystal PUBLIC
 include(CheckIPOSupported)
 # LANGUAGES CXX explicitly: the project enables only C++, but fetched
 # subprojects enable C, and the default check would fail on that C compiler.
-check_ipo_supported(RESULT CPPCRYSTAL_HAS_IPO OUTPUT CPPCRYSTAL_IPO_ERROR
+check_ipo_supported(RESULT SEITZ_HAS_IPO OUTPUT SEITZ_IPO_ERROR
         LANGUAGES CXX)
 # NOT MSVC: the measurement above is a GCC measurement, and its mechanism --
 # interposition blocking cross-TU inlining until -fno-semantic-interposition
 # unblocked it -- has no Windows counterpart. /GL + /LTCG on a library whose
 # slowest TU is a 70k-line table would buy an unmeasured maybe and cost an
 # expensive LTCG pass at every downstream link. Measure before enabling.
-if (CPPCRYSTAL_HAS_IPO AND NOT MSVC)
-    set_target_properties(cppcrystal PROPERTIES
+if (SEITZ_HAS_IPO AND NOT MSVC)
+    set_target_properties(seitz PROPERTIES
             INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
             INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
 else ()
-    message(STATUS "CppCrystal: IPO/LTO unavailable (${CPPCRYSTAL_IPO_ERROR})")
+    message(STATUS "Seitz: IPO/LTO unavailable (${SEITZ_IPO_ERROR})")
 endif ()
 
 # Symbol visibility. The library is compiled with everything hidden by default;
 # each public header under include/ opens a `#pragma GCC visibility push(default)`
 # window around its declarations, so the exported set is exactly the installed
-# interface (plus the handful of internal symbols marked CPPCRYSTAL_TESTABLE for
+# interface (plus the handful of internal symbols marked SEITZ_TESTABLE for
 # the unit tests, which link the shared object and reach into src/).
 #
 # --exclude-libs,ALL keeps the statically linked Boost archives from
 # re-exporting their vague-linkage instantiations through this shared object;
-# cmake/CppCrystalConfig.cmake.in promises consumers never need Boost, and this
+# cmake/SeitzConfig.cmake.in promises consumers never need Boost, and this
 # is what makes that true of the symbol table as well as the CMake interface.
-set_target_properties(cppcrystal PROPERTIES CXX_VISIBILITY_PRESET hidden)
-target_link_options(cppcrystal PRIVATE
+set_target_properties(seitz PROPERTIES CXX_VISIBILITY_PRESET hidden)
+target_link_options(seitz PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wl,--exclude-libs,ALL>)
 
 # Interposition. A default-visibility function in a shared object may be
@@ -391,7 +391,7 @@ target_link_options(cppcrystal PRIVATE
 # expects to have its own symbols interposed, so calls inside it bind directly.
 # MEASURED: ~1.5% on the determination driver, consistent across 7 interleaved
 # runs. Small, but free and in the right direction.
-target_compile_options(cppcrystal PRIVATE
+target_compile_options(seitz PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-semantic-interposition>)
 
 # Nothing here reads errno after a libm call, and promising that it might blocks
@@ -399,7 +399,7 @@ target_compile_options(cppcrystal PRIVATE
 # this benchmark set; kept because it is accurate about the code and costs
 # nothing. Deliberately NOT -ffast-math: the search is tolerance-sensitive and
 # bit-parity-tested against the reference implementation.
-target_compile_options(cppcrystal PRIVATE
+target_compile_options(seitz PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-math-errno>)
 
 # ISA. The shipped library targets the portable x86-64 baseline, which is why
@@ -415,42 +415,42 @@ target_compile_options(cppcrystal PRIVATE
 # already inert in the optimized build types (they define NDEBUG) and is worth
 # keeping in Debug, where an out-of-range block or a mis-sized product should
 # abort rather than corrupt memory quietly.
-if (CPPCRYSTAL_NATIVE_ARCH)
+if (SEITZ_NATIVE_ARCH)
     if (MSVC)
         message(FATAL_ERROR
-                "CPPCRYSTAL_NATIVE_ARCH has no MSVC spelling: /arch: names fixed "
+                "SEITZ_NATIVE_ARCH has no MSVC spelling: /arch: names fixed "
                 "ISA levels rather than the host's, and raising it past the SSE2 "
                 "default introduces FMA and breaks the bit-parity guarantee "
                 "described above.")
     endif ()
-    target_compile_options(cppcrystal PUBLIC -march=native -ffp-contract=off)
+    target_compile_options(seitz PUBLIC -march=native -ffp-contract=off)
 endif ()
 
-if (CPPCRYSTAL_ENABLE_SANITIZERS)
+if (SEITZ_ENABLE_SANITIZERS)
     if (MSVC)
         message(FATAL_ERROR
-                "CPPCRYSTAL_ENABLE_SANITIZERS is GCC/Clang-only: MSVC ships "
+                "SEITZ_ENABLE_SANITIZERS is GCC/Clang-only: MSVC ships "
                 "/fsanitize=address but no UBSan, and the ASan-under-CPython "
                 "arrangement in python/CMakeLists.txt has no Windows counterpart.")
     endif ()
-    target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
-    target_link_options(cppcrystal PUBLIC -fsanitize=address,undefined)
+    target_compile_options(seitz PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(seitz PUBLIC -fsanitize=address,undefined)
 endif ()
 
-if (CPPCRYSTAL_BUILD_DEMO)
-    add_executable(cppcrystal_demo main.cpp)
-    target_link_libraries(cppcrystal_demo PRIVATE cppcrystal::cppcrystal)
+if (SEITZ_BUILD_DEMO)
+    add_executable(seitz_demo main.cpp)
+    target_link_libraries(seitz_demo PRIVATE seitz::seitz)
 endif ()
 
 # Offline generator for the baked t-subgroup table (data/subgroup_relations.hpp).
 # Not built by default — it re-runs the slow in-house derivation. Build with
-# -DCPPCRYSTAL_BUILD_TOOLS=ON, run it, and redirect stdout over the header.
-if (CPPCRYSTAL_BUILD_TOOLS)
+# -DSEITZ_BUILD_TOOLS=ON, run it, and redirect stdout over the header.
+if (SEITZ_BUILD_TOOLS)
     add_executable(generate_subgroup_relations tools/generate_subgroup_relations.cpp)
-    target_link_libraries(generate_subgroup_relations PRIVATE cppcrystal::cppcrystal)
+    target_link_libraries(generate_subgroup_relations PRIVATE seitz::seitz)
 endif ()
 
-if (CPPCRYSTAL_BUILD_TESTS)
+if (SEITZ_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif ()
@@ -460,7 +460,7 @@ endif ()
 # Python package -- and because src/ is the never-installed pipeline.
 # enable_testing() above also registers the pytest suite, so the ordering
 # matters when tests are on.
-if (CPPCRYSTAL_BUILD_PYTHON)
+if (SEITZ_BUILD_PYTHON)
     enable_testing()
     add_subdirectory(python)
 endif ()
@@ -468,38 +468,38 @@ endif ()
 # ---- install ----
 # Only include/ ships. The pipeline headers under src/ are on the library's
 # PRIVATE include path and are deliberately not part of the exported interface,
-# so an installed consumer can reach exactly what <cppcrystal/cppcrystal.hpp>
+# so an installed consumer can reach exactly what <seitz/seitz.hpp>
 # reaches and no more.
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # GNUInstallDirs supplies every destination; naming them again would only
 # restate the defaults.
-install(TARGETS cppcrystal EXPORT CppCrystalTargets)
-install(DIRECTORY include/cppcrystal
+install(TARGETS seitz EXPORT SeitzTargets)
+install(DIRECTORY include/seitz
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.hpp")
 # The three public tables are generated, so they are not under include/ to be
 # picked up by the rule above; they land in the same place from the build tree.
 # Their $<BUILD_INTERFACE:> and the authored headers' $<INSTALL_INTERFACE:include>
 # converge on one directory, which is why the installed layout is unchanged.
-install(DIRECTORY "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal"
+install(DIRECTORY "${SEITZ_GENERATED_INCLUDE_DIR}/seitz"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.hpp")
-install(EXPORT CppCrystalTargets
-        FILE CppCrystalTargets.cmake
-        NAMESPACE cppcrystal::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CppCrystal)
+install(EXPORT SeitzTargets
+        FILE SeitzTargets.cmake
+        NAMESPACE seitz::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
 
 write_basic_package_version_file(
-        "${CMAKE_CURRENT_BINARY_DIR}/CppCrystalConfigVersion.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion)
 configure_package_config_file(
-        cmake/CppCrystalConfig.cmake.in
-        "${CMAKE_CURRENT_BINARY_DIR}/CppCrystalConfig.cmake"
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CppCrystal)
+        cmake/SeitzConfig.cmake.in
+        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
 install(FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/CppCrystalConfig.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/CppCrystalConfigVersion.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CppCrystal)
+        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)

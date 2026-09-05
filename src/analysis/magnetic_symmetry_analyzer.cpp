@@ -1,4 +1,4 @@
-#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
 
 #include "core/validation.hpp"
 #include "magnetic/identify.hpp"
@@ -7,7 +7,7 @@
 
 #include <utility>
 
-namespace cppcrystal::analysis {
+namespace seitz::analysis {
 
 Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
   // The magnetic determination always searches with time reversal (the full
@@ -50,4 +50,4 @@ Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
   };
 }
 
-} // namespace cppcrystal::analysis
+} // namespace seitz::analysis

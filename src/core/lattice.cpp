@@ -1,6 +1,6 @@
-#include <cppcrystal/core/lattice.hpp>
+#include <seitz/core/lattice.hpp>
 
-namespace cppcrystal {
+namespace seitz {
 
 namespace {
 
@@ -28,4 +28,4 @@ Matrix3d Lattice::rigid_rotation_to(Lattice const &ideal) const noexcept {
          orthonormal_basis(basis_).transpose();
 }
 
-} // namespace cppcrystal
+} // namespace seitz

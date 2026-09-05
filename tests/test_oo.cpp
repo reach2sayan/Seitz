@@ -5,14 +5,14 @@
 // through the analyzer.
 #include "core/overlap.hpp"
 #include "data/rod_database.hpp"
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/generate/distance_check.hpp>
-#include <cppcrystal/generate/generator.hpp>
-#include <cppcrystal/group/point_group.hpp>
-#include <cppcrystal/group/rod_group.hpp>
-#include <cppcrystal/group/space_group.hpp>
-#include <cppcrystal/group/subgroup_graph.hpp>
-#include <cppcrystal/warmup.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/generate/distance_check.hpp>
+#include <seitz/generate/generator.hpp>
+#include <seitz/group/point_group.hpp>
+#include <seitz/group/rod_group.hpp>
+#include <seitz/group/space_group.hpp>
+#include <seitz/group/subgroup_graph.hpp>
+#include <seitz/warmup.hpp>
 
 #include "helpers.hpp"
 
@@ -30,12 +30,12 @@
 #include <string_view>
 #include <utility>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 // Unwrap a move-only Result<T>, failing the test on an error result.
-using cppcrystal::test::errored;
-using cppcrystal::test::must;
+using seitz::test::errored;
+using seitz::test::must;
 
 // Order of the point group named by a tabulated site-symmetry symbol. The
 // symbols are oriented Hermann-Mauguin symbols ("..2", "m.mm", "-4m.2"): the

@@ -1,11 +1,11 @@
-#include <cppcrystal/core/mdspan.hpp>
+#include <seitz/core/mdspan.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 // A 2 x 3 table over a flat constexpr array is itself a constant expression.

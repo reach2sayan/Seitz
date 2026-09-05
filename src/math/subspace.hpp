@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -12,7 +12,7 @@
 // the origin {0}. `tol` is the singular-value cutoff — callers own their
 // tolerance (the derivations legitimately differ: 1e-7 for exact point-group
 // subspaces, 1e-6 for rod loci built from solved affine systems).
-namespace cppcrystal::math {
+namespace seitz::math {
 
 // Orthonormal basis of the column space of `m` (columns with non-negligible
 // singular value).
@@ -66,4 +66,4 @@ intersect_column_spaces(Eigen::MatrixXd const &a, Eigen::MatrixXd const &b,
   return column_space(a * ker.topRows(a.cols()), tol);
 }
 
-} // namespace cppcrystal::math
+} // namespace seitz::math

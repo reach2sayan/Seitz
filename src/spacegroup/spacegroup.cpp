@@ -7,9 +7,9 @@
 #include "math/integer_matrix.hpp"
 #include "symmetry/pointgroup.hpp"
 #include "symmetry/search.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <algorithm>
 #include <array>
@@ -26,14 +26,14 @@
 // clean up the triclinic/monoclinic basis, determine the centering, build the
 // conventional symmetry, then loop candidate Hall numbers permuting
 // axis/setting choices and matching against the Hall database.
-namespace cppcrystal {
+namespace seitz {
 
 data::SpacegroupType const &SpacegroupMatch::type() const noexcept {
   return data::spacegroup_type(hall);
 }
-} // namespace cppcrystal
+} // namespace seitz
 
-namespace cppcrystal::spacegroup {
+namespace seitz::spacegroup {
 
 using data::Centering;
 using symmetry::Primitive;
@@ -1116,11 +1116,11 @@ spacegroup_type_from_symmetry(Operations const &operations,
                                          red_lat, symprec);
 }
 
-} // namespace cppcrystal::spacegroup
+} // namespace seitz::spacegroup
 
 // The implementation behind OperationSet::spacegroup, out of line here so the
 // public header never names the matcher.
-namespace cppcrystal::detail {
+namespace seitz::detail {
 
 Result<SpacegroupMatch>
 spacegroup_of_operations(std::span<SymmetryOperation const> operations,
@@ -1135,4 +1135,4 @@ spacegroup_of_operations(std::span<SymmetryOperation const> operations,
                    LatticeSetting::conventional>(ops, lattice, tol.symprec);
 }
 
-} // namespace cppcrystal::detail
+} // namespace seitz::detail

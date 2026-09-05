@@ -1,4 +1,4 @@
-#include <cppcrystal/alloy/cvm.hpp>
+#include <seitz/alloy/cvm.hpp>
 
 #include "alloy/enumerate.hpp"
 #include "alloy/geometry.hpp"
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::alloy {
+namespace seitz::alloy {
 namespace {
 
 using detail::coincident;
@@ -399,4 +399,4 @@ Result<Cvm> Cvm::create(ParentLattice const &parent,
   return Cvm{lattice, std::move(clusters), std::move(functions)};
 }
 
-} // namespace cppcrystal::alloy
+} // namespace seitz::alloy

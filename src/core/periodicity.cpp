@@ -1,8 +1,8 @@
-#include <cppcrystal/core/periodicity.hpp>
+#include <seitz/core/periodicity.hpp>
 
 #include <ranges>
 
-namespace cppcrystal::detail {
+namespace seitz::detail {
 
 Vector3d minimal_image_mixed(Vector3d const &diff,
                              CellPeriodicity const &p) noexcept {
@@ -27,4 +27,4 @@ Vector3d wrap_mixed(Vector3d const &v, CellPeriodicity const &p) noexcept {
   return out;
 }
 
-} // namespace cppcrystal::detail
+} // namespace seitz::detail

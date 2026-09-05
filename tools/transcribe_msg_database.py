@@ -212,7 +212,7 @@ def main():
         w("// public msg_database.hpp without leaking the operation encoding.\n\n")
         w("#include <array>\n\n")
         w("#pragma GCC visibility push(default)\n\n")
-        w("namespace cppcrystal::data {\n\n")
+        w("namespace seitz::data {\n\n")
         w("struct MagneticSpacegroupTypeRaw {\n")
         w("  int uni_number;\n")
         w("  int litvin_number;\n")
@@ -242,7 +242,7 @@ def main():
         for (n, first) in uni_mapping:
             w("    {{%d, %d}},\n" % (n, first))
         w("}};\n\n")
-        w("} // namespace cppcrystal::data\n")
+        w("} // namespace seitz::data\n")
         w("\n#pragma GCC visibility pop\n")
 
     # --- operations header (private): encoded ops + index + alt transforms ---
@@ -256,7 +256,7 @@ def main():
         w("// where 34012224 = 3^9 * 12^3. Decoded in src/data/msg_database.cpp;\n")
         w("// must NOT be included by a public header.\n\n")
         w("#include <array>\n\n")
-        w("namespace cppcrystal::data {\n\n")
+        w("namespace seitz::data {\n\n")
 
         w("inline constexpr std::array<int, %d> kMagneticOperations = {{\n"
           % len(ops))
@@ -282,7 +282,7 @@ def main():
             w("    {{" + ", ".join("{{%s}}" % ", ".join(str(x) for x in r)
                                    for r in e) + "}},\n")
         w("}};\n\n")
-        w("} // namespace cppcrystal::data\n")
+        w("} // namespace seitz::data\n")
 
     print("types: %d, hall_mapping: %d, uni_mapping: %d, op_index: %d, "
           "ops: %d, alt: %d" % (len(types), len(hall_mapping),

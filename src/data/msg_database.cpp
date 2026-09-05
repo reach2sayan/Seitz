@@ -1,7 +1,7 @@
-#include <cppcrystal/data/msg_database.hpp>
+#include <seitz/data/msg_database.hpp>
 
-#include <cppcrystal/core/mdspan.hpp>
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/mdspan.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "data/magnetic_spacegroup_operation_tables.hpp"
 #include "data/packed_decode.hpp"
@@ -11,7 +11,7 @@
 #include <optional>
 #include <ranges>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 namespace {
 
@@ -160,4 +160,4 @@ Operations const &magnetic_std_transformations(UniNumber uni,
   return table[offset ? setting_slot(uni.value(), *offset) : 0];
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

@@ -4,9 +4,9 @@
 // independent of the reference oracle, so it runs in the standalone suite.
 
 #include "data/spacegroup_operation_tables.hpp" // raw ops (old indexing)
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/data/spacegroup_metadata_tables.hpp> // raw metadata (old indexing)
-#include <cppcrystal/data/spg_database.hpp> // accessors (new indexing)
+#include <seitz/core/operation_set.hpp>
+#include <seitz/data/spacegroup_metadata_tables.hpp> // raw metadata (old indexing)
+#include <seitz/data/spg_database.hpp> // accessors (new indexing)
 
 #include "helpers.hpp"
 
@@ -14,8 +14,8 @@
 
 #include <string_view>
 
-using namespace cppcrystal;
-using cppcrystal::test::space_hall;
+using namespace seitz;
+using seitz::test::space_hall;
 
 namespace {
 // Reference unpack of one packed operation (spgdb_decode_symmetry: rotation

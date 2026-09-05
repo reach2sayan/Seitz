@@ -1,6 +1,6 @@
 # Workflow
 
-How data flows through CppCrystal's pipelines. Each diagram is a Mermaid
+How data flows through Seitz's pipelines. Each diagram is a Mermaid
 flowchart; GitHub renders them inline. Boxes name the module or function that
 does the work.
 
@@ -158,6 +158,6 @@ flowchart LR
 Metadata (numbers, symbols, centering, multiplicities) is decoded once at
 compile time and indexed directly by the group's key. Operation matrices, which
 cannot be `constexpr` because they are `Eigen` types, are decoded on first use
-and cached. `cppcrystal::warmup()` builds every Hall setting of both families up
+and cached. `seitz::warmup()` builds every Hall setting of both families up
 front — about 30 ms — so the caches are race-free for concurrent reads and the
 cost is off the query path.

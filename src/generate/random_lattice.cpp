@@ -1,14 +1,14 @@
 #include "generate/random_lattice.hpp"
 
 #include "math/lattice_parameters.hpp"
-#include <cppcrystal/data/element_data.hpp>
+#include <seitz/data/element_data.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <random>
 
-namespace cppcrystal::generate {
+namespace seitz::generate {
 
 namespace {
 
@@ -131,4 +131,4 @@ Matrix3d random_layer_lattice(std::span<SymmetryOperation const> operations,
   return lattice;
 }
 
-} // namespace cppcrystal::generate
+} // namespace seitz::generate

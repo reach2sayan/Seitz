@@ -7,7 +7,7 @@
 // files are machine-generated and regular (lattice = 3 bracketed float triples,
 // points = number + coordinates, plus the expected space_group.number).
 
-#include <cppcrystal/core/cell.hpp>
+#include <seitz/core/cell.hpp>
 
 #include <cctype>
 #include <filesystem>
@@ -17,7 +17,7 @@
 #include <system_error>
 #include <vector>
 
-namespace cppcrystal::oracle {
+namespace seitz::oracle {
 
 struct CorpusEntry {
   Cell cell;
@@ -171,4 +171,4 @@ inline std::vector<CorpusEntry> load_corpus() {
   return out;
 }
 
-} // namespace cppcrystal::oracle
+} // namespace seitz::oracle

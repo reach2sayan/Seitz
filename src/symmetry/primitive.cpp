@@ -8,8 +8,8 @@
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "symmetry/search.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/periodicity.hpp>
 
 #include <boost/container/flat_map.hpp>
 
@@ -31,7 +31,7 @@
 //   3. Otherwise pick three pure-translation/unit vectors that span the
 //      primitive volume, Delaunay-reduce, then fold and de-duplicate the atoms
 //      into the smaller cell.
-namespace cppcrystal::symmetry {
+namespace seitz::symmetry {
 
 namespace {
 
@@ -423,11 +423,11 @@ Result<Primitive> PrimitiveFinder<F>::from_pure_translations(
 template class PrimitiveFinder<GroupFamily::space>;
 template class PrimitiveFinder<GroupFamily::layer>;
 
-} // namespace cppcrystal::symmetry
+} // namespace seitz::symmetry
 
 // The implementation behind OperationSet::to_primitive, out of line here so
 // the public header never names the primitive-cell machinery.
-namespace cppcrystal::detail {
+namespace seitz::detail {
 
 std::optional<std::pair<std::vector<SymmetryOperation>, Matrix3d>>
 primitive_operations(std::span<SymmetryOperation const> operations,
@@ -460,4 +460,4 @@ primitive_operations(std::span<SymmetryOperation const> operations,
       t_mat);
 }
 
-} // namespace cppcrystal::detail
+} // namespace seitz::detail

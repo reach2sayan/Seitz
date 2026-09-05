@@ -6,7 +6,7 @@
 #include <array>
 #include <string_view>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 // Number of rod (1D-periodic subperiodic) groups.
 inline constexpr int kNumRodGroups = 75;
@@ -635,4 +635,4 @@ inline constexpr std::array<int, kNumRodGroups + 1> kRodOperationOffset = {{
     422, 434, 446, 458, 470, 482, 494, 506, 530, 554, 578,
 }};
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

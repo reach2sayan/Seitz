@@ -48,7 +48,7 @@ def main():
         w("// hall_symbol.c. Do not edit by hand. Each table is N x [3][9]: N\n")
         w("// candidate settings, each with 3 generators / VSpU rows of 9 values.\n\n")
         w("#include <array>\n\n")
-        w("namespace cppcrystal::data {\n\n")
+        w("namespace seitz::data {\n\n")
         w("using GeneratorSet = std::array<std::array<int, 9>, 3>;\n")
         w("using VSpUSet = std::array<std::array<double, 9>, 3>;\n\n")
 
@@ -65,7 +65,7 @@ def main():
                 w("    {{" + ", ".join(rows) + "}},\n")
             w("}};\n\n")
 
-        w("} // namespace cppcrystal::data\n")
+        w("} // namespace seitz::data\n")
 
     print("transcribed %d tables: %s" % (len(tables), ", ".join(
         "%s[%d]" % (n, len(d)) for (n, _c, d) in tables)))

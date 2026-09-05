@@ -1,9 +1,9 @@
 #include "data/rod_database.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "data/rod_group_tables.hpp"
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 Operations rod_operations_from_database(int rod_number) {
   if (!rod_number_in_range(rod_number)) {
@@ -30,4 +30,4 @@ Operations rod_operations_from_database(int rod_number) {
   return Operations{std::move(ops)};
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

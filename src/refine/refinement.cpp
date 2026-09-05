@@ -4,15 +4,15 @@
 #include "math/integer_matrix.hpp"
 #include "math/lattice_parameters.hpp"
 #include "symmetry/pointgroup.hpp"
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/core/lattice.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include <cmath>
 #include <ranges>
 
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 using data::operations_from_database;
 
@@ -219,4 +219,4 @@ SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
   return sg;
 }
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

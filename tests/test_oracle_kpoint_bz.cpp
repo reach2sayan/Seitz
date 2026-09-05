@@ -5,7 +5,7 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,13 +14,13 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::Lattice;
-using cppcrystal::Matrix3d;
-using cppcrystal::Matrix3i;
-using cppcrystal::Positions;
-using cppcrystal::Vector3d;
-using cppcrystal::Vector3i;
+using seitz::Cell;
+using seitz::Lattice;
+using seitz::Matrix3d;
+using seitz::Matrix3i;
+using seitz::Positions;
+using seitz::Vector3d;
+using seitz::Vector3i;
 
 Matrix3d columns(Vector3d const &a, Vector3d const &b, Vector3d const &c) {
   Matrix3d l;
@@ -32,20 +32,20 @@ Matrix3d columns(Vector3d const &a, Vector3d const &b, Vector3d const &c) {
 
 // The identity rotation is enough: BZ relocation itself does not use the
 // reciprocal group, only its geometry.
-cppcrystal::kpoint::ReciprocalMesh
+seitz::kpoint::ReciprocalMesh
 reciprocal_of(Vector3i const &divisions, Vector3i const &is_shift,
               std::vector<Matrix3i> const &rots) {
-  auto const mesh = cppcrystal::kpoint::Mesh::of(
+  auto const mesh = seitz::kpoint::Mesh::of(
       {divisions[0], divisions[1], divisions[2]},
       {is_shift[0] != 0, is_shift[1] != 0, is_shift[2] != 0});
   REQUIRE(mesh);
-  return cppcrystal::kpoint::ReciprocalMesh::from_rotations(
-      *mesh, rots, cppcrystal::TimeReversal::off);
+  return seitz::kpoint::ReciprocalMesh::from_rotations(
+      *mesh, rots, seitz::TimeReversal::off);
 }
 
 std::vector<Vector3i> reference_grid(Vector3i const &divisions) {
   auto const mesh =
-      cppcrystal::kpoint::Mesh::of({divisions[0], divisions[1], divisions[2]});
+      seitz::kpoint::Mesh::of({divisions[0], divisions[1], divisions[2]});
   std::vector<Vector3i> out;
   for (auto const a : mesh->addresses())
     out.emplace_back(a[0], a[1], a[2]);
@@ -57,8 +57,8 @@ void check_relocate(Matrix3d const &real_lattice, Vector3i const &divisions,
   Matrix3d const rec = real_lattice.inverse().transpose();
   std::vector<Matrix3i> const identity{Matrix3i::Identity()};
   auto const got = reciprocal_of(divisions, is_shift, identity)
-                       .brillouin_zone(cppcrystal::Lattice{rec});
-  auto const ref = cppcrystal::oracle::reference_relocate_BZ(
+                       .brillouin_zone(seitz::Lattice{rec});
+  auto const ref = seitz::oracle::reference_relocate_BZ(
       reference_grid(divisions), divisions, rec, is_shift);
 
   CHECK(got.addresses().size() == ref.num_bzgp);
@@ -119,7 +119,7 @@ TEST_CASE("BZ grid points by rotations match reference", "[oracle][kpoint]") {
   Cell const cell(Lattice{4.0 * Matrix3d::Identity()}, p, {0});
 
   auto const rotations =
-      cppcrystal::oracle::reference_symmetry(cell, symprec).rotations();
+      seitz::oracle::reference_symmetry(cell, symprec).rotations();
 
   Matrix3d const rec = cell.lattice().matrix().inverse().transpose();
   Vector3i const mesh(4, 4, 4);
@@ -127,14 +127,14 @@ TEST_CASE("BZ grid points by rotations match reference", "[oracle][kpoint]") {
   auto const reciprocal = reciprocal_of(mesh, shift, rotations);
   std::vector<Matrix3i> const rot_reciprocal(reciprocal.rotations().begin(),
                                              reciprocal.rotations().end());
-  auto const got_bz = reciprocal.brillouin_zone(cppcrystal::Lattice{rec});
-  auto const ref_bz = cppcrystal::oracle::reference_relocate_BZ(
+  auto const got_bz = reciprocal.brillouin_zone(seitz::Lattice{rec});
+  auto const ref_bz = seitz::oracle::reference_relocate_BZ(
       reference_grid(mesh), mesh, rec, shift);
 
   for (Vector3i const &address : {Vector3i(1, 2, 0), Vector3i(2, 2, 0)}) {
     INFO("address " << address.transpose());
     auto const got = got_bz.images_of({address[0], address[1], address[2]});
-    auto const ref = cppcrystal::oracle::reference_BZ_grid_points_by_rotations(
+    auto const ref = seitz::oracle::reference_BZ_grid_points_by_rotations(
         address, rot_reciprocal, mesh, shift, ref_bz.bz_map);
 
     REQUIRE(got.size() == ref.size());

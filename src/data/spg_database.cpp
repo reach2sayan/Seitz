@@ -1,13 +1,13 @@
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "data/packed_decode.hpp"
 #include "data/spacegroup_operation_tables.hpp"
-#include <cppcrystal/data/detail/lookup.hpp>
+#include <seitz/data/detail/lookup.hpp>
 
 #include <array>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 namespace {
 
@@ -34,4 +34,4 @@ Operations const &operations_from_database(HallNumber hall) {
   return hall.family() == GroupFamily::layer ? layer_ops[i] : ops[i];
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

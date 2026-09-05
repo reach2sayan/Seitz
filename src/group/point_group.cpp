@@ -1,11 +1,11 @@
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/group/point_group.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/group/point_group.hpp>
 
 #include "core/matrix_order.hpp"
 #include "group/locus_arrangement.hpp"
 #include "math/subspace.hpp"
 #include "symmetry/pointgroup.hpp"
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include <Eigen/Dense>
 
@@ -15,7 +15,7 @@
 #include <span>
 #include <vector>
 
-namespace cppcrystal::group {
+namespace seitz::group {
 
 namespace {
 
@@ -179,4 +179,4 @@ Result<PointGroup> PointGroup::from_number(int number) {
   return pg;
 }
 
-} // namespace cppcrystal::group
+} // namespace seitz::group

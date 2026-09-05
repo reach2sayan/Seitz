@@ -9,7 +9,7 @@
 #include <limits>
 #include <ranges>
 
-namespace cppcrystal {
+namespace seitz {
 
 namespace bgi = boost::geometry::index;
 
@@ -167,4 +167,4 @@ bool PositionIndex::coincides(Vector3d const &point, int atom) const noexcept {
                     symprec_, periodicity_);
 }
 
-} // namespace cppcrystal
+} // namespace seitz

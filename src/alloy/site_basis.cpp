@@ -1,4 +1,4 @@
-#include <cppcrystal/alloy/site_basis.hpp>
+#include <seitz/alloy/site_basis.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -6,7 +6,7 @@
 #include <ranges>
 #include <utility>
 
-namespace cppcrystal::alloy {
+namespace seitz::alloy {
 
 SiteBasis SiteBasis::trigonometric(int max_species) {
   // Floored at binary: a table with no block at all would make every
@@ -32,4 +32,4 @@ SiteBasis SiteBasis::trigonometric(int max_species) {
   return basis;
 }
 
-} // namespace cppcrystal::alloy
+} // namespace seitz::alloy

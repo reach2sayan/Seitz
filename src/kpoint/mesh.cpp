@@ -1,6 +1,6 @@
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
-#include <cppcrystal/core/tolerance.hpp> // approx_equal
+#include <seitz/core/tolerance.hpp> // approx_equal
 
 #include "core/matrix_order.hpp" // unique_by_rotation
 #include "core/parallel_for.hpp" // the mapping loop is the one hot parallel loop
@@ -16,7 +16,7 @@
 #include <ranges>
 #include <vector>
 
-namespace cppcrystal::kpoint {
+namespace seitz::kpoint {
 
 namespace {
 
@@ -333,4 +333,4 @@ BrillouinZone::images_of(Address address) const {
           })};
 }
 
-} // namespace cppcrystal::kpoint
+} // namespace seitz::kpoint

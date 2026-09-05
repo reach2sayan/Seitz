@@ -3,11 +3,11 @@
 // port's own validation/guards.
 
 #include "symmetry/search.hpp"
-#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/magnetic_cell.hpp>
 
 #include "helpers.hpp"
 
@@ -17,7 +17,7 @@
 
 namespace {
 
-using namespace cppcrystal;
+using namespace seitz;
 
 enum class Err { none, empty, invalid_lattice, other };
 

@@ -1,5 +1,5 @@
 #include "symmetry/pointgroup.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
 
@@ -20,7 +20,7 @@
 //   * kRotAxes: 73 candidate rotation axes used to pick conventional axes.
 // Identification matches the input's rotation-type histogram against the table;
 // the transformation matrix selects conventional axes per Laue class.
-namespace cppcrystal::symmetry {
+namespace seitz::symmetry {
 
 namespace {
 
@@ -536,4 +536,4 @@ template Result<PointgroupTransform>
     identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
                                              std::optional<int>);
 
-} // namespace cppcrystal::symmetry
+} // namespace seitz::symmetry

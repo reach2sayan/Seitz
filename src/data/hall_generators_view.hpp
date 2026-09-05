@@ -1,11 +1,11 @@
 #pragma once
 
 #include "data/hall_generators.hpp"
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <cstddef>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 // A VSpU set is a 3x9 pseudo-inverse (V.Sigma+.U^T) stored as three contiguous
 // rows of 9 -> row-major 3x9. shift = VSpU . dw.
@@ -27,4 +27,4 @@ generator_matrix(GeneratorSet const &g, std::size_t i) {
   return Eigen::Map<GeneratorMatrix const>(g[i].data());
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

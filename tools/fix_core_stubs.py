@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and narrow the type stub for the cppcrystal._core extension.
+"""Generate and narrow the type stub for the seitz._core extension.
 
 Runs pybind11-stubgen and then fixes up what it cannot get right on its own:
 
@@ -37,8 +37,8 @@ import sys
 # so stubgen writes a directory. It sits beside _core.cpython-*.so and does not
 # shadow it -- a real module in the same directory wins over a directory with no
 # __init__.py -- which is checked by the import in python/tests.
-STUB_DIR = pathlib.Path("python/cppcrystal/_core")
-MODULE = "cppcrystal._core"
+STUB_DIR = pathlib.Path("python/seitz/_core")
+MODULE = "seitz._core"
 OUT_DIR = "python"
 
 # Every py::native_enum in the bindings. A default argument of one of these

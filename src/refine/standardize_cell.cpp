@@ -10,7 +10,7 @@
 // The two changes of basis that turn a determined cell into a standardized one
 // in a chosen setting. They belong to the refinement because the centering they
 // use is the matched group's.
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 template <GroupFamily F>
 Result<Cell> Refinement<F>::to_primitive(Cell const &cell,
@@ -75,4 +75,4 @@ Refinement<GroupFamily::space>::from_primitive(Cell const &) const;
 template Result<Cell>
 Refinement<GroupFamily::layer>::from_primitive(Cell const &) const;
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

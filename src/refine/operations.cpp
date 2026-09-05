@@ -1,17 +1,17 @@
 #include "refine/refinement.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
 #include "core/position_index.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include <algorithm>
 #include <ranges>
 
 // Refined-operation recovery chain (3D path).
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 using data::operations_from_database;
 
@@ -168,4 +168,4 @@ Refinement<GroupFamily::space>::operations() const;
 template std::optional<Operations>
 Refinement<GroupFamily::layer>::operations() const;
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

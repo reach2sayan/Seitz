@@ -1,11 +1,11 @@
-#include <cppcrystal/group/wyckoff.hpp>
+#include <seitz/group/wyckoff.hpp>
 
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <algorithm>
 #include <ranges>
 
-namespace cppcrystal::group {
+namespace seitz::group {
 
 Positions Wyckoff::orbit(Vector3d const &xyz,
                          CellPeriodicity const &periodicity) const {
@@ -36,4 +36,4 @@ Positions Wyckoff::orbit(Vector3d const &xyz,
   return points;
 }
 
-} // namespace cppcrystal::group
+} // namespace seitz::group

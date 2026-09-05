@@ -1,4 +1,6 @@
-# CppCrystal
+# Seitz
+
+**Crystal symmetry analysis and structure generation in C++23.**
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/CMake-3.28%2B-064F8C.svg?logo=cmake&logoColor=white)](https://cmake.org)
@@ -12,7 +14,13 @@ cells, classifies magnetic structures, reduces reciprocal-space meshes to their
 irreducible wedge, and generates random crystals, layers, rods, and clusters
 from a chosen symmetry group.
 
-> **License & attribution.** CppCrystal is released under the BSD-3-Clause
+The name is the object the library is built on. A crystallographic symmetry
+operation is a Seitz operator `{R | t}` — a rotation paired with a translation —
+and every capability below is composition, inversion, or classification of
+those. The calculus is written out in
+[`docs/MATHEMATICS.md`](docs/MATHEMATICS.md).
+
+> **License & attribution.** Seitz is released under the BSD-3-Clause
 > license (see [`LICENSE`](LICENSE)). Its algorithms are derived from
 > [**spglib**](https://github.com/spglib/spglib) (BSD-3-Clause) and its
 > object-oriented, generation-focused API is modeled on
@@ -26,7 +34,7 @@ from a chosen symmetry group.
 One umbrella header reaches everything, and it is also everything that ships:
 
 ```cpp
-#include <cppcrystal/cppcrystal.hpp>
+#include <seitz/seitz.hpp>
 ```
 
 | Capability | Entry point |
@@ -53,9 +61,9 @@ One umbrella header reaches everything, and it is also everything that ships:
 determination runs once and every later query is served from that cache:
 
 ```cpp
-#include <cppcrystal/cppcrystal.hpp>
+#include <seitz/seitz.hpp>
 #include <print>
-using namespace cppcrystal;
+using namespace seitz;
 
 Cell const rutile{Lattice{basis}, positions, types};  // lattice columns = basis vectors
 auto const sa = analysis::SymmetryAnalyzer::from_cell(rutile);
@@ -157,7 +165,7 @@ is no manual memory management and no ownership to reason about.
 
 **Everything is safe to share.** A `const` analyzer can be used from any number
 of threads from the moment it is built, the group catalogs are immutable and
-race-free, and no query mutates observable state. `cppcrystal::warmup()` builds
+race-free, and no query mutates observable state. `seitz::warmup()` builds
 every group setting up front (about 30 ms) to move first-use cost off the query
 path; it is an optimization, never a precondition.
 
@@ -181,10 +189,10 @@ there is no system lookup and no `find_package` fallback to go stale: **Eigen
 5.0.0**, **Boost 1.88** (`container`, `flyweight`, `geometry`, `leaf`) and
 **Catch2 3** for the tests. No library needs to be installed on the system.
 
-`cppcrystal` builds as a **shared library**, versioned `0.1.0` with
+`seitz` builds as a **shared library**, versioned `0.1.0` with
 `SONAME 0.1` — while the API is pre-1.0, every minor version may break ABI. It
 builds as a **static archive** in the two cases where a shared object is not the
-deliverable: on Windows, and when `CPPCRYSTAL_BUILD_PYTHON` is on, where it is
+deliverable: on Windows, and when `SEITZ_BUILD_PYTHON` is on, where it is
 absorbed into the extension module so a wheel is a single binary.
 
 Four presets, and CI runs exactly these — a green pipeline means the
@@ -216,12 +224,12 @@ cmake --preset release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl   # MSVC
 
 | Option | Default | Effect |
 |---|---|---|
-| `CPPCRYSTAL_BUILD_TESTS` | ON | unit test suite |
-| `CPPCRYSTAL_BUILD_DEMO` | ON | `cppcrystal_demo` executable |
-| `CPPCRYSTAL_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 (every preset turns this ON) |
-| `CPPCRYSTAL_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
-| `CPPCRYSTAL_BUILD_TOOLS` | OFF | the offline t-subgroup table generator (the transcribers run as part of every build) |
-| `CPPCRYSTAL_BUILD_PYTHON` | OFF | pybind11 extension module |
+| `SEITZ_BUILD_TESTS` | ON | unit test suite |
+| `SEITZ_BUILD_DEMO` | ON | `seitz_demo` executable |
+| `SEITZ_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 (every preset turns this ON) |
+| `SEITZ_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
+| `SEITZ_BUILD_TOOLS` | OFF | the offline t-subgroup table generator (the transcribers run as part of every build) |
+| `SEITZ_BUILD_PYTHON` | OFF | pybind11 extension module |
 
 Every preset turns the oracle on. It builds reference spglib via `FetchContent`
 and links it only into the oracle tests — never into the library — to
@@ -232,7 +240,7 @@ tag feeds both the tables and the oracle and the two cannot drift apart. Turn it
 off for a faster loop:
 
 ```bash
-cmake --preset debug -DCPPCRYSTAL_BUILD_ORACLE_TESTS=OFF
+cmake --preset debug -DSEITZ_BUILD_ORACLE_TESTS=OFF
 ```
 
 ### Use it in your project
@@ -240,8 +248,8 @@ cmake --preset debug -DCPPCRYSTAL_BUILD_ORACLE_TESTS=OFF
 As a subdirectory:
 
 ```cmake
-add_subdirectory(CppCrystal)
-target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
+add_subdirectory(Seitz)
+target_link_libraries(your_target PRIVATE seitz::seitz)
 ```
 
 Or installed:
@@ -251,8 +259,8 @@ cmake --install build/release --prefix /your/prefix
 ```
 
 ```cmake
-find_package(CppCrystal REQUIRED)
-target_link_libraries(your_target PRIVATE cppcrystal::cppcrystal)
+find_package(Seitz REQUIRED)
+target_link_libraries(your_target PRIVATE seitz::seitz)
 ```
 
 Only `include/` ships, so an installed consumer reaches exactly what the
@@ -273,7 +281,7 @@ exception hierarchy.
 
 ```python
 import numpy as np
-import cppcrystal as cc
+import seitz as cc
 
 cell = cc.Cell(
     cc.Lattice(3.0 * np.eye(3)),          # columns are the basis vectors
@@ -293,7 +301,7 @@ print(cc.DatasetRecord.from_analyzer(analyzer).model_dump_json(indent=2))
 
 The analyzer memoizes, so it is the object you keep rather than a call you
 repeat, and every query on it is thread-safe. Errors are never sentinels:
-"absent" is `None`, and a failure raises a `cppcrystal.errors.CppCrystalError`
+"absent" is `None`, and a failure raises a `seitz.errors.SeitzError`
 subclass — `InvalidLatticeError` carries `.determinant`, `AtomsTooCloseError`
 carries `.distance`. Layer groups are not a separate entry point: a cell built
 with `periodicity=cc.aperiodic_along(2)` goes through the same analyzer.
@@ -303,7 +311,7 @@ with `periodicity=cc.aperiodic_along(2)` goes through the same analyzer.
 Two paths onto the same CMake target, so they cannot drift:
 
 ```bash
-cmake --preset python                  # configure with CPPCRYSTAL_BUILD_PYTHON=ON
+cmake --preset python                  # configure with SEITZ_BUILD_PYTHON=ON
 cmake --build --preset python
 ctest --preset python                  # the pytest suite
 ```
@@ -345,7 +353,7 @@ Through `uv run`, always: stubgen's output depends on the interpreter (3.10
 renders an enum default as `...` where 3.12 renders `Warm.all`), and CI
 regenerates under uv and fails on a diff.
 
-(`_core` has submodules, so the stubs are a package — `python/cppcrystal/_core/`
+(`_core` has submodules, so the stubs are a package — `python/seitz/_core/`
 — sitting beside the extension. A real module wins over a directory with no
 `__init__.py`, so it does not shadow the `.so`; `test_stubs.py` pins that.)
 
@@ -353,7 +361,7 @@ regenerates under uv and fails on a diff.
 
 ## Attribution
 
-CppCrystal stands on two existing projects and is grateful to both.
+Seitz stands on two existing projects and is grateful to both.
 
 - **[spglib](https://github.com/spglib/spglib)** (Atsushi Togo and contributors),
   BSD-3-Clause. The symmetry algorithms — space-group determination, lattice

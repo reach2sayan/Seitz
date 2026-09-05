@@ -1,12 +1,12 @@
 #include "helpers.hpp"
 #include "oracle.hpp"
 
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
-using cppcrystal::test::space_hall;
+using namespace seitz;
+using seitz::test::space_hall;
 
 TEST_CASE(
     "db ops match spg_get_symmetry_from_database for all 530 Hall numbers",

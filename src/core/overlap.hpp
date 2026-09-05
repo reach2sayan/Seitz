@@ -2,16 +2,16 @@
 
 #include "core/position_index.hpp"
 #include "core/testable.hpp"
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/periodicity.hpp>
+#include <seitz/core/types.hpp>
 
 #include <boost/container/small_vector.hpp>
 
 #include <cstdint>
 #include <vector>
 
-namespace cppcrystal {
+namespace seitz {
 
 // Tests candidate symmetry operations against a cell. Built once per cell and
 // tolerance: the atoms are re-ordered by (type, distance to the nearest
@@ -23,7 +23,7 @@ namespace cppcrystal {
 // translation) pair, so its working buffers live here and are reused rather
 // than reallocated per call. They are mutable because every caller holds the
 // checker by const reference; the price is that one checker serves one thread.
-class CPPCRYSTAL_TESTABLE OverlapChecker {
+class SEITZ_TESTABLE OverlapChecker {
 public:
   OverlapChecker(Cell const &cell, double symprec);
 
@@ -48,4 +48,4 @@ private:
   mutable PositionIndex::Scratch scratch_;
 };
 
-} // namespace cppcrystal
+} // namespace seitz

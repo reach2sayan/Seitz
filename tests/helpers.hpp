@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cppcrystal/analysis/magnetic_symmetry_analyzer.hpp>
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/keys.hpp>
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,7 +13,7 @@
 
 // Shared Result<T> plumbing for the test suites, so each file does not carry
 // its own copy of the same two try_handle_all wrappers.
-namespace cppcrystal::test {
+namespace seitz::test {
 
 // Shorthand for the validated keys: the tests name literal settings by the
 // dozen, and `*HallNumber::of(GroupFamily::space, 1)` at each of them buries
@@ -75,4 +75,4 @@ template <ResultProducer F> [[nodiscard]] bool errored(F &&make) {
       [](leaf::error_info const &) { return true; });
 }
 
-} // namespace cppcrystal::test
+} // namespace seitz::test

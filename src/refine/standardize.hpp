@@ -1,14 +1,14 @@
 #pragma once
 
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
 
 #include <string_view>
 #include <vector>
 
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 // The standardized conventional ("bravais") cell together with the per-atom
 // Wyckoff / equivalence data of the *input* cell.
@@ -22,4 +22,4 @@ struct Standardized {
   std::vector<int> std_mapping_to_primitive; // per bravais atom
 };
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

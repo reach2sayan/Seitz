@@ -7,14 +7,12 @@
 #include <cstddef>
 #include <span>
 
-namespace cppcrystal {
+namespace seitz {
 
 using data::Centering;
 
 // The tables are the source of truth; these are the typed views the pipeline
-// works with, materialised into Eigen once on first use. math::as_matrix maps
-// the row-major proxy in place rather than copying it entry by entry -- the
-// same pattern data/packed_decode.hpp uses for the operation tables.
+// works with, materialised into Eigen once on first use.
 
 Matrix3i const &centering_matrix(Centering c) {
   static auto const table = [] {
@@ -70,4 +68,4 @@ std::span<Vector3d const> centering_shifts(Centering centering) {
   }
 }
 
-} // namespace cppcrystal
+} // namespace seitz

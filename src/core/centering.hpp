@@ -1,8 +1,8 @@
 #pragma once
 
 #include "math/integer_matrix.hpp"
-#include <cppcrystal/core/types.hpp>
-#include <cppcrystal/data/spg_database.hpp> // data::Centering
+#include <seitz/core/types.hpp>
+#include <seitz/data/spg_database.hpp> // data::Centering
 
 #include <array>
 #include <cstddef>
@@ -19,14 +19,9 @@
 //                                      shift is implicit)
 // PRIMITIVE (and any unused entry) maps to the identity / an empty shift list.
 //
-// M is the only transcribed table. M^-1 is *derived* from it at compile time as
-// adjugate(M) / det(M), which is exact for every centering, so there is no
-// second table to keep in sync and no M . M^-1 = I transcription check to run
-// -- the identity holds by construction (a static_assert below pins that
-// claim). The table is a constexpr std::array proxy, row-major, because Eigen
-// types are literal for construction and access but not for arithmetic; Eigen
-// materialises once at first use.
-namespace cppcrystal {
+// M is the only transcribed table.
+// M^-1 is *derived* from it at compile time as adjugate(M) / det(M), (exact for every centering)
+namespace seitz {
 
 inline constexpr std::size_t kCenteringCount = 9; // Centering::error..r_center
 
@@ -51,9 +46,8 @@ inline constexpr auto kCenteringMatrix = [] {
   return t;
 }();
 
-// M^-1 = adjugate(M) / det(M), exact for every centering: det is 1, 2, 3 or 4
-// and the adjugate entries are divisible into it in binary floating point
-// without rounding. Kept unreduced -- reducing by gcd would change num and den
+// M^-1 = adjugate(M) / det(M), exact for every centering:
+// Kept unreduced -- reducing by gcd would change num and den
 // by the same factor and land on the identical double.
 inline constexpr auto kCenteringMatrixInvNum = [] {
   std::array<math::Mat3Rows, kCenteringCount> t{};
@@ -103,4 +97,4 @@ static_assert(inverses_are_exact());
 [[nodiscard]] Matrix3d const &centering_matrix_inv(data::Centering c);
 [[nodiscard]] std::span<Vector3d const> centering_shifts(data::Centering c);
 
-} // namespace cppcrystal
+} // namespace seitz

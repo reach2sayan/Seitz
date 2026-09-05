@@ -1,8 +1,8 @@
-#include <cppcrystal/alloy/parent_lattice.hpp>
+#include <seitz/alloy/parent_lattice.hpp>
 
 #include "alloy/geometry.hpp"
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include <boost/container/flat_map.hpp>
 
@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::alloy {
+namespace seitz::alloy {
 
 using detail::integral;
 
@@ -169,4 +169,4 @@ Result<Cluster> ParentLattice::cluster_of(
   return Cluster{std::move(cluster)};
 }
 
-} // namespace cppcrystal::alloy
+} // namespace seitz::alloy

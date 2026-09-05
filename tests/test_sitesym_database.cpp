@@ -5,9 +5,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
-using namespace cppcrystal::data;
-using cppcrystal::test::space_hall;
+using namespace seitz;
+using namespace seitz::data;
+using seitz::test::space_hall;
 
 TEST_CASE("wyckoff_coordinate decodes the documented entries", "[sitesym]") {
   // Index 1 (P1 general position): identity rotation, zero translation.

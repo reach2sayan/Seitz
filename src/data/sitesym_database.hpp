@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/types.hpp>
 
 #include <string_view>
 #include <vector>
@@ -11,7 +11,7 @@
 // src/data/sitesym_tables.hpp). The
 // encoded tables and the compile-time decode are an implementation detail of
 // sitesym_database.cpp; this header exposes only the decoded, Eigen-valued API.
-namespace cppcrystal::data {
+namespace seitz::data {
 
 // A Wyckoff position's representative coordinate operation x' = rot.x + trans
 // (used to map an atom onto the canonical Wyckoff coordinate) and its
@@ -22,7 +22,7 @@ struct WyckoffCoordinate {
   int multiplicity;
 };
 
-[[nodiscard]] CPPCRYSTAL_TESTABLE WyckoffCoordinate
+[[nodiscard]] SEITZ_TESTABLE WyckoffCoordinate
 wyckoff_coordinate(int index);
 
 // The half-open range [start, start + count) of global Wyckoff-position indices
@@ -32,11 +32,11 @@ struct WyckoffRange {
   int count;
 };
 
-[[nodiscard]] CPPCRYSTAL_TESTABLE WyckoffRange wyckoff_indices(HallNumber hall);
+[[nodiscard]] SEITZ_TESTABLE WyckoffRange wyckoff_indices(HallNumber hall);
 
 // Site-symmetry symbol of a Wyckoff position. The trailing space padding is
 // removed at generation time, so the view points straight into static storage.
-[[nodiscard]] CPPCRYSTAL_TESTABLE std::string_view
+[[nodiscard]] SEITZ_TESTABLE std::string_view
 site_symmetry_symbol(int index);
 
 // One Wyckoff position of a Hall setting: its global database index (the key
@@ -56,4 +56,4 @@ struct WyckoffEntry {
 // Dataset::wyckoffs in refine/site_symmetry.cpp.
 [[nodiscard]] std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall);
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

@@ -1,16 +1,16 @@
 #pragma once
 
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
 
 #include <optional>
 #include <string_view>
 #include <vector>
 
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 // Exact-position / Wyckoff data of one conventional-primitive atom.
 struct ExactPosition {
@@ -32,4 +32,4 @@ using ExactPositions = std::vector<ExactPosition>;
 exact_positions(Cell const &conv_prim, Operations const &conv_sym,
                 int num_pure_trans, HallNumber hall, double symprec);
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

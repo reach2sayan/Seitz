@@ -1,20 +1,20 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
-#include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/spacegroup_match.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
+#include <seitz/data/spg_database.hpp>
+#include <seitz/spacegroup_match.hpp>
 
 #include "symmetry/primitive.hpp"
 
 #include <optional>
 
-namespace cppcrystal::spacegroup {
+namespace seitz::spacegroup {
 
 // Matches a primitive cell against the Hall-symbol database. The family is a
 // compile-time parameter: the layer path draws its candidates from the layer
@@ -22,7 +22,7 @@ namespace cppcrystal::spacegroup {
 // the 3D-only representative-Hall refinement -- all `if constexpr` branches.
 //
 // Non-owning: `primitive` must outlive the matcher.
-template <GroupFamily F> class CPPCRYSTAL_TESTABLE SpacegroupMatcher {
+template <GroupFamily F> class SEITZ_TESTABLE SpacegroupMatcher {
 public:
   // An unset `setting` searches every Hall setting of the family; a set one
   // restricts the search to it. The tolerance is the one the primitive cell was
@@ -71,4 +71,4 @@ SpacegroupMatcher<GroupFamily::layer>::match_hall(Matrix3d const &, HallNumber,
 search_spacegroup_with_symmetry(Operations const &operations,
                                 Matrix3d const &prim_lattice, double symprec);
 
-} // namespace cppcrystal::spacegroup
+} // namespace seitz::spacegroup

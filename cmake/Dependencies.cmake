@@ -4,7 +4,7 @@
 # developer builds against byte-identical sources. The one exception is
 # Threads, which is part of the toolchain rather than a library we vendor.
 #
-# Both Eigen and Boost are PUBLIC dependencies of the exported cppcrystal
+# Both Eigen and Boost are PUBLIC dependencies of the exported seitz
 # target, so both must also be installable — otherwise install(EXPORT) writes a
 # config whose find_dependency() calls have nothing to point at. Each defaults
 # to skipping its install rules when built as a subproject; turn them back on so
@@ -70,7 +70,7 @@ endif ()
 
 # Catch2 v3. extras/ holds the Catch.cmake module providing
 # catch_discover_tests(); FetchContent does not add it to CMAKE_MODULE_PATH.
-if (CPPCRYSTAL_BUILD_TESTS)
+if (SEITZ_BUILD_TESTS)
     FetchContent_Declare(Catch2
             GIT_REPOSITORY https://github.com/catchorg/Catch2.git
             GIT_TAG v3.8.1
@@ -90,7 +90,7 @@ endif ()
 #   implementation the oracle compares them against are the same spglib.
 #
 #   The validation oracle itself, exposing Spglib::symspg. Built only under
-#   CPPCRYSTAL_BUILD_ORACLE_TESTS and never linked into the cppcrystal library.
+#   SEITZ_BUILD_ORACLE_TESTS and never linked into the seitz library.
 #
 # Which means the checkout is unconditional but the BUILD is not. SOURCE_SUBDIR
 # naming a directory with no CMakeLists.txt is the documented way to say
@@ -102,23 +102,23 @@ endif ()
 # points this at a local clone — the same escape hatch pybind11 gets below, and
 # it matters more here now that every build needs these sources, not just the
 # oracle ones.
-if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
+if (SEITZ_BUILD_ORACLE_TESTS)
     set(SPGLIB_WITH_TESTS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Fortran OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Python OFF CACHE BOOL "" FORCE)
     set(SPGLIB_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_INSTALL OFF CACHE BOOL "" FORCE)
-    set(CPPCRYSTAL_SPGLIB_SUBDIR "")
+    set(SEITZ_SPGLIB_SUBDIR "")
 else ()
-    set(CPPCRYSTAL_SPGLIB_SUBDIR SOURCE_SUBDIR cppcrystal-tables-only)
+    set(SEITZ_SPGLIB_SUBDIR SOURCE_SUBDIR seitz-tables-only)
 endif ()
 FetchContent_Declare(spglib_reference
         GIT_REPOSITORY https://github.com/spglib/spglib.git
         GIT_TAG v2.7.0
         GIT_SHALLOW TRUE
-        ${CPPCRYSTAL_SPGLIB_SUBDIR})
+        ${SEITZ_SPGLIB_SUBDIR})
 FetchContent_MakeAvailable(spglib_reference)
-unset(CPPCRYSTAL_SPGLIB_SUBDIR)
+unset(SEITZ_SPGLIB_SUBDIR)
 
 # The transcribers take file paths, so a missing checkout has to fail here with
 # a sentence rather than three directories later with a Python traceback.
@@ -132,7 +132,7 @@ endif ()
 
 # pybind11 3.x — the Python binding layer. Fetched here like everything else
 # rather than taken from PyPI as a build requirement, so that
-# `cmake -DCPPCRYSTAL_BUILD_PYTHON=ON` and `pip install .` compile against
+# `cmake -DSEITZ_BUILD_PYTHON=ON` and `pip install .` compile against
 # byte-identical headers; pyproject.toml therefore names only scikit-build-core
 # in build-system.requires and says nothing about pybind11. 3.x specifically,
 # for py::native_enum — it hands Python a real enum.IntEnum instead of a
@@ -148,7 +148,7 @@ endif ()
 # No network at configure time? FETCHCONTENT_SOURCE_DIR_PYBIND11=/path/to/checkout
 # points this at a local clone, which matters now that a FetchContent configure
 # can happen inside `pip install`.
-if (CPPCRYSTAL_BUILD_PYTHON)
+if (SEITZ_BUILD_PYTHON)
     set(PYBIND11_FINDPYTHON ON CACHE BOOL "" FORCE)
     set(PYBIND11_INSTALL OFF CACHE BOOL "" FORCE)
     set(PYBIND11_TEST OFF CACHE BOOL "" FORCE)

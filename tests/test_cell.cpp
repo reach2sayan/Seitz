@@ -1,10 +1,10 @@
-#include <cppcrystal/core/cell.hpp>
+#include <seitz/core/cell.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 TEST_CASE("Cell exposes size, types, positions", "[cell]") {
   Positions pos(2, 3);

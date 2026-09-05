@@ -3,18 +3,18 @@
 // is tagged [!benchmark], so it is skipped by a plain `ctest` run and only
 // executes under an explicit tag filter:
 //
-//   ./cppcrystal_tests "[!benchmark]"
+//   ./seitz_tests "[!benchmark]"
 //
 // The cells are built here rather than loaded from the reference corpus: the
 // corpus loader needs SPGLIB_REF_DATA_DIR, which only the oracle target
 // defines, and a benchmark that cannot run in the default build is a benchmark
 // nobody runs.
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/generate/generator.hpp>
-#include <cppcrystal/group/space_group.hpp>
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/generate/generator.hpp>
+#include <seitz/group/space_group.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
 #include "helpers.hpp"
 
@@ -24,7 +24,7 @@
 #include <random>
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 

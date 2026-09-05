@@ -1,16 +1,16 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <vector>
 
-namespace cppcrystal::symmetry {
+namespace seitz::symmetry {
 
 // The symmetry search over one cell at one tolerance: the lattice point group,
 // the cell's own space-group operations, and the pure translations. The family
@@ -18,7 +18,7 @@ namespace cppcrystal::symmetry {
 // operation cap are `if constexpr` branches rather than runtime tests.
 //
 // Non-owning: `cell` must outlive the search.
-template <GroupFamily F> class CPPCRYSTAL_TESTABLE SymmetrySearch {
+template <GroupFamily F> class SEITZ_TESTABLE SymmetrySearch {
 public:
   SymmetrySearch(Cell const &cell, Tolerance const &tol) noexcept
       : cell_(cell), tol_(tol) {}
@@ -53,4 +53,4 @@ private:
 extern template class SymmetrySearch<GroupFamily::space>;
 extern template class SymmetrySearch<GroupFamily::layer>;
 
-} // namespace cppcrystal::symmetry
+} // namespace seitz::symmetry

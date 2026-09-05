@@ -1,13 +1,13 @@
-#include <cppcrystal/warmup.hpp>
+#include <seitz/warmup.hpp>
 
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/group/space_group.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/group/space_group.hpp>
 
 #include <future>
 #include <ranges>
 #include <vector>
 
-namespace cppcrystal {
+namespace seitz {
 
 namespace {
 
@@ -42,4 +42,4 @@ std::future<void> warmup_async(Warm what) {
   return std::async(std::launch::async, [what] { prime(what); });
 }
 
-} // namespace cppcrystal
+} // namespace seitz

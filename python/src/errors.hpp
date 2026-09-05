@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/error.hpp>
+#include <seitz/core/error.hpp>
 
 #include <pybind11/pybind11.h>
 
@@ -11,7 +11,7 @@
 // The one place a Result<T> becomes a Python exception, and the one helper that
 // binds an Analyzer projection. Everything else in this module is ordinary
 // pybind11.
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace py = pybind11;
 
@@ -20,7 +20,7 @@ namespace py = pybind11;
 // py::object would decref them during static destruction, after the interpreter
 // -- and the GIL -- are already gone.
 struct ErrorTypes {
-  py::handle base; // CppCrystalError, which every other one derives from
+  py::handle base; // SeitzError, which every other one derives from
   py::handle spacegroup_search_failed;
   py::handle cell_standardization_failed;
   py::handle symmetry_operation_search_failed;
@@ -137,7 +137,7 @@ template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
       // A message with no tag beside it: the group catalogs raise these.
       [&](e_message const &m) -> Value { raise(types.base, m.text.c_str()); },
       [&](leaf::error_info const &) -> Value {
-        raise(types.base, "cppcrystal: unclassified failure");
+        raise(types.base, "seitz: unclassified failure");
       });
 }
 
@@ -203,4 +203,4 @@ template <class Derived, class Base, class T>
   };
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

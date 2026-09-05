@@ -8,7 +8,7 @@
 #include <random>
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 // Body-centered cubic: atoms at (0,0,0) and (1/2,1/2,1/2).

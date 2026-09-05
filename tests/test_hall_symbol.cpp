@@ -5,8 +5,8 @@
 // recognise that Hall number, with a zero origin shift.
 
 #include "spacegroup/spacegroup.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
 
@@ -17,8 +17,8 @@
 #include <random>
 #include <vector>
 
-using namespace cppcrystal;
-using cppcrystal::test::space_hall;
+using namespace seitz;
+using seitz::test::space_hall;
 
 TEST_CASE(
     "each Hall setting matches its own database operations with zero shift",

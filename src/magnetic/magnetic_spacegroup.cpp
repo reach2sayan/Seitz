@@ -7,10 +7,10 @@
 #include "spacegroup/spacegroup.hpp"
 #include "spin/search.hpp"
 #include "symmetry/primitive.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/data/msg_database.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/data/msg_database.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::magnetic {
+namespace seitz::magnetic {
 
 namespace {
 
@@ -548,4 +548,4 @@ Result<MagneticCell> MagneticIdentification::transform(
                       std::move(tensors));
 }
 
-} // namespace cppcrystal::magnetic
+} // namespace seitz::magnetic

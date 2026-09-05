@@ -8,7 +8,7 @@ import pathlib
 import numpy as np
 import pytest
 
-import cppcrystal as cc
+import seitz as sz
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -24,47 +24,47 @@ def pytest_configure(config: pytest.Config) -> None:
     expected = os.environ.get("PYTHONPATH", "").split(os.pathsep)[0]
     if not expected:
         return
-    loaded = pathlib.Path(cc._core.__file__).resolve()
+    loaded = pathlib.Path(sz._core.__file__).resolve()
     if not loaded.is_relative_to(pathlib.Path(expected).resolve()):
         raise pytest.UsageError(
-            f"cppcrystal._core was imported from {loaded}, but PYTHONPATH points "
+            f"seitz._core was imported from {loaded}, but PYTHONPATH points "
             f"at {expected}. Something is shadowing the build tree -- most "
-            f"likely an editable install of cppcrystal in this interpreter. "
-            f"Remove it (`uv pip uninstall cppcrystal`); this project is reached "
+            f"likely an editable install of seitz in this interpreter. "
+            f"Remove it (`uv pip uninstall seitz`); this project is reached "
             f"through the CMake build tree, not an editable install."
         )
 
 
 @pytest.fixture
-def bcc_fe() -> cc.Cell:
+def bcc_fe() -> sz.Cell:
     """The demo cell from main.cpp: 2 Fe in a 3 A cube -> Im-3m, No. 229."""
-    return cc.Cell(
-        cc.Lattice(3.0 * np.eye(3)),
+    return sz.Cell(
+        sz.Lattice(3.0 * np.eye(3)),
         [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],
         [26, 26],
     )
 
 
 @pytest.fixture
-def simple_cubic() -> cc.Cell:
+def simple_cubic() -> sz.Cell:
     """One atom in a cube -> Pm-3m, No. 221."""
-    return cc.Cell(cc.Lattice(np.eye(3) * 4.0), [[0.0, 0.0, 0.0]], [11])
+    return sz.Cell(sz.Lattice(np.eye(3) * 4.0), [[0.0, 0.0, 0.0]], [11])
 
 
 @pytest.fixture
-def layer_cell() -> cc.Cell:
+def layer_cell() -> sz.Cell:
     """A 2D-periodic cell, which routes through the same analyzer."""
-    return cc.Cell(
-        cc.Lattice(np.diag([3.0, 3.0, 20.0])),
+    return sz.Cell(
+        sz.Lattice(np.diag([3.0, 3.0, 20.0])),
         [[0.0, 0.0, 0.5]],
         [6],
-        cc.aperiodic_along(2),
+        sz.aperiodic_along(2),
     )
 
 
-def space_hall(index: int) -> cc.HallNumber:
-    return cc.HallNumber(cc.GroupFamily.space, index)
+def space_hall(index: int) -> sz.HallNumber:
+    return sz.HallNumber(sz.GroupFamily.space, index)
 
 
-def layer_hall(index: int) -> cc.HallNumber:
-    return cc.HallNumber(cc.GroupFamily.layer, index)
+def layer_hall(index: int) -> sz.HallNumber:
+    return sz.HallNumber(sz.GroupFamily.layer, index)

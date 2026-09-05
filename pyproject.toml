@@ -3,7 +3,7 @@ requires = ["scikit-build-core>=0.10"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "cppcrystal"
+name = "seitz"
 version = "0.1.0"
 description = "Modern C++23 crystallography and symmetry analysis"
 readme = "README.md"
@@ -12,7 +12,7 @@ license = "BSD-3-Clause"
 dependencies = ["numpy>=1.24", "pydantic>=2.7"]
 
 [project.urls]
-Homepage = "https://github.com/reach2sayan/CppCrystal"
+Homepage = "https://github.com/reach2sayan/Seitz"
 
 # Source installs only -- there are deliberately no manylinux wheels. The
 # library hard-errors below GCC 15 and compiles as gnu++23, while the manylinux
@@ -30,16 +30,16 @@ cmake.version = ">=3.28"
 # NOTE: this path does not read CMakePresets.json, so it picks up whatever `c++`
 # is on PATH. The library needs GCC 15+; export CXX=g++-15 (as .github/workflows
 # does) or the configure step stops with a message saying so.
-cmake.define.CPPCRYSTAL_BUILD_PYTHON = "ON"
-cmake.define.CPPCRYSTAL_BUILD_TESTS = "OFF"
-cmake.define.CPPCRYSTAL_BUILD_DEMO = "OFF"
+cmake.define.SEITZ_BUILD_PYTHON = "ON"
+cmake.define.SEITZ_BUILD_TESTS = "OFF"
+cmake.define.SEITZ_BUILD_DEMO = "OFF"
 install.components = ["python"]
-wheel.packages = ["python/cppcrystal"]
+wheel.packages = ["python/seitz"]
 build-dir = "build/{wheel_tag}"
 sdist.exclude = ["cmake-build-*", ".deps", "build"]
 
 # No [tool.scikit-build.editable] section, deliberately. scikit-build-core's
-# editable install works through a meta-path finder that maps cppcrystal._core to
+# editable install works through a meta-path finder that maps seitz._core to
 # whichever artifact it installed -- and a meta-path finder wins over PYTHONPATH
 # unconditionally, so an editable install silently shadows the build tree that
 # `ctest` compiles and points at. For a project whose source of truth is the

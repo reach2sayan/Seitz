@@ -1,20 +1,20 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/analysis/dataset.hpp> // magnetic::MagneticType
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/core/magnetic_symmetry_operation.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/analysis/dataset.hpp> // magnetic::MagneticType
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/lattice.hpp>
+#include <seitz/core/magnetic_cell.hpp>
+#include <seitz/core/magnetic_symmetry_operation.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 // Magnetic space-group determination (3D path): given a lattice and a set of
 // magnetic symmetry operations, identify the magnetic space group (UNI number)
 // and the transformation to its standardized setting.
-namespace cppcrystal::magnetic {
+namespace seitz::magnetic {
 
 // The identification result. `transformation_matrix` and `origin_shift` map the
 // input setting to the standardized one; `std_rotation_matrix` is the rigid
@@ -35,7 +35,7 @@ struct MagneticTypeIdentification {
 // only: magnetic layer groups are not in the database.
 //
 // Non-owning: `lattice` and `operations` must outlive the identification.
-class CPPCRYSTAL_TESTABLE MagneticIdentification {
+class SEITZ_TESTABLE MagneticIdentification {
 public:
   MagneticIdentification(Lattice const &lattice,
                          MagneticOperations const &operations,
@@ -62,4 +62,4 @@ private:
   Tolerance tol_;
 };
 
-} // namespace cppcrystal::magnetic
+} // namespace seitz::magnetic

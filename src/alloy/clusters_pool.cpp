@@ -1,4 +1,4 @@
-#include <cppcrystal/alloy/clusters_pool.hpp>
+#include <seitz/alloy/clusters_pool.hpp>
 
 #include "alloy/enumerate.hpp"
 #include "alloy/geometry.hpp"
@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::alloy {
+namespace seitz::alloy {
 namespace {
 
 using detail::lattice_box;
@@ -149,4 +149,4 @@ Result<ClustersPool> ClustersPool::generate(ParentLattice const &parent,
   return ClustersPool{lattice, std::move(orbits)};
 }
 
-} // namespace cppcrystal::alloy
+} // namespace seitz::alloy

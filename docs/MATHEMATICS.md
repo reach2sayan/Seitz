@@ -1,4 +1,4 @@
-# The mathematics behind CppCrystal
+# The mathematics behind Seitz
 
 This document sets out the mathematics the library rests on, in general terms.
 Nothing here is about a particular space group; everything applies to all of

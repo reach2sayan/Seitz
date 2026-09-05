@@ -1,7 +1,7 @@
 #include "data/sitesym_database.hpp"
 
 #include "data/sitesym_tables.hpp"
-#include <cppcrystal/data/detail/lookup.hpp>
+#include <seitz/data/detail/lookup.hpp>
 
 #include <array>
 #include <cstddef>
@@ -9,7 +9,7 @@
 #include <ranges>
 #include <string_view>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 namespace {
 
@@ -119,4 +119,4 @@ std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall) {
   return entries;
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

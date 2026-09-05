@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
@@ -19,7 +19,7 @@
 // the library is one of the sorted flat containers below, keyed by this one
 // comparator: |G| <= 192, so a handful of 9-int comparisons per lookup beats
 // hashing, and the ordering makes "first match" deterministic.
-namespace cppcrystal {
+namespace seitz {
 
 // Strict weak order over the 9 entries of a Matrix3i (storage-order
 // lexicographic; any fixed order works for set keys).
@@ -162,4 +162,4 @@ bool push_unique(C &out, std::ranges::range_value_t<C> value, Equiv &&equiv) {
   return true;
 }
 
-} // namespace cppcrystal
+} // namespace seitz

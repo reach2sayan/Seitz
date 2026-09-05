@@ -7,8 +7,8 @@
 
 #include "spin/search.hpp"
 #include "symmetry/search.hpp"
-#include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/magnetic_cell.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "math/integer_matrix.hpp"
 
@@ -20,17 +20,17 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::CollinearTensors;
-using cppcrystal::Lattice;
-using cppcrystal::MagneticCell;
-using cppcrystal::MagneticOperations;
-using cppcrystal::Matrix3d;
-using cppcrystal::Matrix3i;
-using cppcrystal::noncollinear_tensors;
-using cppcrystal::Positions;
-using cppcrystal::SiteTensors;
-using cppcrystal::Vector3d;
+using seitz::Cell;
+using seitz::CollinearTensors;
+using seitz::Lattice;
+using seitz::MagneticCell;
+using seitz::MagneticOperations;
+using seitz::Matrix3d;
+using seitz::Matrix3i;
+using seitz::noncollinear_tensors;
+using seitz::Positions;
+using seitz::SiteTensors;
+using seitz::Vector3d;
 
 Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
                std::vector<int> const &types) {
@@ -48,7 +48,7 @@ Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
 // per atom. Returns operations with time_reversal derived from spin_flips
 // (spin_flips = 1 - 2*timerev, so timerev <=> spin_flips == -1).
 struct Reference {
-  std::vector<cppcrystal::MagneticSymmetryOperation> operations;
+  std::vector<seitz::MagneticSymmetryOperation> operations;
   std::vector<int> equivalent_atoms;
   Matrix3d primitive_lattice;
 };
@@ -57,7 +57,7 @@ Reference reference_magnetic(Cell const &cell,
                              std::vector<double> const &tensors,
                              int tensor_rank, bool with_time_reversal,
                              bool is_axial, double symprec) {
-  cppcrystal::oracle::CCell c(cell);
+  seitz::oracle::CCell c(cell);
   int const n = c.num_atom();
   int const max_size = 384;
   std::vector<int> rot(static_cast<std::size_t>(9 * max_size));
@@ -87,12 +87,12 @@ Reference reference_magnetic(Cell const &cell,
     ref.operations.push_back({{r, t}, time_reversal});
   }
   ref.equivalent_atoms = equiv;
-  cppcrystal::oracle::from_c_lattice(ref.primitive_lattice, prim);
+  seitz::oracle::from_c_lattice(ref.primitive_lattice, prim);
   return ref;
 }
 
 bool contains_operation(auto const &ops,
-                        cppcrystal::MagneticSymmetryOperation const &target,
+                        seitz::MagneticSymmetryOperation const &target,
                         double symprec) {
   for (auto const &op : ops) {
     if (op.spatial.rotation != target.spatial.rotation ||
@@ -112,7 +112,7 @@ bool contains_operation(auto const &ops,
 // unimodular matrix (a change of primitive basis).
 bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
   Matrix3d const rel = a.inverse() * b;
-  Matrix3i const rounded = cppcrystal::math::round_to_int(rel);
+  Matrix3i const rounded = seitz::math::round_to_int(rel);
   if ((rel - rounded.cast<double>()).cwiseAbs().maxCoeff() > 1e-6) {
     return false;
   }
@@ -123,19 +123,19 @@ void check(MagneticCell const &input, std::vector<double> const &tensors,
            int tensor_rank, bool with_time_reversal, bool is_axial,
            double symprec) {
   MagneticCell const mcell(input.cell(), input.tensors(),
-                           is_axial ? cppcrystal::TensorKind::axial
-                                    : cppcrystal::TensorKind::polar);
-  cppcrystal::symmetry::SymmetrySearch<cppcrystal::GroupFamily::space> const
+                           is_axial ? seitz::TensorKind::axial
+                                    : seitz::TensorKind::polar);
+  seitz::symmetry::SymmetrySearch<seitz::GroupFamily::space> const
       search(mcell.cell(), {symprec});
   auto const sym_nonspin = search.operations();
   REQUIRE(sym_nonspin);
 
-  cppcrystal::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
+  seitz::spin::SpinSearch const spin_search(mcell, sym_nonspin.value(),
                                                  {{symprec}});
   auto const got =
       with_time_reversal
-          ? spin_search.operations<cppcrystal::TimeReversal::on>()
-          : spin_search.operations<cppcrystal::TimeReversal::off>();
+          ? spin_search.operations<seitz::TimeReversal::on>()
+          : spin_search.operations<seitz::TimeReversal::off>();
   REQUIRE(got);
 
   auto const ref = reference_magnetic(mcell.cell(), tensors, tensor_rank,

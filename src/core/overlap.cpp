@@ -6,7 +6,7 @@
 #include <tuple>
 #include <vector>
 
-namespace cppcrystal {
+namespace seitz {
 
 namespace {
 
@@ -112,4 +112,4 @@ bool OverlapChecker::check_total_overlap(Vector3d const &trans,
   });
 }
 
-} // namespace cppcrystal
+} // namespace seitz

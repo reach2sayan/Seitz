@@ -5,23 +5,23 @@
 // number embedded in each YAML.
 
 #include "corpus.hpp"
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
 #include "oracle.hpp"
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-using cppcrystal::test::space_hall;
+using seitz::test::space_hall;
 
 TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
           "[oracle][corpus]") {
   double const symprec = 1e-5;
-  auto const corpus = cppcrystal::oracle::load_corpus();
+  auto const corpus = seitz::oracle::load_corpus();
   INFO("corpus size " << corpus.size());
   REQUIRE(corpus.size() >= 200); // ~230 cells; guards against a bad data path
 
@@ -30,16 +30,16 @@ TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
     INFO("cell " << entry.name << " (expected SG " << entry.space_group_number
                  << ")");
 
-    auto const got = cppcrystal::test::dataset_of(entry.cell, {symprec});
+    auto const got = seitz::test::dataset_of(entry.cell, {symprec});
     REQUIRE(got);
-    auto const ref = cppcrystal::oracle::reference_dataset(entry.cell, symprec);
+    auto const ref = seitz::oracle::reference_dataset(entry.cell, symprec);
     REQUIRE(ref.number != 0);
 
-    CHECK(cppcrystal::data::spacegroup_type(got->hall).number == ref.number);
-    CHECK(cppcrystal::data::spacegroup_type(got->hall).number ==
+    CHECK(seitz::data::spacegroup_type(got->hall).number == ref.number);
+    CHECK(seitz::data::spacegroup_type(got->hall).number ==
           entry.space_group_number);
     CHECK(got->hall == space_hall(ref.hall_number));
-    CHECK(cppcrystal::data::spacegroup_type(got->hall).international_short ==
+    CHECK(seitz::data::spacegroup_type(got->hall).international_short ==
           std::string_view(ref.international));
     CHECK(static_cast<int>(got->operations.size()) == ref.n_operations);
     CHECK(static_cast<int>(got->standardized.types().size()) ==

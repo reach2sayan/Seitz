@@ -1,7 +1,7 @@
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
 
 #include "casters.hpp" // to_str
 #include "errors.hpp"  // detail::raise
@@ -15,7 +15,7 @@
 #include <cstddef>
 #include <string>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -197,8 +197,8 @@ void bind_core_symmetry(py::module_ &m) {
 
   // ---- point-group metadata ----------------------------------------------
   //
-  // cppcrystal::PointGroup, the plain metadata row -- distinct from
-  // cppcrystal::group::PointGroup, the 0D group class that arrives in phase 2.
+  // seitz::PointGroup, the plain metadata row -- distinct from
+  // seitz::group::PointGroup, the 0D group class that arrives in phase 2.
   // Named PointGroupType here so the two never collide in one namespace.
   py::class_<PointGroup>(m, "PointGroupType",
                          "Metadata for one of the 32 crystallographic point "
@@ -222,4 +222,4 @@ void bind_core_symmetry(py::module_ &m) {
                 "gives an empty row."));
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

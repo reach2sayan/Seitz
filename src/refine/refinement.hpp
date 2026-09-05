@@ -1,12 +1,12 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/lattice.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/lattice.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 #include "refine/standardize.hpp"
 #include "spacegroup/spacegroup.hpp"
@@ -18,19 +18,19 @@
 // Standardization: the idealized conventional lattice, the rigid rotation that
 // orients it, the exact operations recovered in the input cell, and the
 // standardized cell with its per-atom Wyckoff data.
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 // Idealized conventional lattice built purely from the metric (lengths +
 // angles) of the matched bravais lattice, in the canonical orientation for the
 // crystal system. A pure function of the matched group: the magnetic path needs
 // it without a cell to refine.
-[[nodiscard]] CPPCRYSTAL_TESTABLE Lattice
+[[nodiscard]] SEITZ_TESTABLE Lattice
 conventional_lattice(SpacegroupMatch const &sg);
 
 // Rotate the bravais lattice — and correspondingly the origin shift — to the
 // proper-rotation setting whose basis vectors are closest (Frobenius) to the
 // idealized conventional lattice.
-[[nodiscard]] CPPCRYSTAL_TESTABLE SpacegroupMatch
+[[nodiscard]] SEITZ_TESTABLE SpacegroupMatch
 find_similar_bravais_lattice(SpacegroupMatch sg, double symprec);
 
 // Turns a matched space group plus the cell it was matched from into the
@@ -38,7 +38,7 @@ find_similar_bravais_lattice(SpacegroupMatch sg, double symprec);
 // path leaves the conventional c axis aperiodic.
 //
 // Non-owning: `primitive` and `cell` must outlive the refinement.
-template <GroupFamily F> class CPPCRYSTAL_TESTABLE Refinement {
+template <GroupFamily F> class SEITZ_TESTABLE Refinement {
 public:
   Refinement(SpacegroupMatch matched, Cell const &primitive, Cell const &cell,
              Tolerance const &tol)
@@ -118,4 +118,4 @@ extern template std::optional<Standardized>
 Refinement<GroupFamily::layer>::standardize(Operations const &,
                                             std::vector<int> const &) const;
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

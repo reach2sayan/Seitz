@@ -1,13 +1,13 @@
 #pragma once
 
-#include <cppcrystal/core/fractional.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/fractional.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 // Fractional-coordinate comparisons used by the symmetry search. The folding
 // primitives themselves (wrap_to_unit_cell, nearest_offset) are public, in
 // core/fractional.hpp.
-namespace cppcrystal::math {
+namespace seitz::math {
 
 // Minimal-image fractional displacement b - a, each component folded to
 // [-0.5, 0.5].
@@ -23,4 +23,4 @@ namespace cppcrystal::math {
   return approx_zero(frac_displacement(a, b), tol);
 }
 
-} // namespace cppcrystal::math
+} // namespace seitz::math

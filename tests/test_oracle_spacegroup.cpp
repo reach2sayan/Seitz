@@ -1,5 +1,5 @@
 #include "oracle.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "core/overlap.hpp"
 #include "refine/refinement.hpp"
@@ -7,7 +7,7 @@
 #include "spacegroup/spacegroup.hpp"
 #include "symmetry/primitive.hpp"
 #include "symmetry/search.hpp"
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
 
@@ -17,8 +17,8 @@
 #include <string>
 #include <vector>
 
-using namespace cppcrystal;
-using cppcrystal::test::space_hall;
+using namespace seitz;
+using seitz::test::space_hall;
 
 namespace {
 

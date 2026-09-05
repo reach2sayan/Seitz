@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cppcrystal/alloy/cluster.hpp>
-#include <cppcrystal/core/fractional.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/alloy/cluster.hpp>
+#include <seitz/core/fractional.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 #include <algorithm>
 #include <ranges>
@@ -14,8 +14,8 @@
 // The reference implementation carries a 140-line geometry header for this;
 // everything else in it (unit-cell wrapping, minimum-image norms, mutable site
 // lookup) serves parts of that codebase this module does not port, and the
-// three that remain are either one line over cppcrystal::math or a view.
-namespace cppcrystal::alloy::detail {
+// three that remain are either one line over seitz::math or a view.
+namespace seitz::alloy::detail {
 
 // A fractional delta that is a lattice translation: every component an integer
 // to within `tol`. In the parent's own fractional frame this is what "modulo
@@ -63,4 +63,4 @@ template <class Bound>
                           c | std::views::transform(bound)};
 }
 
-} // namespace cppcrystal::alloy::detail
+} // namespace seitz::alloy::detail

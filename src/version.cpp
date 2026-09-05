@@ -1,7 +1,7 @@
-#include <cppcrystal/core/version.hpp>
+#include <seitz/core/version.hpp>
 
-namespace cppcrystal {
+namespace seitz {
 
 char const *version_string() noexcept { return "0.1.0"; }
 
-} // namespace cppcrystal
+} // namespace seitz

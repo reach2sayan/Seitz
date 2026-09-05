@@ -4,8 +4,8 @@
 #include "data/sitesym_database.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/periodicity.hpp>
 
 #include <algorithm>
 #include <iterator>
@@ -17,7 +17,7 @@
 // location of each conventional-cell atom from its site symmetry (Grosse-
 // Kunstleve & Adams 2002), groups equivalent atoms, and looks up the Wyckoff
 // letter + site-symmetry symbol from the database.
-namespace cppcrystal::refine {
+namespace seitz::refine {
 
 namespace {
 
@@ -216,4 +216,4 @@ std::optional<ExactPositions> exact_positions(Cell const &conv_prim,
   return std::nullopt;
 }
 
-} // namespace cppcrystal::refine
+} // namespace seitz::refine

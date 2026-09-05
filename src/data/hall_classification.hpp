@@ -2,12 +2,12 @@
 
 #include <algorithm>
 
-#include <cppcrystal/core/point_group.hpp> // Holohedry
+#include <seitz/core/point_group.hpp> // Holohedry
 
 #include <array>
 #include <cstddef>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 // Pure integer-derived properties of a Hall number (1..530).
 struct HallClass {
@@ -118,4 +118,4 @@ static_assert(hall_class(530).system == Holohedry::cubic);
 static_assert(hall_class(433).rhombohedral && hall_class(433).rhombo_hex_setting);
 static_assert(hall_class(434).rhombohedral && !hall_class(434).rhombo_hex_setting);
 // clang-format on
-} // namespace cppcrystal::data
+} // namespace seitz::data

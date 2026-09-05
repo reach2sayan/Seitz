@@ -1,6 +1,6 @@
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/group/rod_group.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/group/rod_group.hpp>
 
 #include "data/rod_database.hpp"
 #include "group/locus_arrangement.hpp"
@@ -16,7 +16,7 @@
 #include <span>
 #include <vector>
 
-namespace cppcrystal::group {
+namespace seitz::group {
 
 namespace {
 
@@ -242,4 +242,4 @@ Result<RodGroup> RodGroup::from_number(int number) {
   return rg;
 }
 
-} // namespace cppcrystal::group
+} // namespace seitz::group

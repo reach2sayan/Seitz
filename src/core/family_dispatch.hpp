@@ -1,12 +1,12 @@
 #pragma once
 
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/periodicity.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/periodicity.hpp>
 
 #include <concepts>
 #include <utility>
 
-namespace cppcrystal {
+namespace seitz {
 
 template <class Fn, GroupFamily F>
 using family_call_result_t =
@@ -39,4 +39,4 @@ template <FamilyVisitor Fn>
              : std::forward<Fn>(fn).template operator()<GroupFamily::space>();
 }
 
-} // namespace cppcrystal
+} // namespace seitz

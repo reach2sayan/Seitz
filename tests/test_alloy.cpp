@@ -4,10 +4,10 @@
 // triangle multiplicities, and every ingredient the CVM builds on the
 // nearest-neighbour tetrahedron. They are textbook numbers for fcc, so they
 // pin the port without needing an external oracle.
-#include <cppcrystal/alloy/clusters_pool.hpp>
-#include <cppcrystal/alloy/cvm.hpp>
-#include <cppcrystal/alloy/parent_lattice.hpp>
-#include <cppcrystal/alloy/site_basis.hpp>
+#include <seitz/alloy/clusters_pool.hpp>
+#include <seitz/alloy/cvm.hpp>
+#include <seitz/alloy/parent_lattice.hpp>
+#include <seitz/alloy/site_basis.hpp>
 
 #include "helpers.hpp"
 
@@ -18,10 +18,10 @@
 #include <ranges>
 #include <vector>
 
-using namespace cppcrystal;
-using namespace cppcrystal::alloy;
-using cppcrystal::test::errored;
-using cppcrystal::test::must;
+using namespace seitz;
+using namespace seitz::alloy;
+using seitz::test::errored;
+using seitz::test::must;
 using Catch::Approx;
 
 namespace {

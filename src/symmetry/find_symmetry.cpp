@@ -6,8 +6,8 @@
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "math/lattice_parameters.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/periodicity.hpp>
 
 #include <boost/container/flat_map.hpp>
 
@@ -28,7 +28,7 @@
 //   2. Transform those rotations into the input cell's basis.
 //   3. For each rotation, find the translations that map the cell onto itself
 //      via the OverlapChecker.
-namespace cppcrystal::symmetry {
+namespace seitz::symmetry {
 
 namespace {
 
@@ -416,4 +416,4 @@ std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
 template class SymmetrySearch<GroupFamily::space>;
 template class SymmetrySearch<GroupFamily::layer>;
 
-} // namespace cppcrystal::symmetry
+} // namespace seitz::symmetry

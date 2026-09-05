@@ -1,14 +1,14 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/error.hpp>
-#include <cppcrystal/core/magnetic_cell.hpp>
-#include <cppcrystal/core/magnetic_symmetry_operation.hpp>
-#include <cppcrystal/core/mdspan.hpp>
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/error.hpp>
+#include <seitz/core/magnetic_cell.hpp>
+#include <seitz/core/magnetic_symmetry_operation.hpp>
+#include <seitz/core/mdspan.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/core/types.hpp>
 
 #include <cstddef>
 #include <optional>
@@ -19,7 +19,7 @@
 // (spatial) symmetry of a cell and its per-site magnetic moments, this
 // filters/splits those operations into the magnetic symmetry operations that
 // also preserve the moments (optionally up to time reversal).
-namespace cppcrystal::spin {
+namespace seitz::spin {
 
 // The result of the magnetic symmetry search, in the *input* cell's basis.
 class MagneticSymmetrySearch {
@@ -56,7 +56,7 @@ private:
 // selects between the magnetic family group and its maximal space subgroup.
 //
 // Non-owning: `cell` and `spatial` must outlive the search.
-class CPPCRYSTAL_TESTABLE SpinSearch {
+class SEITZ_TESTABLE SpinSearch {
 public:
   SpinSearch(MagneticCell const &cell, Operations const &spatial,
              MagneticTolerance const &tol) noexcept
@@ -92,4 +92,4 @@ SpinSearch::idealized<TimeReversal::on>(MagneticSymmetrySearch const &) const;
 extern template MagneticCell
 SpinSearch::idealized<TimeReversal::off>(MagneticSymmetrySearch const &) const;
 
-} // namespace cppcrystal::spin
+} // namespace seitz::spin

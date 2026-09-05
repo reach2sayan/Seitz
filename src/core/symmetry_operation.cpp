@@ -1,8 +1,8 @@
-#include <cppcrystal/core/symmetry_operation.hpp>
+#include <seitz/core/symmetry_operation.hpp>
 
 #include "math/integer_matrix.hpp"
 
-namespace cppcrystal {
+namespace seitz {
 
 std::optional<SymmetryOperation> SymmetryOperation::inverse() const noexcept {
   auto const rinv = math::integer_inverse(rotation);
@@ -13,4 +13,4 @@ std::optional<SymmetryOperation> SymmetryOperation::inverse() const noexcept {
       .rotation = *rinv, .translation = -(rinv->cast<double>() * translation)};
 }
 
-} // namespace cppcrystal
+} // namespace seitz

@@ -1,9 +1,9 @@
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/data/spg_database.hpp>
-#include <cppcrystal/group/space_group.hpp>
-#include <cppcrystal/group/subgroup_graph.hpp>
-#include <cppcrystal/group/wyckoff.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/periodicity.hpp>
+#include <seitz/data/spg_database.hpp>
+#include <seitz/group/space_group.hpp>
+#include <seitz/group/subgroup_graph.hpp>
+#include <seitz/group/wyckoff.hpp>
 
 #include "casters.hpp" // borrowed_list, copied_list, to_str
 #include "errors.hpp"  // unwrap
@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -204,4 +204,4 @@ void bind_group(py::module_ &m) {
   subgroups.attr("K_NUM_SPACE_GROUPS") = group::kNumSpaceGroups;
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

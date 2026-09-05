@@ -1,11 +1,11 @@
 // Oracle test for cell standardization (spglib spg_standardize_cell):
-// cppcrystal::standardize_cell must reproduce the reference across all four
+// seitz::standardize_cell must reproduce the reference across all four
 // to_primitive x no_idealize combinations — atom count, cell shape (metric
 // tensor, rotation-invariant), composition, and the atom set.
 
 #include "oracle.hpp"
 
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
 
@@ -21,13 +21,13 @@
 
 namespace {
 
-using cppcrystal::Cell;
-using cppcrystal::Lattice;
-using cppcrystal::Matrix3d;
-using cppcrystal::Positions;
-using cppcrystal::Result;
-using cppcrystal::Types;
-using cppcrystal::Vector3d;
+using seitz::Cell;
+using seitz::Lattice;
+using seitz::Matrix3d;
+using seitz::Positions;
+using seitz::Result;
+using seitz::Types;
+using seitz::Vector3d;
 
 Cell make_cell(Matrix3d const &lattice,
                std::vector<std::array<double, 3>> const &pos,
@@ -59,15 +59,15 @@ bool overlap(Vector3d const &a, Vector3d const &b, double tol) {
   return d.cwiseAbs().maxCoeff() <= tol;
 }
 
-using cppcrystal::test::must;
+using seitz::test::must;
 
 void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
                double symprec) {
   INFO("to_primitive=" << to_primitive << " no_idealize=" << no_idealize);
-  using cppcrystal::analysis::CellSetting;
-  using cppcrystal::analysis::Idealize;
+  using seitz::analysis::CellSetting;
+  using seitz::analysis::Idealize;
   auto const analyzer =
-      cppcrystal::analysis::SymmetryAnalyzer::from_cell(cell, {symprec});
+      seitz::analysis::SymmetryAnalyzer::from_cell(cell, {symprec});
   // The setting is a template argument, so the reference's two runtime flags
   // pick one of the four instantiations here.
   auto const got = must(
@@ -80,7 +80,7 @@ void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
                                                       Idealize::no>()
                          : analyzer.standardized_cell<CellSetting::conventional,
                                                       Idealize::yes>()));
-  Cell const ref = cppcrystal::oracle::reference_standardize_cell(
+  Cell const ref = seitz::oracle::reference_standardize_cell(
       cell, to_primitive, no_idealize, symprec);
   REQUIRE(ref.size() > 0); // reference succeeded
 
@@ -208,16 +208,16 @@ TEST_CASE("standardize: the to_primitive / idealized option pairs",
   };
 
   Cell const prim =
-      must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl)
-               .standardized_cell<cppcrystal::analysis::CellSetting::primitive,
-                                  cppcrystal::analysis::Idealize::yes>());
+      must(seitz::analysis::SymmetryAnalyzer::from_cell(nacl)
+               .standardized_cell<seitz::analysis::CellSetting::primitive,
+                                  seitz::analysis::Idealize::yes>());
   Cell const prim_ref =
-      must(cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl)
-               .standardized_cell<cppcrystal::analysis::CellSetting::primitive,
-                                  cppcrystal::analysis::Idealize::yes>());
+      must(seitz::analysis::SymmetryAnalyzer::from_cell(nacl)
+               .standardized_cell<seitz::analysis::CellSetting::primitive,
+                                  seitz::analysis::Idealize::yes>());
   CHECK(same_cell(prim, prim_ref));
 
-  auto const analyzer = cppcrystal::analysis::SymmetryAnalyzer::from_cell(nacl);
+  auto const analyzer = seitz::analysis::SymmetryAnalyzer::from_cell(nacl);
   Cell const refined = must(analyzer.standardized_cell());
   Cell const refined_ref = must(analyzer.standardized_cell());
   CHECK(same_cell(refined, refined_ref));

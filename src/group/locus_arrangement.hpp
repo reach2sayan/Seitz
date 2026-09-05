@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
-#include <cppcrystal/group/wyckoff.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
+#include <seitz/group/wyckoff.hpp>
 
 #include "math/subspace.hpp"
 
@@ -20,7 +20,7 @@
 // operation's fixed loci, the closure under intersection), emit one derived
 // position per orbit of loci under the group, then sort and assign letters.
 // A geometry policy supplies everything dimension-specific.
-namespace cppcrystal::group::detail {
+namespace seitz::group::detail {
 
 // One derived Wyckoff position before letter assignment.
 struct DerivedLocus {
@@ -170,4 +170,4 @@ derive_wyckoff_positions(std::span<SymmetryOperation const> ops,
   return WyckoffFactory::to_wyckoffs(std::move(derived));
 }
 
-} // namespace cppcrystal::group::detail
+} // namespace seitz::group::detail

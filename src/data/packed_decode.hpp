@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
 
 #include <Eigen/Dense>
 
@@ -17,7 +17,7 @@
 // translation as 3 base-12 numerators (value n/12). Decoding is constexpr so
 // the tables unpack once at compile time; only the Eigen materialisation runs
 // at runtime (Eigen matrices cannot live in constexpr globals).
-namespace cppcrystal::data::detail {
+namespace seitz::data::detail {
 
 // Decoded form of one packed operation: rotation as 9 row-major elements,
 // translation as 3 base-12 numerators.
@@ -77,4 +77,4 @@ build_operation_table(std::array<std::array<int, 2>, N> const &index,
   return ops;
 }
 
-} // namespace cppcrystal::data::detail
+} // namespace seitz::data::detail

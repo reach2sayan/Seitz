@@ -1,7 +1,7 @@
-#include <cppcrystal/core/lattice.hpp>
+#include <seitz/core/lattice.hpp>
 
 #include "math/integer_matrix.hpp"
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <array>
 #include <cmath>
@@ -9,7 +9,7 @@
 #include <ranges>
 #include <utility>
 
-namespace cppcrystal {
+namespace seitz {
 
 namespace {
 
@@ -233,4 +233,4 @@ Result<Lattice> Lattice::delaunay(double symprec) const {
   return Lattice{*reduced};
 }
 
-} // namespace cppcrystal
+} // namespace seitz

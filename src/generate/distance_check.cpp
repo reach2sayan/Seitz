@@ -1,8 +1,8 @@
-#include <cppcrystal/generate/distance_check.hpp>
+#include <seitz/generate/distance_check.hpp>
 
 #include "core/position_index.hpp"
 #include "math/integer_matrix.hpp"
-#include <cppcrystal/data/element_data.hpp>
+#include <seitz/data/element_data.hpp>
 
 #include <boost/container/static_vector.hpp>
 
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal::generate {
+namespace seitz::generate {
 
 namespace {
 
@@ -146,4 +146,4 @@ bool distances_valid(Cell const &cell, DistanceTolerance tol) {
                                tol);
 }
 
-} // namespace cppcrystal::generate
+} // namespace seitz::generate

@@ -1,4 +1,4 @@
-#include <cppcrystal/core/lattice.hpp>
+#include <seitz/core/lattice.hpp>
 
 #include <algorithm>
 #include <array>
@@ -11,7 +11,7 @@
 // and each step right-multiplies the lattice by an integer matrix `tmat`,
 // transforming the basis columns. Which steps restart the pass is part of the
 // algorithm (see the restart set below) and must not be changed.
-namespace cppcrystal {
+namespace seitz {
 
 namespace {
 
@@ -190,4 +190,4 @@ Result<Lattice> Lattice::niggli(double eps) const {
   return Lattice{p.lattice};
 }
 
-} // namespace cppcrystal
+} // namespace seitz

@@ -16,7 +16,7 @@
 //
 // Both yield a span into the coroutine's own buffer: valid until the generator
 // is resumed, which is exactly how every caller here consumes them.
-namespace cppcrystal::alloy::detail {
+namespace seitz::alloy::detail {
 
 // Every tuple of [0, radix[0]) x ... x [0, radix[k-1]), digit 0 varying
 // FASTEST.
@@ -78,4 +78,4 @@ combinations(std::size_t n, int choose) {
   } while (std::prev_permutation(mask.begin(), mask.end()));
 }
 
-} // namespace cppcrystal::alloy::detail
+} // namespace seitz::alloy::detail

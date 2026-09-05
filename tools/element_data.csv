@@ -1,4 +1,4 @@
-# Curated element reference data for CppCrystal crystal generation.
+# Curated element reference data for Seitz crystal generation.
 # Single-bond covalent radii (angstrom) from Cordero et al.,
 # "Covalent radii revisited", Dalton Trans., 2008, 2832-2838.
 # Atomic volume is NOT tabulated here: it is derived from the covalent radius

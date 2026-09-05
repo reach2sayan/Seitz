@@ -1,11 +1,11 @@
 #include "oracle.hpp"
-#include <cppcrystal/core/operation_set.hpp>
+#include <seitz/core/operation_set.hpp>
 
 #include "symmetry/search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 // Returns true iff the two operation collections are equal as sets (rotations

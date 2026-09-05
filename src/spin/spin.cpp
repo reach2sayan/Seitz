@@ -1,6 +1,6 @@
 #include "spin/search.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include "core/position_index.hpp"
 #include "math/fractional.hpp" // math::nearest_offset
@@ -17,7 +17,7 @@
 #include <variant>
 #include <vector>
 
-namespace cppcrystal::spin {
+namespace seitz::spin {
 
 namespace {
 
@@ -414,4 +414,4 @@ SpinSearch::idealized<TimeReversal::on>(MagneticSymmetrySearch const &) const;
 template MagneticCell
 SpinSearch::idealized<TimeReversal::off>(MagneticSymmetrySearch const &) const;
 
-} // namespace cppcrystal::spin
+} // namespace seitz::spin

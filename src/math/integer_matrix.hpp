@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cppcrystal/core/fractional.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/fractional.hpp>
+#include <seitz/core/types.hpp>
 
 #include <Eigen/Dense>
 
@@ -16,7 +16,7 @@
 // trip. The rounding primitives live in core/fractional.hpp, which the public
 // headers need inline. General matrix arithmetic uses Eigen operators at the
 // call site.
-namespace cppcrystal::math {
+namespace seitz::math {
 
 // Row-major 3x3 integer proxy. Eigen 5's fixed-size matrices are literal types
 // for construction and access, but not for arithmetic, so anything that has to
@@ -99,4 +99,4 @@ integer_inverse(Matrix3i const &a) noexcept {
   return det == 1 ? adj : Matrix3i(-adj);
 }
 
-} // namespace cppcrystal::math
+} // namespace seitz::math

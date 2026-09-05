@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -18,7 +18,7 @@ namespace {
 // at static-destruction time would run after the GIL is already gone.
 [[nodiscard]] py::handle make(py::module_ &m, char const *name, char const *doc,
                               py::handle base) {
-  std::string const qualified = std::string("cppcrystal._core.") + name;
+  std::string const qualified = std::string("seitz._core.") + name;
   py::handle const type =
       PyErr_NewExceptionWithDoc(qualified.c_str(), doc, base.ptr(), nullptr);
   if (!type) {
@@ -58,7 +58,7 @@ ErrorTypes const &error_types() noexcept { return g_types; }
 
 void register_errors(py::module_ &m) {
   g_types.base =
-      make(m, "CppCrystalError",
+      make(m, "SeitzError",
            "Base of every error this library reports. The C++ side returns "
            "Result<T> and never throws; this is what that becomes.",
            PyExc_Exception);
@@ -104,4 +104,4 @@ void register_errors(py::module_ &m) {
            g_types.base);
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

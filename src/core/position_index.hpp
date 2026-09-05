@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/testable.hpp"
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/periodicity.hpp>
+#include <seitz/core/types.hpp>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/geometry/algorithms/disjoint.hpp>
@@ -19,13 +19,13 @@
 #include <utility>
 #include <vector>
 
-namespace cppcrystal {
+namespace seitz {
 
 // True when fractional points a and b are the same site: their difference,
 // folded to the minimal image along the periodic axes only, is within a
 // Cartesian distance of symprec (inclusive). The one definition of "same site"
 // for any periodicity.
-[[nodiscard]] CPPCRYSTAL_TESTABLE bool
+[[nodiscard]] SEITZ_TESTABLE bool
 coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
            double symprec, CellPeriodicity const &periodicity) noexcept;
 
@@ -60,7 +60,7 @@ coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
 // below is the part of that experiment worth keeping.
 //
 // Non-owning: the positions and types must outlive the index.
-class CPPCRYSTAL_TESTABLE PositionIndex {
+class SEITZ_TESTABLE PositionIndex {
 public:
   // Reused across queries; each query clears it. Sized for the common case:
   // a coincidence query typically returns one or two atoms.
@@ -168,4 +168,4 @@ private:
   Tree tree_;
 };
 
-} // namespace cppcrystal
+} // namespace seitz

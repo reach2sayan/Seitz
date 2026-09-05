@@ -1,15 +1,15 @@
-// The public API in one file: everything here compiles against <cppcrystal/…>
+// The public API in one file: everything here compiles against <seitz/…>
 // alone, with none of src/ on the include path, so this program is also the
 // guard that the installed interface is self-contained.
 
-#include <cppcrystal/cppcrystal.hpp>
+#include <seitz/seitz.hpp>
 
 #include <print>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 int main() {
-  std::println("CppCrystal {} — modern C++23 crystallography library "
+  std::println("Seitz {} — modern C++23 crystallography library "
                "(validated against reference spglib v{}.{}.{})",
                version_string(), kReferenceSpglibVersion.major,
                kReferenceSpglibVersion.minor, kReferenceSpglibVersion.patch);

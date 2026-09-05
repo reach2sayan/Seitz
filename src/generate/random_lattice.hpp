@@ -1,15 +1,15 @@
 #pragma once
 
-#include <cppcrystal/core/symmetry_operation.hpp>
-#include <cppcrystal/core/types.hpp>
-#include <cppcrystal/generate/assignments.hpp> // Composition
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/core/types.hpp>
+#include <seitz/generate/assignments.hpp> // Composition
 
 #include <cstdint>
 #include <span>
 
 // The random metrics the generators draw their cells from. Private: a caller
 // asks a Generator for a structure, not for a lattice.
-namespace cppcrystal::generate {
+namespace seitz::generate {
 
 enum class CrystalSystem {
   triclinic,
@@ -71,4 +71,4 @@ crystal_system(int spacegroup_number) noexcept {
 random_layer_lattice(std::span<SymmetryOperation const> operations,
                      double target_area, double c_length, std::uint64_t seed);
 
-} // namespace cppcrystal::generate
+} // namespace seitz::generate

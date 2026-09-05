@@ -3,11 +3,11 @@
 // backtracker it replaced (equal as sets), and the bucketed distance check
 // against the all-pairs scan.
 
-#include <cppcrystal/data/element_data.hpp>
-#include <cppcrystal/generate/assignments.hpp>
-#include <cppcrystal/generate/distance_check.hpp>
-#include <cppcrystal/generate/generator.hpp>
-#include <cppcrystal/group/space_group.hpp>
+#include <seitz/data/element_data.hpp>
+#include <seitz/generate/assignments.hpp>
+#include <seitz/generate/distance_check.hpp>
+#include <seitz/generate/generator.hpp>
+#include <seitz/group/space_group.hpp>
 
 #include "helpers.hpp"
 
@@ -20,11 +20,11 @@
 #include <stdexcept>
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 
-using cppcrystal::test::must;
+using seitz::test::must;
 
 // An assignment as a comparable value: sorted (type, position index) pairs.
 using Canonical = std::vector<std::pair<int, int>>;

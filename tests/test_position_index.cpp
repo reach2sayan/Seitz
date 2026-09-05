@@ -15,7 +15,7 @@
 #include <ranges>
 #include <vector>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 

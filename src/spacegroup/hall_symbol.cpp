@@ -6,10 +6,10 @@
 #include "data/hall_classification.hpp"
 #include "data/hall_generators_view.hpp"
 #include "data/operation_index.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/periodicity.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/tolerance.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/periodicity.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/core/tolerance.hpp>
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
@@ -28,7 +28,7 @@
 // dw is precomputed per setting (the VSpU tables); dw is the per-generator
 // translation difference vs the database, over every representative of the
 // generator rotation the operations offer.
-namespace cppcrystal::spacegroup {
+namespace seitz::spacegroup {
 
 using data::Centering;
 
@@ -74,7 +74,7 @@ template <GroupFamily F> struct MatchContext {
     }
   }
   [[nodiscard]] Vector3d wrap(Vector3d const &v) const noexcept {
-    return cppcrystal::wrap(v, periodicity());
+    return seitz::wrap(v, periodicity());
   }
 };
 
@@ -378,4 +378,4 @@ SpacegroupMatcher<GroupFamily::layer>::match_hall(Matrix3d const &, HallNumber,
                                                   Centering, Operations const &,
                                                   double);
 
-} // namespace cppcrystal::spacegroup
+} // namespace seitz::spacegroup

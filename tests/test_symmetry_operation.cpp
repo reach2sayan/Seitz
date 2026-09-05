@@ -1,13 +1,13 @@
 #include "core/matrix_order.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <iterator>
 
-using namespace cppcrystal;
+using namespace seitz;
 using Catch::Approx;
 
 namespace {

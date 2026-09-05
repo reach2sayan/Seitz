@@ -1,12 +1,12 @@
 #include "data/operation_index.hpp"
 
 #include "data/spacegroup_operation_tables.hpp"
-#include <cppcrystal/data/detail/lookup.hpp>
+#include <seitz/data/detail/lookup.hpp>
 
 #include <cstddef>
 #include <vector>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 RotationMultimap<int> const &operations_by_rotation(HallNumber hall) {
   // 1-based like the generated tables; entry 0 is never addressed.
@@ -27,4 +27,4 @@ RotationMultimap<int> const &operations_by_rotation(HallNumber hall) {
   return hall.family() == GroupFamily::layer ? layer_index[i] : index[i];
 }
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

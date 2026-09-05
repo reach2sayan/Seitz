@@ -2,8 +2,8 @@
 // structures with hand-checked layer-group numbers, symbols and Wyckoff data.
 // The oracle comparison against spg_get_layer_dataset lives in the gated
 // oracle suite; these cases pin the behavior in the default build.
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/data/spg_database.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
 
@@ -15,12 +15,12 @@
 #include <stdexcept>
 #include <utility>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
-using cppcrystal::test::layer_hall;
-using cppcrystal::test::must;
-using cppcrystal::test::space_hall;
+using seitz::test::layer_hall;
+using seitz::test::must;
+using seitz::test::space_hall;
 
 // A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along
 // c, the aperiodic axis. Columns are basis vectors.

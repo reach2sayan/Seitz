@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Transcribe the curated element reference CSV into a constexpr header.
 
-Unlike the spglib database transcribers, the source here is CppCrystal's own
+Unlike the spglib database transcribers, the source here is Seitz's own
 curated table (tools/element_data.csv: atomic number, symbol, single-bond
 covalent radius from Cordero et al. 2008), not a spglib C array. The output
 mirrors the same convention: `inline constexpr std::array`s, with the
-accessors hand-written (constexpr) in include/cppcrystal/data/element_data.hpp.
+accessors hand-written (constexpr) in include/seitz/data/element_data.hpp.
 
 Only the covalent radius is tabulated; the atomic volume used to size a
 generated cell is derived from it ((4/3) * pi * r^3) at the accessor layer.
@@ -41,7 +41,7 @@ def main():
         w("#include <array>\n")
         w("#include <string_view>\n\n")
         w("#pragma GCC visibility push(default)\n\n")
-        w("namespace cppcrystal::data {\n\n")
+        w("namespace seitz::data {\n\n")
 
         w("// Number of tabulated elements (atomic numbers 1..%d).\n" % n)
         w("inline constexpr int kNumElements = %d;\n\n" % n)
@@ -60,7 +60,7 @@ def main():
             w("    " + ", ".join("%.2f" % r for r in radii[i:i + 8]) + ",\n")
         w("}};\n\n")
 
-        w("} // namespace cppcrystal::data\n")
+        w("} // namespace seitz::data\n")
         w("\n#pragma GCC visibility pop\n")
 
     print("elements: %d (Z 1..%d)" % (n, n))

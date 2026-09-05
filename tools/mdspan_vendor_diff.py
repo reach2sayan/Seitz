@@ -20,9 +20,9 @@ from pathlib import Path
 
 REPO = "kokkos/mdspan"
 BRANCH = "single-header"
-# The commit include/cppcrystal/third_party/mdspan.hpp was taken from.  Bump on re-vendor.
+# The commit include/seitz/third_party/mdspan.hpp was taken from.  Bump on re-vendor.
 PINNED = "c3fc07b607db2a43cd65aabc12ffda9328833d95"
-VENDORED = Path(__file__).resolve().parent.parent / "include/cppcrystal/third_party/mdspan.hpp"
+VENDORED = Path(__file__).resolve().parent.parent / "include/seitz/third_party/mdspan.hpp"
 
 TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|[A-Za-z_]\w*|\d[\w.\']*|\S')
 def strip_comments(src: str) -> str:

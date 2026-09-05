@@ -2,16 +2,16 @@
 // reference spglib needed). Most of Mesh's own arithmetic is static_asserted in
 // the header itself; what remains here is what needs a run.
 
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <vector>
 
-using cppcrystal::Matrix3i;
-using cppcrystal::kpoint::Address;
-using cppcrystal::kpoint::Mesh;
-using cppcrystal::kpoint::ReciprocalMesh;
+using seitz::Matrix3i;
+using seitz::kpoint::Address;
+using seitz::kpoint::Mesh;
+using seitz::kpoint::ReciprocalMesh;
 
 TEST_CASE("Mesh index_of uses the a0-fastest encoding", "[kpoint]") {
   auto const mesh = Mesh::of({2, 3, 4}); // d0=2, d1=3, d0*d1=6
@@ -48,12 +48,12 @@ TEST_CASE("reciprocal point group: transpose, inversion, dedup", "[kpoint]") {
   std::vector<Matrix3i> const rots{Matrix3i::Identity()};
 
   auto const group = ReciprocalMesh::from_rotations(
-      *mesh, rots, cppcrystal::TimeReversal::off);
+      *mesh, rots, seitz::TimeReversal::off);
   REQUIRE(group.rotations().size() == 1U);
   CHECK(group.rotations()[0] == Matrix3i::Identity());
 
   auto const grey =
-      ReciprocalMesh::from_rotations(*mesh, rots, cppcrystal::TimeReversal::on);
+      ReciprocalMesh::from_rotations(*mesh, rots, seitz::TimeReversal::on);
   REQUIRE(grey.rotations().size() == 2U); // identity and its partner -I
   Matrix3i const minus_identity = -Matrix3i::Identity();
   CHECK((grey.rotations()[0] == minus_identity ||

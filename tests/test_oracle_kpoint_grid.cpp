@@ -4,15 +4,15 @@
 
 #include "oracle.hpp"
 
-#include <cppcrystal/kpoint/mesh.hpp>
+#include <seitz/kpoint/mesh.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
 
-using cppcrystal::Vector3i;
-using cppcrystal::kpoint::Address;
-using cppcrystal::kpoint::Mesh;
+using seitz::Vector3i;
+using seitz::kpoint::Address;
+using seitz::kpoint::Mesh;
 
 void check_mesh(Address const &divisions) {
   auto const mesh = Mesh::of(divisions);
@@ -24,7 +24,7 @@ void check_mesh(Address const &divisions) {
         INFO("mesh " << as_vector.transpose() << " address " << x << " " << y
                      << " " << z);
         REQUIRE(mesh->index_of({x, y, z}) ==
-                cppcrystal::oracle::reference_grid_point_from_address(
+                seitz::oracle::reference_grid_point_from_address(
                     Vector3i(x, y, z), as_vector));
       }
     }

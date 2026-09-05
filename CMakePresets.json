@@ -14,8 +14,8 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "gcc-15",
         "CMAKE_CXX_COMPILER": "g++-15",
-        "CPPCRYSTAL_BUILD_TESTS": "ON",
-        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"
+        "SEITZ_BUILD_TESTS": "ON",
+        "SEITZ_BUILD_ORACLE_TESTS": "ON"
       }
     },
     {
@@ -39,7 +39,7 @@
       "displayName": "Debug + oracle + Address/UB sanitizers",
       "inherits": "debug",
       "cacheVariables": {
-        "CPPCRYSTAL_ENABLE_SANITIZERS": "ON"
+        "SEITZ_ENABLE_SANITIZERS": "ON"
       }
     },
     {
@@ -48,10 +48,10 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CPPCRYSTAL_BUILD_PYTHON": "ON",
-        "CPPCRYSTAL_BUILD_TESTS": "OFF",
-        "CPPCRYSTAL_BUILD_DEMO": "OFF",
-        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "OFF"
+        "SEITZ_BUILD_PYTHON": "ON",
+        "SEITZ_BUILD_TESTS": "OFF",
+        "SEITZ_BUILD_DEMO": "OFF",
+        "SEITZ_BUILD_ORACLE_TESTS": "OFF"
       }
     }
   ],

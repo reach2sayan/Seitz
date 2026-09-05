@@ -1,14 +1,14 @@
 #pragma once
 
 #include "data/rod_group_tables.hpp"
-#include <cppcrystal/core/operation_set.hpp>
-#include <cppcrystal/core/symmetry_operation.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
 
 #include <cstddef>
 #include <ranges>
 #include <string_view>
 
-namespace cppcrystal::data {
+namespace seitz::data {
 
 // Whether `rod_number` is a valid rod-group number (1..75).
 [[nodiscard]] constexpr bool rod_number_in_range(int rod_number) noexcept {
@@ -53,4 +53,4 @@ static_assert(rod_symbol(75) == "p6/mmc");
 
 [[nodiscard]] Operations rod_operations_from_database(int rod_number);
 
-} // namespace cppcrystal::data
+} // namespace seitz::data

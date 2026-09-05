@@ -1,12 +1,12 @@
 #include "oracle.hpp"
 
-#include <cppcrystal/core/lattice.hpp>
+#include <seitz/core/lattice.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
 
-using namespace cppcrystal;
+using namespace seitz;
 
 namespace {
 // A spread of lattices: cubic, a primitive-rhombohedral-ish cell, a sheared

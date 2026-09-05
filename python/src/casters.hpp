@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cppcrystal/core/types.hpp>
+#include <seitz/core/types.hpp>
 
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
@@ -12,7 +12,7 @@
 
 // The conversions that are not pybind11's job out of the box: borrowing a span
 // into an object's own storage, and the small NumPy shapes the library speaks.
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace py = pybind11;
 
@@ -63,4 +63,4 @@ template <class T>
   return out;
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python

@@ -1,10 +1,10 @@
-#include <cppcrystal/analysis/dataset.hpp>
-#include <cppcrystal/analysis/symmetry_analyzer.hpp>
-#include <cppcrystal/core/cell.hpp>
-#include <cppcrystal/core/keys.hpp>
-#include <cppcrystal/core/point_group.hpp>
-#include <cppcrystal/core/tolerance.hpp>
-#include <cppcrystal/spacegroup_match.hpp>
+#include <seitz/analysis/dataset.hpp>
+#include <seitz/analysis/symmetry_analyzer.hpp>
+#include <seitz/core/cell.hpp>
+#include <seitz/core/keys.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/core/tolerance.hpp>
+#include <seitz/spacegroup_match.hpp>
 
 #include "casters.hpp" // to_str
 #include "errors.hpp"  // unwrap, memo
@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-namespace cppcrystal::python {
+namespace seitz::python {
 
 namespace {
 
@@ -263,4 +263,4 @@ void bind_analysis(py::module_ &m) {
                              py::return_value_policy::reference);
 }
 
-} // namespace cppcrystal::python
+} // namespace seitz::python
