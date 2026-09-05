@@ -6,19 +6,19 @@ The translationengleiche subgroup graph of the 230 space groups. Klassengleiche 
 from __future__ import annotations
 import typing
 __all__: list[str] = ['K_NUM_SPACE_GROUPS', 'is_subgroup', 'maximal_subgroups', 'minimal_supergroups', 'path']
-def is_subgroup(sub: typing.SupportsInt, super: typing.SupportsInt) -> bool:
+def is_subgroup(sub: typing.SupportsInt | typing.SupportsIndex, super: typing.SupportsInt | typing.SupportsIndex) -> bool:
     """
     Whether `sub` is reachable from `super` by a chain of maximal t-subgroup steps. True when they are equal.
     """
-def maximal_subgroups(number: typing.SupportsInt) -> list:
+def maximal_subgroups(number: typing.SupportsInt | typing.SupportsIndex) -> list:
     """
     Maximal t-subgroups of `number`. Empty for P1 and out of range.
     """
-def minimal_supergroups(number: typing.SupportsInt) -> list:
+def minimal_supergroups(number: typing.SupportsInt | typing.SupportsIndex) -> list:
     """
     The groups of which `number` is a maximal t-subgroup.
     """
-def path(super: typing.SupportsInt, sub: typing.SupportsInt) -> list[int] | None:
+def path(super: typing.SupportsInt | typing.SupportsIndex, sub: typing.SupportsInt | typing.SupportsIndex) -> list[int] | None:
     """
     A descending chain of space-group numbers from `super` to `sub`, or None if there is none.
     """

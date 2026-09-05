@@ -12,9 +12,9 @@
 
 namespace seitz {
 
-// How a rank-1 site tensor transforms under an improper operation: an axial
-// vector picks up the |det R| factor, a polar one does not. A property of the
-// structure, so it is carried by the cell rather than passed at every call.
+// How a rank-1 site tensor transforms under an improper operation:
+// (a) axial : picks up the |det R| factor,
+// (b) polar : one does not.
 enum class TensorKind { polar, axial };
 
 // Rank of per-site tensors for magnetic structures.

@@ -36,22 +36,20 @@ struct SymmetryOperation {
   // Group composition: (a * b).apply(x) == a.apply(b.apply(x)).
   [[nodiscard]] SymmetryOperation
   operator*(SymmetryOperation const &rhs) const noexcept {
-    return {rotation * rhs.rotation,
-            rotation.cast<double>() * rhs.translation + translation};
+    return {.rotation = rotation * rhs.rotation,
+            .translation =
+                rotation.cast<double>() * rhs.translation + translation};
   }
 
-  // Inverse operation; std::nullopt when the rotation is not unimodular. Out
-  // of line: the exact integer inverse it needs is private to src/math.
+  // Inverse operation; std::nullopt when the rotation is not unimodular.
   [[nodiscard]] std::optional<SymmetryOperation> inverse() const noexcept;
-
   [[nodiscard]] bool is_identity_rotation() const noexcept {
     return rotation == Matrix3i::Identity();
   }
 };
 
 // Change of basis of an operation: (T, 0)(R, t)(T, 0)^-1 = (T R T^-1, T t),
-// with the conjugated rotation rounded back to the integer basis. Any extra
-// fields of `Op` (e.g. a time-reversal flag) ride along unchanged.
+// with the conjugated rotation rounded back to the integer basis.
 [[nodiscard]] auto conjugated_by(SpaceGroupOperationLike auto op,
                                  Matrix3d const &t,
                                  Matrix3d const &t_inv) noexcept {

@@ -638,3 +638,18 @@ _skbuild/
 # the codegen block:
 #   src/data/rod_group_tables.hpp              needs PyXtal/pymatgen
 #   include/seitz/data/subgroup_relations.hpp   derived from this library
+
+# ---- docs/ prose ----
+# Kept out of the repository on purpose: the .md files under docs/ are working
+# notes rather than a published manual, and prose churn in diffs is noise. They
+# stay on disk and are read locally.
+#
+# Note that ignoring is only half of it -- a file already in the index keeps
+# being tracked no matter what this file says, until `git rm --cached` takes it
+# out.
+#
+# README.md deliberately does not link in here. Anything a reader of the
+# repository actually needs -- how releases are cut, why the Windows archive is
+# static -- is written out there instead, because a link to an ignored path
+# resolves for whoever wrote it and for nobody else.
+/docs/*.md

@@ -14,7 +14,7 @@
 # written to libstdc++'s C++23, and libc++ has no <generator>.
 #
 # Nothing is published to PyPI. The wheels ride the GitHub Release and are
-# installed by URL; see docs/RELEASING.md.
+# installed by URL; the README shows the incantation.
 name: Release
 
 on:

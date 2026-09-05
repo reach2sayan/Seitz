@@ -7,14 +7,12 @@
 
 namespace seitz {
 
-// The two crystallographic families the determination pipeline handles. A
-// layer group is 2D-periodic with its own 116-setting Hall database; the rest
-// of the search is shared with the 3D space groups, so the family is carried as
-// a compile-time parameter and every family-dependent branch is `if constexpr`.
+// The two crystallographic families the determination pipeline handles.
+// (a) A layer group is 2D-periodic with its own 116-setting Hall database;
+// (b) the rest shared with the 3D space groups
 enum class GroupFamily { space, layer };
 
-// Number of Hall settings per family. Static-asserted against the generated
-// tables in data/spg_database.hpp.
+// Number of Hall settings per family.
 inline constexpr int kSpaceHallSettings = 530;
 inline constexpr int kLayerHallSettings = 116;
 
@@ -72,7 +70,6 @@ public:
   }
 
   [[nodiscard]] constexpr int value() const noexcept { return value_; }
-
   [[nodiscard]] friend constexpr bool operator==(UniNumber,
                                                  UniNumber) = default;
   [[nodiscard]] friend constexpr std::strong_ordering

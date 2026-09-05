@@ -37,11 +37,11 @@ class Cell:
         ...
     def __deepcopy__(self, memo: dict) -> Cell:
         ...
-    def __getitem__(self, arg0: typing.SupportsInt) -> tuple:
+    def __getitem__(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"], int]:
         ...
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[Lattice, typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"], list[int], typing.Annotated[list[AxisKind], "FixedSize(3)"]]:
         ...
-    def __init__(self, lattice: Lattice, positions: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 3]"], types: collections.abc.Sequence[typing.SupportsInt], periodicity: typing.Annotated[collections.abc.Sequence[AxisKind], "FixedSize(3)"] = ...) -> None:
+    def __init__(self, lattice: Lattice, positions: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 3]"], types: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], periodicity: typing.Annotated[collections.abc.Sequence[AxisKind], "FixedSize(3)"] = ...) -> None:
         ...
     def __iter__(self) -> collections.abc.Iterator:
         ...
@@ -51,9 +51,9 @@ class Cell:
         ...
     def __setstate__(self, arg0: tuple) -> None:
         ...
-    def position(self, i: typing.SupportsInt) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
+    def position(self, i: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
         ...
-    def type(self, i: typing.SupportsInt) -> int:
+    def type(self, i: typing.SupportsInt | typing.SupportsIndex) -> int:
         ...
     def with_lattice(self, lattice: Lattice) -> Cell:
         ...
@@ -217,7 +217,7 @@ class HallNumber:
     A validated Hall setting: a family plus a 1-based index into that family's settings.
     """
     @staticmethod
-    def of(family: GroupFamily, index: typing.SupportsInt) -> seitz._core.HallNumber | None:
+    def of(family: GroupFamily, index: typing.SupportsInt | typing.SupportsIndex) -> seitz._core.HallNumber | None:
         """
         The setting, or None when `index` is out of range.
         """
@@ -225,13 +225,13 @@ class HallNumber:
         ...
     def __ge__(self, arg0: HallNumber) -> bool:
         ...
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[GroupFamily, int]:
         ...
     def __gt__(self, arg0: HallNumber) -> bool:
         ...
     def __hash__(self) -> int:
         ...
-    def __init__(self, family: GroupFamily, index: typing.SupportsInt) -> None:
+    def __init__(self, family: GroupFamily, index: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     def __le__(self, arg0: HallNumber) -> bool:
         ...
@@ -285,7 +285,7 @@ class Lattice:
         ...
     def __deepcopy__(self, memo: dict) -> Lattice:
         ...
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 3]"]]:
         ...
     def __init__(self, basis: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 3]"]) -> None:
         """
@@ -295,15 +295,15 @@ class Lattice:
         ...
     def __setstate__(self, arg0: tuple) -> None:
         ...
-    def delaunay(self, symprec: typing.SupportsFloat = 1e-05) -> Lattice:
+    def delaunay(self, symprec: typing.SupportsFloat | typing.SupportsIndex = 1e-05) -> Lattice:
         """
         Delaunay reduction; the result is right-handed.
         """
-    def delaunay_in_plane(self, unique_axis: typing.SupportsInt, symprec: typing.SupportsFloat = 1e-05) -> Lattice:
+    def delaunay_in_plane(self, unique_axis: typing.SupportsInt | typing.SupportsIndex, symprec: typing.SupportsFloat | typing.SupportsIndex = 1e-05) -> Lattice:
         """
         2D Delaunay reduction in the plane normal to `unique_axis`.
         """
-    def niggli(self, eps: typing.SupportsFloat = 1e-05) -> Lattice:
+    def niggli(self, eps: typing.SupportsFloat | typing.SupportsIndex = 1e-05) -> Lattice:
         """
         Krivy-Gruber Niggli reduction.
         """
@@ -389,13 +389,13 @@ class MagneticTolerance(Tolerance):
     """
     Tolerance plus the magnetic search's moment comparison.
     """
-    def __init__(self, symprec: typing.SupportsFloat = 1e-05, angle_tolerance: typing.SupportsFloat | None = None, moment: typing.SupportsFloat | None = None) -> None:
+    def __init__(self, symprec: typing.SupportsFloat | typing.SupportsIndex = 1e-05, angle_tolerance: typing.SupportsFloat | typing.SupportsIndex | None = None, moment: typing.SupportsFloat | typing.SupportsIndex | None = None) -> None:
         ...
     @property
     def moment(self) -> float | None:
         ...
     @moment.setter
-    def moment(self, arg0: typing.SupportsFloat | None) -> None:
+    def moment(self, arg0: typing.SupportsFloat | typing.SupportsIndex | None) -> None:
         ...
     @property
     def moment_or_symprec(self) -> float:
@@ -408,7 +408,7 @@ class Operations:
     """
     An immutable set of space-group operations.
     """
-    def __getitem__(self, arg0: typing.SupportsInt) -> SymmetryOperation:
+    def __getitem__(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> SymmetryOperation:
         ...
     def __init__(self, operations: collections.abc.Sequence[SymmetryOperation]) -> None:
         ...
@@ -510,7 +510,7 @@ class SpaceGroup:
     A space or layer group as a standalone, structure-free object. One shared immutable instance per Hall setting.
     """
     @staticmethod
-    def from_number(family: GroupFamily, number: typing.SupportsInt) -> SpaceGroup:
+    def from_number(family: GroupFamily, number: typing.SupportsInt | typing.SupportsIndex) -> SpaceGroup:
         """
         The group of an international number, in its default Hall setting. 1..230 for space groups, 1..80 for layer groups.
         """
@@ -698,7 +698,7 @@ class SymmetryOperation:
         ...
     def __deepcopy__(self, memo: dict) -> SymmetryOperation:
         ...
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.int32], "[3, 3]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]]:
         ...
     def __init__(self, rotation: typing.Annotated[numpy.typing.ArrayLike, numpy.int32, "[3, 3]"] = ..., translation: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"] = ...) -> None:
         ...
@@ -745,7 +745,7 @@ class Tolerance:
     """
     The tolerances threaded through the symmetry search.
     """
-    def __init__(self, symprec: typing.SupportsFloat = 1e-05, angle_tolerance: typing.SupportsFloat | None = None) -> None:
+    def __init__(self, symprec: typing.SupportsFloat | typing.SupportsIndex = 1e-05, angle_tolerance: typing.SupportsFloat | typing.SupportsIndex | None = None) -> None:
         ...
     def __repr__(self) -> str:
         ...
@@ -753,20 +753,20 @@ class Tolerance:
     def angle_tolerance(self) -> float | None:
         ...
     @angle_tolerance.setter
-    def angle_tolerance(self, arg0: typing.SupportsFloat | None) -> None:
+    def angle_tolerance(self, arg0: typing.SupportsFloat | typing.SupportsIndex | None) -> None:
         ...
     @property
     def symprec(self) -> float:
         ...
     @symprec.setter
-    def symprec(self, arg0: typing.SupportsFloat) -> None:
+    def symprec(self, arg0: typing.SupportsFloat | typing.SupportsIndex) -> None:
         ...
 class UniNumber:
     """
     A validated magnetic space-group (UNI) number, 1..1651.
     """
     @staticmethod
-    def of(number: typing.SupportsInt) -> seitz._core.UniNumber | None:
+    def of(number: typing.SupportsInt | typing.SupportsIndex) -> seitz._core.UniNumber | None:
         """
         The number, or None when out of range.
         """
@@ -774,13 +774,13 @@ class UniNumber:
         ...
     def __ge__(self, arg0: UniNumber) -> bool:
         ...
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[int]:
         ...
     def __gt__(self, arg0: UniNumber) -> bool:
         ...
     def __hash__(self) -> int:
         ...
-    def __init__(self, number: typing.SupportsInt) -> None:
+    def __init__(self, number: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     def __le__(self, arg0: UniNumber) -> bool:
         ...
@@ -851,7 +851,7 @@ class Wyckoff:
         """
         The full orbit of `xyz` as an (N, 3) array, one row per image, projected onto the locus first.
         """
-    def sample(self, params: collections.abc.Sequence[typing.SupportsFloat]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
+    def sample(self, params: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
         """
         A point on the locus from `degrees_of_freedom` free parameters. Extra parameters are ignored.
         """
@@ -882,7 +882,7 @@ def all_periodic() -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
     """
     The fully periodic descriptor: a 3D space-group cell.
     """
-def aperiodic_along(axis: typing.SupportsInt) -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
+def aperiodic_along(axis: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
     """
     Periodic in the plane, aperiodic along `axis` -- a layer.
     """
@@ -894,11 +894,11 @@ def conjugated_by(op: SymmetryOperation, t: typing.Annotated[numpy.typing.ArrayL
     """
     Change of basis of one operation: (T,0)(R,t)(T,0)^-1.
     """
-def default_hall(family: GroupFamily, number: typing.SupportsInt) -> seitz._core.HallNumber | None:
+def default_hall(family: GroupFamily, number: typing.SupportsInt | typing.SupportsIndex) -> seitz._core.HallNumber | None:
     """
     The default (first) Hall setting of an international number, or None.
     """
-def default_halls_with_pointgroup(family: GroupFamily, pointgroup_number: typing.SupportsInt) -> list[int]:
+def default_halls_with_pointgroup(family: GroupFamily, pointgroup_number: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
     """
     The default Hall setting index of every group with that point group, ascending by group number.
     """
@@ -906,7 +906,7 @@ def family_of(periodicity: typing.Annotated[collections.abc.Sequence[AxisKind], 
     """
     The family a periodicity puts a cell in.
     """
-def halls_with_number(family: GroupFamily, number: typing.SupportsInt) -> list[int]:
+def halls_with_number(family: GroupFamily, number: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
     """
     Every Hall setting index of an international number, ascending; empty if out of range.
     """
@@ -922,15 +922,15 @@ def operations_from_database(hall: HallNumber) -> Operations:
     """
     The symmetry operations of a Hall setting.
     """
-def periodic_along(axis: typing.SupportsInt) -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
+def periodic_along(axis: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
     """
     Periodic along `axis` only -- a rod.
     """
-def pointgroup_by_number(number: typing.SupportsInt) -> PointGroupType:
+def pointgroup_by_number(number: typing.SupportsInt | typing.SupportsIndex) -> PointGroupType:
     """
     Metadata for point group 1..32; number 0 or out of range gives an empty row.
     """
-def same_operation(a: SymmetryOperation, b: SymmetryOperation, symprec: typing.SupportsFloat) -> bool:
+def same_operation(a: SymmetryOperation, b: SymmetryOperation, symprec: typing.SupportsFloat | typing.SupportsIndex) -> bool:
     """
     Whether two operations agree to within `symprec`. This is the comparison to use -- SymmetryOperation has no __eq__, because an exact float comparison would compete with the library's one definition of equal-within-tolerance.
     """

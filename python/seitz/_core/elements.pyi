@@ -10,18 +10,18 @@ def atomic_number(symbol: str) -> int | None:
     """
     Atomic number of a chemical symbol (case-sensitive), or None.
     """
-def atomic_volume(z: typing.SupportsInt) -> float | None:
+def atomic_volume(z: typing.SupportsInt | typing.SupportsIndex) -> float | None:
     """
     Sphere volume from the covalent radius, or None.
     """
-def covalent_radius(z: typing.SupportsInt) -> float | None:
+def covalent_radius(z: typing.SupportsInt | typing.SupportsIndex) -> float | None:
     """
     Single-bond covalent radius in angstrom, or None.
     """
-def element_symbol(z: typing.SupportsInt) -> str | None:
+def element_symbol(z: typing.SupportsInt | typing.SupportsIndex) -> str | None:
     """
     Chemical symbol, or None.
     """
-def is_known_element(z: typing.SupportsInt) -> bool:
+def is_known_element(z: typing.SupportsInt | typing.SupportsIndex) -> bool:
     ...
 K_NUM_ELEMENTS: int = 96

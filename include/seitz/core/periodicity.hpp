@@ -15,10 +15,10 @@ namespace seitz {
 
 enum class AxisKind { periodic, aperiodic };
 
-//   3D space group : {periodic,  periodic,  periodic}  (dim 3)
-//   layer group    : {periodic,  periodic,  aperiodic} (dim 2, aperiodic c)
-//   rod group      : {aperiodic, aperiodic, periodic}  (dim 1, periodic c)
-//   point group    : {aperiodic, aperiodic, aperiodic} (dim 0, a cluster)
+// 3D space group : {periodic,  periodic,  periodic}  (dim 3)
+// layer group    : {periodic,  periodic,  aperiodic} (dim 2, aperiodic c)
+// rod group      : {aperiodic, aperiodic, periodic}  (dim 1, periodic c)
+// point group    : {aperiodic, aperiodic, aperiodic} (dim 0, a cluster)
 using CellPeriodicity = std::array<AxisKind, 3>;
 
 // The fully-periodic descriptor (a 3D space-group cell).
@@ -26,9 +26,10 @@ using CellPeriodicity = std::array<AxisKind, 3>;
   return {AxisKind::periodic, AxisKind::periodic, AxisKind::periodic};
 }
 
-// The family a cell's periodicity puts it in: one aperiodic axis is a layer
-// group, all-periodic is a 3D space group. (Rod and cluster cells are handled
-// by the generation layer, not the space-group search.)
+// The family a cell's periodicity puts it in:
+// (a) 1 aperiodic axis = layer group,
+// (b) all-periodic = 3D space group.
+// (Rod and cluster cells are handled by the generation, not the space-group.)
 [[nodiscard]] constexpr GroupFamily
 family_of(CellPeriodicity const &p) noexcept {
   return std::ranges::contains(p, AxisKind::aperiodic) ? GroupFamily::layer
@@ -56,11 +57,7 @@ family_of(CellPeriodicity const &p) noexcept {
   return p;
 }
 
-// The single aperiodic axis if there is exactly one — a layer group's c. The
-// layer path needs the axis index itself (to pick the in-plane pair, to reject
-// the cubic point groups, ...); this is the one place that search lives.
-// std::nullopt for the 3D case and for the rod/cluster cases, which have no
-// single distinguished aperiodic axis.
+// The single aperiodic axis if there is exactly one — a layer group's c.
 [[nodiscard]] constexpr std::optional<int>
 aperiodic_axis(CellPeriodicity const &p) noexcept {
   std::optional<int> found;

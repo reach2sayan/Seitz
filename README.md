@@ -17,8 +17,7 @@ from a chosen symmetry group.
 The name is the object the library is built on. A crystallographic symmetry
 operation is a Seitz operator `{R | t}` — a rotation paired with a translation —
 and every capability below is composition, inversion, or classification of
-those. The calculus is written out in
-[`docs/MATHEMATICS.md`](docs/MATHEMATICS.md).
+those.
 
 > **License & attribution.** Seitz is released under the BSD-3-Clause
 > license (see [`LICENSE`](LICENSE)). Its algorithms are derived from
@@ -168,9 +167,6 @@ of threads from the moment it is built, the group catalogs are immutable and
 race-free, and no query mutates observable state. `seitz::warmup()` builds
 every group setting up front (about 30 ms) to move first-use cost off the query
 path; it is an optimization, never a precondition.
-
-For the pipelines behind the API see [`docs/WORKFLOW.md`](docs/WORKFLOW.md), and
-for the group theory [`docs/MATHEMATICS.md`](docs/MATHEMATICS.md).
 
 ---
 
@@ -375,7 +371,14 @@ own copy and every typed error would arrive as the generic base.
 `WINDOWS_EXPORT_ALL_SYMBOLS` cannot fix that, because it is a property of where
 the payload lives, not of which symbols are exported.
 
-See [docs/RELEASING.md](docs/RELEASING.md) for how releases are cut.
+Releases are cut on a schedule rather than by hand: on a Monday where `main` has
+moved and CI is green, a workflow bumps the patch component of
+`project(Seitz VERSION ...)`, commits and tags it, and the tag is what builds and
+publishes everything above. Minor and major versions are edited and tagged by
+hand; the next Monday finds `HEAD` already tagged and does nothing. Running the
+release workflow manually on any branch builds the identical set of artifacts,
+leaves them on the run page, and publishes nothing — which is how a change to the
+pipeline gets exercised before a version rides on it.
 
 Type stubs for the private `_core` extension are generated and committed; CI
 regenerates them and fails on a diff:

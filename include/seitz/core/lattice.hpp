@@ -13,11 +13,6 @@
 namespace seitz {
 
 // A crystal lattice: the three basis vectors as the columns of a 3x3 matrix.
-//
-// matrix() is the ONE Eigen escape hatch — every other operation the pipeline
-// performs on "a lattice" (metric, volume, coordinate conversion, reduction,
-// change of basis) is a member here, so a bare Matrix3d never has to carry the
-// implicit "these columns are basis vectors" contract on its own.
 class Lattice {
 public:
   Lattice() = default;

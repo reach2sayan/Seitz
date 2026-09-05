@@ -14,21 +14,14 @@
 
 namespace seitz::math {
 
-// Round to the nearest integer, ties away from zero (matching the truncation
-// behaviour the symmetry search depends on).
-//
+// Round to the nearest integer, ties away from zero
 // Branchless on purpose. This is the innermost operation in the library --
 // nearest_offset, wrap_to_unit_cell, minimal_image and coincident all apply it
 // elementwise -- and the ternary form it replaces compiled to a compare and a
-// jump that blocked vectorization; the copysign form compiles to andpd/orpd
-// and lets GCC do four lanes at a time (cvttpd2dq). Bit-identical to the
-// ternary for every double, -0.0 included: copysign(0.5, -0.0) is -0.5, and
-// the conversion truncates toward zero either way.
-//
-// std::copysign is only constexpr from C++23 (P0533) and MSVC has not
-// implemented that yet, so constant evaluation takes the ternary form -- which
-// agrees with copysign on every double for this use, including -0.0, where
-// both -0.5 and +0.5 truncate to 0. Runtime keeps the vectorizable form.
+// jump that blocked vectorization;
+// copysign form compiles to andpd/orpd and lets GCC do four lanes at a time (cvttpd2dq).
+// Bit-identical to the ternary for every double,
+// -0.0 included: copysign(0.5, -0.0) is -0.5
 [[nodiscard]] constexpr int nint(double a) noexcept {
   if consteval {
     return static_cast<int>(a + (a < 0.0 ? -0.5 : 0.5));
