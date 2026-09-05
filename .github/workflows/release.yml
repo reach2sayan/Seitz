@@ -1,0 +1,463 @@
+# Wheels, an sdist and a bare-library archive per platform, attached to a GitHub
+# Release. A tag `vX.Y.Z` builds and publishes -- pushed by hand, or cut on
+# Mondays by weekly-release.yml; a `workflow_dispatch` run on a branch builds the
+# same artifacts, leaves them on the run page and publishes nothing, which is how
+# a change to this pipeline gets tried before a version rides on it. Both publish
+# jobs are gated on `github.ref_type == 'tag'` and that gate is the whole of the
+# distinction -- there is no separate "trial" workflow to keep in step.
+#
+# Linux wheels need a compiler the manylinux images do not ship: CMakeLists.txt
+# hard-errors below GCC 15 and every RHEL-based policy still pins gcc-toolset-14
+# (pypa/manylinux#1878, postponed). pyproject.toml's before-all installs
+# gcc-toolset-15 from AlmaLinux 8's AppStream and explains why the wheel is still
+# importable on a machine that has never seen GCC 15. No macOS wheel: the tree is
+# written to libstdc++'s C++23, and libc++ has no <generator>.
+#
+# Nothing is published to PyPI. The wheels ride the GitHub Release and are
+# installed by URL; see docs/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # First and cheap: a tag that does not name the CMake version stops here,
+  # before two hours of wheels is spent on the wrong number.
+  version:
+    name: version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        run: |
+          version=$(sed -nE 's/^project\(Seitz VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+          [[ -n "$version" ]] || { echo "::error::no project(Seitz VERSION ...) in CMakeLists.txt"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "CMakeLists.txt says $version"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not name CMakeLists.txt's version $version"
+            exit 1
+          fi
+
+  wheels:
+    name: wheels (${{ matrix.os }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    # Four interpreters, each a full build of a library whose heaviest TU decodes
+    # 76683 operations at a 10^8 constexpr budget. ccache/sccache is what keeps
+    # this inside the window -- the library TUs are byte-identical across wheel
+    # tags, so only the first interpreter pays for them.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      # Not for building the wheels -- cibuildwheel brings its own interpreters
+      # for that -- but so the checking steps below have a `python` on PATH under
+      # Git Bash on Windows as well as on Linux.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # --- Linux: caches live outside the checkout ---------------------------
+      #
+      # cibuildwheel tar-copies the working directory into the container and
+      # copies only the wheelhouse back out, so anything written under /project
+      # dies with the container. The container reaches these through /host, the
+      # bind cibuildwheel always adds. Keeping them out of the checkout also
+      # stops the tar-copy from carrying a restored dependency tree back in.
+      #
+      # Two entries because they want different key policies. The FetchContent
+      # tree is a pure function of Dependencies.cmake: exact key, saved only on a
+      # miss. The compiler cache changes every run: rolling key, always saved.
+      - name: Restore fetched dependencies (Linux)
+        if: runner.os == 'Linux'
+        id: fc
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/seitz-cache/fc
+          key: wheels-fc-manylinux_2_28-x86_64-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Restore compiler cache (Linux)
+        if: runner.os == 'Linux'
+        id: cc
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/seitz-cache/ccache
+          key: wheels-ccache-manylinux_2_28-x86_64-${{ github.run_id }}
+          restore-keys: wheels-ccache-manylinux_2_28-x86_64-
+
+      # --- Windows: the toolchain by hand ------------------------------------
+      #
+      # scikit-build-core would find cl.exe on its own by defaulting to the
+      # Visual Studio generator, but that drives MSBuild and CMake emits no /MP
+      # there, so all 49 TUs would compile serially -- past the six-hour limit.
+      # pyproject.toml forces Ninja instead, which needs the environment
+      # vcvars64.bat sets. cibuildwheel runs in-process on Windows, so it
+      # inherits what this step puts in GITHUB_ENV.
+      #
+      # This is the same script as the `windows` job in ci.yml; see the comment
+      # there for why it is written out rather than using ilammy/msvc-dev-cmd.
+      - name: Set up MSVC (x64)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $root = & $vswhere -latest -products '*' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $root) { throw "no Visual Studio with the C++ toolset found" }
+          $vcvars = Join-Path $root 'VC\Auxiliary\Build\vcvars64.bat'
+          $env_after = & "$env:COMSPEC" /s /c "`"$vcvars`" && set"
+          if ($LASTEXITCODE -ne 0) { throw "vcvars64.bat failed ($LASTEXITCODE)" }
+          foreach ($line in $env_after) {
+            if ($line -notmatch '^([^=\s]+)=(.*)$') { continue }
+            $name, $value = $Matches[1], $Matches[2]
+            if ([Environment]::GetEnvironmentVariable($name) -eq $value) { continue }
+            [Environment]::SetEnvironmentVariable($name, $value)
+            "$name=$value" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if (-not $cl) { throw "cl.exe is not on PATH after vcvars64.bat" }
+          Write-Host "cl.exe: $($cl.Source)"
+
+      - name: Set up sccache (Windows)
+        if: runner.os == 'Windows'
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          variant: sccache
+          key: wheels-msvc
+          max-size: 2G
+
+      # C:/d because Boost's superproject under the default _deps blows MAX_PATH,
+      # the same reason ci.yml does it.
+      - name: Cache fetched dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v6
+        with:
+          path: C:/d
+          key: wheels-fc-win-amd64-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: |
+            wheels-fc-win-amd64-
+
+      # A full version: cibuildwheel publishes no floating major tag.
+      - uses: pypa/cibuildwheel@v3.4.1
+        env:
+          SEITZ_CACHE_DIR: /host${{ runner.temp }}/seitz-cache
+          # Appended to the pyproject line through its $CMAKE_ARGS expansion.
+          # No CMAKE_MSVC_DEBUG_INFORMATION_FORMAT here, unlike ci.yml:
+          # scikit-build-core builds Release, which produces no PDB, so there is
+          # nothing sccache cannot cache.
+          CMAKE_ARGS: -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: sccache statistics (Windows)
+        if: always() && runner.os == 'Windows'
+        run: sccache --show-stats
+
+      # The container wrote through /host as root; actions/cache tars as the
+      # runner user.
+      - name: Reclaim the cache directories (Linux)
+        if: always() && runner.os == 'Linux'
+        run: sudo chown -R "$(id -u):$(id -g)" "${{ runner.temp }}/seitz-cache" || true
+
+      # A shell test rather than hashFiles(): hashFiles only resolves paths under
+      # GITHUB_WORKSPACE, and this tree deliberately lives outside it, so the
+      # expression would evaluate to '' every time and the save below would never
+      # run -- the cache would look configured and never actually be written.
+      - name: Did the dependency tree complete?
+        if: always() && runner.os == 'Linux'
+        id: fc-state
+        run: |
+          if [[ -f "${{ runner.temp }}/seitz-cache/fc/boost-src/CMakeLists.txt" ]]; then
+            echo "complete=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "boost-src is absent or partial; not saving"
+          fi
+
+      # Only a tree that got as far as a populated boost-src: a cache key can be
+      # written once, and a half-extracted archive saved under it would be
+      # restored later as if it were whole.
+      - name: Save fetched dependencies (Linux)
+        if: always() && runner.os == 'Linux' && steps.fc.outputs.cache-hit != 'true'
+            && steps.fc-state.outputs.complete == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/seitz-cache/fc
+          key: ${{ steps.fc.outputs.cache-primary-key }}
+
+      - name: Save compiler cache (Linux)
+        if: always() && runner.os == 'Linux'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/seitz-cache/ccache
+          key: ${{ steps.cc.outputs.cache-primary-key }}
+
+      # What auditwheel already enforced, restated as an explicit gate, plus the
+      # shape of the wheel. Worth doing separately because it is *stricter* than
+      # the in-container import test cibuildwheel ran: the image's
+      # LD_LIBRARY_PATH points at gcc-toolset-14's newer libstdc++.so.6, so an
+      # import inside the container happily resolves symbols a user's stock
+      # AlmaLinux 8 cannot. A hit here means gcc-toolset-15's
+      # libstdc++_nonshared.a did not cover something we use -- most likely
+      # std::format on a double reaching to_chars at GLIBCXX_3.4.29.
+      # `python`, not `python3`: this step runs under Git Bash on the Windows
+      # runner too, where only the former is on PATH.
+      - name: Check the wheels
+        shell: bash
+        run: |
+          python - <<'PY'
+          import glob, re, sys, zipfile
+          bad = False
+          for w in sorted(glob.glob("wheelhouse/*.whl")):
+              names = set(zipfile.ZipFile(w).namelist())
+              print(f"=== {w}")
+              for want in ("seitz/__init__.py", "seitz/py.typed", "seitz/_core/__init__.pyi"):
+                  if want not in names:
+                      print(f"::error::{w}: missing {want}"); bad = True
+              ext = [n for n in names if re.fullmatch(r"seitz/_core\.[^/]+\.(so|pyd)", n)]
+              if len(ext) != 1:
+                  print(f"::error::{w}: expected exactly one extension, got {ext}"); bad = True
+              # The whole C++ library is absorbed into _core; nothing should have
+              # been vendored beside it. On Windows that means MSVCP140 stays a
+              # redistributable dependency, which is the convention for C++
+              # extension wheels -- assert it rather than discover a change.
+              vendored = [n for n in names if n.startswith("seitz.libs/")]
+              if vendored:
+                  print(f"::error::{w}: unexpected vendored libraries {vendored}"); bad = True
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: The Linux wheels need nothing newer than the manylinux_2_28 baseline
+        if: runner.os == 'Linux'
+        run: |
+          python3 -m pip install --quiet auditwheel
+          for w in wheelhouse/*.whl; do
+            echo "=== $w"
+            python3 -m auditwheel show "$w"
+            rm -rf /tmp/unpack && python3 -m zipfile -e "$w" /tmp/unpack
+            nm -D --undefined-only /tmp/unpack/seitz/_core*.so \
+              | grep -oE 'GLIBCXX_[0-9.]+|CXXABI_[0-9.]+|GLIBC_[0-9.]+' \
+              | sort -uV | tee /tmp/vers
+            if grep -qE 'GLIBCXX_3\.4\.(2[5-9]|[3-9][0-9])' /tmp/vers; then
+              echo "::error::$w requires a post-3.4.24 GLIBCXX; see the wheels comment in pyproject.toml"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  sdist:
+    name: sdist
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      # `pipx run build`, not `uv build`: pyproject.toml sets
+      # [tool.uv] package = false, and uv currently overrides that for an
+      # explicit build invocation (astral-sh/uv#12352) -- behaviour with an open
+      # issue against it is not what a release should rest on.
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # The bare library, for C++ consumers who are not going through Python.
+  # Linux gets libseitz.so; Windows gets a static seitz.lib and no DLL, because
+  # CMakeLists.txt forces STATIC on WIN32 -- Boost.LEAF keeps error payloads in
+  # thread_local statics with no usable visibility attribute off GCC, so across
+  # a DLL boundary each module would get its own copy and every typed error
+  # would arrive as the generic base. That is a property of the error model, not
+  # something WINDOWS_EXPORT_ALL_SYMBOLS can paper over.
+  #
+  # The install prefix is self-contained: Dependencies.cmake leaves Boost's and
+  # Eigen's own install rules on, so find_package(Seitz) against the extracted
+  # archive resolves its find_dependency(Boost ...) without a system Boost.
+  native:
+    name: native library (${{ matrix.os }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            archive: seitz-${{ needs.version.outputs.version }}-linux-x86_64.tar.gz
+          - os: windows-2022
+            archive: seitz-${{ needs.version.outputs.version }}-windows-x86_64.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up MSVC (x64)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $root = & $vswhere -latest -products '*' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $root) { throw "no Visual Studio with the C++ toolset found" }
+          $vcvars = Join-Path $root 'VC\Auxiliary\Build\vcvars64.bat'
+          $env_after = & "$env:COMSPEC" /s /c "`"$vcvars`" && set"
+          if ($LASTEXITCODE -ne 0) { throw "vcvars64.bat failed ($LASTEXITCODE)" }
+          foreach ($line in $env_after) {
+            if ($line -notmatch '^([^=\s]+)=(.*)$') { continue }
+            $name, $value = $Matches[1], $Matches[2]
+            if ([Environment]::GetEnvironmentVariable($name) -eq $value) { continue }
+            [Environment]::SetEnvironmentVariable($name, $value)
+            "$name=$value" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+            throw "cl.exe is not on PATH after vcvars64.bat"
+          }
+
+      # The PPA is not optional: ubuntu-24.04 tops out below GCC 15. Ninja comes
+      # with it here and from Visual Studio on the Windows side, which is why
+      # that runner installs nothing -- the same arrangement ci.yml relies on.
+      - name: Install GCC 15 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          variant: ${{ runner.os == 'Windows' && 'sccache' || 'ccache' }}
+          key: native-${{ matrix.os }}
+          max-size: 500M
+
+      - name: Cache fetched dependencies
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.os == 'Windows' && 'C:/d' || format('{0}/.deps', github.workspace) }}
+          key: native-deps-${{ matrix.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: |
+            native-deps-${{ matrix.os }}-
+
+      # `dist` is a preset, not a pile of -D flags: what the release ships is a
+      # statement about what the project is, and those live in CMakePresets.json.
+      # The only -D allowed here is about running on a shared runner.
+      - name: Configure
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            cmake --preset dist -DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15 \
+              -DFETCHCONTENT_BASE_DIR="$GITHUB_WORKSPACE/.deps" \
+              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/stage"
+          else
+            cmake --preset dist -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl \
+              -DFETCHCONTENT_BASE_DIR=C:/d \
+              -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+              -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
+              -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/stage"
+          fi
+
+      - name: Build
+        run: cmake --build --preset dist --parallel
+
+      - name: Install
+        run: cmake --install build/dist
+
+      # tar on Linux, zip on Windows, both rooted at the prefix so the archive
+      # extracts to lib/ include/ lib/cmake/Seitz/ and nothing above them.
+      - name: Pack
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            tar czf "dist/${{ matrix.archive }}" -C stage .
+          else
+            (cd stage && 7z a -tzip "$GITHUB_WORKSPACE/dist/${{ matrix.archive }}" .)
+          fi
+          ls -l dist
+
+      # A consumer that only has the archive: extract it somewhere else entirely
+      # and let find_package resolve Seitz and its Boost dependency out of the
+      # prefix alone. This is the assertion that the archive is self-contained,
+      # and it is cheap.
+      - name: A consumer can find_package it
+        shell: bash
+        run: |
+          # Under the workspace, not /tmp: this step also runs under Git Bash on
+          # Windows, where MSYS rewrites a leading /tmp into something CMake and
+          # 7z disagree about.
+          root="$GITHUB_WORKSPACE/consumer-check"
+          rm -rf "$root" && mkdir -p "$root/src" "$root/prefix"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            tar xzf "dist/${{ matrix.archive }}" -C "$root/prefix"
+            compiler=g++-15
+          else
+            7z x "dist/${{ matrix.archive }}" -o"$(cygpath -w "$root/prefix")" -y > /dev/null
+            compiler=cl
+          fi
+          cat > "$root/src/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(consumer LANGUAGES CXX)
+          find_package(Seitz REQUIRED)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE seitz::seitz)
+          EOF
+          cat > "$root/src/main.cpp" <<'EOF'
+          #include <seitz/core/version.hpp>
+          #include <cstdio>
+          int main() {
+            std::printf("%s %d.%d.%d\n", seitz::version_string(), seitz::kVersion.major,
+                        seitz::kVersion.minor, seitz::kVersion.patch);
+          }
+          EOF
+          cmake -S "$root/src" -B "$root/build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="$compiler" \
+            -DCMAKE_PREFIX_PATH="$root/prefix"
+          cmake --build "$root/build"
+          # It links and it runs: the version it prints is the one CMakeLists.txt
+          # names, which is the same check the wheel makes on the Python side.
+          "$root/build/consumer"
+          rm -rf "$root"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: native-${{ matrix.os }}
+          path: dist/*
+
+  # Only on a tag. A workflow_dispatch run reaches here and stops, which is what
+  # makes a dispatch a rehearsal: everything above ran and its output is on the
+  # run page, and nothing was published.
+  release:
+    name: publish
+    if: github.ref_type == 'tag'
+    needs: [version, wheels, sdist, native]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -l dist
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes

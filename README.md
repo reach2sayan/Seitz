@@ -335,12 +335,47 @@ For a user install, `CXX=g++-15` matters: that path does not read
 `CMakePresets.json`, so without it CMake picks up whatever `c++` is on `PATH` —
 on Ubuntu 24.04 that is GCC 13, and configuring stops with a message saying so.
 
-**There are no manylinux wheels, deliberately.** The library hard-errors below
-GCC 15 and compiles as `gnu++23`, while the manylinux images top out several
-major versions earlier; even if one built, the result would need a GCC 15
-`libstdc++` on the user's machine, which auditwheel cannot vendor safely. A
-wheel that fails at import is worse than no wheel, so `pip install .` builds
-from source. conda-forge ships the toolchain if a binary channel is ever wanted.
+**Binary wheels ride the GitHub Releases**, not PyPI — CPython 3.11–3.14 on
+`manylinux_2_28` x86-64 and on Windows x64:
+
+```bash
+uv pip install https://github.com/reach2sayan/Seitz/releases/latest/download/seitz-<version>-cp313-cp313-manylinux_2_28_x86_64.whl
+```
+
+The wheel is one binary: the C++ library is static in that configuration and is
+absorbed into the extension, so there is nothing beside it to locate at import
+time. It needs no GCC 15 on the target machine. That last point used to be the
+argument *against* shipping wheels, and it is worth saying why it does not hold:
+the release builds with `gcc-toolset-15`, whose `libstdc++.so` is a linker
+script over `libstdc++_nonshared.a`, so post-baseline symbols link statically
+and everything older resolves against the system `libstdc++.so.6` — the same
+mechanism numpy and pyarrow use. `auditwheel` and an explicit `nm -D` gate check
+it on every build rather than taking it on trust. The Windows wheel expects the
+Visual C++ redistributable, as C++ extension wheels conventionally do.
+
+Building from source stays fully supported, and `CXX=g++-15` still matters for
+it. There is no macOS wheel: the tree is written to libstdc++'s C++23 and libc++
+has no `<generator>`.
+
+**For C++ consumers there is a bare-library archive** per release —
+`seitz-<version>-linux-x86_64.tar.gz` and `seitz-<version>-windows-x86_64.zip`.
+Each unpacks to a self-contained prefix (`lib/`, `include/`, `lib/cmake/Seitz/`,
+and the vendored Boost and Eigen the config file looks for), so:
+
+```cmake
+find_package(Seitz REQUIRED)          # -DCMAKE_PREFIX_PATH=/path/to/extracted
+target_link_libraries(app PRIVATE seitz::seitz)
+```
+
+The Linux archive holds a shared `libseitz.so`; the Windows one holds a **static**
+`seitz.lib` and no DLL. That asymmetry is deliberate rather than an oversight:
+Boost.LEAF keeps error payloads in `thread_local` statics whose visibility
+attribute is empty off GCC, so across a DLL boundary each module would get its
+own copy and every typed error would arrive as the generic base.
+`WINDOWS_EXPORT_ALL_SYMBOLS` cannot fix that, because it is a property of where
+the payload lives, not of which symbols are exported.
+
+See [docs/RELEASING.md](docs/RELEASING.md) for how releases are cut.
 
 Type stubs for the private `_core` extension are generated and committed; CI
 regenerates them and fails on a diff:

@@ -1,0 +1,84 @@
+# Every Monday, main becomes a release: the patch number in project() goes up by
+# one, the bump is committed and tagged, and Release builds and publishes the
+# artifacts for that tag. A week in which main did not move produces nothing --
+# the test is whether HEAD is already the commit the latest tag names -- and a
+# red main is never released. "Run workflow" is the same thing on demand.
+#
+# The green check reads one workflow because there is one: CI covers GCC, Clang,
+# the sanitizers, the Python bindings and both MSVC jobs. It is only meaningful
+# because those MSVC jobs are no longer continue-on-error -- that flag reports a
+# job's conclusion as success whether its steps passed or failed, so until it
+# came off, "was CI green?" could not distinguish a working Windows build from a
+# broken one.
+#
+# The bump is pushed over SSH with the release-agent deploy key
+# (RELEASE_DEPLOY_KEY holds the private half) rather than with GITHUB_TOKEN. A
+# token push does not fire another workflow's `push: tags` trigger, so
+# release.yml would never run; a deploy key's does. It also sits on the bypass
+# list if main ever grows a "changes must be made through a pull request" rule.
+#
+# Minor and major bumps are written into project() by hand and tagged the same
+# way; the next Monday finds HEAD already tagged and does nothing.
+name: Weekly release
+
+on:
+  schedule:
+    # 06:00 UTC, two hours after CI's own Monday run, so the green check below
+    # has something recent to read.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
+      - name: Anything since the last tag?
+        id: since
+        run: |
+          # No tags at all is the first-release case, not an error -- and
+          # `git describe` exits non-zero there, which would end the step.
+          last=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [[ -z "$last" ]]; then
+            echo "no v* tag yet; this will be the first release"
+          elif [[ $(git rev-parse "$last^{commit}") == $(git rev-parse HEAD) ]]; then
+            echo "main is still $last; nothing to release"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$(git rev-list --count "$last"..HEAD) commits since $last"
+          fi
+
+      - name: Is main green?
+        if: steps.since.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          c=$(gh run list --workflow CI --commit "$GITHUB_SHA" --branch main \
+                --json conclusion --jq '.[0].conclusion')
+          [[ "$c" == success ]] || { echo "::error::CI on $GITHUB_SHA: ${c:-no run}"; exit 1; }
+
+      - name: Bump, commit, tag, push
+        if: steps.since.outputs.skip != 'true'
+        run: |
+          cur=$(sed -nE 's/^project\(Seitz VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)
+          [[ -n "$cur" ]] || { echo "::error::no project(Seitz VERSION ...) in CMakeLists.txt"; exit 1; }
+          new="${cur%.*}.$(( ${cur##*.} + 1 ))"
+          sed -i -E "s/^(project\(Seitz VERSION )$cur\b/\1$new/" CMakeLists.txt
+          # The one file that carries the number. version.hpp is configured from
+          # it and the wheel metadata is read out of it, so there is nothing else
+          # to keep in step -- but check the edit landed before tagging on it.
+          grep -q "^project(Seitz VERSION $new" CMakeLists.txt \
+            || { echo "::error::the version bump did not apply"; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release $new"
+          git tag -a "v$new" -m "Release $new"
+          git push --follow-tags origin HEAD:main

@@ -1,0 +1,38 @@
+#pragma once
+
+#pragma GCC visibility push(default)
+
+namespace seitz {
+
+struct Version {
+  int major;
+  int minor;
+  int patch;
+};
+
+// This port's own version. Configured from `project(Seitz VERSION ...)` in
+// CMakeLists.txt, which is the only place the number is written: the wheel
+// metadata reads that same line through scikit-build-core's regex provider,
+// and a release tag is checked against it. Editing a copy here would be
+// editing the copy that loses.
+inline constexpr Version kVersion{@PROJECT_VERSION_MAJOR@,
+                                  @PROJECT_VERSION_MINOR@,
+                                  @PROJECT_VERSION_PATCH@};
+
+// The reference spglib release whose behaviour this port targets and validates
+// against (see the oracle test setup).
+inline constexpr Version kReferenceSpglibVersion{2, 7, 0};
+
+// The same number in the form a C API wants. Configured here beside kVersion
+// rather than defined on version.cpp's command line: this header already
+// changes when the version does, so a second mechanism would buy no rebuild
+// that the first does not already pay for -- and one quoting scheme is easier
+// to be sure of across GCC, Clang and MSVC than two.
+#define SEITZ_VERSION_STRING "@PROJECT_VERSION@"
+
+// "major.minor.patch" of this port.
+[[nodiscard]] char const *version_string() noexcept;
+
+} // namespace seitz
+
+#pragma GCC visibility pop

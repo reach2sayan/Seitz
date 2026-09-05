@@ -94,8 +94,19 @@ set(SEITZ_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/src")
 # generators write into each of these directories, and having both race to
 # create the same path under `ninja -j` is a failure mode worth not having.
 file(MAKE_DIRECTORY
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/core"
         "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data"
         "${SEITZ_GENERATED_SRC_DIR}/data")
+
+# The one place the version is written is `project(Seitz VERSION ...)` above.
+# version.hpp is configured from it rather than authored, so kVersion cannot
+# drift from the wheel metadata (which scikit-build-core reads out of that same
+# line) or from a release tag (which release.yml checks against it). Unlike the
+# transcribed tables this is a configure_file, not a custom command: it depends
+# on nothing but a CMake variable, so there is nothing to rebuild.
+configure_file(cmake/version.hpp.in
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/core/version.hpp"
+        @ONLY)
 
 # One custom command per generator. Every transcriber takes its inputs then its
 # outputs as positional arguments, which is what lets this be one function
@@ -118,6 +129,7 @@ set(SEITZ_SPGLIB_SOURCE "${spglib_reference_SOURCE_DIR}/src")
 
 # Public — installed, and reachable from <seitz/seitz.hpp>.
 set(SEITZ_GENERATED_PUBLIC_HEADERS
+        "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/core/version.hpp"
         "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/element_tables.hpp"
         "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/spacegroup_metadata_tables.hpp"
         "${SEITZ_GENERATED_INCLUDE_DIR}/seitz/data/magnetic_spacegroup_metadata_tables.hpp")

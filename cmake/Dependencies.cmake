@@ -137,7 +137,8 @@ endif ()
 # in build-system.requires and says nothing about pybind11. 3.x specifically,
 # for py::native_enum — it hands Python a real enum.IntEnum instead of a
 # pybind11-private enum type, so the bound enums pickle and pattern-match like
-# any other.
+# any other. The patch level is not arbitrary: 3.0.1 predates CPython 3.14's
+# final release, and the release wheels build a cp314 tag.
 #
 # PYBIND11_FINDPYTHON so pybind11 uses FindPython rather than the deprecated
 # FindPythonInterp, which is what lets scikit-build-core's injected
@@ -154,7 +155,7 @@ if (SEITZ_BUILD_PYTHON)
     set(PYBIND11_TEST OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(pybind11
             GIT_REPOSITORY https://github.com/pybind/pybind11.git
-            GIT_TAG v3.0.1
+            GIT_TAG v3.0.4
             GIT_SHALLOW TRUE
             SYSTEM)
     FetchContent_MakeAvailable(pybind11)

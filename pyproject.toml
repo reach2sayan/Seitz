@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "seitz"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Modern C++23 crystallography and symmetry analysis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,12 +14,16 @@ dependencies = ["numpy>=1.24", "pydantic>=2.7"]
 [project.urls]
 Homepage = "https://github.com/reach2sayan/Seitz"
 
-# Source installs only -- there are deliberately no manylinux wheels. The
-# library hard-errors below GCC 15 and compiles as gnu++23, while the manylinux
-# images top out several major versions earlier; even if one built, the result
-# would need a GCC 15 libstdc++ on the user's machine, which auditwheel cannot
-# vendor safely. A wheel that fails at import is worse than no wheel. If a
-# binary channel is ever wanted, conda-forge ships the toolchain to do it.
+# One version, CMake's. `project(Seitz VERSION ...)` in CMakeLists.txt is where
+# the number is written; <seitz/core/version.hpp> is configured from it into the
+# build tree, and release.yml checks a release tag against the same line.
+# Nothing here to bump.
+[[tool.dynamic-metadata]]
+field = "version"
+provider = "scikit_build_core.metadata.regex"
+input = "CMakeLists.txt"
+regex = 'project\(Seitz VERSION (?P<value>[0-9]+\.[0-9]+\.[0-9]+)'
+
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 cmake.version = ">=3.28"
@@ -65,3 +69,98 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
+
+# --- release wheels -----------------------------------------------------------
+# There ARE binary wheels now, which reverses what this file used to say. The
+# old objection was that the manylinux images top out several GCC major versions
+# below the 15 this library requires, and that a wheel built against a newer
+# libstdc++ would need that libstdc++ on the user's machine. The first half is
+# still true and is exactly what before-all below is for; the second is not, and
+# is why the reversal is safe: RHEL's GCC Toolset ships libstdc++.so as a linker
+# script over libstdc++_nonshared.a, so the post-baseline symbols link
+# statically and everything older resolves against the base system's
+# libstdc++.so.6. That is the same mechanism numpy and pyarrow rely on. It is
+# not taken on faith -- auditwheel fails the build on any undefined symbol above
+# the policy's GLIBCXX_3.4.24, and release.yml re-checks the repaired wheel with
+# `nm -D`.
+#
+# One wheel per CPython: pybind11 has no stable-ABI mode.
+[tool.cibuildwheel]
+build = "cp311-* cp312-* cp313-* cp314-*"
+# musllinux: Alpine ships GCC 14 and has no gcc-toolset equivalent to install
+# our way out of. 32-bit: never tested, and the constexpr tables want the
+# address space. Free-threaded: doubles a matrix whose cost is already the
+# headline, and nothing in this API is contended.
+skip = "*-musllinux* *-win32 *_i686 cp3??t-*"
+build-frontend = "build[uv]"
+build-verbosity = 1
+test-requires = "pytest"
+# numpy and pydantic arrive as install dependencies of the wheel under test.
+# This is the only gate that catches an extension that links but does not
+# import, and the only place the *installed* layout is exercised -- in the build
+# tree the stub package seitz/_core/ sits beside the extension seitz/_core.so,
+# and test_stubs.py asserts the extension is what wins.
+test-command = "pytest -q {package}/python/tests"
+
+# No image tag ships GCC 15 yet: pypa/manylinux#1878 is postponed and
+# install-runtime-packages.sh still pins gcc-toolset-14 for every RHEL-based
+# policy. AlmaLinux 8's AppStream does carry gcc-toolset-15, and the images keep
+# their .repo files (they only `dnf clean all`), so we install it. That runs
+# once for the whole container, not once per interpreter.
+#
+# manylinux_2_28 rather than _2_34, deliberately. AlmaLinux 9's compilers default
+# to -march=x86-64-v2; the image papers over that with /usr/local/bin/gcc
+# wrappers that re-inject -march=x86-64 -- and naming gcc-toolset-15's g++ by
+# absolute path walks straight past them. EL8 has no such default, so the
+# portable-baseline ISA contract in CMakeLists.txt survives without depending on
+# a wrapper we are not going through. -march is passed explicitly anyway so a
+# later move to 2_34 cannot quietly break it. 2_28 also buys the wider glibc
+# floor for free.
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+before-all = [
+  "dnf -y --setopt=retries=5 install gcc-toolset-15-gcc gcc-toolset-15-gcc-c++ gcc-toolset-15-binutils gcc-toolset-15-libatomic-devel ccache",
+  "/opt/rh/gcc-toolset-15/root/usr/bin/g++ --version",
+  "mkdir -p ${SEITZ_CACHE_DIR:-/project/.cache}/fc ${SEITZ_CACHE_DIR:-/project/.cache}/ccache",
+]
+environment-pass = ["SEITZ_CACHE_DIR"]
+# SEITZ_CACHE_DIR is set by release.yml to /host<runner.temp>/seitz-cache.
+# cibuildwheel tar-copies the checkout into the container and copies only the
+# wheelhouse back out, so a path under /project is thrown away when the
+# container exits; /host is the runner's real filesystem, which is what
+# actions/cache can see afterwards. It sits outside the checkout so the tar-copy
+# does not carry a restored dependency tree back in on every run.
+#
+# PATH as well as CC/CXX: `seitz` is a static archive built with IPO, so CMake
+# resolves gcc-ar/gcc-ranlib/ld from the compiler's directory, and
+# gcc-toolset-14's ld would meet GCC 15 LTO bytecode. Deliberately NOT
+# LD_LIBRARY_PATH -- loading GCC 15's own libstdc++ at test time would mask the
+# exact ABI gap the auditwheel/nm gate exists to catch.
+#
+# FETCHCONTENT_BASE_DIR goes through CMAKE_ARGS, not env: FetchContent declares
+# it as a plain set(... CACHE PATH ...) with no $ENV{} fallback. CMAKE_ARGS
+# rather than SKBUILD_CMAKE_ARGS because scikit-build-core *appends* the former
+# and lets the latter *replace* cmake.define, which would drop the three defines
+# above. It is parsed with shlex.split, so: spaces, forward slashes, no quoting.
+environment = { CC = "/opt/rh/gcc-toolset-15/root/usr/bin/gcc", CXX = "/opt/rh/gcc-toolset-15/root/usr/bin/g++", PATH = "/opt/rh/gcc-toolset-15/root/usr/bin:$PATH", CFLAGS = "-march=x86-64 -mtune=generic", CXXFLAGS = "-march=x86-64 -mtune=generic", CMAKE_ARGS = "-DFETCHCONTENT_BASE_DIR=${SEITZ_CACHE_DIR:-/project/.cache}/fc", CCACHE_DIR = "${SEITZ_CACHE_DIR:-/project/.cache}/ccache", CCACHE_MAXSIZE = "3G", CCACHE_COMPILERCHECK = "content" }
+
+# No macOS section, and none is coming: the tree needs libstdc++'s C++23.
+# <generator> in include/seitz/generate/assignments.hpp alone rules libc++ out.
+
+# CMAKE_GENERATOR=Ninja, not the CMake default. scikit-build-core would pick
+# "Visual Studio 17 2022", which finds the toolchain without vcvars -- but
+# drives MSBuild, and CMake's VS generator emits no /MP, so all 49 TUs would
+# compile one at a time. With msg_database.cpp decoding 76683 operations at a
+# 10^8 constexpr budget that is past the six-hour job limit. Ninja instead,
+# which needs the environment vcvars64.bat sets: release.yml does the same
+# hand-off ci.yml does, and cibuildwheel inherits it (no container on Windows,
+# so environment-pass does not apply here).
+#
+# C:/d because Boost's superproject nested under the default _deps blows
+# MAX_PATH, exactly as ci.yml documents. The wheel build directory itself is
+# short enough to leave alone. $CMAKE_ARGS expands first so release.yml can add
+# the sccache launcher without restating this.
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+environment = { CMAKE_GENERATOR = "Ninja", CMAKE_ARGS = "$CMAKE_ARGS -DFETCHCONTENT_BASE_DIR=C:/d" }

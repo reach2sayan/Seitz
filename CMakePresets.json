@@ -53,6 +53,16 @@
         "SEITZ_BUILD_DEMO": "OFF",
         "SEITZ_BUILD_ORACLE_TESTS": "OFF"
       }
+    },
+    {
+      "name": "dist",
+      "displayName": "Release, library only -- what the release archives ship",
+      "inherits": "release",
+      "cacheVariables": {
+        "SEITZ_BUILD_TESTS": "OFF",
+        "SEITZ_BUILD_DEMO": "OFF",
+        "SEITZ_BUILD_ORACLE_TESTS": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -71,6 +81,10 @@
     {
       "name": "python",
       "configurePreset": "python"
+    },
+    {
+      "name": "dist",
+      "configurePreset": "dist"
     }
   ],
   "testPresets": [
