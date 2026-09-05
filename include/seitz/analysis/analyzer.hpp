@@ -15,8 +15,8 @@ namespace seitz::analysis {
 
 namespace detail {
 
-// A memoized Result-producing computation:
-// Race-free: a populated cache is read lock-free through the acquire flag;
+// A memoized Result-producing computation. Race-free: a populated cache is
+// read lock-free through the acquire flag.
 template <class T> class Lazy {
 public:
   Lazy() = default;
@@ -62,12 +62,10 @@ concept AnalyzerTraits = requires {
   typename T::ToleranceType;
 };
 
-// A persistent, stateful view over a cell + tolerances that lazily computes
-// and memoizes its determination.
-// Facade over the pipeline, Template Method over the determination:
-// owns the inputs, the cache and the projection
-// machinery; `Derived` supplies only `determine()` (the actual pipeline).
-// Thread-safety: every memo is race-free (detail::Lazy)
+// A stateful view over a cell + tolerances that lazily computes and memoizes
+// its determination. Facade over the pipeline, Template Method over the
+// determination: this owns the inputs, the cache and the projections,
+// `Derived` supplies only determine(). Every memo is race-free (detail::Lazy).
 template <typename Derived, AnalyzerTraits Traits> class Analyzer {
 public:
   using CellType = typename Traits::CellType;
@@ -77,12 +75,9 @@ public:
   [[nodiscard]] CellType const &cell() const noexcept { return cell_; }
   [[nodiscard]] ToleranceType const &tolerance() const noexcept { return tol_; }
 
-  // The full determination of the input cell (memoized). A reference into the
-  // memo: every projection below is a view onto this one computation, and a
-  // caller that wants ownership copies for itself.
-  //
-  // Ref-qualified, so a reference into a temporary analyzer is a compile error
-  // rather than a dangling read.
+  // The full determination of the input cell (memoized): a reference into the
+  // memo that every projection below views. Ref-qualified, so a reference into
+  // a temporary analyzer is a compile error, not a dangling read.
   [[nodiscard]] Result<DatasetType const &> dataset() const & {
     BOOST_LEAF_AUTO(ds, cached_dataset());
     return *ds;
@@ -101,8 +96,8 @@ protected:
     return dataset_.get([&] { return derived().determine(); });
   }
 
-  // One field of the memoized dataset, by reference. Same lifetime contract as
-  // dataset(): the derived accessors that use this are ref-qualified too.
+  // One field of the memoized dataset, by reference; same lifetime contract as
+  // dataset().
   template <auto Member>
   [[nodiscard]] auto project() const
       -> Result<decltype(std::declval<DatasetType const &>().*Member) const &> {

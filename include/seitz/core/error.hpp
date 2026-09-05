@@ -13,9 +13,9 @@ namespace seitz {
 namespace leaf = boost::leaf;
 template <class T> using Result = boost::leaf::result<T>;
 
-// A nullary callable that produces a Result. What the LEAF handling scopes
-// take instead of a finished Result -- taking the call rather than its value
-// is what lets a BOOST_LEAF_AUTO chain be written inline at the call site.
+// A nullary callable producing a Result: what the LEAF handling scopes take
+// instead of a finished Result, so a BOOST_LEAF_AUTO chain can be written
+// inline at the call site.
 template <class F>
 concept ResultProducer =
     std::invocable<F &> &&
@@ -31,9 +31,8 @@ struct e_delaunay_failed {};
 struct e_empty_cell {};
 
 // Degenerate input rejected at a public entry point: a (near-)singular lattice
-// whose inverse would propagate NaN/inf through the whole pipeline. (A
-// non-positive sampling mesh is unrepresentable rather than an error:
-// kpoint::Mesh::of rejects it.)
+// whose inverse would propagate NaN/inf. (A non-positive mesh is
+// unrepresentable rather than an error -- kpoint::Mesh::of rejects it.)
 struct e_invalid_lattice {
   double determinant;
 };

@@ -24,10 +24,9 @@ concept FamilyVisitor =
     } && std::same_as<family_call_result_t<Fn, GroupFamily::layer>,
                       family_call_result_t<Fn, GroupFamily::space>>;
 
-// The ONE runtime branch on the group family. Everything below it is templated
-// on GroupFamily, so the family-dependent steps of the pipeline are resolved at
-// compile time; this is where a cell's periodicity is turned into that
-// parameter, once, at the top.
+// The ONE runtime branch on the group family: everything below is templated on
+// GroupFamily, so the family-dependent steps resolve at compile time. Here a
+// cell's periodicity becomes that parameter, once, at the top.
 //
 //   dispatch_family(cell.periodicity(),
 //                   [&]<GroupFamily F>() { return run_pipeline<F>(); });

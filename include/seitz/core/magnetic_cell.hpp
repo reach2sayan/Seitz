@@ -20,19 +20,17 @@ enum class TensorKind { polar, axial };
 // Rank of per-site tensors for magnetic structures.
 enum class SiteTensor { none = -1, collinear = 0, noncollinear = 1 };
 
-// Per-site magnetic tensors. The rank is carried by the variant alternative, so
-// there is no separate `tensor_rank` field to keep in sync:
-//   - collinear     : one scalar magnetic moment per atom.
-//   - non-collinear : one 3-vector magnetic moment per atom, stored as an N x 3
-//     row-major block (the `Positions` layout) so each moment's three
-//     components are contiguous, matching the per-atom symmetry-search access.
+// Per-site magnetic tensors; the rank is the variant alternative, so no
+// `tensor_rank` field can fall out of sync:
+//   collinear     : one scalar moment per atom.
+//   non-collinear : one 3-vector moment per atom, as an N x 3 row-major block
+//                   (the `Positions` layout), contiguous per atom.
 using CollinearTensors = std::vector<double>;
 using NoncollinearTensors =
     Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>;
 using SiteTensors = std::variant<CollinearTensors, NoncollinearTensors>;
 
-// Build noncollinear site tensors from a list of per-atom moments (row i is
-// atom i), replacing the brace-init that the std::vector form allowed.
+// Noncollinear site tensors from per-atom moments, row i = atom i.
 [[nodiscard]] inline NoncollinearTensors
 noncollinear_tensors(std::initializer_list<Vector3d> moments) {
   NoncollinearTensors out(static_cast<Index>(moments.size()), 3);
@@ -42,9 +40,9 @@ noncollinear_tensors(std::initializer_list<Vector3d> moments) {
   return out;
 }
 
-// A crystal cell plus per-site magnetic tensors — the input to the magnetic
-// symmetry search. Wraps a plain Cell rather than extending it, since site
-// tensors are only meaningful for magnetic structures.
+// A Cell plus per-site magnetic tensors: the input to the magnetic symmetry
+// search. Wraps a Cell rather than extending it -- site tensors mean nothing
+// for a non-magnetic structure.
 class MagneticCell {
 public:
   MagneticCell(Cell cell, SiteTensors tensors,

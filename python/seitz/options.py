@@ -18,33 +18,19 @@ __all__ = ["MagneticTolerance", "Tolerance"]
 #: The library's own default, read from the extension so there is one home.
 K_DEFAULT_SYMPREC: float = _core.K_DEFAULT_SYMPREC
 
-
 class Tolerance(BaseModel):
     """Tolerances threaded through the symmetry search.
-
-    ``angle_tolerance`` left unset means "derive an effective value from
-    symprec", which is what ``std::nullopt`` means on the C++ side -- not zero,
-    and not a sentinel.
+    ``angle_tolerance`` unset means "derive an effective value from symprec",
+    == ``std::nullopt`` means on the C++ side
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-
     symprec: float = Field(default=K_DEFAULT_SYMPREC, gt=0.0)
     angle_tolerance: float | None = Field(default=None, gt=0.0)
-
     def to_core(self) -> _core.Tolerance:
         return _core.Tolerance(self.symprec, self.angle_tolerance)
 
-
 class MagneticTolerance(Tolerance):
-    """Tolerance plus the magnetic search's moment comparison.
-
-    ``moment`` unset falls back to ``symprec``, as it does in C++.
-    """
-
     moment: float | None = Field(default=None, gt=0.0)
-
     def to_core(self) -> _core.MagneticTolerance:
-        return _core.MagneticTolerance(
-            self.symprec, self.angle_tolerance, self.moment
-        )
+        return _core.MagneticTolerance(self.symprec, self.angle_tolerance, self.moment)

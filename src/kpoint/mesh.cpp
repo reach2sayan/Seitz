@@ -120,10 +120,9 @@ distortion_representative(Address doubled, Mesh const &mesh, std::size_t self,
 
 // The 125 reciprocal-lattice offsets searched per grid point: the +-2 cube over
 // the digits 0,1,2,-2,-1 per axis. cartesian_product varies its last range
-// fastest, which is exactly the documented order (x outermost, z fastest); the
-// static_asserts below pin that rather than leave it to the reader. Plain int
-// triples rather than Vector3i, because Eigen fixed-size matrices are literal
-// types for construction and access but not for arithmetic.
+// fastest (x outermost, z fastest), pinned by the static_asserts below. Plain
+// int triples, not Vector3i: Eigen fixed-size matrices are literal types for
+// construction and access, not for arithmetic.
 inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
   constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
   std::array<Address, 125> table{};
@@ -249,12 +248,11 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   // original index); boundary duplicates are appended afterwards.
   std::vector<Address> addresses(mesh_.size());
 
-  // Split in two so the expensive half can be threaded. The distance scan is
-  // 125 reciprocal-space products per grid point and depends only on the grid
-  // point, but the pass that consumes it appends to a shared vector in index
-  // order -- so phase one records, per point, which of the 125 images qualify
-  // (ascending) and which is the closest, and phase two replays exactly the
-  // sequence the single loop used to perform.
+  // Split so the expensive half can be threaded: the distance scan is 125
+  // reciprocal-space products per grid point and depends on that point alone,
+  // while the pass consuming it appends to a shared vector in index order.
+  // Phase one records, per point, the qualifying images (ascending) and the
+  // closest; phase two replays the single loop's sequence exactly.
   struct Candidates {
     std::uint8_t closest = 0;
     boost::container::small_vector<std::uint8_t, 4> qualifying;

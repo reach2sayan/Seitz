@@ -19,10 +19,9 @@
 
 namespace seitz::analysis {
 
-// Which setting the standardized cell is expressed in, and whether it carries
-// the metric-idealized (symmetrized) lattice or keeps the input's real —
-// possibly distorted — geometry. Template arguments, so the four combinations
-// are resolved at compile time.
+// The setting of the standardized cell, and whether its lattice is
+// metric-idealized or the input's own (possibly distorted) geometry. Template
+// arguments: the four combinations resolve at compile time.
 enum class CellSetting { conventional, primitive };
 enum class Idealize { yes, no };
 
@@ -34,8 +33,8 @@ struct SpaceGroupTraits {
 
 class SymmetryAnalyzer : public Analyzer<SymmetryAnalyzer, SpaceGroupTraits> {
 public:
-  // Named factory (no overloaded constructors). An unset `setting` searches
-  // every Hall setting of the cell's family; a set one fixes it.
+  // An unset `setting` searches every Hall setting of the cell's family; a set
+  // one fixes it.
   [[nodiscard]] static SymmetryAnalyzer
   from_cell(Cell cell, Tolerance tol = {},
             std::optional<HallNumber> setting = std::nullopt) {
@@ -60,23 +59,21 @@ public:
     return data::spacegroup_type(setting);
   }
 
-  // The standardized conventional, idealized cell — the one the dataset
-  // already holds.
+  // The standardized conventional idealized cell, as the dataset holds it.
   [[nodiscard]] Result<Cell const &> standardized_cell() const & {
     return project<&Dataset::standardized>();
   }
   Result<Cell const &> standardized_cell() const && = delete;
 
   // The standardized cell in another setting: primitive vs conventional,
-  // idealized vs the input's own geometry. Not memoized — keyed by its
-  // template arguments, and the conventional/idealized case is the accessor
-  // above.
+  // idealized vs the input's geometry. Not memoized -- keyed by its template
+  // arguments, and the conventional/idealized case is the accessor above.
   template <CellSetting S, Idealize I>
   [[nodiscard]] Result<Cell> standardized_cell() const;
 
-  // A reference into the memo, and &-qualified for it, like the dataset
-  // projections above: these three used to copy their cache on every call, and
-  // for lattice_symmetry() that copy is a static_vector<Matrix3i, 48>.
+  // References into their own memos, &-qualified like the dataset projections:
+  // by value, lattice_symmetry() copies a static_vector<Matrix3i, 48> per
+  // call.
   [[nodiscard]] Result<Operations const &> cell_operations() const &;
   Result<Operations const &> cell_operations() const && = delete;
 
@@ -89,9 +86,9 @@ public:
   [[nodiscard]] Result<Cell const &> primitive_cell() const &;
   Result<Cell const &> primitive_cell() const && = delete;
 
-  // The irreducible reciprocal mesh of this crystal: the determination's
-  // rotations, made reciprocal (adding the inversion partner with time
-  // reversal), reducing `mesh`
+  // The irreducible reciprocal mesh: the determination's rotations made
+  // reciprocal (with the inversion partner under time reversal), reducing
+  // `mesh`.
   [[nodiscard]] Result<kpoint::ReciprocalMesh>
   reciprocal_mesh(kpoint::Mesh mesh, TimeReversal time_reversal) const;
 

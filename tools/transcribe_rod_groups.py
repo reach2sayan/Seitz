@@ -1,127 +1,49 @@
 #!/usr/bin/env python3
-"""Transcribe PyXtal's rod-group (1D-periodic) symmetry operations into a
-constexpr header.
+"""Transcribe tools/rod_group_data.csv into the rod-group constexpr tables.
 
-Rod groups are the 75 subperiodic groups periodic along ONE axis. They are NOT
-in spglib (unlike layer groups, which Seitz reaches through spglib's
-negative-Hall datasets), so the source of truth here is PyXtal — the same
-crystal-generation library this layer mirrors — read through its stable public
-API rather than its on-disk database format:
+    transcribe_rod_groups.py <rod_group_data.csv> <out.hpp>
 
-    from pyxtal.symmetry import Group
-    g = Group(n, dim=1)            # rod group n (1..75)
+Stdlib only, like every other transcriber the build runs. The CSV is one row per
+symmetry operation -- number, HM symbol, 9 row-major rotation entries, 3
+translation numerators over kRodTranslationDenominator -- extracted from PyXtal
+by tools/extract_rod_groups.py, which is the offline half of this pair.
 
-For each rod group we emit only its symmetry OPERATIONS (and HM symbol). That is
-deliberately the minimal sufficient data: the C++ layer derives the rod Wyckoff
-positions IN-HOUSE from these operations (the same approach group::PointGroup
-uses for the 0D point groups — stabiliser/orbit of a generic point), so the
-brittle, less-documented PyXtal Wyckoff attribute names never enter the build.
-Wyckoff letters are then assigned by ascending multiplicity in C++.
-
-Operation convention (matches the spglib operation tables): each entry holds one
-period's worth of factor-group representatives; the pure (0,0,1) lattice
-translation along the periodic axis is implicit. PyXtal places the periodic axis
-along c (index 2); a, b are the two aperiodic directions. The orbit expansion in
-the generator must therefore fold ONLY the c component (the rod analogue of the
-layer-group aperiodic-axis fix: a rod-flipping op sends y -> -y in Cartesian, and
-that must not be wrapped to 1 - y).
-
-Usage:
-    pip install pyxtal            # provides pymatgen (SymmOp.affine_matrix) too
-    transcribe_rod_groups.py [out.hpp]
-
-`out.hpp` defaults to src/data/rod_group_tables.hpp relative to the repo root.
+Operation convention (as in the space-group operation tables): each group holds
+one period's worth of factor-group representatives, the pure (0,0,1) lattice
+translation being implicit. The periodic axis is c (index 2); a, b are the
+aperiodic directions, so the generator's orbit expansion folds the c component
+only -- a rod-flipping op sends y -> -y in Cartesian, which must not wrap to
+1 - y.
 """
-import os
+import csv
 import sys
 
 NUM_ROD_GROUPS = 75
 TRANSLATION_DENOMINATOR = 12
-PERIODIC_AXIS = 2  # c; PyXtal rod-group convention
-
-# Default output, resolved relative to this file (tools/ -> repo root).
-DEFAULT_OUT = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), os.pardir,
-                 "src", "data", "rod_group_tables.hpp"))
+PERIODIC_AXIS = 2  # c
 
 
-def require_pyxtal():
-    try:
-        from pyxtal.symmetry import Group  # noqa: F401
-    except ImportError:
-        sys.exit("error: PyXtal is not installed. Install it (and its pymatgen "
-                 "dependency) with:\n    pip install pyxtal\n"
-                 "then re-run this transcriber.")
-    return Group
+def read_csv(path):
+    """(symbols, ops_per_group) for rod groups 1..NUM_ROD_GROUPS."""
+    symbols = [None] * NUM_ROD_GROUPS
+    ops_per_group = [[] for _ in range(NUM_ROD_GROUPS)]
 
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            number = int(row["number"])
+            assert 1 <= number <= NUM_ROD_GROUPS, ("rod number", number)
+            symbol = row["symbol"]
+            if symbols[number - 1] is None:
+                symbols[number - 1] = symbol
+            assert symbols[number - 1] == symbol, ("symbol drift", number)
+            rotation = [int(row["r%d" % i]) for i in range(9)]
+            translation = [int(row["t%d" % i]) for i in range(3)]
+            assert all(0 <= t < TRANSLATION_DENOMINATOR for t in translation)
+            ops_per_group[number - 1].append((rotation, translation))
 
-def rationalize_translation(value):
-    """A translation component (a float fraction) as an integer numerator over
-    TRANSLATION_DENOMINATOR, folded into [0, denominator)."""
-    frac = value - int(value)            # strip whole periods
-    if frac < 0:
-        frac += 1.0
-    num = round(frac * TRANSLATION_DENOMINATOR)
-    num %= TRANSLATION_DENOMINATOR
-    return num
-
-
-def integerize_rotation(matrix):
-    """A 3x3 rotation (row-major list of 9 ints), asserting it is integral."""
-    out = []
-    for r in range(3):
-        for c in range(3):
-            v = matrix[r][c]
-            i = round(v)
-            assert abs(v - i) < 1e-6, ("non-integer rotation entry", v)
-            out.append(int(i))
-    return out
-
-
-def operations_of(group):
-    """The full symmetry-operation set of a rod group = the operations of its
-    general position (maximum multiplicity, trivial site symmetry). Returned as a
-    list of (rotation[9], translation[3]) tuples.
-
-    Uses only pymatgen's SymmOp.affine_matrix (a 4x4 numpy array), which is
-    stable across PyXtal/pymatgen versions, rather than any PyXtal-specific
-    Wyckoff attribute.
-    """
-    wyckoffs = group.Wyckoff_positions
-    general = max(wyckoffs, key=lambda w: w.multiplicity)
-
-    ops = []
-    seen = set()
-    for symm_op in general.ops:
-        affine = symm_op.affine_matrix  # 4x4
-        rotation = integerize_rotation(
-            [[affine[r][c] for c in range(3)] for r in range(3)])
-        translation = [rationalize_translation(affine[a][3]) for a in range(3)]
-        key = (tuple(rotation), tuple(translation))
-        if key not in seen:                 # distinct factor-group reps only
-            seen.add(key)
-            ops.append((rotation, translation))
-    return ops
-
-
-def collect():
-    """Return (symbols, ops_per_group) for rod groups 1..75."""
-    Group = require_pyxtal()
-    symbols = []
-    ops_per_group = []
-    for number in range(1, NUM_ROD_GROUPS + 1):
-        g = Group(number, dim=1)
-        symbols.append(str(g.symbol))
-        ops_per_group.append(operations_of(g))
+    missing = [i + 1 for i, s in enumerate(symbols) if s is None]
+    assert not missing, ("rod groups absent from the CSV", missing)
     return symbols, ops_per_group
-
-
-def fmt_rotation(rotation):
-    return "{" + ", ".join("%d" % v for v in rotation) + "}"
-
-
-def fmt_translation(translation):
-    return "{" + ", ".join("%d" % v for v in translation) + "}"
 
 
 def emit(symbols, ops_per_group, out_path):
@@ -133,8 +55,9 @@ def emit(symbols, ops_per_group, out_path):
     with open(out_path, "w") as f:
         w = f.write
         w("#pragma once\n\n")
-        w("// GENERATED by tools/transcribe_rod_groups.py from PyXtal "
-          "(Group(n, dim=1)).\n// Do not edit by hand.\n\n")
+        w("// GENERATED by tools/transcribe_rod_groups.py from "
+          "tools/rod_group_data.csv\n// (PyXtal, via tools/extract_rod_groups"
+          ".py). Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
         w("namespace seitz::data {\n\n")
@@ -171,8 +94,9 @@ def emit(symbols, ops_per_group, out_path):
         w("inline constexpr std::array<RodOperation, %d> kRodOperations = "
           "{{\n" % len(flat))
         for rotation, translation in flat:
-            w("    {%s, %s},\n"
-              % (fmt_rotation(rotation), fmt_translation(translation)))
+            w("    {{%s}, {%s}},\n"
+              % (", ".join("%d" % v for v in rotation),
+                 ", ".join("%d" % v for v in translation)))
         w("}};\n\n")
 
         w("// Half-open range [kRodOperationOffset[g-1], kRodOperationOffset[g])"
@@ -190,13 +114,15 @@ def emit(symbols, ops_per_group, out_path):
 
 
 def main():
-    out_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_OUT
-    symbols, ops_per_group = collect()
-    total = emit(symbols, ops_per_group, out_path)
+    if len(sys.argv) != 3:
+        sys.exit("usage: transcribe_rod_groups.py <rod_group_data.csv> "
+                 "<out.hpp>")
+    symbols, ops_per_group = read_csv(sys.argv[1])
+    total = emit(symbols, ops_per_group, sys.argv[2])
     counts = [len(o) for o in ops_per_group]
     print("rod groups: %d, operations: %d (min %d, max %d per group)"
           % (NUM_ROD_GROUPS, total, min(counts), max(counts)))
-    print("written: %s" % out_path)
+    print("written: %s" % sys.argv[2])
 
 
 if __name__ == "__main__":

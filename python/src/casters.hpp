@@ -16,13 +16,10 @@ namespace seitz::python {
 
 namespace py = pybind11;
 
-// A span into `parent`'s own storage, as a Python list whose elements keep
-// `parent` alive.
-//
-// Deliberately not a std::span type caster. A caster cannot see the parent, and
-// copying the elements is the wrong answer for group::Wyckoff, whose ADDRESS is
-// its identity -- generate::Placed stores a Wyckoff const *, so a copied
-// Wyckoff would be an object whose address means nothing.
+// A span into `parent`'s storage, as a Python list whose elements keep `parent`
+// alive. Not a std::span type caster: a caster cannot see the parent, and
+// copying is wrong for group::Wyckoff, whose ADDRESS is its identity
+// (generate::Placed stores a Wyckoff const *).
 template <class T>
 [[nodiscard]] py::list borrowed_list(py::handle parent,
                                      std::span<T const> items) {

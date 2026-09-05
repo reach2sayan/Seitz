@@ -11,12 +11,11 @@ namespace data {
 struct SpacegroupType;
 }
 
-// The matched space group of a cell or an operation set: the Hall setting it
-// was matched to, the conventional/bravais lattice it was matched in, and the
-// origin shift that aligns the operations with the Hall-symbol database. The
-// metadata itself is not copied — it is one lookup away through the key, which
-// is what type() does. (Out of line: the catalog that answers it is built on
-// top of this header.)
+// The matched space group of a cell or operation set: the Hall setting, the
+// conventional (bravais) lattice it was matched in, and the origin shift
+// aligning the operations with the Hall-symbol database. The metadata is one
+// key lookup away -- type(), out of line, since its catalog is built on this
+// header.
 struct SpacegroupMatch {
   HallNumber hall;
   Matrix3d bravais_lattice{Matrix3d::Identity()};
@@ -24,9 +23,9 @@ struct SpacegroupMatch {
   [[nodiscard]] data::SpacegroupType const &type() const noexcept;
 };
 
-// Whether the lattice handed to OperationSet::spacegroup is the conventional
-// cell (recover the primitive setting via the transformation the operations
-// imply) or already a primitive cell.
+// Whether the lattice given to OperationSet::spacegroup is conventional (the
+// primitive setting is recovered from the transformation the operations imply)
+// or already primitive.
 enum class LatticeSetting { conventional, primitive };
 
 } // namespace seitz

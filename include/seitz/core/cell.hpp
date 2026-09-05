@@ -11,12 +11,9 @@
 
 namespace seitz {
 
-// A crystal cell: a Lattice, fractional atomic positions (row i is atom i), and
-// integer atom types, together with the per-axis periodicity that says which of
-// the three directions actually repeat (3D / layer / rod / cluster).
-//
-// Immutable: every derived cell is built with a constructor or a with_* builder
-// rather than mutated in place, so a Cell can be shared without a copy.
+// A crystal cell: a Lattice, fractional positions (row i = atom i), integer
+// types, and the per-axis periodicity saying which directions repeat (3D /
+// layer / rod / cluster). Immutable: derive with a with_* builder.
 class Cell {
 public:
   Cell() = default;
@@ -46,8 +43,8 @@ public:
     return types_[static_cast<std::size_t>(i)];
   }
 
-  // The atoms as a range of {position, type} pairs, so the two parallel
-  // containers are never indexed in lockstep at a call site.
+  // The atoms as {position, type} pairs, so the two containers are never
+  // indexed in lockstep at a call site.
   [[nodiscard]] auto atoms() const {
     return std::views::iota(Index{0}, size()) |
            std::views::transform([this](Index i) {
@@ -55,8 +52,7 @@ public:
            });
   }
 
-  // Builders for the derived cells the pipeline produces: same atoms in a new
-  // basis, or the same geometry reinterpreted at a different periodicity.
+  // Same atoms in a new basis, or the same geometry at a new periodicity.
   [[nodiscard]] Cell with_lattice(Lattice lattice) const {
     return Cell{std::move(lattice), positions_, types_, periodicity_};
   }

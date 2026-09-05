@@ -152,10 +152,9 @@ void bind_analysis(py::module_ &m) {
   // ---- the analyzer ------------------------------------------------------
   //
   // No py::init: the analyzer is non-copyable (detail::Lazy holds a mutex) and
-  // reached through a named factory, exactly as the C++ intends. Every
-  // projection goes through memo(), which resolves the deleted-rvalue overload
-  // pair and copies out of the memo rather than handing Python a reference that
-  // would silently pin an analyzer holding two Cells behind every HallNumber.
+  // reached through its named factory. Every projection goes through memo(),
+  // which resolves the deleted-rvalue overload pair and copies out -- a
+  // reference would pin an analyzer holding two Cells behind every HallNumber.
   py::class_<SymmetryAnalyzer>(
       m, "SymmetryAnalyzer",
       "A persistent view over a cell plus tolerances that lazily computes and "

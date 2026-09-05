@@ -57,30 +57,24 @@ namespace detail {
 // The success value of `make()`, or a raised Python exception carrying the
 // error.
 //
-// Takes the CALL, not its Result, and that is not a stylistic choice: LEAF
-// captures an error's payload objects into thread-local slots that exist only
-// while a matching context is active. A Result produced before try_handle_all
-// is entered has already discarded its payloads, and every typed error would
-// arrive here as the bare fallback. So the work has to happen inside.
+// Takes the CALL, not its Result: LEAF keeps an error's payloads in
+// thread-local slots live only while a matching context is active, so a Result
+// produced before try_handle_all is entered arrives with its payloads gone and
+// every typed error degrades to the bare fallback.
 //
-// Nothing in the library throws: every fallible entry point returns Result<T>
-// and every failure is a typed tag, sometimes with a small payload. So the
-// binding layer needs exactly one translation and this is it -- raising
-// directly rather than through a parallel set of C++ exception classes, which
-// would exist only to be caught two lines later by a translator this same file
-// would also write.
+// Nothing in the library throws -- every fallible entry point returns Result<T>
+// with a typed tag -- so this is the one translation the binding layer needs,
+// raising directly rather than through C++ exception classes that would exist
+// only to be caught two lines later.
 //
-// The value comes back BY VALUE, always. Result<T const &> holds a
-// reference_wrapper into an analyzer's memo, and letting try_handle_all return
-// that reference would re-bind it through its own frame; tests/helpers.hpp's
-// must() made the same call for the same reason. Result<Cell const &> ->
+// The value comes back BY VALUE, always: Result<T const &> holds a
+// reference_wrapper into an analyzer's memo, and returning that reference from
+// try_handle_all re-binds it through its own frame. Result<Cell const &> ->
 // Result<Cell> is LEAF's converting move constructor.
 //
-// Each handler takes `e_message const *`, not `const &`: LEAF reads a pointer
-// parameter as "and this one if it is also present". A message rides alongside
-// a tag at several error roots (group/wyckoff.hpp is one), and this way the
-// specific class and the specific sentence both survive instead of one
-// shadowing the other.
+// Handlers take `e_message const *`, not `const &`: LEAF reads a pointer
+// parameter as "and this one if also present", so the specific class and the
+// specific sentence both survive instead of one shadowing the other.
 template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
   using Value =
       std::remove_cvref_t<typename std::invoke_result_t<F &>::value_type>;
@@ -142,19 +136,16 @@ template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
 }
 
 // A const&-qualified Result<T const &> accessor, as something pybind11 can
-// bind. The parameter type is the whole point: every Analyzer projection comes
-// as a pair -- `f() const &` and `f() const && = delete` -- so a bare
-// &SymmetryAnalyzer::hall names an ambiguous overload set and does not compile.
-// Naming the const& signature here resolves it once instead of a static_cast at
-// every binding site.
+// bind. The parameter type is the point: every Analyzer projection is a pair --
+// `f() const &` and `f() const && = delete` -- so a bare &SymmetryAnalyzer::hall
+// is an ambiguous overload set. Naming the const& signature resolves it once
+// instead of a static_cast per binding site.
 //
-// The GIL is dropped around the call and the copy out. Determination is the
-// expensive thing this library does, detail::Lazy makes a const analyzer safe
-// to share across threads, and nothing under here touches a Python object.
-// unwrap() then runs with the GIL held, because raising needs it.
-//
-// py::call_guard<py::gil_scoped_release> would be wrong: it wraps the whole
-// dispatch including the return cast, and unwrap() raises.
+// The GIL is dropped around the call and the copy out: determination is the
+// expensive operation, detail::Lazy makes a const analyzer shareable across
+// threads, and nothing below touches a Python object. unwrap() then runs with
+// the GIL held, since raising needs it. py::call_guard<gil_scoped_release>
+// would be wrong -- it wraps the return cast too, and unwrap() raises.
 template <class Self, class T>
 [[nodiscard]] auto memo(Result<T const &> (Self::*accessor)() const &) {
   return [accessor](Self const &self) -> T {

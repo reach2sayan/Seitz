@@ -8,19 +8,16 @@
 #include <cstddef>
 #include <span>
 
-// Centering change-of-basis data, the single source of truth shared by the
-// space-group search (spacegroup.cpp / hall_symbol.cpp) and cell
-// standardization (standardize_cell). For a centering C:
-//   - centering_matrix(C)      M     : primitive -> conventional basis
-//   (integer)
-//   - centering_matrix_inv(C)  M^-1  : conventional -> primitive basis
-//   - centering_shifts(C)            : the non-trivial centering translations
-//                                      (multiplicity - 1 of them; the zero
-//                                      shift is implicit)
-// PRIMITIVE (and any unused entry) maps to the identity / an empty shift list.
+// Centering change-of-basis data, shared by the space-group search
+// (spacegroup.cpp / hall_symbol.cpp) and standardize_cell. For a centering C:
+//   centering_matrix(C)      M    : primitive -> conventional (integer)
+//   centering_matrix_inv(C)  M^-1 : conventional -> primitive
+//   centering_shifts(C)           : the multiplicity - 1 non-trivial centering
+//                                   translations (the zero shift is implicit)
+// PRIMITIVE and any unused entry give the identity / an empty shift list.
 //
-// M is the only transcribed table.
-// M^-1 is *derived* from it at compile time as adjugate(M) / det(M), (exact for every centering)
+// M is the only transcribed table; M^-1 is derived at compile time as
+// adjugate(M) / det(M), exact for every centering.
 namespace seitz {
 
 inline constexpr std::size_t kCenteringCount = 9; // Centering::error..r_center

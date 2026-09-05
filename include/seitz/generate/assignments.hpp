@@ -45,13 +45,10 @@ template <WyckoffLike W> struct Placed {
 // One complete Wyckoff assignment of a composition.
 template <WyckoffLike W> using Assignment = std::vector<Placed<W>>;
 
-// Which Wyckoff positions a structure may be built on.
-// (a) `general_only` keeps generic coordinates only, so the exact target group
-// is realized without the accidental extra symmetry a special
-// (fixed/high-symmetry) site can introduce — notably for layer groups, where
-// atoms confined to a special site in one plane gain a horizontal mirror. It
-// requires the total atom count to be a multiple of the general-position
-// multiplicity.
+// Which Wyckoff positions a structure may be built on. `general_only` keeps
+// generic coordinates, so no special site adds accidental symmetry (a layer
+// group's atoms pinned in one plane gain a horizontal mirror); it requires
+// N_atoms to be a multiple of the general multiplicity.
 enum class Placement { any, general_only };
 
 // What a Generator may vary while searching for a structure.
@@ -67,15 +64,14 @@ struct GenerateOptions {
 
 namespace detail {
 
-// A structure never has more Wyckoff positions than this (27 in 3D, fewer
-// for layer and rod groups);
+// Bound on positions per group (27 in 3D, fewer for layer and rod).
 constexpr std::size_t kMaxPositions = 64;
 using UsedSpecial = std::bitset<kMaxPositions>;
 
-// The fixed data of one enumeration: the elements to place and, per (position,
-// remainder), whether the positions from there on can supply exactly that many
-// atoms. The table ignores the once-only rule on fixed positions, so it
-// over-approximates and is therefore a valid prune of the search.
+// Fixed data of one enumeration: the elements to place, plus
+// reachable_[p, r] = can positions p.. supply exactly r atoms. The table
+// ignores the once-only rule on fixed positions, so it over-approximates --
+// a valid prune.
 template <WyckoffLike W> struct AssignmentContext {
   std::span<W const> positions;
   std::vector<std::pair<int, int>> elements{}; // (type, count), count > 0
@@ -95,10 +91,9 @@ template <WyckoffLike W> struct AssignmentContext {
       return ctx;
     }
     ctx.max_count = std::ranges::max(ctx.elements | std::views::values);
-    // Named rather than written inline as `table[...size(), 0]`: MSVC applies
-    // its discarded-[[nodiscard]] check to the non-final operands of a
-    // multidimensional subscript, so a call there -- span::size() is
-    // [[nodiscard]] in that standard library -- raises a spurious C4834.
+    // Named, not inline as `table[...size(), 0]`: MSVC applies its
+    // discarded-[[nodiscard]] check to non-final operands of a
+    // multidimensional subscript, so span::size() there raises C4834.
     auto const last = static_cast<Index>(positions.size());
     auto const rows = positions.size() + 1;
     auto const cols = static_cast<std::size_t>(ctx.max_count) + 1;
@@ -127,13 +122,11 @@ template <WyckoffLike W> struct AssignmentContext {
   }
 };
 
-// Depth-first walk of the assignments. Element by element, choose how many
-// copies of each position to use (0 or 1 for a fixed/no-DOF position, any
-// number for a position with free coordinates) so the chosen multiplicities
-// sum to the element's count. `used_special` enforces the "a no-DOF position
-// is one fixed orbit, usable at most once across the whole structure" rule.
-// Yields a reference to the shared `placements` buffer for each complete
-// assignment.
+// Depth-first walk of the assignments: per element, choose each position's
+// copy count (0 or 1 with no DOF, any number with free coordinates) so the
+// multiplicities sum to the element's count. `used_special` enforces one use
+// per no-DOF position across the structure -- it is a single fixed orbit.
+// Yields the shared `placements` buffer for each complete assignment.
 template <WyckoffLike W>
 std::generator<Assignment<W> const &>
 walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
@@ -174,11 +167,10 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
 
 } // namespace detail
 
-// Every valid Wyckoff assignment of `comp` on `positions`, lazily and in
-// depth-first order. Each yielded reference points at a buffer reused for
-// the next assignment: copy what you keep. Compose with views::take for a
-// bounded enumeration; a composition with no assignment yields nothing
-// (usually without walking the tree, thanks to the reachability prune).
+// Every valid Wyckoff assignment of `comp` on `positions`, lazily, depth
+// first. The yielded reference points at a reused buffer: copy what you keep.
+// Compose with views::take to bound it; a composition with no assignment
+// yields nothing, usually without walking the tree (reachability prune).
 template <WyckoffLike W>
 [[nodiscard]] std::generator<Assignment<W> const &>
 enumerate_assignments(std::span<W const> positions, Composition comp) {

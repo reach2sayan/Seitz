@@ -16,14 +16,12 @@
 #include <span>
 #include <string_view>
 
-// Access to the built-in space-group database. The raw data tables are
-// generated into two headers: spacegroup_metadata_tables.hpp (plain metadata,
-// included here to back the constexpr catalog) and
-// spacegroup_operation_tables.hpp (the encoded operations — a
-// compile-time-only compaction, included only by the .cpp). The metadata is
-// decoded once at compile time into a Catalog per family; the operations go
-// through a lazily-built cache, since they carry Eigen, which is not a literal
-// type.
+// The built-in space-group database. Raw tables are generated into
+// spacegroup_metadata_tables.hpp (metadata, included here to back the constexpr
+// catalog) and spacegroup_operation_tables.hpp (encoded operations, a
+// compile-time compaction included only by the .cpp). Metadata decodes once at
+// compile time into a Catalog per family; the operations are cached lazily,
+// carrying Eigen, which is not a literal type.
 
 #pragma GCC visibility push(default)
 
@@ -42,9 +40,8 @@ enum class Centering {
   r_center,
 };
 
-// One Hall setting's metadata. The Hall number itself is NOT a field: it is
-// the key that addresses the row, and storing it alongside would be a second
-// source of truth.
+// One Hall setting's metadata. The Hall number is the key addressing the row,
+// not a field of it.
 struct SpacegroupType {
   int number = 0; // international space-group / layer-group number
   std::string_view schoenflies;
@@ -63,8 +60,8 @@ inline constexpr int kNumPointgroups = 32;
 
 // ---- family policies -------------------------------------------------------
 
-// The two space-group families differ only in which generated table they
-// decode and how many settings and groups they have.
+// The families differ only in the table they decode and in how many settings
+// and groups they have.
 template <GroupFamily F> struct SpacegroupFamily {
   using Row = SpacegroupType;
   using Key = HallNumber;
@@ -152,9 +149,8 @@ default_hall(int number) noexcept {
   return halls.empty() ? std::nullopt : HallNumber::of(F, halls.front());
 }
 
-// point-group number -> the default Hall setting index of every group with
-// that point group, ascending by group number. The candidate list of the
-// space-group search: a found point group narrows the candidates to these.
+// point-group number -> the default Hall setting of every group with that
+// point group, ascending by number: the space-group search's candidate list.
 template <GroupFamily F>
 inline constexpr auto kDefaultHallsByPointgroup =
     detail::bucket_index<static_cast<std::size_t>(SpacegroupFamily<F>::groups),
@@ -192,9 +188,8 @@ template <GroupFamily F> constexpr bool pointgroup_index_well_formed() {
   return total == static_cast<std::size_t>(SpacegroupFamily<F>::groups);
 }
 
-// The settings must cover the group numbers in ascending blocks, so the first
-// setting of each number is its canonical one. Breaks the build if the
-// generated tables ever drift.
+// Settings cover the group numbers in ascending blocks, so each number's first
+// setting is canonical. Table drift breaks the build.
 template <GroupFamily F> constexpr bool catalog_well_formed() {
   auto const &rows = kCatalog<SpacegroupFamily<F>>.rows;
   constexpr int groups = SpacegroupFamily<F>::groups;

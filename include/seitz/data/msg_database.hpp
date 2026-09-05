@@ -14,15 +14,12 @@
 #include <optional>
 #include <string_view>
 
-// Access to the built-in magnetic space-group database (1651 UNI numbers). The
-// raw data tables are generated into two headers:
-// magnetic_spacegroup_metadata_tables.hpp (catalog metadata + the small
-// Hall<->UNI mapping tables, included here to back the constexpr catalog) and
-// magnetic_spacegroup_operation_tables.hpp (the encoded operations +
-// alternative transformations — a compile-time-only compaction, included only
-// by the .cpp). As with spg_database, metadata is decoded once at compile time
-// into a constexpr catalog, while the symmetry operations (which carry Eigen,
-// not a literal type) are decoded on demand.
+// The built-in magnetic space-group database (1651 UNI numbers). Raw tables are
+// generated into magnetic_spacegroup_metadata_tables.hpp (metadata + the
+// Hall<->UNI mappings, backing the constexpr catalog here) and
+// magnetic_spacegroup_operation_tables.hpp (encoded operations + alternative
+// transformations, included only by the .cpp). As in spg_database, metadata
+// decodes at compile time, operations on demand.
 #pragma GCC visibility push(default)
 
 namespace seitz::data {

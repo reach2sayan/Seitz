@@ -48,16 +48,14 @@ constexpr int kRelativeAxes[26][3] = {
 
 [[nodiscard]] Vector3i axis(int const (&a)[3]) { return {a[0], a[1], a[2]}; }
 
-// The candidate axis triples worth testing at all: those whose matrix is
-// unimodular. That is a property of kRelativeAxes alone, so it is decided once
-// at compile time rather than 26^3 times per pass -- and the search re-enters
-// this loop up to kNumAttempt times per determination attempt. Index triples
-// rather than the matrices themselves: 3 bytes an entry instead of 9, and the
-// unpacking below is the same comma-initializer the runtime loop already used.
+// The axis triples worth testing: those whose matrix is unimodular. A property
+// of kRelativeAxes alone, so it is decided once at compile time rather than
+// 26^3 times per pass, up to kNumAttempt passes per attempt. Index triples, not
+// matrices: 3 bytes an entry instead of 9.
 //
-// Order is the cartesian-product order of the loop this replaces, and the two
-// filters (determinant here, couples_aperiodic at runtime) commute, so exactly
-// the same candidates are visited in exactly the same sequence.
+// The order is the cartesian-product order of the loop this replaces, and the
+// two filters (determinant here, couples_aperiodic at runtime) commute, so the
+// same candidates are visited in the same sequence.
 using AxisTriple = std::array<std::uint8_t, 3>;
 
 // 6960 of the 17576 triples are unimodular; `count` below pins that.
@@ -172,9 +170,9 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{
 // angle_tolerance uses the sin-based criterion; a positive angle_tolerance
 // compares angles in degrees. math::metric_cosine clamps to [-1, 1] -- see
 // there for why.
-// The cheap half of the comparison: the basis-vector lengths must agree. Split
-// out so the scan can run it off three table lookups and skip assembling the
-// rest of the metric for the candidates it rejects -- which is most of them.
+// The cheap half: the basis-vector lengths must agree. Split out so the scan
+// runs it off three table lookups and never assembles the rest of the metric
+// for the candidates it rejects, which is most of them.
 [[nodiscard]] bool lengths_agree(MetricReference const &orig,
                                  Eigen::Array3d const &length_rot,
                                  double symprec) {

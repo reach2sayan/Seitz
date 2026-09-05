@@ -7,9 +7,8 @@
 
 namespace seitz {
 
-// The two crystallographic families the determination pipeline handles.
-// (a) A layer group is 2D-periodic with its own 116-setting Hall database;
-// (b) the rest shared with the 3D space groups
+// The two families the determination handles: layer groups are 2D-periodic
+// with their own 116-setting Hall database, the rest is shared with 3D.
 enum class GroupFamily { space, layer };
 
 // Number of Hall settings per family.
@@ -20,13 +19,10 @@ inline constexpr int kLayerHallSettings = 116;
   return family == GroupFamily::layer ? kLayerHallSettings : kSpaceHallSettings;
 }
 
-// A validated Hall-setting key: a family plus a 1-based index into that
-// family's settings. Replaces the old signed convention (a 3D setting as
-// 1..530, a layer setting as -1..-116), so a catalog lookup keyed by one of
-// these is total and the catalogs need no sentinel row.
-//
-// There is no default constructor and no invalid state: `of` is the only way
-// in, and it rejects an out-of-range index.
+// A validated Hall-setting key: family + 1-based index into that family's
+// settings, so a catalog lookup keyed by one is total and needs no sentinel
+// row. No default constructor and no invalid state -- `of` is the only way in
+// and rejects an out-of-range index.
 class HallNumber {
 public:
   [[nodiscard]] static constexpr std::optional<HallNumber>

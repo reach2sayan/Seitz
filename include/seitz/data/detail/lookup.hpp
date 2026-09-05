@@ -10,19 +10,17 @@
 #include <type_traits>
 
 // The inverted index the data catalogs are queried through: a compile-time map
-// from a small integer key to the values that carry it, built by counting sort
-// at consteval time. (The 1-based-with-sentinel-row and negative-Hall lookups
-// that used to live here are gone: Catalog<Family> is keyed by a validated
-// HallNumber, so every lookup is in range by construction.)
+// from a small integer key to the values carrying it, by consteval counting
+// sort. Every lookup is in range by construction -- Catalog<Family> is keyed by
+// a validated HallNumber.
 
 #pragma GCC visibility push(default)
 
 namespace seitz::data::detail {
 
-// key -> the values of the ids with that key, as one contiguous span. Built by
-// bucket_index at compile time; K is the number of keys (0..K-1). T is usually
-// an id, but any literal type works -- the t-subgroup adjacency in
-// group/subgroup_graph.hpp buckets whole relation records this way.
+// key -> the values of the ids carrying it, as one contiguous span; K keys
+// (0..K-1). T is usually an id, but any literal type works -- the t-subgroup
+// adjacency buckets whole relation records this way.
 template <class T, std::size_t N, std::size_t K> struct BucketIndex {
   std::array<T, N> values{}; // grouped by key, ascending id within
   std::array<int, K + 1>

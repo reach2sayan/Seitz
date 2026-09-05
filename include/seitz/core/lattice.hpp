@@ -18,8 +18,8 @@ public:
   Lattice() = default;
   explicit Lattice(Matrix3d basis) noexcept : basis_{std::move(basis)} {}
 
-  // Checked construction: std::nullopt for a (near-)singular basis, whose
-  // inverse would otherwise propagate NaN/inf through the whole pipeline.
+  // nullopt for a (near-)singular basis, whose inverse would propagate
+  // NaN/inf downstream.
   [[nodiscard]] static std::optional<Lattice>
   from_basis(Matrix3d basis) noexcept {
     if (std::abs(basis.determinant()) < kZeroPrec) {
@@ -51,26 +51,22 @@ public:
     return Lattice{Matrix3d(basis_ * t)};
   }
 
-  // Rigid rotation R with `ideal` = R . *this, built from the orthonormal
-  // frames of the two lattices' first two basis vectors. Used to record how the
-  // standardized basis is oriented relative to the bravais one.
+  // The rotation R with `ideal` = R . *this, from the orthonormal frames of
+  // both lattices' first two basis vectors: how the standardized basis is
+  // oriented against the Bravais one.
   [[nodiscard]] Matrix3d rigid_rotation_to(Lattice const &ideal) const noexcept;
 
-  // Krivy-Gruber Niggli reduction. `eps` is the tolerance on the metric
-  // parameters (typically symprec). Errors with e_niggli_failed if it does not
-  // converge.
+  // Krivy-Gruber Niggli reduction; `eps` is the tolerance on the metric
+  // parameters (typically symprec). Errors e_niggli_failed if it diverges.
   [[nodiscard]] Result<Lattice> niggli(double eps) const;
 
-  // Delaunay reduction; the result is right-handed. Errors with
-  // e_delaunay_failed when the cell is degenerate or the change of basis is not
-  // unimodular.
+  // Delaunay reduction, right-handed. Errors e_delaunay_failed on a degenerate
+  // cell or a non-unimodular change of basis.
   [[nodiscard]] Result<Lattice> delaunay(double symprec) const;
 
-  // 2D Delaunay reduction within the plane spanned by the two axes other than
-  // `unique_axis`, whose column is left untouched (up to a sign flip that keeps
-  // the result right-handed). Named rather than overloaded on arity: the axis
-  // to hold fixed is a different question from the 3D reduction, not an extra
-  // detail of it — a layer's aperiodic c, or a monoclinic cell's unique b.
+  // 2D Delaunay reduction in the plane of the two axes other than
+  // `unique_axis`, whose column is untouched up to a right-handedness sign
+  // flip. The fixed axis is a layer's aperiodic c or a monoclinic unique b.
   [[nodiscard]] Result<Lattice> delaunay_in_plane(int unique_axis,
                                                   double symprec) const;
 

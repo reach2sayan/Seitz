@@ -101,12 +101,11 @@ SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
       })};
 }
 
-// The Flyweight (Boost.Flyweight): one immutable SpaceGroup per HallNumber,
-// built from the key on first use and shared thereafter. `set_factory` keys on
-// HallNumber's ordering (no hash needed) and keeps addresses stable;
-// `no_tracking` pins every built setting for the program's lifetime, which is
-// what lets `of` hand out plain references; the default locking policy makes
-// concurrent first-calls safe. warmup() primes it.
+// The Boost.Flyweight: one immutable SpaceGroup per HallNumber, built on first
+// use and shared. `set_factory` keys on HallNumber's ordering (no hash) and
+// keeps addresses stable; `no_tracking` pins every setting for the program's
+// lifetime, which is what lets `of` return plain references; the default
+// locking policy makes concurrent first calls safe. warmup() primes it.
 SpaceGroup const &SpaceGroup::of(HallNumber hall) {
   using Shared =
       boost::flyweight<boost::flyweights::key_value<HallNumber, SpaceGroup>,

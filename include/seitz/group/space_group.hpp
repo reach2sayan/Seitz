@@ -14,26 +14,21 @@
 
 namespace seitz::group {
 
-// A space group as a standalone, structure-free object: built from a Hall
-// number (or international number), it owns its conventional symmetry
-// operations and its Wyckoff positions as first-class objects. No atomic
-// structure is involved — this is the queryable catalog face of the symmetry
-// database, the foundation for crystal generation and group-relation work.
-//
-// Wyckoff positions are exposed as a span of objects rather than parallel
-// arrays of letters / multiplicities / symbols.
+// A space group as a standalone, structure-free object: from a Hall (or
+// international) number, owning its conventional operations and its Wyckoff
+// positions. No atomic structure involved -- the queryable face of the symmetry
+// database, under crystal generation and group-relation work.
 class SpaceGroup : public GroupBase {
 public:
-  // The group of a Hall setting. A Flyweight (Boost.Flyweight): one immutable
-  // object per setting, built on first use and shared thereafter, so the
-  // Wyckoff construction is paid once per setting rather than once per query.
-  // Total — a HallNumber cannot name a setting that does not exist. Layer
-  // groups come through the same door, with the family carried by the key.
-  // Race-free; warmup() primes it.
+  // The group of a Hall setting, as a Boost.Flyweight: one immutable object
+  // per setting, built on first use, so Wyckoff construction is paid once per
+  // setting, not per query. Total -- a HallNumber always names a setting that
+  // exists. Layer groups come through the same door, family carried by the
+  // key. Race-free; warmup() primes it.
   [[nodiscard]] static SpaceGroup const &of(HallNumber hall);
 
-  // Build a private, unshared instance from its key. The flyweight factory
-  // constructs settings through this; callers want `of`.
+  // A private, unshared instance; the flyweight factory builds settings
+  // through it, callers want `of`.
   explicit SpaceGroup(HallNumber hall);
 
   // The group of an international number, in its default (first) Hall setting.
@@ -51,10 +46,9 @@ public:
   }
 
 private:
-  // Build one Wyckoff position by partitioning the conventional operations into
-  // its orbit (coset representatives) and site-symmetry stabilizer. A member so
-  // it can reach Wyckoff's private constructor (SpaceGroup is a
-  // friend).
+  // One Wyckoff position, by partitioning the conventional operations into its
+  // orbit (coset representatives) and its stabilizer. A member so it can reach
+  // Wyckoff's private constructor.
   [[nodiscard]] static Wyckoff build_position(int global_index, int letter,
                                               Operations const &conv_ops);
 

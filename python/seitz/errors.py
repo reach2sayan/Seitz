@@ -26,16 +26,7 @@ InvalidLatticeError = _core.InvalidLatticeError
 #: Carries ``.distance``, how close the offending pair actually was.
 AtomsTooCloseError = _core.AtomsTooCloseError
 
-__all__ = [
-    "AtomsTooCloseError",
-    "CellStandardizationFailedError",
-    "SeitzError",
-    "DelaunayFailedError",
-    "EmptyCellError",
-    "InvalidLatticeError",
-    "MagneticSymmetrySearchFailedError",
-    "NiggliFailedError",
-    "PointgroupNotFoundError",
-    "SpacegroupSearchFailedError",
-    "SymmetryOperationSearchFailedError",
+__all__ = ["AtomsTooCloseError", "CellStandardizationFailedError", "SeitzError", "DelaunayFailedError",
+           "EmptyCellError", "InvalidLatticeError", "MagneticSymmetrySearchFailedError", "NiggliFailedError",
+           "PointgroupNotFoundError", "SpacegroupSearchFailedError", "SymmetryOperationSearchFailedError",
 ]

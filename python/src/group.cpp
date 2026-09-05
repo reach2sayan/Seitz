@@ -30,12 +30,10 @@ using group::Wyckoff;
 // families are unrelated concrete types that happen to answer the same
 // questions -- there is no runtime hierarchy in the C++ and there is none here.
 template <class G> void bind_group_base(py::class_<G> &cls) {
-  // Lambdas, not member pointers: every GroupBase accessor is noexcept, and
-  // since C++17 that is part of the function's type. pybind11's method_adaptor
-  // has overloads for `Return (Class::*)(Args...)` and its const form but none
-  // for the noexcept ones, so a member pointer here falls through to the
-  // pass-through overload and binds with GroupBase -- an unregistered type --
-  // as the self argument. The failure is at call time, not compile time.
+  // Lambdas, not member pointers: every GroupBase accessor is noexcept, part of
+  // the type since C++17, and pybind11's method_adaptor has no noexcept
+  // overload -- a member pointer falls through to the pass-through overload and
+  // binds GroupBase, an unregistered type, as self. It fails at call time.
   cls.def_property_readonly("number",
                             [](G const &self) { return self.number(); })
       .def_property_readonly(
@@ -122,12 +120,11 @@ void bind_group(py::module_ &m) {
 
   // ---- SpaceGroup --------------------------------------------------------
   //
-  // Layer groups come through this same class, with the family carried by the
-  // key -- there is no separate LayerGroup type, in Python or in C++.
+  // Layer groups come through this class too, the family carried by the key --
+  // there is no LayerGroup type, in Python or in C++.
   //
-  // The public `explicit SpaceGroup(HallNumber)` is deliberately not bound: it
-  // builds a private unshared instance, and binding it would let Python create
-  // duplicates of the very object the flyweight exists to share.
+  // `explicit SpaceGroup(HallNumber)` is deliberately not bound: it builds a
+  // private unshared instance, i.e. a duplicate of what the flyweight shares.
   py::class_<SpaceGroup> space_group(
       m, "SpaceGroup",
       "A space or layer group as a standalone, structure-free object. One "

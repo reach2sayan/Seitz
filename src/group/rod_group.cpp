@@ -159,12 +159,11 @@ struct RodGeometry {
         });
   }
 
-  // Re-express a direction subspace as an axis-separated basis: the in-plane
-  // (aperiodic) directions first, then the periodic axis itself if the
-  // subspace contains it. SVD bases can mix the periodic axis into the
-  // in-plane vectors; this canonical form lets the generator sample each free
-  // coordinate correctly (full repeat along the periodic axis, a centred band
-  // across the section).
+  // A direction subspace in axis-separated form: the in-plane (aperiodic)
+  // directions first, then the periodic axis if the subspace contains it. An
+  // SVD basis can mix the periodic axis into the in-plane vectors; this form
+  // lets the generator sample each free coordinate correctly -- full repeat
+  // along the periodic axis, a centred band across the section.
   [[nodiscard]] Eigen::MatrixXd
   canonicalize_dir(Eigen::MatrixXd const &dir) const {
     Vector3d const e = unit_axis(axis);

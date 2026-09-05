@@ -5,9 +5,8 @@
 #include <array>
 #include <cstddef>
 
-// The compile-time catalogs of the built-in databases. One class parameterised
-// by a family policy :
-// a Catalog is keyed by a validated key (HallNumber, UniNumber),
+// The compile-time catalogs of the built-in databases: one class over a family
+// policy, keyed by a validated key (HallNumber, UniNumber).
 #pragma GCC visibility push(default)
 
 namespace seitz::data {
@@ -41,10 +40,9 @@ template <CatalogFamily Family> struct Catalog {
   [[nodiscard]] constexpr auto end() const noexcept { return rows.end(); }
 };
 
-// The one catalog per family, decoded from the generated tables at compile
-// time. `decode()` yields the row array rather than a Catalog: a family policy
-// that named Catalog<Self> in its own body would make CatalogFamily<Self>
-// depend on itself.
+// One catalog per family, decoded from the generated tables at compile time.
+// `decode()` yields the row array, not a Catalog: a policy naming
+// Catalog<Self> in its own body would make CatalogFamily<Self> self-dependent.
 template <CatalogFamily Family>
 inline constexpr Catalog<Family> kCatalog{Family::decode()};
 

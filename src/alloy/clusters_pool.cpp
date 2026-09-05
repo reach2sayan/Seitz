@@ -17,14 +17,13 @@ namespace {
 
 using detail::lattice_box;
 
-// Every active point within Cartesian distance `radius` of `anchor`, excluding
-// the anchor itself, over a box of integer translations sized from the metric.
+// Every active point within Cartesian distance `radius` of `anchor`, the anchor
+// excluded, over a box of integer translations sized from the metric.
 //
-// A brute-force scan on purpose: it must return EVERY neighbour inside the
-// radius, several periodic images of the same site included, so
-// generate::minimum_image_distance -- which reports only the nearest image --
-// cannot stand in for it. The nesting is a cartesian product of the sites with
-// that box, sites outermost, which is the order the cutoff test then sees.
+// Brute force on purpose: EVERY neighbour inside the radius is wanted, several
+// periodic images of one site included, so minimum_image_distance -- nearest
+// image only -- cannot stand in. Sites outermost, which is the order the cutoff
+// test sees.
 [[nodiscard]] std::vector<ClusterPoint>
 neighbours_within(Lattice const &lattice,
                   std::vector<ClusterPoint> const &active,

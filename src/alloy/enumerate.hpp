@@ -9,25 +9,16 @@
 #include <vector>
 
 // Private to src/alloy: the two combinatorial walks the cluster and CVM
-// builders share. Coroutines rather than the callback-taking recursive lambdas
-// the reference implementation uses -- three of those (one per call site,
-// duplicated across two translation units) collapse into these two, and the
-// call sites become ordinary range-for loops.
-//
-// Both yield a span into the coroutine's own buffer: valid until the generator
-// is resumed, which is exactly how every caller here consumes them.
+// builders share, as coroutines, so the call sites are ordinary range-for
+// loops. Both yield a span into the coroutine's own buffer, valid until the
+// generator is resumed.
 namespace seitz::alloy::detail {
 
 // Every tuple of [0, radix[0]) x ... x [0, radix[k-1]), digit 0 varying
-// FASTEST.
-//
-// The carry is written out rather than expressed as an algorithm: it IS the
-// odometer, and the standard library has no counterpart to borrow. The order is
-// load-bearing, not incidental -- it decides which member of a symmetry orbit
-// is generated first and therefore becomes that orbit's stored representative,
-// and it fixes the order of the correlation sums. An empty radix yields exactly
-// one empty tuple, which is what makes the empty cluster fall out of the same
-// loop as every other.
+// FASTEST. The order is load-bearing: it picks which member of a symmetry orbit
+// becomes that orbit's representative, and it fixes the order of the
+// correlation sums. An empty radix yields exactly one empty tuple, which is how
+// the empty cluster falls out of the same loop as every other.
 [[nodiscard]] inline std::generator<std::span<int const>>
 mixed_radix(std::span<int const> radix) {
   if (std::ranges::any_of(radix, [](int bound) { return bound <= 0; })) {

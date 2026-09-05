@@ -142,12 +142,8 @@ __all__ = [
 ]
 
 
-def analyze(
-    cell: Cell,
-    tolerance: Tolerance | dict[str, float | None] | None = None,
-    *,
-    setting: HallNumber | None = None,
-) -> SymmetryAnalyzer:
+def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = None, *, setting: HallNumber | None = None,) \
+        -> SymmetryAnalyzer:
     """Determine the symmetry of ``cell``.
 
     This is the single place a validated :class:`~seitz.options.Tolerance`
@@ -160,10 +156,7 @@ def analyze(
     Nothing is computed here.  The returned analyzer computes on first query and
     caches, so asking it several questions costs one determination.
     """
-    if tolerance is None:
-        validated = Tolerance()
-    elif isinstance(tolerance, Tolerance):
-        validated = tolerance
-    else:
-        validated = Tolerance.model_validate(tolerance)
+    if tolerance is None: validated = Tolerance()
+    elif isinstance(tolerance, Tolerance): validated = tolerance
+    else: validated = Tolerance.model_validate(tolerance)
     return SymmetryAnalyzer.from_cell(cell, validated.to_core(), setting)

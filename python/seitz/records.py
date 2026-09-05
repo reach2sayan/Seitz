@@ -52,7 +52,6 @@ class _Frozen(BaseModel):
     # hashable and a value hash would have to copy them on every lookup.
     __hash__ = object.__hash__
 
-
 class Site(_Frozen):
     """The per-atom result of a determination."""
 
@@ -72,7 +71,6 @@ class Site(_Frozen):
             primitive_atom=site.primitive_atom,
         )
 
-
 class Setting(_Frozen):
     """How the input cell maps onto the standardized setting."""
 
@@ -87,7 +85,6 @@ class Setting(_Frozen):
             origin_shift=setting.origin_shift,
             rigid_rotation=setting.rigid_rotation,
         )
-
 
 class SpacegroupType(_Frozen):
     """One Hall setting's metadata."""
@@ -119,7 +116,6 @@ class SpacegroupType(_Frozen):
 
 class CellRecord(_Frozen):
     """A cell as data, for storage and provenance.
-
     The explicit adapter rather than making :class:`~seitz.Cell` itself a
     model: a Cell is on the hot path in both directions -- out of a
     determination and straight back into another one -- and a validation layer

@@ -9,20 +9,14 @@
 
 namespace seitz::alloy {
 
-// The per-site cluster basis: the point functions theta_f(occupation) whose
-// products over a cluster's points form that cluster's basis functions. A site
-// admitting k species carries k - 1 non-constant point functions over k
-// occupations, so the table is one dense (k-1 x k) block per species count.
+// The per-site cluster basis: point functions theta_f(occupation) whose
+// products over a cluster's points are that cluster's basis functions. A site
+// admitting k species has k - 1 non-constant functions over k occupations: one
+// dense (k-1 x k) block per species count.
 //
-// Rows are keyed by the SPECIES COUNT itself. ATAT keys them by "site type" =
-// count - 2 and threads that biased number through every cluster record, where
-// it silently changes meaning halfway through the CVM build; the bias buys
-// nothing but a class of off-by-two bugs, so here it survives nowhere but the
-// subscript arithmetic inside operator[].
-//
-// Keeping the basis behind a type is the extension point: a Chebyshev,
-// polynomial or indicator basis would be a further named factory over exactly
-// this storage, with nothing else in the module changing.
+// Blocks are keyed by k itself, not ATAT's "site type" = k - 2; the bias
+// survives only in operator[]'s subscript arithmetic. A Chebyshev, polynomial
+// or indicator basis would be another factory over this same storage.
 class SiteBasis {
 public:
   // van de Walle's orthonormal trigonometric basis, covering sublattices that
@@ -40,11 +34,9 @@ public:
     return block(species)(function, occupation);
   }
 
-  // Sum of theta_function(q)^2 over every occupation q the site admits: the
-  // per-point factor of the CVM v-matrix's normalization. Folded in here
-  // because it is the only consumer that wants a whole row, and an Eigen row of
-  // a column-major block is not contiguous -- handing out a span would mean
-  // changing the storage order for one call site.
+  // sum_q theta_function(q)^2 over the occupations the site admits: the
+  // per-point factor of the v-matrix normalization. Kept here because a row of
+  // a column-major block is not contiguous, so no span can be handed out.
   [[nodiscard]] double sum_of_squares(int species, int function) const noexcept {
     return block(species).row(function).squaredNorm();
   }
@@ -60,8 +52,8 @@ private:
     return blocks_[static_cast<std::size_t>(species - 2)];
   }
 
-  // blocks_[i] covers species count i + 2; a site admitting one species is a
-  // spectator and carries no point function, so there is no block below binary.
+  // blocks_[i] covers k = i + 2; a one-species site is a spectator with no
+  // point function, so nothing below binary.
   std::vector<MatrixXd> blocks_;
 };
 

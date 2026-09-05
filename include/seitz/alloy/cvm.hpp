@@ -17,12 +17,8 @@
 namespace seitz::alloy {
 
 // A decorated subcluster: one basis function of the expansion. These index the
-// correlation vector, and so the columns of every v-matrix.
-//
-// Like Orbit, it stores its images and derives the multiplicity from them --
-// which here also removes the reference implementation's repeated
-// symmetry_images() call inside the v-matrix builder, since the images the
-// count comes from are the ones that builder needs.
+// correlation vector xi, hence the columns of every v-matrix. Multiplicity =
+// |images|, and the v-matrix builder reads the same images.
 struct ClusterFunction {
   Cluster cluster;
   std::vector<Cluster> images;
@@ -32,26 +28,21 @@ struct ClusterFunction {
   }
 };
 
-// One species assignment on a subcluster, with the size of its orbit under that
-// subcluster's own site symmetry.
-//
-// The occupation is its own field rather than being stuffed into the cluster's
-// point functions, as the reference implementation does. Those are different
-// quantities over different ranges -- a basis function index in [0, k-1) and a
-// species index in [0, k) -- and sharing one field is what forced its v-matrix
-// builder to read two different meanings off the same name in one loop body.
+// One species assignment on a subcluster, with the size of its orbit under
+// that subcluster's site symmetry. Occupations are species indices in [0, k),
+// kept apart from the point-function indices in [0, k - 1).
 struct Configuration {
   std::vector<int> occupation; // one species index per point of the subcluster
   int multiplicity = 0;
 };
 
-// One symmetry-distinct subcluster, carrying everything the CVM entropy
+// One symmetry-distinct subcluster, carrying what the CVM entropy
 //
 //   S = -k_B sum_c k_c sum_j m_jc rho_jc ln rho_jc,   rho_.c = V_c . xi
 //
-// needs from it: its configurations j with their multiplicities m_jc, the
-// v-matrix V_c that turns the correlation vector xi into cluster probabilities,
-// and its Kikuchi-Barker coefficient k_c.
+// needs: the configurations j with multiplicities m_jc, the v-matrix V_c
+// mapping xi onto cluster probabilities, and the Kikuchi-Barker coefficient
+// k_c.
 struct CvmCluster {
   Cluster sites; // undecorated: every point function is zero
   std::vector<Configuration> configurations;
@@ -63,12 +54,9 @@ struct CvmCluster {
 // The Cluster Variation Method ingredients of a set of maximal clusters.
 class Cvm {
 public:
-  // `maximal` are the maximal clusters in the parent's fractional frame with
-  // each point's species count filled in -- which is exactly what
-  // ParentLattice::cluster_of produces from Cartesian points.
-  //
-  // `basis` must cover the parent's largest sublattice; it is taken by value
-  // because the v-matrices are built from it once and it is not kept.
+  // `maximal`: the maximal clusters in the parent's fractional frame with
+  // species counts filled in, as ParentLattice::cluster_of produces. `basis`
+  // must cover the parent's largest sublattice; it is read once, not kept.
   [[nodiscard]] static Result<Cvm> create(ParentLattice const &parent,
                                           std::span<Cluster const> maximal,
                                           SiteBasis const &basis,
@@ -85,7 +73,7 @@ public:
     return functions_;
   }
   // Carried so a consumer can measure a subcluster or recover Cartesian
-  // geometry without holding the parent lattice alongside.
+  // geometry without the parent alongside.
   [[nodiscard]] Lattice const &lattice() const noexcept { return lattice_; }
 
 private:

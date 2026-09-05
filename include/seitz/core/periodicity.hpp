@@ -26,18 +26,17 @@ using CellPeriodicity = std::array<AxisKind, 3>;
   return {AxisKind::periodic, AxisKind::periodic, AxisKind::periodic};
 }
 
-// The family a cell's periodicity puts it in:
-// (a) 1 aperiodic axis = layer group,
-// (b) all-periodic = 3D space group.
-// (Rod and cluster cells are handled by the generation, not the space-group.)
+// The family a cell's periodicity puts it in: any aperiodic axis = layer,
+// all-periodic = 3D space group. (Rod and cluster cells belong to generation,
+// not to the determination.)
 [[nodiscard]] constexpr GroupFamily
 family_of(CellPeriodicity const &p) noexcept {
   return std::ranges::contains(p, AxisKind::aperiodic) ? GroupFamily::layer
                                                        : GroupFamily::space;
 }
 
-// The layer-group descriptor: periodic in the plane, aperiodic along `axis`
-// (c, axis 2, in the conventional setting). The inverse of aperiodic_axis().
+// Layer group: periodic in the plane, aperiodic along `axis` (c in the
+// conventional setting). Inverse of aperiodic_axis().
 [[nodiscard]] constexpr CellPeriodicity aperiodic_along(int axis) noexcept {
   CellPeriodicity p = all_periodic();
   p[static_cast<std::size_t>(axis)] = AxisKind::aperiodic;
@@ -49,8 +48,8 @@ family_of(CellPeriodicity const &p) noexcept {
   return {AxisKind::aperiodic, AxisKind::aperiodic, AxisKind::aperiodic};
 }
 
-// The rod descriptor: periodic along `axis` only, the two remaining axes being
-// the vacuum-padded cross-section. The dual of aperiodic_along().
+// Rod group: periodic along `axis` only, the other two vacuum-padded. Dual of
+// aperiodic_along().
 [[nodiscard]] constexpr CellPeriodicity periodic_along(int axis) noexcept {
   CellPeriodicity p = none_periodic();
   p[static_cast<std::size_t>(axis)] = AxisKind::periodic;
@@ -77,12 +76,10 @@ aperiodic_axis(CellPeriodicity const &p) noexcept {
 
 namespace detail {
 
-// The mixed-periodicity forms of the two folds below, out of line. A layer,
-// rod or cluster cell is the rare case, and its per-axis loop is what pushed
-// the whole function past the inliner's budget: keeping it out of the header
-// leaves an inline body small enough that the fully-periodic fast path folds
-// into its caller, which matters because these run once per atom per candidate
-// operation.
+// The mixed-periodicity forms of the two folds below, out of line: their
+// per-axis loop pushed the inline body past the inliner's budget, and these run
+// once per atom per candidate operation, so the fully-periodic fast path has to
+// fold into its caller.
 [[nodiscard]] Vector3d minimal_image_mixed(Vector3d const &diff,
                                            CellPeriodicity const &p) noexcept;
 [[nodiscard]] Vector3d wrap_mixed(Vector3d const &v,
@@ -90,18 +87,15 @@ namespace detail {
 
 } // namespace detail
 
-// Minimal-image fractional offset of `diff`: every periodic component is
-// folded to its nearest-lattice-point residue, every aperiodic component is
-// left as the raw difference (no images along it).
+// Minimal-image fractional offset of `diff`: periodic components folded to
+// their nearest-lattice-point residue, aperiodic ones left raw (no images).
 [[nodiscard]] inline Vector3d minimal_image(Vector3d const &diff,
                                             CellPeriodicity const &p) noexcept {
   return p == all_periodic() ? Vector3d{math::nearest_offset(diff)}
                              : detail::minimal_image_mixed(diff, p);
 }
 
-// Fold a fractional coordinate into the cell [0, 1) along every periodic axis,
-// leaving the aperiodic axes at their raw values — a layer/rod/cluster cell is
-// not periodic along those.
+// Fold into [0, 1) along every periodic axis, leaving aperiodic axes raw.
 [[nodiscard]] inline Vector3d wrap(Vector3d const &v,
                                    CellPeriodicity const &p) noexcept {
   return p == all_periodic() ? math::wrap_to_unit_cell(v)

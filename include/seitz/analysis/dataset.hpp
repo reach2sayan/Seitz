@@ -51,9 +51,9 @@ struct Dataset {
   Operations operations;
   std::vector<Site> sites;
 
-  // Standardized conventional ("bravais") cell — idealized lattice, positions
-  // and types, carrying its own periodicity — and the map from each of its
-  // atoms to a primitive-cell atom.
+  // Standardized conventional (bravais) cell -- idealized lattice, positions
+  // and types with its own periodicity -- and each of its atoms' primitive-cell
+  // atom.
   Cell standardized;
   std::vector<int> std_mapping_to_primitive;
 

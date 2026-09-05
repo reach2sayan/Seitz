@@ -1,12 +1,11 @@
 #pragma once
 
-// The one place the library says "mdspan". It binds to the vendored reference
+// The one place the library says "mdspan", bound to the vendored reference
 // implementation (third_party/mdspan.hpp, Apache-2.0 WITH LLVM-exception,
-// pinned in tools/mdspan_vendor_diff.py): the standard libraries this project
-// builds against do not ship a complete <mdspan>, and a std::mdspan without
-// std::submdspan leaves slicing with no spelling at all. Explicit `using`
-// declarations, not a namespace alias: `namespace md = std` would make
-// seitz::md::vector compile.
+// pinned in tools/mdspan_vendor_diff.py): no standard library built against
+// here ships a complete <mdspan>, and mdspan without submdspan leaves slicing
+// unspellable. Explicit `using`s, not a namespace alias -- `namespace md = std`
+// would make seitz::md::vector compile.
 
 // Before the include: otherwise the vendored header plants itself in ::std,
 // which is UB and collides with a real <mdspan> in the same TU.
@@ -48,9 +47,8 @@ using MDSPAN_IMPL_STANDARD_NAMESPACE::full_extent;
 using MDSPAN_IMPL_STANDARD_NAMESPACE::strided_slice;
 using MDSPAN_IMPL_STANDARD_NAMESPACE::submdspan;
 
-// A read-only view of a flat constexpr array as a fixed-shape table: the
-// replacement for nested std::array<std::array<...>> lookup tables, usable in
-// constant evaluation.
+// A flat constexpr array as a fixed-shape read-only table, replacing nested
+// std::array lookup tables and usable in constant evaluation.
 template <class T, std::size_t... Extents>
 using table = mdspan<T const, extents<std::size_t, Extents...>>;
 

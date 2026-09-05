@@ -50,11 +50,10 @@ namespace {
 void bind_core(py::module_ &m) {
   // ---- enums -------------------------------------------------------------
   //
-  // Real enum.IntEnum classes rather than pybind11's own enum type: Python
-  // already knows how to print, hash, alias, pickle and pattern-match those.
-  // Member names keep the C++ lower_snake_case spelling deliberately, against
-  // Python's UPPER_CASE convention -- renaming would create a second vocabulary
-  // for the same concept and break every cross-reference to the C++ docs.
+  // Real enum.IntEnum classes, not pybind11's enum type: Python prints, hashes,
+  // aliases, pickles and pattern-matches those already. Member names keep the
+  // C++ lower_snake_case against Python's UPPER_CASE convention -- a rename
+  // would be a second vocabulary for one concept.
   py::native_enum<GroupFamily>(m, "GroupFamily", "enum.IntEnum",
                                "The two families the determination handles: "
                                "3D space groups, and 2D-periodic layer groups.")
@@ -106,11 +105,9 @@ void bind_core(py::module_ &m) {
 
   // ---- validated keys ----------------------------------------------------
   //
-  // HallNumber has a private constructor and one static of() returning
-  // optional. That becomes both Python idioms, consistently across every such
-  // type here: `X.of(...)` answers None, `X(...)` raises. Python already works
-  // that way -- re.match returns None, int("x") raises -- and having both
-  // removes the "does this return None or raise?" question from the API.
+  // HallNumber has a private constructor and a static of() returning optional.
+  // Both Python idioms are bound, uniformly for every such type here:
+  // `X.of(...)` answers None, `X(...)` raises -- as re.match and int("x") do.
   py::class_<HallNumber>(m, "HallNumber",
                          "A validated Hall setting: a family plus a 1-based "
                          "index into that family's settings.")

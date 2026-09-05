@@ -1,10 +1,10 @@
 #pragma once
 
-// Umbrella header: the whole public API, and nothing else. The determination
+// Umbrella header: the whole public API and nothing else. The determination
 // pipeline (symmetry/, spacegroup/, refine/, spin/, magnetic/), the generated
-// operation tables and the numeric and container helpers behind them all live
-// under src/ and are unreachable from here by construction — a translation unit
-// that compiles against this header compiles against the installed library.
+// tables and the helpers behind them live under src/ and are unreachable from
+// here, so a TU compiling against this header compiles against the installed
+// library.
 
 // Vocabulary: the values everything else is phrased in.
 #include <seitz/core/cell.hpp>

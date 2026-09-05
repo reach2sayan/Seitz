@@ -11,12 +11,11 @@ namespace seitz {
 // Default Cartesian distance tolerance for the symmetry search.
 inline constexpr double kDefaultSymprec = 1e-5;
 
-// Threshold used when folding fractional coordinates into the unit cell. Keeps
-// values a hair below 0 near 0 instead of wrapping them up to ~1.
+// Fold threshold: keeps values a hair below 0 near 0, not wrapped to ~1.
 inline constexpr double kZeroPrec = 1e-10;
 
-// True when |lhs| is longer than |rhs| by more than the near-tie tolerance,
-// given their squared norms. Order is preserved on near-equal lengths.
+// |lhs| > |rhs| by more than the near-tie tolerance, from squared norms;
+// near-equal lengths keep their order.
 [[nodiscard]] constexpr bool sqnorm_longer(double lhs_sqnorm,
                                            double rhs_sqnorm) {
   return lhs_sqnorm > rhs_sqnorm + kZeroPrec;

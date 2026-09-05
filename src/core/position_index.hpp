@@ -29,35 +29,28 @@ namespace seitz {
 coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
            double symprec, CellPeriodicity const &periodicity) noexcept;
 
-// A build-once, query-many index answering "which atoms sit at this
-// fractional point". An R-tree over the atoms' Cartesian positions, each
-// folded into the cell along the periodic axes. A query folds its point the
-// same way and asks the tree for everything inside a symprec-sized box around
-// each image the minimal-image fold in `coincident` can pick. The symprec
-// sphere sits inside that box, so candidates() is a guaranteed superset of the
-// coincident atoms; matches() re-tests each with the exact predicate, so a
-// caller replaces its linear scan without changing what it accepts. Candidates
-// come out ascending, so a first hit is the first hit of the linear scan it
-// replaces.
+// Build-once, query-many index of "which atoms sit at this fractional point":
+// an R-tree over the atoms' Cartesian positions, folded into the cell along the
+// periodic axes. A query folds the same way and takes everything in a
+// symprec-sized box around each image `coincident`'s minimal-image fold can
+// pick. The symprec sphere is inside that box, so candidates() is a superset of
+// the coincident atoms and matches() re-tests with the exact predicate;
+// candidates come out ascending, so a first hit is the linear scan's first hit.
 //
-// Only the images that can actually contain a match are queried. Both the
-// query point and the indexed atoms are folded into [0, 1), and a Cartesian
-// offset of at most `half_width_` is a fractional offset of at most
-// ||lattice^-1||_inf * half_width_ -- so the +1 image along an axis can only
-// match when the folded coordinate is that close to 0, and the -1 image only
-// when it is that close to 1. For a typical symprec that is one box per query
-// rather than the 27 of the full +-1 cube.
+// Only images that can contain a match are queried: with both sides folded into
+// [0, 1), a Cartesian offset of at most half_width_ is a fractional offset of at
+// most ||lattice^-1||_inf * half_width_, so the +-1 image along an axis matches
+// only when the folded coordinate is that close to 0 or 1 -- typically one box
+// per query, not the 27 of the full cube.
 //
-// Queries take a caller-owned Scratch buffer so the hot paths -- which query
-// once per atom per candidate operation -- do not allocate. The allocating
-// overloads remain for the cold callers.
+// Queries take a caller-owned Scratch buffer: the hot paths run once per atom
+// per candidate operation and must not allocate. The allocating overloads
+// remain for cold callers.
 //
-// A uniform bucket grid was tried here and REJECTED on measurement: with the
-// query box far smaller than a bucket, addressing the bucket arithmetically
-// beat the tree walk by ~5% on the determination driver, but cost ~14% on
-// generation, where the index is rebuilt per attempt over a small cell and the
-// bucket-array build never amortizes. The tree wins on the mix; the node size
-// below is the part of that experiment worth keeping.
+// A uniform bucket grid was measured and REJECTED: ~5% faster on the
+// determination driver, ~14% slower on generation, where the index is rebuilt
+// per attempt and the bucket array never amortizes. The node size below is what
+// survived that experiment.
 //
 // Non-owning: the positions and types must outlive the index.
 class SEITZ_TESTABLE PositionIndex {
@@ -141,11 +134,10 @@ private:
   using Point =
       boost::geometry::model::point<double, 3, boost::geometry::cs::cartesian>;
   using Box = boost::geometry::model::box<Point>;
-  // Node capacity 8, measured rather than assumed: against the default 16 it
-  // is ~1% on the determination driver and ~12% on generation, where the cells
-  // are small (12-60 atoms) and a fatter node costs more box tests per level
-  // than the shallower tree saves. 4 and 32 were both worse (32 by 14%), and
-  // rstar / linear were indistinguishable from quadratic at 16.
+  // Node capacity 8, measured: ~1% over the default 16 on the determination
+  // driver, ~12% on generation, where cells are small (12-60 atoms) and a
+  // fatter node costs more box tests per level than the shallower tree saves.
+  // 4 and 32 were worse (32 by 14%); rstar / linear matched quadratic at 16.
   using Tree =
       boost::geometry::index::rtree<std::pair<Point, int>,
                                     boost::geometry::index::quadratic<8>>;

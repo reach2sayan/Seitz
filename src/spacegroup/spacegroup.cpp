@@ -1002,16 +1002,13 @@ iterative_search_hall_number(std::optional<HallNumber> forced_hall,
 
   symmetry::SymmetrySearch<F> const search(primitive.cell, tol);
   Tolerance tightened = tol;
-  // The only input to search_hall_number that varies across attempts is the
-  // reduced operation set -- the tolerance passed to it is the original
-  // tol.symprec, not the tightened one. So an attempt that filters down to the
-  // set the previous one already tried is guaranteed to reach the same answer,
-  // and the search (up to 530 Hall candidates, each matching every operation)
-  // is far more expensive than the filtering that produced it. Tightening by
-  // 5% at a time usually leaves the set unchanged for many attempts in a row,
-  // so skipping the repeats is most of this loop's work.
-  // Held by value, not by pointer: `reduced` below dies at the end of each
-  // iteration. One copy of the operation set, against up to 100 Hall searches.
+  // search_hall_number sees the original tol.symprec, not the tightened one,
+  // so the reduced operation set is the only input that varies: an attempt
+  // filtering down to the previous set reaches the same answer. The search (up
+  // to 530 Hall candidates against every operation) far outweighs the filtering,
+  // and a 5% tightening usually leaves the set unchanged for many attempts, so
+  // skipping repeats is most of this loop's work. Held by value -- `reduced`
+  // dies each iteration -- trading one copy against up to 100 Hall searches.
   Operations last_tried = symmetry;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     tightened.symprec *= kReduceRate;

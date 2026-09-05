@@ -39,10 +39,9 @@ enum class Laue {
   laue_m3m,  // m-3m
 };
 
-// The 32 crystallographic point groups (crystal classes), named by their
-// Schoenflies symbol. Enumerator values match the international point-group
-// numbering (1..32, 0 = none) used by pointgroup_by_number /
-// identify_pointgroup_number, so static_cast<CrystalClass>(number) round-trips.
+// The 32 crystal classes by Schoenflies symbol. Enumerator values are the
+// international numbering (1..32, 0 = none), so
+// static_cast<CrystalClass>(number) round-trips.
 enum class CrystalClass {
   none,
   c1,  // 1
@@ -88,9 +87,8 @@ struct PointGroup {
   CrystalClass crystal_class = CrystalClass::none;
 };
 
-// The 32 point groups: for each, the histogram of rotation types that
-// identifies it, plus its symbols and crystal-system classification. Entry 0 is
-// the empty "no point group" row.
+// Per point group: the rotation-type histogram identifying it, its symbols and
+// its crystal-system classification. Entry 0 is the empty row.
 struct PgEntry {
   std::array<int, 10> table;
   std::string_view symbol;
@@ -275,8 +273,8 @@ constexpr std::array<PgEntry, 33> kPointgroupData = {{
           e.holohedry, e.laue,   static_cast<CrystalClass>(number)};
 }
 
-// The 32 crystal classes, in the International Tables order. Pinned at compile
-// time so a drift in the table breaks the build rather than a test.
+// The 32 crystal classes in International Tables order, pinned at compile time
+// so table drift breaks the build, not a test.
 static_assert([] {
   constexpr std::array<std::string_view, 33> kSymbols = {
       "",      "1",  "-1",  "2",   "m",    "2/m",  "222",   "mm2", "mmm",

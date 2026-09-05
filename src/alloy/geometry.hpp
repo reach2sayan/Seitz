@@ -9,12 +9,8 @@
 #include <ranges>
 
 // Private to src/alloy: the three geometric primitives the cluster, pool and
-// CVM builders share. All fractional, all keyed on a caller-supplied tolerance.
-//
-// The reference implementation carries a 140-line geometry header for this;
-// everything else in it (unit-cell wrapping, minimum-image norms, mutable site
-// lookup) serves parts of that codebase this module does not port, and the
-// three that remain are either one line over seitz::math or a view.
+// CVM builders share. All fractional, all on a caller-supplied tolerance --
+// each is a line over seitz::math or a view.
 namespace seitz::alloy::detail {
 
 // A fractional delta that is a lattice translation: every component an integer

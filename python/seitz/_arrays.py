@@ -18,7 +18,6 @@ from pydantic_core import CoreSchema, core_schema
 
 __all__ = ["Basis", "Positions", "Vector3"]
 
-
 def _as_positions(value: Any) -> NDArray[np.float64]:
     """Coerce to the C-contiguous (N, 3) float64 block ``Positions`` is in C++.
 
@@ -27,13 +26,11 @@ def _as_positions(value: Any) -> NDArray[np.float64]:
     the one shape pybind11 can memcpy instead of converting element by element.
     """
     array = np.ascontiguousarray(value, dtype=np.float64)
-    if array.size == 0:
-        array = array.reshape(0, 3)
+    if array.size == 0: array = array.reshape(0, 3)
     if array.ndim != 2 or array.shape[1] != 3:
         raise ValueError(f"expected an (N, 3) array, got shape {array.shape}")
     array.setflags(write=False)
     return array
-
 
 def _as_basis(value: Any) -> NDArray[np.float64]:
     """Coerce to the (3, 3) F-ordered block ``Matrix3d`` is in C++.
@@ -46,7 +43,6 @@ def _as_basis(value: Any) -> NDArray[np.float64]:
         raise ValueError(f"expected a (3, 3) matrix, got shape {array.shape}")
     array.setflags(write=False)
     return array
-
 
 def _as_vector3(value: Any) -> NDArray[np.float64]:
     array = np.ascontiguousarray(value, dtype=np.float64)
@@ -68,33 +64,17 @@ class _ArrayAnnotation:
         self._validator = validator
         self._json_schema = json_schema
 
-    def __get_pydantic_core_schema__(
-        self, source: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            self._validator,
+    def __get_pydantic_core_schema__(self, source: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(self._validator,
             serialization=core_schema.plain_serializer_function_ser_schema(
-                lambda array: array.tolist(), when_used="json"
-            ),
+                lambda array: array.tolist(), when_used="json"),
         )
 
-    def __get_pydantic_json_schema__(
-        self, schema: CoreSchema, handler: GetJsonSchemaHandler
-    ) -> JsonSchemaValue:
+    def __get_pydantic_json_schema__(self, schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
         return dict(self._json_schema)
-
 
 _ROW = {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3}
 
-Positions = Annotated[
-    NDArray[np.float64],
-    _ArrayAnnotation(_as_positions, {"type": "array", "items": _ROW}),
-]
-Basis = Annotated[
-    NDArray[np.float64],
-    _ArrayAnnotation(
-        _as_basis,
-        {"type": "array", "items": _ROW, "minItems": 3, "maxItems": 3},
-    ),
-]
+Positions = Annotated[NDArray[np.float64], _ArrayAnnotation(_as_positions, {"type": "array", "items": _ROW}),]
+Basis = Annotated[NDArray[np.float64], _ArrayAnnotation(_as_basis,{"type": "array", "items": _ROW, "minItems": 3, "maxItems": 3},),]
 Vector3 = Annotated[NDArray[np.float64], _ArrayAnnotation(_as_vector3, _ROW)]

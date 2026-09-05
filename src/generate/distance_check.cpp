@@ -17,19 +17,15 @@ namespace seitz::generate {
 
 namespace {
 
-// The neighbour images to search, built once per cell: each entry pairs a
-// fractional offset n with its Cartesian image lattice * n. Because
-// lattice * (base + n) == lattice * base + lattice * n, the per-pair loop then
-// costs one vector add and a squaredNorm per image instead of a fresh 3x3
-// matvec -- and the pair loop runs once per atom pair per attempt.
+// The neighbour images to search, built once per cell: offset n paired with
+// lattice * n. Since lattice * (base + n) = lattice * base + lattice * n, each
+// image costs one add and a squaredNorm instead of a 3x3 matvec, in a loop that
+// runs once per atom pair per attempt.
 //
-// The distributed form is not bit-identical to the matvec it replaces (the two
-// round differently in the last place). That is acceptable here and only here:
-// the comparison this feeds is `distance < scale * (r_i + r_j)`, a threshold
-// from a covalent-radius table with two significant figures, not a
-// tolerance-parity check against the reference implementation. The seeded
-// generation tests pin the consequence -- a structure accepted before must
-// still be accepted, for the same seed.
+// The distributed form differs from the matvec in the last place. Acceptable
+// here only: it feeds `distance < scale * (r_i + r_j)`, a two-significant-figure
+// covalent-radius threshold, not a tolerance-parity check against the reference.
+// The seeded generation tests pin the consequence.
 class MinimumImage {
 public:
   MinimumImage(Matrix3d const &lattice, CellPeriodicity const &periodicity)

@@ -14,15 +14,15 @@
 namespace seitz {
 
 // Tests candidate symmetry operations against a cell. Built once per cell and
-// tolerance: the atoms are re-ordered by (type, distance to the nearest
-// lattice point) so that the cheap rejection probes the most discriminating
-// atoms first, and a PositionIndex over them makes the full check
-// O(n log n) per operation instead of O(n^2).
+// tolerance: atoms are ordered by (type, distance to the nearest lattice point)
+// so the cheap rejection probes the most discriminating atoms first, and a
+// PositionIndex over them makes the full check O(n log n) per operation rather
+// than O(n^2).
 //
 // NOT thread-safe: check_total_overlap runs once per candidate (rotation,
-// translation) pair, so its working buffers live here and are reused rather
-// than reallocated per call. They are mutable because every caller holds the
-// checker by const reference; the price is that one checker serves one thread.
+// translation) pair, so its buffers live here and are reused. They are mutable
+// because callers hold the checker by const reference -- one checker, one
+// thread.
 class SEITZ_TESTABLE OverlapChecker {
 public:
   OverlapChecker(Cell const &cell, double symprec);

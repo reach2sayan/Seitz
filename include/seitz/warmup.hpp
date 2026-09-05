@@ -8,14 +8,10 @@
 namespace seitz {
 
 // Which per-setting caches to build ahead of first use. group::SpaceGroup::of
-// is a flyweight: the operations and the Wyckoff positions of a setting are
-// derived once and shared thereafter, so the first query of each setting pays
-// for it. Priming moves that cost off the query path.
-//
-// A bitmask rather than a struct of flags: a caller names the families it
-// wants, and the set is one value it can pass on. PointGroup and RodGroup are
-// deliberately absent — they are built by value, not cached, so there is
-// nothing to prime.
+// is a flyweight, so the first query of a setting pays for its operations and
+// Wyckoff positions; priming moves that off the query path. A bitmask, so a
+// caller passes the set of families on as one value. PointGroup and RodGroup
+// are built by value, not cached, so there is nothing to prime.
 enum class Warm : unsigned {
   space_groups = 1U << 0, // the 530 Hall settings of the 230 space groups
   layer_groups = 1U << 1, // the 116 Hall settings of the 80 layer groups
@@ -30,13 +26,13 @@ enum class Warm : unsigned {
   return (std::to_underlying(set) & std::to_underlying(what)) != 0;
 }
 
-// Build the requested caches, one thread per family, and return once they are
-// ready. Safe to call concurrently with any query: priming races the ordinary
-// first-use path and both end up with the same shared objects.
+// Build the requested caches, one thread per family, returning when ready.
+// Safe to call concurrently with any query: priming and first use race to the
+// same shared objects.
 void warmup(Warm what = Warm::all);
 
-// The same, off the calling thread. The returned future must be waited on (or
-// discarded deliberately) — priming continues either way.
+// The same off the calling thread; the future must be waited on or discarded
+// deliberately, priming continues either way.
 [[nodiscard]] std::future<void> warmup_async(Warm what = Warm::all);
 
 } // namespace seitz

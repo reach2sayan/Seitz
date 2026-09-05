@@ -24,12 +24,10 @@ using detail::radix_of;
 
 // Every subset of the maximal cluster's ACTIVE points, deduplicated by the full
 // space group and inserted so the list stays ordered by (point count,
-// diameter). Inserting rather than collecting-and-sorting is what makes a tie
-// keep the FIRST-generated representative, which the ordering of everything
-// downstream -- and the Kikuchi-Barker recursion in particular -- depends on.
-//
-// The list accumulates across all the maximal clusters, so a subcluster two of
-// them share is recorded once.
+// diameter). Inserted rather than collected-and-sorted so a tie keeps the
+// FIRST-generated representative, which everything downstream -- the
+// Kikuchi-Barker recursion above all -- depends on. The list accumulates over
+// all maximal clusters, so a shared subcluster is recorded once.
 void collect_subclusters(std::vector<Cluster> &subclusters,
                          Cluster const &maximal, Operations const &ops,
                          Lattice const &lattice, double tol) {
@@ -101,12 +99,11 @@ build_functions(std::span<Cluster const> subclusters, Operations const &ops,
 // Every species assignment on `sub`, grouped into orbits of the subcluster's
 // own site symmetry.
 //
-// The grouping compares occupations through PERMUTATIONS of the point indices
-// rather than by rebuilding and geometrically matching a decorated cluster for
-// every candidate. Each stabilizer element permutes the subcluster's own points
-// -- that is what the translation correction in site_symmetry() buys -- so the
-// permutations are computed once and equivalence becomes ranges::equal against
-// the permuted occupation.
+// Occupations are compared through PERMUTATIONS of the point indices, not by
+// rebuilding and matching decorated geometry per candidate: each stabilizer
+// element permutes the subcluster's own points (what site_symmetry()'s
+// translation correction buys), so the permutations are computed once and
+// equivalence is ranges::equal against the permuted occupation.
 [[nodiscard]] std::vector<Configuration>
 build_configurations(Cluster const &sub, Operations const &ops, double tol) {
   Operations const stabilizer = site_symmetry(sub, ops, tol);
@@ -319,14 +316,13 @@ overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
   return overlaps;
 }
 
-// The Kikuchi-Barker coefficients: the Moebius inversion over the subcluster
+// The Kikuchi-Barker coefficients: Moebius inversion over the subcluster
 // inclusion lattice,
 //
-//   k_c = 1 - sum over strictly larger clusters c' containing c of k_c',
+//   k_c = 1 - sum_{c' > c, c' contains c} k_c',
 //
-// with the empty cluster at zero. Walked largest index to smallest, which is
-// valid only because the subcluster list is ordered by point count -- every
-// term on the right is already final by the time it is read.
+// the empty cluster at zero. Walked from the largest index down, valid because
+// the list is ordered by point count: every term on the right is already final.
 [[nodiscard]] std::vector<double>
 build_kikuchi_barker(std::span<Cluster const> subclusters,
                      Operations const &ops, double tol) {

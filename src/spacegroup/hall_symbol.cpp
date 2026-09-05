@@ -91,15 +91,14 @@ using DwChoices = std::array<DwCandidates, 3>;
 }
 
 // Every distinct dw a generator rotation admits: the folded translation
-// difference (primitive setting) between an operation carrying that rotation
-// and the first database operation with it. Two operations of one rotation
+// difference (primitive setting) between an operation with that rotation and
+// the first database operation carrying it. Two operations of one rotation
 // differ by a lattice translation, integral in the primitive setting, so a
-// centering the database declares folds them onto a single value. The
-// B-centered monoclinic and orthorhombic Hall settings (13, 15, 34, ... 333)
-// are declared PRIMITIVE while their operations still carry the B translation,
-// so there each representative gives its own dw and only trying all of them
-// makes the match independent of the order of the input operations. A zero
-// generator contributes the single zero block.
+// declared centering folds them onto one value. The B-centered monoclinic and
+// orthorhombic settings (13, 15, 34, ... 333) are declared PRIMITIVE while
+// their operations still carry the B translation, so each representative gives
+// its own dw and only trying all of them makes the match independent of input
+// order. A zero generator contributes the single zero block.
 template <GroupFamily F>
 [[nodiscard]] std::optional<DwCandidates>
 dw_candidates(MatchContext<F> const &s, Centering c, Matrix3i const &rot) {
@@ -157,11 +156,10 @@ origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
 }
 
 // The two operation lists re-expressed in the primitive setting: everything
-// matches_database needs that does NOT depend on the origin shift. It runs
-// once per element of the dw product below, and rebuilding M.t and M.R.M^-1
-// for all (up to 192) operations on each of those runs was the bulk of its
-// cost. Built once per (operation set, centering), which is once per
-// match_hall.
+// matches_database needs that does NOT depend on the origin shift. It runs once
+// per element of the dw product below, and rebuilding M.t and M.R.M^-1 for up
+// to 192 operations each time was the bulk of its cost. Built once per
+// (operation set, centering), i.e. once per match_hall.
 struct CenteredOperations {
   std::vector<Vector3d> sym_translation; // M . t, per input operation
   std::vector<Matrix3d> sym_rotation;    // M . R . M^-1, per input operation

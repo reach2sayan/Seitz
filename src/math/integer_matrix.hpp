@@ -10,12 +10,11 @@
 #include <cstddef>
 #include <optional>
 
-// Numerical helpers backing the symmetry search where exact semantics matter:
-// a checked real inverse, and the exact integer adjugate/determinant that give
-// the unimodular rotation matrices an inverse with no floating-point round
-// trip. The rounding primitives live in core/fractional.hpp, which the public
-// headers need inline. General matrix arithmetic uses Eigen operators at the
-// call site.
+// Where the symmetry search needs exact semantics: a checked real inverse, and
+// the integer adjugate/determinant giving a unimodular rotation its inverse
+// with no floating-point round trip. Rounding lives in core/fractional.hpp,
+// which the public headers need inline; general arithmetic is Eigen at the call
+// site.
 namespace seitz::math {
 
 // Row-major 3x3 integer proxy. Eigen 5's fixed-size matrices are literal types

@@ -4,14 +4,12 @@
 
 #include <pybind11/pybind11.h>
 
-// The extension module. Nothing is bound here: each subsystem's translation
-// unit binds its own headers, mirroring include/seitz/, and this file only
-// fixes the order they run in.
+// The extension module. Nothing is bound here: each subsystem's TU binds its
+// own headers, mirroring include/seitz/, and this file only fixes their order.
 //
-// _core is private. The public surface is the pure-Python seitz package,
-// which re-exports what belongs in it and adds the pydantic models -- the
-// things a C++ binding cannot express well (keyword-only arguments, overloads,
-// a stable __all__, JSON round-trips).
+// _core is private; the public surface is the pure-Python seitz package, which
+// re-exports from it and adds what a C++ binding expresses poorly (keyword-only
+// arguments, overloads, a stable __all__, JSON round-trips).
 namespace seitz::python {
 
 void bind_core(py::module_ &m);

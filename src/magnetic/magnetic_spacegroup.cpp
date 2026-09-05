@@ -132,15 +132,14 @@ get_representative(MagneticOperations const &magnetic_symmetry) {
 
 // The MSG type and the coset representatives of XSG in MSG.
 //
-// The four Opechowski-Guccione types are distinguished by a single index,
-// [FSG : XSG]: the family space group FSG (the spatial parts, time reversal
-// ignored) over its subgroup XSG of time-even operations.
-//   * index 1 - time reversal does not divide the spatial group, so either no
-//     operation is primed (type I, colorless) or the group also contains the
-//     pure time reversal 1' (type II, grey).
-//   * index 2 - XSG is a halving subgroup; the missing spatial operations recur
-//     only when primed, as a pure anti-translation (type IV) or a primed point
-//     operation (type III), read off the coset representative.
+// The four Opechowski-Guccione types are fixed by the index [FSG : XSG] of the
+// time-even subgroup XSG in the family space group FSG (spatial parts, time
+// reversal ignored):
+//   1 - time reversal does not divide the spatial group: nothing primed
+//       (type I, colorless), or 1' present as well (type II, grey).
+//   2 - XSG is a halving subgroup; the missing spatial operations recur only
+//       primed, as a pure anti-translation (type IV) or a primed point
+//       operation (type III), read off the coset representative.
 [[nodiscard]] std::optional<std::pair<MagneticType, MagOps>>
 magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
                           std::size_t num_sym_fsg, std::size_t num_sym_xsg) {

@@ -27,26 +27,24 @@ struct Generated {
 };
 
 // The fractional box a seed coordinate is drawn from, per axis. The seed is
-// projected onto the Wyckoff locus before its orbit is built, so this only has
-// to say where in the cell the structure should live: the full repeat along a
-// periodic axis, a band centred on 0 along an aperiodic one, where an
-// axis-flipping operation must map the structure onto itself (image at -z, not
-// at 1 - z) rather than away from it.
+// projected onto the Wyckoff locus first, so this only fixes where in the cell
+// the structure lives: the full repeat along a periodic axis, a band centred
+// on 0 along an aperiodic one, where an axis-flipping op must map the
+// structure onto itself (image at -z, not 1 - z).
 struct SeedBox {
   Vector3d low{Vector3d::Zero()};
   Vector3d high{Vector3d::Ones()};
   [[nodiscard]] Vector3d sample(std::mt19937_64 &rng) const;
 };
 
-// How one group family realizes its geometry: what to call it in an error, how
-// its cell is periodic, where in that cell a seed coordinate belongs, and the
-// random metric one attempt is made in. Everything else about generation — the
-// assignment enumeration, the general-position restriction, the shuffled
-// assignment/attempt search, the distance acceptance — is family-independent
-// and lives in Generator.
+// How one group family realizes its geometry: its name in an error, its cell
+// periodicity, the seed box, and the random metric of one attempt. Everything
+// else -- assignment enumeration, the general-position restriction, the
+// shuffled assignment/attempt search, distance acceptance -- is
+// family-independent and lives in Generator.
 //
 // A layer group is a SpaceGroup whose Hall key names the layer family; the
-// traits read that from the group rather than taking a second entry point.
+// traits read that off the group, not a second entry point.
 template <class G> struct GroupTraits;
 
 template <> struct GroupTraits<group::SpaceGroup> {
@@ -84,8 +82,8 @@ template <> struct GroupTraits<group::RodGroup> {
                                         int attempt, std::mt19937_64 &rng);
 };
 
-// A group the generator can place a composition on: it offers Wyckoff
-// positions, and GroupTraits<G> is specialized for its geometry.
+// A group the generator can place a composition on: it has Wyckoff positions
+// and a GroupTraits<G> specialization.
 template <class G>
 concept GeneratableGroup = requires(G const &g, Composition const &comp,
                                     GenerateOptions const &options,
@@ -97,8 +95,8 @@ concept GeneratableGroup = requires(G const &g, Composition const &comp,
   { GroupTraits<G>::lattice(g, comp, options, 0, rng) } -> std::same_as<Matrix3d>;
 };
 
-// Assignments considered per search: enough for any real composition, a bound
-// for pathological ones.
+// Assignments per search: ample for any real composition, a bound on
+// pathological ones.
 inline constexpr std::size_t kMaxAssignments = 1000;
 
 // The random-structure generator
@@ -111,9 +109,9 @@ public:
     return assignable(group_->wyckoffs(), comp);
   }
 
-  // The first `max` valid Wyckoff assignments of `comp` (see
-  // enumerate_assignments for the rules); fewer when there are fewer, exactly
-  // `max` when the enumeration was cut short.
+  // The first `max` valid Wyckoff assignments of `comp`;
+  // fewer when there are fewer, exactly `max` when the enumeration was cut
+  // short.
   [[nodiscard]] std::vector<Assignment<group::Wyckoff>>
   assignments(Composition const &comp,
               std::size_t max = kMaxAssignments) const {

@@ -8,14 +8,13 @@ namespace seitz::python {
 
 namespace {
 
-// The classes themselves, built with the C API rather than py::exception<T>.
-// PyErr_NewExceptionWithDoc makes a plain heap type -- so its instances accept
-// arbitrary attributes, which is how the payloads below reach Python -- and it
-// takes the docstring at creation instead of needing one patched on afterwards.
+// Built with the C API rather than py::exception<T>:
+// PyErr_NewExceptionWithDoc makes a plain heap type, whose instances accept
+// arbitrary attributes (how the payloads below reach Python) and which takes
+// its docstring at creation.
 //
-// The returned reference is deliberately never released: these are
-// interpreter-lifetime type objects, and letting a static py::object decref one
-// at static-destruction time would run after the GIL is already gone.
+// The reference is never released: these are interpreter-lifetime type objects,
+// and a static py::object would decref one after the GIL is gone.
 [[nodiscard]] py::handle make(py::module_ &m, char const *name, char const *doc,
                               py::handle base) {
   std::string const qualified = std::string("seitz._core.") + name;

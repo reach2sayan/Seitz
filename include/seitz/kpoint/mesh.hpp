@@ -12,10 +12,10 @@
 #include <span>
 #include <vector>
 
-// Reciprocal-space sampling, 3D path. A Mesh is pure grid geometry — the
-// mapping between integer addresses and linear grid-point indices — and is
-// constexpr on std::array<int, 3>, with Eigen only at the boundary. The
-// double-mesh convention is q = (address * 2 + shift) / (divisions * 2).
+// Reciprocal-space sampling, 3D path. A Mesh is grid geometry only -- the map
+// between integer addresses and linear grid-point indices -- constexpr over
+// std::array<int, 3>, with Eigen at the boundary. Double-mesh convention:
+// q = (2 * address + shift) / (2 * divisions).
 
 #pragma GCC visibility push(default)
 
@@ -27,9 +27,8 @@ class BrillouinZone;
 
 class Mesh {
 public:
-  // A mesh must be strictly positive on every axis, or the modulo and index
-  // arithmetic below is undefined. Rejecting it here is what used to be
-  // e_invalid_mesh raised at each root.
+  // Strictly positive on every axis, or the modulo and index arithmetic below
+  // is undefined.
   [[nodiscard]] static constexpr std::optional<Mesh>
   of(Address divisions, std::array<bool, 3> shift = {}) noexcept {
     if (divisions[0] <= 0 || divisions[1] <= 0 || divisions[2] <= 0) {
@@ -150,9 +149,9 @@ static_assert(Mesh::of({4, 4, 4}, {true, false, false})
                   ->doubled_address({1, 0, 0}) == Address{3, 0, 0});
 
 // The symmetry reduction of a sampling mesh: the reciprocal point group and,
-// for each grid point, the index of its irreducible representative (the
-// smallest index in its orbit). Reciprocal rotations are the transpose of the
-// real-space ones; with time reversal the inversion partner is added too.
+// per grid point, the index of its irreducible representative (the smallest in
+// its orbit). Reciprocal rotations are the real-space transposes, plus the
+// inversion partner under time reversal.
 class ReciprocalMesh {
 public:
   [[nodiscard]] static ReciprocalMesh
@@ -192,10 +191,9 @@ private:
   std::size_t num_irreducible_ = 0;
 };
 
-// A sampling grid relocated into the first Brillouin zone: each point moved to
-// the reciprocal-lattice image closest to the origin, with boundary points
-// (several equidistant images within tolerance) duplicated. The map is indexed
-// on the doubled mesh.
+// A sampling grid in the first Brillouin zone: each point moved to the
+// reciprocal-lattice image nearest the origin, boundary points (equidistant
+// images within tolerance) duplicated. The map is indexed on the doubled mesh.
 class BrillouinZone {
 public:
   // The in-BZ grid points: the first mesh.size() are the closest image of each
@@ -222,14 +220,13 @@ public:
 private:
   friend class ReciprocalMesh;
 
-  // "No BZ point here", as a sentinel rather than std::optional: the map is
-  // indexed on the DOUBLED mesh, so it holds 8x the grid points, and
-  // optional<size_t> spends 16 bytes an entry to carry one bit. The public
-  // accessor above still hands back an optional.
+  // "No BZ point here" as a sentinel, not std::optional: the map is on the
+  // DOUBLED mesh, 8x the grid points, and optional<size_t> spends 16 bytes an
+  // entry for one bit. The accessor above still returns an optional.
   static constexpr std::size_t kNoPoint = static_cast<std::size_t>(-1);
 
-  // The rotations are copied, not borrowed: this is returned by value from
-  // ReciprocalMesh::brillouin_zone and may outlive the mesh that built it.
+  // Rotations copied, not borrowed: returned by value from
+  // ReciprocalMesh::brillouin_zone, this may outlive the mesh that built it.
   BrillouinZone(Mesh mesh, std::span<Matrix3i const> rotations,
                 std::vector<Address> addresses, std::vector<std::size_t> map)
       : mesh_{mesh}, rotations_(rotations.begin(), rotations.end()),

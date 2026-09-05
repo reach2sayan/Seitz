@@ -49,24 +49,21 @@ crystal_system(int spacegroup_number) noexcept {
 [[nodiscard]] Matrix3d random_lattice(CrystalSystem system,
                                       double target_volume, std::uint64_t seed);
 
-// An element-aware estimate of the conventional-cell volume (cubic angstrom)
-// for a composition (atom type -> count in the conventional cell). Each atom
-// contributes the volume of a sphere of its covalent radius
-// (data::atomic_volume); the sum is divided by a representative packing
-// fraction so the estimate lands near real cell volumes rather than the cramped
-// sphere-sum. Replaces the old flat 20 A^3/atom constant. Untabulated types use
-// `fallback_volume` cubic angstrom.
+// Element-aware estimate of the conventional-cell volume (A^3) of a
+// composition: each atom contributes (4/3) pi r_cov^3 (data::atomic_volume),
+// the sum divided by a representative packing fraction so it lands near real
+// cell volumes rather than the cramped sphere-sum. Untabulated types use
+// `fallback_volume`.
 [[nodiscard]] double estimated_cell_volume(Composition const &composition,
                                            double fallback_volume = 20.0);
 
 // A random layer lattice (columns = Cartesian basis vectors): a, b span the
-// periodic plane, c is perpendicular with length `c_length` (the non-periodic
-// stacking direction, aperiodic axis 2). The in-plane metric is symmetrized
-// over the in-plane (2x2) blocks of `operations`, so it is exactly invariant
-// under the layer group's in-plane point group whatever its crystal system — no
-// number-range table, which would mis-handle mixed cases (e.g. p112 wants an
-// oblique gamma while pm11 forces gamma = 90 in the same range). Scaled so the
-// 2D cell area equals `target_area`. Deterministic in `seed`.
+// periodic plane, c is perpendicular with length `c_length` (aperiodic axis 2).
+// The in-plane metric is symmetrized over the 2x2 blocks of `operations`, so it
+// is exactly invariant under the in-plane point group whatever the crystal
+// system -- a number-range table would mishandle mixed cases (p112 wants an
+// oblique gamma where pm11 forces gamma = 90 in the same range). Scaled to
+// `target_area`; deterministic in `seed`.
 [[nodiscard]] Matrix3d
 random_layer_lattice(std::span<SymmetryOperation const> operations,
                      double target_area, double c_length, std::uint64_t seed);
