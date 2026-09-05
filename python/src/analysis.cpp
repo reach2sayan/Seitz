@@ -189,8 +189,15 @@ void bind_analysis(py::module_ &m) {
       .def_property_readonly("sites", memo(&SymmetryAnalyzer::sites))
       .def_property_readonly("spacegroup_type",
                              memo(&SymmetryAnalyzer::spacegroup_type))
+      // Explicit template arguments, unlike its siblings: standardized_cell
+      // also names the (CellSetting, Idealize) member template below, and an
+      // overload set holding a function template is a non-deduced context
+      // ([temp.deduct.call]/6), so Self and T have to be given rather than
+      // deduced. Naming them makes memo's parameter type concrete, which is
+      // what picks the `const &` accessor back out of the set.
       .def_property_readonly("standardized_cell",
-                             memo(&SymmetryAnalyzer::standardized_cell),
+                             memo<SymmetryAnalyzer, Cell>(
+                                 &SymmetryAnalyzer::standardized_cell),
                              py::doc("The standardized conventional, idealized "
                                      "cell."))
       .def_property_readonly("cell_operations",
