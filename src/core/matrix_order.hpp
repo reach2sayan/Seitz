@@ -39,19 +39,16 @@ using RotationMultimap =
     boost::container::flat_multimap<Matrix3i, T, Matrix3iLess>;
 
 // A projection from an element of `R` to the rotation it is keyed by:
-// std::identity for a range of rotations, &SymmetryOperation::rotation (or a
-// lambda) for anything that carries one.
-// (same_as, not convertible_to: every Eigen expression converts to every
-// other, so a projection to the wrong quantity would slip through.)
+// (a) std::identity for a range of rotations,
+// (b) &SymmetryOperation::rotation (or a lambda) for anything that carries one.
 template <class Proj, class R>
 concept RotationProjection = std::same_as<
     std::remove_cvref_t<
         std::invoke_result_t<Proj &, std::ranges::range_reference_t<R>>>,
     Matrix3i>;
 
-// The distinct rotations of a range. `proj` maps an element to its Matrix3i
-// key (identity for ranges of rotations, &SymmetryOperation::rotation for
-// operation lists). O(n log n).
+// The distinct rotations of a range. `proj` : element <==> Matrix3i key
+// O(n log n).
 template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
 [[nodiscard]] RotationSet rotation_set(R &&range, Proj proj = {}) {
   auto v = range | std::views::transform(proj);
@@ -82,17 +79,15 @@ template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity
 }
 
 namespace detail {
-// Sort (key, index) pairs by key, then index, and adopt them as a flat
-// multimap: equal_range(key) then walks the elements with that key in their
+// Sort (key, index) pairs by
+// (1) key --> (2) index, and adopt them as a flat multimap:
+// equal_range(key) then walks the elements with that key in their
 // original order, and find(key) is the first of them.
 template <class Key, std::strict_weak_order<Key const &, Key const &> Less>
 [[nodiscard]] auto ordered_multimap(std::vector<std::pair<Key, int>> pairs,
                                     Less less) {
   std::ranges::sort(pairs, [&](auto const &a, auto const &b) {
-    if (less(a.first, b.first)) {
-      return true;
-    }
-    return !less(b.first, a.first) && a.second < b.second;
+    return less(a.first, b.first) || (!less(b.first, a.first) && a.second < b.second);
   });
   return boost::container::flat_multimap<Key, int, Less>(
       boost::container::ordered_range, pairs.begin(), pairs.end());
@@ -124,10 +119,9 @@ struct OperationKey {
 struct OperationKeyLess {
   [[nodiscard]] bool operator()(OperationKey const &a,
                                 OperationKey const &b) const noexcept {
-    if (a.time_reversal != b.time_reversal) {
-      return !a.time_reversal;
-    }
-    return Matrix3iLess{}(a.rotation, b.rotation);
+    return (a.time_reversal != b.time_reversal)
+               ? !a.time_reversal
+               : Matrix3iLess{}(a.rotation, b.rotation);
   }
 };
 

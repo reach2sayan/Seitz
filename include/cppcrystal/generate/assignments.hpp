@@ -97,16 +97,21 @@ template <WyckoffLike W> struct AssignmentContext {
       return ctx;
     }
     ctx.max_count = std::ranges::max(ctx.elements | std::views::values);
+    // Named rather than written inline as `table[...size(), 0]`: MSVC applies
+    // its discarded-[[nodiscard]] check to the non-final operands of a
+    // multidimensional subscript, so a call there -- span::size() is
+    // [[nodiscard]] in that standard library -- raises a spurious C4834.
+    auto const last = static_cast<Index>(positions.size());
     auto const rows = positions.size() + 1;
     auto const cols = static_cast<std::size_t>(ctx.max_count) + 1;
     ctx.reachable_.assign(rows * cols, 0);
     md::matrix_view<std::uint8_t> table(ctx.reachable_.data(),
                                         static_cast<Index>(rows),
                                         static_cast<Index>(cols));
-    table[static_cast<Index>(positions.size()), 0] = 1;
+    table[last, 0] = 1;
     // Backwards over the positions: take zero copies of p, or one copy and
     // stay on p (free coordinates) / move past it (fixed position).
-    for (auto p = static_cast<Index>(positions.size()); p-- > 0;) {
+    for (auto p = last; p-- > 0;) {
       auto const &wp = positions[static_cast<std::size_t>(p)];
       auto const mult = static_cast<Index>(wp.multiplicity());
       Index const after_one = wp.degrees_of_freedom() == 0 ? p + 1 : p;

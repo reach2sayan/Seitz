@@ -16,13 +16,7 @@ namespace bgi = boost::geometry::index;
 namespace {
 
 // Output iterator that keeps only the atom index of each tree value.
-//
-// The point of it is the rtree call it enables: bgi::rtree::query(pred, out)
-// walks the tree with its state on the stack, whereas the qbegin()/qend()
-// iterator pair has to heap-allocate that state on every query -- and this is
-// the innermost query of the whole search. Templated on the value type so it
-// need not name PositionIndex's private Point.
-template <class Buffer> struct IndexCollector {
+template <typename Buffer> struct IndexCollector {
   using iterator_category = std::output_iterator_tag;
   using value_type = void;
   using difference_type = std::ptrdiff_t;
@@ -50,16 +44,13 @@ template <class Buffer> struct IndexCollector {
 constexpr double kImageMargin = 2.0;
 
 // The largest fractional offset a Cartesian offset of `half_width` can be:
-// ||lattice^-1||_inf * half_width, the induced infinity norm being the maximum
-// absolute row sum. A singular (or near-singular) lattice yields a non-finite
-// bound; fall back to a reach that admits every image, which is what the
-// unpruned search did.
+// ||lattice^-1||_inf * half_width
 [[nodiscard]] double image_reach_of(Matrix3d const &lattice_inv,
                                     double half_width) noexcept {
   double const reach = kImageMargin *
                        lattice_inv.cwiseAbs().rowwise().sum().maxCoeff() *
                        half_width;
-  return std::isfinite(reach) ? reach : 2.0;
+  return std::isfinite(reach) ? reach : kImageMargin;
 }
 
 } // namespace

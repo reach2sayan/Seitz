@@ -7,10 +7,13 @@ namespace cppcrystal::detail {
 Vector3d minimal_image_mixed(Vector3d const &diff,
                              CellPeriodicity const &p) noexcept {
   Vector3d out = math::nearest_offset(diff);
-  for (auto const [axis, kind] : p | std::views::enumerate) {
-    if (kind == AxisKind::aperiodic) {
-      out[axis] = diff[axis];
-    }
+  auto indexed_aperiodic =
+      std::views::enumerate | std::views::filter([](auto const &pair) {
+        auto const [axis, kind] = pair;
+        return kind == AxisKind::aperiodic;
+      });
+  for (auto const [axis, kind] : p | indexed_aperiodic) {
+    out[axis] = diff[axis];
   }
   return out;
 }
