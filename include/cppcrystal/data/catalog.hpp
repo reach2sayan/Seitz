@@ -6,19 +6,17 @@
 #include <cstddef>
 
 // The compile-time catalogs of the built-in databases. One class parameterised
-// by a family policy replaces the three hand-written catalog structs, and the
-// index-0 sentinel row they each carried is gone: a Catalog is keyed by a
-// validated key (HallNumber, UniNumber), so every lookup is in range by
-// construction and there is nothing to fall back to.
-// Everything declared below is the installed ABI: the library is compiled
-// with hidden visibility (see CMakeLists.txt), so a public header opens the
-// window and closes it again at the end of the file.
+// by a family policy :
+// a Catalog is keyed by a validated key (HallNumber, UniNumber),
 #pragma GCC visibility push(default)
 
 namespace cppcrystal::data {
 
-// A family policy supplies the decoded row type, how many there are, the key
-// that addresses them, and the decode from the generated raw table.
+// A family policy supplies
+// (a) the decoded row type,
+// (b) how many there are,
+// (c) the key that addresses them,
+// (d) the decode from the generated raw table.
 template <class Family>
 concept CatalogFamily = requires {
   typename Family::Row;

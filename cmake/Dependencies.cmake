@@ -57,19 +57,54 @@ if (CPPCRYSTAL_BUILD_TESTS)
     list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 endif ()
 
-# Reference spglib v2.7.0 — the validation oracle. Built only for the oracle
-# tests and never linked into the cppcrystal library. Exposes Spglib::symspg.
+# Reference spglib v2.7.0, in two roles that share one pinned tag so they can
+# never drift apart:
+#
+#   Source of truth for the transcribed data tables. Four of the generators in
+#   tools/ read spg_database.c, msg_database.c, hall_symbol.c and
+#   sitesym_database.c straight out of this checkout — see the codegen block in
+#   CMakeLists.txt — so the tables the library compiles and the reference
+#   implementation the oracle compares them against are the same spglib.
+#
+#   The validation oracle itself, exposing Spglib::symspg. Built only under
+#   CPPCRYSTAL_BUILD_ORACLE_TESTS and never linked into the cppcrystal library.
+#
+# Which means the checkout is unconditional but the BUILD is not. SOURCE_SUBDIR
+# naming a directory with no CMakeLists.txt is the documented way to say
+# "populate, do not add_subdirectory": a default build pays for the download and
+# nothing else, rather than configuring and compiling a second crystallography
+# library it will not link.
+#
+# No network at configure time? FETCHCONTENT_SOURCE_DIR_SPGLIB_REFERENCE=/path/to/checkout
+# points this at a local clone — the same escape hatch pybind11 gets below, and
+# it matters more here now that every build needs these sources, not just the
+# oracle ones.
 if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
     set(SPGLIB_WITH_TESTS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Fortran OFF CACHE BOOL "" FORCE)
     set(SPGLIB_WITH_Python OFF CACHE BOOL "" FORCE)
     set(SPGLIB_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     set(SPGLIB_INSTALL OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(spglib_reference
-            GIT_REPOSITORY https://github.com/spglib/spglib.git
-            GIT_TAG v2.7.0
-            GIT_SHALLOW TRUE)
-    FetchContent_MakeAvailable(spglib_reference)
+    set(CPPCRYSTAL_SPGLIB_SUBDIR "")
+else ()
+    set(CPPCRYSTAL_SPGLIB_SUBDIR SOURCE_SUBDIR cppcrystal-tables-only)
+endif ()
+FetchContent_Declare(spglib_reference
+        GIT_REPOSITORY https://github.com/spglib/spglib.git
+        GIT_TAG v2.7.0
+        GIT_SHALLOW TRUE
+        ${CPPCRYSTAL_SPGLIB_SUBDIR})
+FetchContent_MakeAvailable(spglib_reference)
+unset(CPPCRYSTAL_SPGLIB_SUBDIR)
+
+# The transcribers take file paths, so a missing checkout has to fail here with
+# a sentence rather than three directories later with a Python traceback.
+if (NOT EXISTS "${spglib_reference_SOURCE_DIR}/src/spg_database.c")
+    message(FATAL_ERROR
+            "The reference spglib checkout is missing its src/ directory "
+            "(looked in ${spglib_reference_SOURCE_DIR}). The data tables are "
+            "transcribed from it at build time; see the codegen block in "
+            "CMakeLists.txt.")
 endif ()
 
 # pybind11 3.x — the Python binding layer. Fetched here like everything else

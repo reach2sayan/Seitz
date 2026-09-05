@@ -17,23 +17,30 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
-env:
-  # Eigen, Boost, Catch2 and the reference spglib all arrive through
-  # FetchContent. Parking them outside the build tree lets a single cache entry
-  # cover both the downloads and their built artefacts.
-  FETCHCONTENT_BASE_DIR: ${{ github.workspace }}/.deps
+# FETCHCONTENT_BASE_DIR is passed as -D on each configure line, never through
+# `env:`: FetchContent.cmake declares it as a plain `set(... CACHE PATH ...)`
+# with no $ENV{} fallback, so an environment variable of that name does nothing
+# and the dependency cache below would silently archive an empty directory.
+# It matters for every job now, not just the oracle ones -- the reference
+# spglib is the source the data tables are transcribed from, so it is cloned on
+# every configure.
+#
+# Every job below drives CMakePresets.json rather than spelling out its own
+# -D flags: `cmake --preset X && cmake --build --preset X && ctest --preset X`
+# is exactly what a developer runs locally, so a green CI run means the
+# configuration a developer gets is the configuration that was tested. The only
+# -D flags that appear here are the ones that are genuinely about running on a
+# shared runner -- an install prefix, a compiler launcher, a short dependency
+# path -- and never about what the project is.
+#
+# The presets do NOT pin a compiler, which is why the matrix below can vary it.
+# CMakeLists.txt enforces the version floors (GCC 15+, MSVC 19.43+).
 
 jobs:
   #
-  # Build, test and install across the supported toolchains.
-  #
-  # MSVC is deliberately absent: CMakeLists.txt:20 hard-errors on anything but
-  # GCC 15+ / Clang, because the library needs <generator>, compiles as gnu++23
-  # and sets a constexpr budget flag with no portable spelling. The source
-  # itself is platform-neutral (no POSIX headers, no _WIN32), so adding a
-  # windows-latest / MSVC entry here is mostly a matter of relaxing that gate
-  # and supplying /constexpr:steps -- but nothing has been compiled on MSVC
-  # yet, so it stays out of CI rather than sitting permanently red.
+  # Build, test and install across the supported toolchains. MSVC has its own
+  # job below rather than a matrix entry here: it is advisory, and its runner,
+  # compiler launcher and dependency cache all differ from these.
   #
   build:
     name: ${{ matrix.name }}
@@ -42,26 +49,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: GCC 15 (Debug)
+          - name: GCC 15 (debug)
             cc: gcc-15
             cxx: g++-15
-            build_type: Debug
-            oracle: 'OFF'
-          - name: GCC 15 (Release + oracle)
+            preset: debug
+          - name: GCC 15 (release)
             cc: gcc-15
             cxx: g++-15
-            build_type: Release
-            oracle: 'ON'
-          - name: Clang 20 (Debug)
+            preset: release
+          - name: Clang 20 (debug)
             cc: clang-20
             cxx: clang++-20
-            build_type: Debug
-            oracle: 'OFF'
-          - name: Clang 20 (Release + oracle)
+            preset: debug
+          - name: Clang 20 (release)
             cc: clang-20
             cxx: clang++-20
-            build_type: Release
-            oracle: 'ON'
+            preset: release
+
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
 
     steps:
       - name: Checkout
@@ -84,37 +91,37 @@ jobs:
           sudo ./llvm.sh 20
           sudo apt-get install -y clang-20
 
+      # No launcher flag needed: CMakeLists.txt picks ccache up from PATH.
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ matrix.cc }}-${{ matrix.build_type }}-${{ matrix.oracle }}
+          key: ${{ matrix.cc }}-${{ matrix.preset }}
           max-size: 500M
 
       - name: Cache fetched dependencies
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.deps
-          key: deps-${{ matrix.cc }}-${{ matrix.build_type }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: deps-${{ matrix.cc }}-${{ matrix.preset }}-${{ hashFiles('cmake/Dependencies.cmake') }}
           restore-keys: |
-            deps-${{ matrix.cc }}-${{ matrix.build_type }}-
+            deps-${{ matrix.cc }}-${{ matrix.preset }}-
 
+      # The presets default to gcc-15/g++-15 so that a bare `cmake --preset debug`
+      # works on a developer machine and in CLion. Overriding on the command
+      # line is what makes the same preset serve the Clang rows.
       - name: Configure
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
-            -DCPPCRYSTAL_BUILD_TESTS=ON \
-            -DCPPCRYSTAL_BUILD_ORACLE_TESTS=${{ matrix.oracle }}
+        run: >
+          cmake --preset ${{ matrix.preset }}
+          -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+          -DFETCHCONTENT_BASE_DIR=${{ github.workspace }}/.deps
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build --preset ${{ matrix.preset }} --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure --parallel
+        run: ctest --preset ${{ matrix.preset }} --parallel
 
       # A smoke run of the [!benchmark] cases, not a regression gate: a shared
       # CI runner's timings are far too noisy for that (see the interleaved
@@ -122,11 +129,11 @@ jobs:
       # What this catches is the benchmark target silently rotting -- failing
       # to build, or throwing on a cell it used to handle.
       - name: Benchmarks (smoke)
-        if: matrix.build_type == 'Release'
-        run: ./build/tests/cppcrystal_tests "[!benchmark]" --benchmark-samples 3
+        if: matrix.preset == 'release'
+        run: ./build/release/tests/cppcrystal_tests "[!benchmark]" --benchmark-samples 3
 
       - name: Install
-        run: cmake --install build
+        run: cmake --install build/${{ matrix.preset }}
 
   #
   # Address/UB sanitizers against the reference spglib oracle. Split out
@@ -134,8 +141,11 @@ jobs:
   # something the plain builds cannot.
   #
   sanitizers:
-    name: GCC 15 (ASan/UBSan + oracle)
+    name: GCC 15 (asan)
     runs-on: ubuntu-24.04
+    env:
+      CC: gcc-15
+      CXX: g++-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -161,22 +171,15 @@ jobs:
             deps-asan-
 
       - name: Configure
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_C_COMPILER=gcc-15 \
-            -DCMAKE_CXX_COMPILER=g++-15 \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCPPCRYSTAL_BUILD_TESTS=ON \
-            -DCPPCRYSTAL_BUILD_ORACLE_TESTS=ON \
-            -DCPPCRYSTAL_ENABLE_SANITIZERS=ON
+        run: >
+          cmake --preset asan
+          -DFETCHCONTENT_BASE_DIR=${{ github.workspace }}/.deps
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build --preset asan --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --preset asan
         env:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
@@ -188,18 +191,29 @@ jobs:
   python:
     name: python bindings
     runs-on: ubuntu-24.04
+    env:
+      CC: gcc-15
+      CXX: g++-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       # Same as the other jobs: gcc-15 is not in Ubuntu 24.04's own repositories,
-      # so the toolchain PPA has to come first. ninja-build because the configure
-      # step below asks for -G Ninja.
+      # so the toolchain PPA has to come first. ninja-build because the presets
+      # ask for the Ninja generator.
       - name: Install GCC 15
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
           sudo apt-get install -y gcc-15 g++-15 ninja-build
+
+      - name: Cache fetched dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.deps
+          key: deps-python-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: |
+            deps-python-
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -210,26 +224,145 @@ jobs:
       # Through CMake, not an editable install: an editable install works via a
       # meta-path finder that would shadow this build tree (see pyproject.toml).
       - name: Configure and build
-        env:
-          CC: gcc-15
-          CXX: g++-15
         run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCPPCRYSTAL_BUILD_PYTHON=ON \
-            -DCPPCRYSTAL_BUILD_TESTS=OFF \
-            -DCPPCRYSTAL_BUILD_DEMO=OFF \
+          cmake --preset python \
+            -DFETCHCONTENT_BASE_DIR=${{ github.workspace }}/.deps \
             -DPython_EXECUTABLE="$(uv run python -c 'import sys; print(sys.executable)')"
-          cmake --build build
+          cmake --build --preset python
 
       - name: Run pytest
         env:
-          PYTHONPATH: ${{ github.workspace }}/build/python
+          PYTHONPATH: ${{ github.workspace }}/build/python/python
         run: uv run pytest python/tests -q
 
       - name: Check the committed stubs are current
         env:
-          PYTHONPATH: ${{ github.workspace }}/build/python
+          PYTHONPATH: ${{ github.workspace }}/build/python/python
         run: |
           uv run python tools/fix_core_stubs.py
           git diff --exit-code python/cppcrystal/_core
+
+  #
+  # MSVC, advisory. Everything portable: library, unit tests, the reference
+  # spglib oracle, the benchmark smoke run and install -- the same `release`
+  # preset the Linux jobs use, with no Windows-specific project configuration.
+  #
+  # continue-on-error because nothing here had ever been compiled with cl.exe
+  # before this job existed, and its first failures are expected to be
+  # library-maturity ones (<generator>, the constexpr budget) rather than
+  # defects in this tree. Promoting it to a required job is a separate,
+  # deliberate change once it has been green for a while.
+  #
+  # Release only. MSVC Debug turns on _ITERATOR_DEBUG_LEVEL=2, which would make
+  # the benchmark smoke run meaningless and surface MSVC-STL debug assertions
+  # that say nothing about portability -- and the constexpr tables, which are
+  # the bulk of the build, would be paid for twice.
+  #
+  windows:
+    name: MSVC 2022 (release, advisory)
+    runs-on: windows-2022
+    continue-on-error: true
+    # The default is 360. What wants bounding here is a runaway constant
+    # evaluation: msg_database.cpp decodes 76683 operations at compile time with
+    # the budget raised to 10^8, on an evaluator slower and hungrier than GCC's.
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Puts cl.exe and the SDK on PATH, via GITHUB_ENV so the later steps
+      # inherit it. That is all the presets' Ninja generator needs -- no
+      # compiler is pinned in the preset, so cl is simply what it finds.
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # sccache, not ccache: ccache's cl.exe support is narrow. Same action,
+      # different variant. Unlike ccache on Linux, CMakeLists.txt does not go
+      # looking for it, so the launcher is passed below -- along with the
+      # embedded debug format, which is what lets sccache cache the output at
+      # all (it cannot cache a separate PDB).
+      - name: Set up sccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: msvc-release
+          max-size: 500M
+
+      # C:/d because Boost 1.88's superproject nested under the default
+      # D:\a\CppCrystal\CppCrystal\build\release\_deps runs into MAX_PATH.
+      - name: Cache fetched dependencies
+        uses: actions/cache@v4
+        with:
+          path: C:/d
+          key: deps-msvc-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: |
+            deps-msvc-
+
+      - name: Configure
+        run: >
+          cmake --preset release
+          -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl
+          -DFETCHCONTENT_BASE_DIR=C:/d
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+
+      - name: Build
+        run: cmake --build --preset release --parallel
+
+      - name: Test
+        run: ctest --preset release --parallel
+
+      - name: Benchmarks (smoke)
+        run: ./build/release/tests/cppcrystal_tests.exe "[!benchmark]" --benchmark-samples 3
+
+      - name: Install
+        run: cmake --install build/release
+
+  #
+  # Python bindings on Windows, also advisory. Its own job rather than steps in
+  # the one above because the two fail for unrelated reasons -- compiler and
+  # library maturity there, extension-loading and interpreter plumbing here --
+  # and a combined job would need triage on every red run to tell which.
+  #
+  windows-python:
+    name: python bindings (Windows, advisory)
+    runs-on: windows-2022
+    continue-on-error: true
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync the dev tools
+        run: uv sync
+
+      - name: Configure and build
+        run: |
+          cmake --preset python -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
+            -DFETCHCONTENT_BASE_DIR=C:/d `
+            "-DPython_EXECUTABLE=$(uv run python -c 'import sys; print(sys.executable)')"
+          cmake --build --preset python
+
+      - name: Run pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/build/python/python
+        run: uv run pytest python/tests -q
+
+      # No stub-freshness check here, unlike the Linux python job. The runner
+      # sets core.autocrlf=true and the tree carries no .gitattributes, so
+      # `git diff --exit-code` on generated .pyi files is a line-ending coin
+      # flip carrying no portability signal. It is repo hygiene, and the Linux
+      # job already answers it.

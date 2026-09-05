@@ -31,11 +31,8 @@ namespace cppcrystal::data {
 }
 
 [[nodiscard]] constexpr std::optional<double> atomic_volume(int z) noexcept {
-  auto const r = covalent_radius(z);
-  if (!r) {
-    return std::nullopt;
-  }
-  return 4.0 / 3.0 * std::numbers::pi * (*r) * (*r) * (*r);
+  return covalent_radius(z).transform(
+      [](double r) { return 4.0 / 3.0 * std::numbers::pi * r * r * r; });
 }
 
 // Chemical symbol of atomic number `z`; std::nullopt for an untabulated

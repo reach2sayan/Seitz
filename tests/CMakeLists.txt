@@ -26,8 +26,12 @@ target_link_libraries(cppcrystal_tests PRIVATE
         Boost::geometry
         Catch2::Catch2WithMain)
 # The granular unit tests validate each pipeline stage, so they see the private
-# headers under src/ (which are not part of the installed interface).
-target_include_directories(cppcrystal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+# headers under src/ (which are not part of the installed interface) — including
+# the generated operation tables, which live in the build tree. The public
+# generated headers arrive on their own through cppcrystal's PUBLIC interface.
+target_include_directories(cppcrystal_tests PRIVATE
+        ${CPPCRYSTAL_GENERATED_SRC_DIR}
+        ${CMAKE_SOURCE_DIR}/src)
 
 include(Catch)
 catch_discover_tests(cppcrystal_tests)
@@ -60,7 +64,9 @@ if (CPPCRYSTAL_BUILD_ORACLE_TESTS)
             Boost::geometry
             Spglib::symspg
             Catch2::Catch2WithMain)
-    target_include_directories(cppcrystal_oracle_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_include_directories(cppcrystal_oracle_tests PRIVATE
+            ${CPPCRYSTAL_GENERATED_SRC_DIR}
+            ${CMAKE_SOURCE_DIR}/src)
     # The reference corpus (one input cell per space group) lives in the
     # FetchContent source tree; the corpus loader reads it via this path.
     target_compile_definitions(cppcrystal_oracle_tests PRIVATE

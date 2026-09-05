@@ -40,6 +40,9 @@ def main():
           "Do not edit by hand.\n\n")
         w("#include <array>\n")
         w("#include <string_view>\n\n")
+        w("// Public header: opens the exported-ABI visibility window, closed at\n")
+        w("// the end of the file. The library compiles with hidden visibility.\n")
+        w("#pragma GCC visibility push(default)\n\n")
         w("namespace cppcrystal::data {\n\n")
 
         w("// Number of tabulated elements (atomic numbers 1..%d).\n" % n)
@@ -60,6 +63,7 @@ def main():
         w("}};\n\n")
 
         w("} // namespace cppcrystal::data\n")
+        w("\n#pragma GCC visibility pop\n")
 
     print("elements: %d (Z 1..%d)" % (n, n))
 

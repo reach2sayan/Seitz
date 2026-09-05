@@ -8,4 +8,12 @@
 //
 // It is not an API promise -- nothing under src/ is installed, so no consumer
 // can even declare these. It says only "the test binary links this".
+//
+// Empty on MSVC, where the library is a static archive (see CMakeLists.txt):
+// the test executable contains these definitions rather than importing them,
+// so there is nothing to export.
+#if defined(_MSC_VER)
+#define CPPCRYSTAL_TESTABLE
+#else
 #define CPPCRYSTAL_TESTABLE __attribute__((visibility("default")))
+#endif

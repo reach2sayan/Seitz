@@ -7,67 +7,66 @@
   },
   "configurePresets": [
     {
-      "name": "default",
-      "displayName": "Debug",
-      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc-15",
         "CMAKE_CXX_COMPILER": "g++-15",
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CPPCRYSTAL_BUILD_TESTS": "ON"
-      }
-    },
-    {
-      "name": "release",
-      "displayName": "Release",
-      "binaryDir": "${sourceDir}/cmake-build-release",
-      "cacheVariables": {
-        "CMAKE_CXX_COMPILER": "g++-15",
-        "CMAKE_BUILD_TYPE": "Release",
         "CPPCRYSTAL_BUILD_TESTS": "ON",
         "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"
       }
     },
     {
-      "name": "oracle",
+      "name": "debug",
       "displayName": "Debug + reference-spglib oracle",
-      "inherits": "default",
+      "inherits": "base",
       "cacheVariables": {
-        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "ON"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
-      "name": "oracle-asan",
+      "name": "release",
+      "displayName": "Release + reference-spglib oracle",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "asan",
       "displayName": "Debug + oracle + Address/UB sanitizers",
-      "inherits": "oracle",
+      "inherits": "debug",
       "cacheVariables": {
         "CPPCRYSTAL_ENABLE_SANITIZERS": "ON"
       }
     },
     {
       "name": "python",
-      "displayName": "Debug + Python bindings",
-      "inherits": "default",
+      "displayName": "Release + Python bindings",
+      "inherits": "base",
       "cacheVariables": {
-        "CPPCRYSTAL_BUILD_PYTHON": "ON"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CPPCRYSTAL_BUILD_PYTHON": "ON",
+        "CPPCRYSTAL_BUILD_TESTS": "OFF",
+        "CPPCRYSTAL_BUILD_DEMO": "OFF",
+        "CPPCRYSTAL_BUILD_ORACLE_TESTS": "OFF"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "default",
-      "configurePreset": "default"
+      "name": "debug",
+      "configurePreset": "debug"
     },
     {
       "name": "release",
       "configurePreset": "release"
     },
     {
-      "name": "oracle",
-      "configurePreset": "oracle"
-    },
-    {
-      "name": "oracle-asan",
-      "configurePreset": "oracle-asan"
+      "name": "asan",
+      "configurePreset": "asan"
     },
     {
       "name": "python",
@@ -76,8 +75,8 @@
   ],
   "testPresets": [
     {
-      "name": "default",
-      "configurePreset": "default",
+      "name": "debug",
+      "configurePreset": "debug",
       "output": {
         "outputOnFailure": true
       }
@@ -90,15 +89,8 @@
       }
     },
     {
-      "name": "oracle",
-      "configurePreset": "oracle",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "oracle-asan",
-      "configurePreset": "oracle-asan",
+      "name": "asan",
+      "configurePreset": "asan",
       "output": {
         "outputOnFailure": true
       }

@@ -21,29 +21,27 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# GCC 15 / Clang with libstdc++ only. The library needs <generator>, compiles as
-# gnu++23, and the constexpr-budget flag below has no portable spelling — so
-# rather than carry untested branches for other toolchains, say so once, here.
-# The source itself is platform-neutral (no POSIX headers, no _WIN32), so
-# relaxing this is a toolchain question, not a porting one.
-if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    message(FATAL_ERROR
-            "CppCrystal builds with GCC 15+ or Clang only (got ${CMAKE_CXX_COMPILER_ID}).")
-endif ()
-
-# The version, not just the vendor. GCC 14 and earlier accept -std=gnu++23 and
-# then fail deep inside operation_set.hpp on std::from_range, which reads as a
-# library bug rather than as "wrong compiler" -- and it is reachable, because a
-# path that does not go through CMakePresets (pip install ., an IDE default,
-# plain `cmake ..`) picks up whatever `c++` happens to be. Say it here instead.
-# Clang gets no version floor: its constraint is the libstdc++ it is paired
-# with, which is not what CMAKE_CXX_COMPILER_VERSION reports.
+# Version floors, not vendor gates. Each is here because the failure without it
+# is a wall of template errors inside one of our headers rather than "your
+# toolchain is too old", and each is reachable: a path that does not go through
+# CMakePresets (pip install ., an IDE default, plain `cmake ..`) picks up
+# whatever compiler happens to be first.
+#
+# GCC 14 and earlier accept -std=gnu++23 and then fail deep inside
+# operation_set.hpp on std::from_range. MSVC before 19.43 (Visual Studio 17.13)
+# has no <generator> and fails just as deep inside generate/assignments.hpp.
+# Clang gets no floor: its constraint is the libstdc++ it is paired with, which
+# is not what CMAKE_CXX_COMPILER_VERSION reports.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
     message(FATAL_ERROR
             "CppCrystal needs GCC 15+ for <generator> and std::from_range "
             "(got ${CMAKE_CXX_COMPILER_VERSION} at ${CMAKE_CXX_COMPILER}).\n"
             "Select one explicitly, e.g. CXX=g++-15 for a pip/uv build, or "
             "-DCMAKE_CXX_COMPILER=g++-15 for a direct cmake invocation.")
+elseif (MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.43)
+    message(FATAL_ERROR
+            "CppCrystal needs MSVC 19.43 / Visual Studio 17.13+ for <generator> "
+            "(got ${CMAKE_CXX_COMPILER_VERSION}).")
 endif ()
 
 option(CPPCRYSTAL_BUILD_TESTS "Build the test suite" ON)
@@ -56,24 +54,155 @@ option(CPPCRYSTAL_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF
 
 include(Dependencies)
 
+# ---- generated data tables ----
+# The symmetry tables are transcriptions, not authored source: each is a
+# mechanical rewrite of a spglib v2.7.0 C array (or, for the elements, of
+# tools/element_data.csv) into a constexpr std::array. So they are generated
+# into the build tree at build time rather than committed. A checked-in copy is
+# a second source of truth that drifts the moment anyone hand-edits it, and it
+# had already drifted: the `#pragma GCC visibility push(default)` window that
+# the three public tables need was added to the committed files by hand and
+# never to the generators, so a regeneration would silently have unexported
+# them. The generators emit it now, which is what makes this move lossless.
+#
+# The spglib inputs come from the same pinned checkout that backs the oracle
+# (cmake/Dependencies.cmake), so the tables the library compiles and the
+# reference implementation the oracle diffs them against cannot be two
+# different spglib versions.
+#
+# Deliberately NOT generated here, and still tracked in git:
+#   src/data/rod_group_tables.hpp — its source of truth is PyXtal, whose
+#       pymatgen dependency a C++ build has no business requiring.
+#   include/cppcrystal/data/subgroup_relations.hpp — produced by
+#       tools/generate_subgroup_relations.cpp, which links this library, which
+#       includes that header. Only a two-stage build breaks that cycle, and the
+#       derivation is slow enough that it should not run per build anyway.
+#   python/cppcrystal/_core/*.pyi — they describe the built extension module,
+#       so they are downstream of the build, not upstream of it. CI already
+#       fails on a stale one.
+#
+# COMPONENTS Interpreter only: the transcribers are stdlib-only scripts, no
+# third-party imports, so no virtualenv is needed to build C++. Spelled
+# `Python` rather than `Python3` so it resolves the same cache variable
+# pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
+find_package(Python 3.9 REQUIRED COMPONENTS Interpreter)
+
+set(CPPCRYSTAL_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
+set(CPPCRYSTAL_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/src")
+
+# At configure time, not from inside the custom commands: two of the five
+# generators write into each of these directories, and having both race to
+# create the same path under `ninja -j` is a failure mode worth not having.
+file(MAKE_DIRECTORY
+        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data")
+
+# One custom command per generator. Every transcriber takes its inputs then its
+# outputs as positional arguments, which is what lets this be one function
+# rather than five near-identical add_custom_command() blocks. The script is a
+# DEPENDS as well as the data, so editing a transcriber regenerates its tables
+# and recompiles whatever includes them.
+function(cppcrystal_transcribe script)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "INPUTS;OUTPUTS")
+    add_custom_command(
+            OUTPUT ${arg_OUTPUTS}
+            COMMAND ${Python_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}"
+            ${arg_INPUTS} ${arg_OUTPUTS}
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}" ${arg_INPUTS}
+            COMMENT "Transcribing data tables with ${script}"
+            VERBATIM)
+endfunction()
+
+set(CPPCRYSTAL_SPGLIB_SOURCE "${spglib_reference_SOURCE_DIR}/src")
+
+# Public — installed, and reachable from <cppcrystal/cppcrystal.hpp>.
+set(CPPCRYSTAL_GENERATED_PUBLIC_HEADERS
+        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/element_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/spacegroup_metadata_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp")
+# Private — the encoded-operation packing, decoded in the .cpp files. Never
+# installed, and a public header including one of these is a bug.
+set(CPPCRYSTAL_GENERATED_PRIVATE_HEADERS
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/hall_generators.hpp"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
+
+cppcrystal_transcribe(transcribe_elements.py
+        INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/element_data.csv"
+        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/element_tables.hpp")
+
+cppcrystal_transcribe(transcribe_spg_database.py
+        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/spg_database.c"
+        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/spacegroup_metadata_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/spacegroup_operation_tables.hpp")
+
+cppcrystal_transcribe(transcribe_msg_database.py
+        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/msg_database.c"
+        OUTPUTS "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal/data/magnetic_spacegroup_metadata_tables.hpp"
+        "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/magnetic_spacegroup_operation_tables.hpp")
+
+cppcrystal_transcribe(transcribe_hall_generators.py
+        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/hall_symbol.c"
+        OUTPUTS "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/hall_generators.hpp")
+
+cppcrystal_transcribe(transcribe_sitesym_database.py
+        INPUTS "${CPPCRYSTAL_SPGLIB_SOURCE}/sitesym_database.c"
+        OUTPUTS "${CPPCRYSTAL_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
+
+# NOT MSVC: ccache's cl.exe support is narrow enough to be a liability (it
+# needs /Z7 rather than /Zi and misses on several common flag shapes). The
+# Windows CI job passes sccache explicitly instead.
 find_program(CCACHE_PROGRAM ccache)
-if (CCACHE_PROGRAM)
+if (CCACHE_PROGRAM AND NOT MSVC)
     set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif ()
 
 # ---- library ----
-# SHARED explicitly, not via BUILD_SHARED_LIBS: the type is part of the contract
-# here, so a consumer's cache variable cannot silently turn it into a static
-# archive. Being shared is what makes the exported dependency set below exact --
-# PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the interface,
-# which a static archive could not promise.
-add_library(cppcrystal SHARED)
+# The type is decided here, not via BUILD_SHARED_LIBS: it is part of the
+# contract, so a consumer's cache variable cannot silently change it.
+#
+# SHARED where a shared object is the deliverable -- the standalone library a
+# consumer links against. Being shared is what makes the exported dependency set
+# below exact: PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the
+# interface, which a static archive cannot promise (see
+# cmake/CppCrystalConfig.cmake.in, which branches on exactly that).
+#
+# STATIC in the two cases where it is not, for reasons that are not about
+# packaging taste:
+#
+#   The Python extension absorbs the library, so a wheel is one binary rather
+#   than a .pyd/.so plus a sibling it has to locate at import time.
+#
+#   Windows, because of Boost.LEAF. PE has no symbol interposition, and LEAF
+#   keeps its active-context slots in thread_local static members of a class
+#   template (boost/leaf/config/tls_cpp11.hpp; BOOST_LEAF_SYMBOL_VISIBLE is
+#   empty off GCC). A DLL and its consumer would each get a private copy, so an
+#   error raised inside the library would reach the caller's try_handle_all with
+#   its payload silently dropped -- which is what tests/test_error_paths.cpp and
+#   python/tests/test_errors.py exist to catch. WINDOWS_EXPORT_ALL_SYMBOLS
+#   cannot help: the consumer's own COMDAT definition wins over any import.
+#   Linking one module is the only fix that does not fork Boost. It also makes
+#   the `#pragma GCC visibility` windows in the public headers and
+#   CPPCRYSTAL_TESTABLE genuinely inert rather than something to work around.
+if (CPPCRYSTAL_BUILD_PYTHON OR WIN32)
+    set(CPPCRYSTAL_LIBRARY_TYPE STATIC)
+else ()
+    set(CPPCRYSTAL_LIBRARY_TYPE SHARED)
+endif ()
+add_library(cppcrystal ${CPPCRYSTAL_LIBRARY_TYPE})
 add_library(cppcrystal::cppcrystal ALIAS cppcrystal)
-set_target_properties(cppcrystal PROPERTIES
-        # 0.x: SOVERSION tracks the minor, since every minor may break ABI
-        # before 1.0. From 1.0 on this becomes ${PROJECT_VERSION_MAJOR}.
-        VERSION ${PROJECT_VERSION}
-        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+# PIC unconditionally: as a static archive this library still gets linked into a
+# shared object (the Python extension), which needs its objects relocatable.
+set_target_properties(cppcrystal PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if (CPPCRYSTAL_LIBRARY_TYPE STREQUAL "SHARED")
+    set_target_properties(cppcrystal PROPERTIES
+            # 0.x: SOVERSION tracks the minor, since every minor may break ABI
+            # before 1.0. From 1.0 on this becomes ${PROJECT_VERSION_MAJOR}.
+            VERSION ${PROJECT_VERSION}
+            SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+endif ()
 target_sources(cppcrystal PRIVATE
         src/version.cpp
         src/warmup.cpp
@@ -124,13 +253,32 @@ target_sources(cppcrystal PRIVATE
         src/refine/standardize.cpp
         src/refine/standardize_cell.cpp
         src/refine/operations.cpp)
+
+# The generated tables, listed as sources even though they are headers. That is
+# what ties the custom commands above to this target: CMake sees the outputs
+# consumed here, so it schedules the transcription before the first translation
+# unit that includes one. Anything else that includes them (the tests, the
+# Python extension) links this library and is therefore ordered after it.
+target_sources(cppcrystal PRIVATE
+        ${CPPCRYSTAL_GENERATED_PUBLIC_HEADERS}
+        ${CPPCRYSTAL_GENERATED_PRIVATE_HEADERS})
+
+# The generated directories come FIRST, deliberately. A checkout made before the
+# tables stopped being tracked still has stale copies sitting in
+# include/cppcrystal/data and src/data, and a stale table quietly winning the
+# include search is the one failure mode here that yields wrong crystallography
+# rather than a build error. Searching the build tree first makes the leftovers
+# inert; `git rm --cached` plus a delete makes them gone.
 target_include_directories(cppcrystal PUBLIC
+        $<BUILD_INTERFACE:${CPPCRYSTAL_GENERATED_INCLUDE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 # The determination pipeline's headers live beside their .cpp files under src/
 # and are never installed: `#include <cppcrystal/...>` is the public API,
 # `#include "module/x.hpp"` is internal.
-target_include_directories(cppcrystal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(cppcrystal PRIVATE
+        ${CPPCRYSTAL_GENERATED_SRC_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(cppcrystal PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(cppcrystal PUBLIC Eigen3::Eigen Boost::container
@@ -144,25 +292,50 @@ target_link_libraries(cppcrystal PRIVATE Boost::flyweight Boost::geometry)
 # marking cannot keep Eigen's evaluators and libstdc++'s <generator> out of it
 # at -O2.
 target_compile_options(cppcrystal PRIVATE
-        -Wall -Wextra -Wpedantic
-        -Wshadow -Wcast-align -Wdouble-promotion
-        -Wimplicit-fallthrough -Wconversion -Wsign-conversion)
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wshadow;-Wcast-align;-Wdouble-promotion;-Wimplicit-fallthrough;-Wconversion;-Wsign-conversion>)
 
 # The magnetic database decodes all 76683 operations + the alternative
 # transformations into constexpr tables at compile time, subgroup_graph.hpp
 # closes the 230-group t-subgroup relation at compile time, and
 # find_symmetry.cpp filters the 26^3 candidate axis triples down to the 6960
 # unimodular ones; each blows past the compilers' default constant-evaluation
-# budget (find_symmetry.cpp on Clang only -- GCC clears it on the default). GCC and Clang spell the knob
-# differently (-fconstexpr-ops-limit, default 33554432, vs -fconstexpr-steps,
-# default 1048576). PUBLIC, not per-source: the subgroup tables live in an
-# installed header, so consumers evaluate them too.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-ops-limit=100000000")
-else ()
-    set(CPPCRYSTAL_CONSTEXPR_FLAGS "-fconstexpr-steps=100000000")
-endif ()
-target_compile_options(cppcrystal PUBLIC "${CPPCRYSTAL_CONSTEXPR_FLAGS}")
+# budget (find_symmetry.cpp on Clang only -- GCC clears it on the default).
+# All three compilers spell the knob differently: -fconstexpr-ops-limit (GCC,
+# default 33554432), -fconstexpr-steps (Clang, default 1048576) and
+# /constexpr:steps (MSVC, default 100000, with recursion capped separately by
+# /constexpr:depth). The MSVC spelling appends the number with no separator.
+# PUBLIC, not per-source: the subgroup tables live in an installed header, so
+# consumers evaluate them too.
+target_compile_options(cppcrystal PUBLIC
+        $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=100000000>
+        $<$<CXX_COMPILER_ID:Clang,AppleClang>:-fconstexpr-steps=100000000>
+        $<$<CXX_COMPILER_ID:MSVC>:/constexpr:steps100000000;/constexpr:depth2048>)
+
+# MSVC's own short list, all of it PUBLIC because what motivates each one is
+# reachable from an installed header.
+#
+#   /bigobj  -- src/data/magnetic_spacegroup_operation_tables.hpp is a 70458-line
+#               std::array<int, 76683> initializer and msg_database.cpp turns it
+#               into two more constexpr tables. The COFF section limit is not a
+#               theoretical concern there.
+#   /utf-8   -- 48 files under include/ and src/ carry non-ASCII characters in
+#               comments (en/em dashes, the implication arrow, the minus sign).
+#               Without this cl decodes them in the active code page.
+#   /Zc:__cplusplus -- not implied by /std:c++latest, and headers we ship through
+#               read it raw: third_party/mdspan.hpp branches on
+#               `__cplusplus >= 202002L` and boost/leaf/config.hpp gates
+#               BOOST_LEAF_CONSTEXPR on `__cplusplus > 201402L`. They silently
+#               take their C++14 fallbacks when it reports 199711L.
+#   /wd4068  -- the 45 public headers each open a `#pragma GCC visibility`
+#               window, and C4068 (unknown pragma) is level 1, so it fires at the
+#               default /W3 in every consumer TU as well as our own.
+#
+# Deliberately absent: /std:c++latest, /permissive-, /EHsc, /GR and /W3, all of
+# which CMake or the standard level already supplies; and /Zc:preprocessor,
+# which nothing here needs (no __VA_ARGS__ outside third_party) and which would
+# switch the vendored mdspan off its purpose-built _MSVC_TRADITIONAL path.
+target_compile_options(cppcrystal PUBLIC
+        $<$<CXX_COMPILER_ID:MSVC>:/bigobj;/utf-8;/Zc:__cplusplus;/wd4068>)
 
 # Interprocedural optimization, optimized configurations only.
 #
@@ -185,7 +358,12 @@ include(CheckIPOSupported)
 # subprojects enable C, and the default check would fail on that C compiler.
 check_ipo_supported(RESULT CPPCRYSTAL_HAS_IPO OUTPUT CPPCRYSTAL_IPO_ERROR
         LANGUAGES CXX)
-if (CPPCRYSTAL_HAS_IPO)
+# NOT MSVC: the measurement above is a GCC measurement, and its mechanism --
+# interposition blocking cross-TU inlining until -fno-semantic-interposition
+# unblocked it -- has no Windows counterpart. /GL + /LTCG on a library whose
+# slowest TU is a 70k-line table would buy an unmeasured maybe and cost an
+# expensive LTCG pass at every downstream link. Measure before enabling.
+if (CPPCRYSTAL_HAS_IPO AND NOT MSVC)
     set_target_properties(cppcrystal PROPERTIES
             INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
             INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
@@ -204,7 +382,8 @@ endif ()
 # cmake/CppCrystalConfig.cmake.in promises consumers never need Boost, and this
 # is what makes that true of the symbol table as well as the CMake interface.
 set_target_properties(cppcrystal PROPERTIES CXX_VISIBILITY_PRESET hidden)
-target_link_options(cppcrystal PRIVATE -Wl,--exclude-libs,ALL)
+target_link_options(cppcrystal PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wl,--exclude-libs,ALL>)
 
 # Interposition. A default-visibility function in a shared object may be
 # replaced at load time, so GCC must emit a PLT call and may not inline it --
@@ -212,14 +391,16 @@ target_link_options(cppcrystal PRIVATE -Wl,--exclude-libs,ALL)
 # expects to have its own symbols interposed, so calls inside it bind directly.
 # MEASURED: ~1.5% on the determination driver, consistent across 7 interleaved
 # runs. Small, but free and in the right direction.
-target_compile_options(cppcrystal PRIVATE -fno-semantic-interposition)
+target_compile_options(cppcrystal PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-semantic-interposition>)
 
 # Nothing here reads errno after a libm call, and promising that it might blocks
 # GCC from emitting sqrt as a single instruction. Also measured as no change on
 # this benchmark set; kept because it is accurate about the code and costs
 # nothing. Deliberately NOT -ffast-math: the search is tolerance-sensitive and
 # bit-parity-tested against the reference implementation.
-target_compile_options(cppcrystal PRIVATE -fno-math-errno)
+target_compile_options(cppcrystal PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-fno-math-errno>)
 
 # ISA. The shipped library targets the portable x86-64 baseline, which is why
 # Eigen gets no AVX/FMA here and why the oracle's bit-parity holds: with no FMA
@@ -235,10 +416,23 @@ target_compile_options(cppcrystal PRIVATE -fno-math-errno)
 # keeping in Debug, where an out-of-range block or a mis-sized product should
 # abort rather than corrupt memory quietly.
 if (CPPCRYSTAL_NATIVE_ARCH)
+    if (MSVC)
+        message(FATAL_ERROR
+                "CPPCRYSTAL_NATIVE_ARCH has no MSVC spelling: /arch: names fixed "
+                "ISA levels rather than the host's, and raising it past the SSE2 "
+                "default introduces FMA and breaks the bit-parity guarantee "
+                "described above.")
+    endif ()
     target_compile_options(cppcrystal PUBLIC -march=native -ffp-contract=off)
 endif ()
 
 if (CPPCRYSTAL_ENABLE_SANITIZERS)
+    if (MSVC)
+        message(FATAL_ERROR
+                "CPPCRYSTAL_ENABLE_SANITIZERS is GCC/Clang-only: MSVC ships "
+                "/fsanitize=address but no UBSan, and the ASan-under-CPython "
+                "arrangement in python/CMakeLists.txt has no Windows counterpart.")
+    endif ()
     target_compile_options(cppcrystal PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(cppcrystal PUBLIC -fsanitize=address,undefined)
 endif ()
@@ -283,6 +477,13 @@ include(CMakePackageConfigHelpers)
 # restate the defaults.
 install(TARGETS cppcrystal EXPORT CppCrystalTargets)
 install(DIRECTORY include/cppcrystal
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.hpp")
+# The three public tables are generated, so they are not under include/ to be
+# picked up by the rule above; they land in the same place from the build tree.
+# Their $<BUILD_INTERFACE:> and the authored headers' $<INSTALL_INTERFACE:include>
+# converge on one directory, which is why the installed layout is unchanged.
+install(DIRECTORY "${CPPCRYSTAL_GENERATED_INCLUDE_DIR}/cppcrystal"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.hpp")
 install(EXPORT CppCrystalTargets
