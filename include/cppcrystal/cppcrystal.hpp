@@ -45,6 +45,14 @@
 #include <cppcrystal/generate/generator.hpp>
 
 // Reciprocal space.
+// Alloy configurational thermodynamics: symmetry-distinct cluster enumeration
+// and the Cluster Variation Method.
+#include <cppcrystal/alloy/cluster.hpp>
+#include <cppcrystal/alloy/clusters_pool.hpp>
+#include <cppcrystal/alloy/cvm.hpp>
+#include <cppcrystal/alloy/parent_lattice.hpp>
+#include <cppcrystal/alloy/site_basis.hpp>
+
 #include <cppcrystal/kpoint/mesh.hpp>
 
 #include <cppcrystal/warmup.hpp>

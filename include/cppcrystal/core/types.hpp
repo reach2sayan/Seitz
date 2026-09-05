@@ -33,6 +33,12 @@ using Vector3i = Eigen::Vector3i;
 using Matrix3d = Eigen::Matrix3d; // columns are the (Cartesian) basis vectors
 using Matrix3i = Eigen::Matrix3i; // integer rotation expressed in the lat basis
 
+// Dynamically-sized double matrix. The fixed-size types above cover the
+// crystallography; this exists for the alloy layer's v-matrices, whose shape
+// (configurations x cluster functions) is a property of the cluster being
+// expanded and so is not a compile-time constant.
+using MatrixXd = Eigen::MatrixXd;
+
 // N x 3 block of fractional (or Cartesian) coordinates; row i is point/atom i.
 // Row-major so each point's three components are contiguous, matching the
 // per-atom access patterns that dominate the symmetry search.
