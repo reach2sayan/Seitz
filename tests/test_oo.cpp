@@ -1,8 +1,6 @@
-// Tests for the object-oriented layer: the analysis facades (SymmetryAnalyzer),
-// the standalone group objects (SpaceGroup / Wyckoff), and crystal
-// generation. The group tests assert the orbit-stabilizer invariant across all
-// 230 space groups; the generation test round-trips a generated cell back
-// through the analyzer.
+// The object-oriented layer: the analysis facades, the standalone group
+// objects, and generation. The group tests assert orbit-stabilizer across all
+// 230 space groups; generation round-trips a cell back through the analyzer.
 #include "core/overlap.hpp"
 #include "data/rod_database.hpp"
 #include <seitz/analysis/symmetry_analyzer.hpp>
@@ -37,11 +35,9 @@ namespace {
 using seitz::test::errored;
 using seitz::test::must;
 
-// Order of the point group named by a tabulated site-symmetry symbol. The
-// symbols are oriented Hermann-Mauguin symbols ("..2", "m.mm", "-4m.2"): the
-// dots mark direction slots and carry no group information, and a few symbols
-// differ from the standard one only by the order of the axes. Everything else
-// is one of the 32 point-group symbols.
+// Order of the point group a tabulated site-symmetry symbol names. These are
+// oriented Hermann-Mauguin symbols ("..2", "m.mm"): dots mark direction slots
+// and carry no group information, and some differ only in axis order.
 [[nodiscard]] int site_symmetry_order(std::string_view symbol) {
   std::string key;
   std::ranges::copy(symbol |
@@ -68,12 +64,10 @@ using seitz::test::must;
 
 TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
           "[group]") {
-  // Three independently sourced quantities meet in one identity: the tabulated
-  // multiplicity, the stabiliser computed from the tabulated operations at a
-  // generic point of the tabulated locus, and the orbit actually expanded from
-  // a generic seed. The tabulated site-symmetry symbol pins the stabiliser's
-  // order a second way, so a symbol and multiplicity mistabulated together
-  // would still be caught.
+  // Three independently sourced quantities in one identity: tabulated
+  // multiplicity, the stabiliser at a generic point of the tabulated locus, and
+  // the orbit expanded from a generic seed. The site-symmetry symbol pins the
+  // stabiliser's order a second way, so a pair mistabulated together is caught.
   Vector3d const seed{0.1234, 0.2718, 0.3142};
   int checked = 0;
   for (int number = 1; number <= 230; ++number) {
@@ -304,11 +298,9 @@ TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
 
 TEST_CASE("generated layer structures carry their full layer symmetry",
           "[layergen]") {
-  // The direct self-validation: a generated 2D-periodic structure must be
-  // invariant under EVERY operation of its layer group (aperiodic-aware
-  // overlap). This covers all crystal systems and the c-flipping groups
-  // (inversion, in-plane 2-folds/mirrors, horizontal mirrors), which the orbit
-  // must build without folding the non-periodic axis.
+  // A generated 2D-periodic structure must be invariant under EVERY operation
+  // of its layer group, under aperiodic-aware overlap. Covers the c-flipping
+  // groups, whose orbits must build without folding the non-periodic axis.
   for (int number : {1, 2, 19, 49, 61, 65}) {
     INFO("layer group " << number);
     auto const *lg =
@@ -379,13 +371,10 @@ TEST_CASE("SymmetryAnalyzer memoizes a consistent dataset", "[analysis]") {
 }
 
 namespace {
-// A generated structure carries its group's full symmetry iff every operation
-// maps the atom set onto itself, each atom onto an atom of the same type,
-// compared under the cell's OWN periodicity: a flip along an aperiodic axis
-// must land at the image (-a), never at the wrapped 1 - a. That one rule covers
-// the cluster (nothing folded — the integer operation acts on fractional
-// coordinates in the metric the point group is isometric in, which in Cartesian
-// terms is basis . R . basis^-1) and the rod (only its periodic axis folded).
+// A structure carries its group's full symmetry iff every operation maps the
+// atom set onto itself type-for-type, under the cell's OWN periodicity: a flip
+// along an aperiodic axis lands at -a, never the wrapped 1 - a. That covers the
+// cluster (nothing folded) and the rod (only its periodic axis).
 bool is_invariant(Cell const &cell, std::span<SymmetryOperation const> ops,
                   double tol = 1e-4) {
   Index const n = cell.size();

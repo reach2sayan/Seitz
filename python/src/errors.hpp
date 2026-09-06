@@ -15,10 +15,8 @@ namespace seitz::python {
 
 namespace py = pybind11;
 
-// The exception classes, built once at import. Held by handle rather than
-// py::object: these are interpreter-lifetime type objects, and a static
-// py::object would decref them during static destruction, after the interpreter
-// -- and the GIL -- are already gone.
+// Built once at import. By handle, not py::object: a static py::object would
+// decref these interpreter-lifetime types after the GIL is already gone.
 struct ErrorTypes {
   py::handle base; // SeitzError, which every other one derives from
   py::handle spacegroup_search_failed;
@@ -43,10 +41,9 @@ void register_errors(py::module_ &m);
 
 namespace detail {
 
-// Set `type` as the pending Python exception and throw. The payload overload
-// also puts the number on the instance, so `except AtomsTooCloseError as e:
-// e.distance` reads the double the search computed instead of parsing a
-// sentence back apart.
+// Set `type` pending and throw. The payload overloads put the value on the
+// instance, so `except AtomsTooCloseError as e: e.distance` reads a double
+// instead of parsing a sentence apart.
 [[noreturn]] void raise(py::handle type, char const *text);
 [[noreturn]] void raise(py::handle type, char const *text, char const *name,
                         double value);
@@ -65,26 +62,16 @@ namespace detail {
 } // namespace detail
 
 // The success value of `make()`, or a raised Python exception carrying the
-// error.
+// error. Nothing in the library throws, so this is the binding layer's one
+// translation. Three things are load-bearing:
 //
-// Takes the CALL, not its Result: LEAF keeps an error's payloads in
-// thread-local slots live only while a matching context is active, so a Result
-// produced before try_handle_all is entered arrives with its payloads gone and
-// every typed error degrades to the bare fallback.
-//
-// Nothing in the library throws -- every fallible entry point returns Result<T>
-// with a typed tag -- so this is the one translation the binding layer needs,
-// raising directly rather than through C++ exception classes that would exist
-// only to be caught two lines later.
-//
-// The value comes back BY VALUE, always: Result<T const &> holds a
-// reference_wrapper into an analyzer's memo, and returning that reference from
-// try_handle_all re-binds it through its own frame. Result<Cell const &> ->
-// Result<Cell> is LEAF's converting move constructor.
-//
-// Handlers take `e_message const *`, not `const &`: LEAF reads a pointer
-// parameter as "and this one if also present", so the specific class and the
-// specific sentence both survive instead of one shadowing the other.
+//  * Takes the CALL, not its Result. LEAF's payload slots live only while a
+//    matching context is active, so a Result produced beforehand arrives with
+//    its payloads gone and every typed error degrades to the fallback.
+//  * BY VALUE always: Result<T const &> holds a reference into an analyzer's
+//    memo, and returning it from try_handle_all re-binds through its frame.
+//  * Handlers take `e_message const *`, not `const &`. LEAF reads a pointer as
+//    "and this too if present", so class and sentence both survive.
 template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
   using Value =
       std::remove_cvref_t<typename std::invoke_result_t<F &>::value_type>;
@@ -177,17 +164,14 @@ template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
       });
 }
 
-// A const&-qualified Result<T const &> accessor, as something pybind11 can
-// bind. The parameter type is the point: every Analyzer projection is a pair --
-// `f() const &` and `f() const && = delete` -- so a bare &SymmetryAnalyzer::hall
-// is an ambiguous overload set. Naming the const& signature resolves it once
-// instead of a static_cast per binding site.
+// A const&-qualified Result<T const &> accessor pybind11 can bind. The
+// parameter type is the point: each projection is a `const &` / `const && =
+// delete` pair, so a bare &SymmetryAnalyzer::hall is ambiguous; naming the
+// signature resolves it once instead of a static_cast per binding site.
 //
-// The GIL is dropped around the call and the copy out: determination is the
-// expensive operation, detail::Lazy makes a const analyzer shareable across
-// threads, and nothing below touches a Python object. unwrap() then runs with
-// the GIL held, since raising needs it. py::call_guard<gil_scoped_release>
-// would be wrong -- it wraps the return cast too, and unwrap() raises.
+// The GIL is dropped around the call and copy out -- determination is the
+// expensive part and touches no Python object. Not call_guard: that would wrap
+// the return cast too, and unwrap() raises.
 template <class Self, class T>
 [[nodiscard]] auto memo(Result<T const &> (Self::*accessor)() const &) {
   return [accessor](Self const &self) -> T {
@@ -216,12 +200,10 @@ template <class Self, class T>
   };
 }
 
-// The same again, naming the class to bind against, for a projection the
-// analyzer INHERITS -- dataset() is declared on the CRTP base, so plain memo()
-// would deduce Self as Analyzer<Derived, Traits> and hand pybind11 a lambda
-// taking a base-class reference it has no caster for. (A member pointer would
-// have been fine: class_::def runs method_adaptor over one of those. A lambda
-// gets no such help, so the derived type is named here instead.)
+// The same, naming the class, for a projection the analyzer INHERITS: plain
+// memo() would deduce Self as the CRTP base and hand pybind11 a lambda taking
+// a base reference it has no caster for. A member pointer would survive
+// (class_::def runs method_adaptor); a lambda gets no such help.
 template <class Derived, class Base, class T>
   requires std::derived_from<Derived, Base>
 [[nodiscard]] auto memo_as(Result<T const &> (Base::*accessor)() const &) {

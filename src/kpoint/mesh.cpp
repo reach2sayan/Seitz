@@ -118,11 +118,10 @@ distortion_representative(Address doubled, Mesh const &mesh, std::size_t self,
   return best;
 }
 
-// The 125 reciprocal-lattice offsets searched per grid point: the +-2 cube over
-// the digits 0,1,2,-2,-1 per axis. cartesian_product varies its last range
-// fastest (x outermost, z fastest), pinned by the static_asserts below. Plain
-// int triples, not Vector3i: Eigen fixed-size matrices are literal types for
-// construction and access, not for arithmetic.
+// The 125 offsets searched per grid point: the +-2 cube over 0,1,2,-2,-1 per
+// axis. cartesian_product varies its last range fastest, pinned by the
+// static_asserts below. Plain int triples -- Eigen fixed-size matrices are
+// literal for construction and access, not arithmetic.
 inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
   constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
   std::array<Address, 125> table{};
@@ -164,11 +163,9 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
       static_cast<std::int64_t>(d[0]) * d[1],
   };
 
-  // Indexed writes, not push_back: each mapping_[i] depends only on i, both
-  // representative functions are pure, and normal_representative has no early
-  // exit at all -- it is a min-reduction over the rotations. This is the
-  // largest raw iteration count in the library (divisions can reach 10^6
-  // points), and the only loop in it worth threading.
+  // Indexed writes, not push_back: each mapping_[i] depends only on i and both
+  // representative functions are pure. The largest raw iteration count in the
+  // library (up to 10^6 points), and the only loop worth threading.
   mapping_.resize(mesh_.size());
   parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
     auto const i = static_cast<std::size_t>(index);
@@ -249,10 +246,9 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   std::vector<Address> addresses(mesh_.size());
 
   // Split so the expensive half can be threaded: the distance scan is 125
-  // reciprocal-space products per grid point and depends on that point alone,
-  // while the pass consuming it appends to a shared vector in index order.
-  // Phase one records, per point, the qualifying images (ascending) and the
-  // closest; phase two replays the single loop's sequence exactly.
+  // products per grid point and depends on that point alone, while the pass
+  // consuming it appends to a shared vector in order. Phase one records the
+  // qualifying images and the closest; phase two replays the same sequence.
   struct Candidates {
     std::uint8_t closest = 0;
     boost::container::small_vector<std::uint8_t, 4> qualifying;

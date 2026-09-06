@@ -30,27 +30,22 @@ coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
            double symprec, CellPeriodicity const &periodicity) noexcept;
 
 // Build-once, query-many index of "which atoms sit at this fractional point":
-// an R-tree over the atoms' Cartesian positions, folded into the cell along the
-// periodic axes. A query folds the same way and takes everything in a
-// symprec-sized box around each image `coincident`'s minimal-image fold can
-// pick. The symprec sphere is inside that box, so candidates() is a superset of
-// the coincident atoms and matches() re-tests with the exact predicate;
-// candidates come out ascending, so a first hit is the linear scan's first hit.
+// an R-tree over Cartesian positions folded along the periodic axes. A query
+// folds the same way and takes a symprec-sized box around each image
+// `coincident`'s minimal-image fold can pick. The sphere is inside the box, so
+// candidates() is a superset and matches() re-tests exactly; candidates come
+// out ascending, so a first hit is the linear scan's first hit.
 //
-// Only images that can contain a match are queried: with both sides folded into
-// [0, 1), a Cartesian offset of at most half_width_ is a fractional offset of at
-// most ||lattice^-1||_inf * half_width_, so the +-1 image along an axis matches
-// only when the folded coordinate is that close to 0 or 1 -- typically one box
-// per query, not the 27 of the full cube.
+// Only images that can contain a match are queried: a Cartesian offset of at
+// most half_width_ is a fractional one of at most ||lattice^-1||_inf *
+// half_width_, so the +-1 image matters only near 0 or 1 -- typically one box
+// per query, not 27.
 //
-// Queries take a caller-owned Scratch buffer: the hot paths run once per atom
-// per candidate operation and must not allocate. The allocating overloads
-// remain for cold callers.
+// Queries take a caller-owned Scratch: the hot paths run once per atom per
+// candidate operation and must not allocate.
 //
-// A uniform bucket grid was measured and REJECTED: ~5% faster on the
-// determination driver, ~14% slower on generation, where the index is rebuilt
-// per attempt and the bucket array never amortizes. The node size below is what
-// survived that experiment.
+// A uniform bucket grid was measured and REJECTED: ~5% faster on determination,
+// ~14% slower on generation, where the bucket array never amortizes.
 //
 // Non-owning: the positions and types must outlive the index.
 class SEITZ_TESTABLE PositionIndex {

@@ -13,13 +13,10 @@
 #include <ranges>
 #include <utility>
 
-// Two static tables drive point-group identification:
-//   * kPointgroupData: for each of the 32 point groups, the histogram of
-//     rotation types {-6,-4,-3,-2,-1,1,2,3,4,6} plus its
-//     symbols/holohedry/Laue.
-//   * kRotAxes: 73 candidate rotation axes used to pick conventional axes.
-// Identification matches the input's rotation-type histogram against the table;
-// the transformation matrix selects conventional axes per Laue class.
+// Two static tables drive identification: kPointgroupData holds each of the 32
+// groups' rotation-type histogram {-6,-4,-3,-2,-1,1,2,3,4,6} and its
+// symbols/holohedry/Laue; kRotAxes holds 73 candidate axes. The input's
+// histogram picks the group, then the Laue class picks conventional axes.
 namespace seitz::symmetry {
 
 namespace {
@@ -306,10 +303,9 @@ struct Principal {
                      SignedAxis{*second, 1}}};
 }
 
-// The two in-plane axes (a, b) for a one-axis Laue class: the first orthogonal
-// axis whose image under prop_rot is, up to sign, another orthogonal axis,
-// chosen so the cell is not F-centred (|det| < 4). nullopt if none qualifies
-// (also covers an empty orthogonal-axis set).
+// The in-plane axes (a, b) for a one-axis Laue class: the first orthogonal
+// axis whose image under prop_rot is another, up to sign, with |det| < 4 so the
+// cell is not F-centred. nullopt if none qualifies.
 [[nodiscard]] std::optional<std::pair<SignedAxis, SignedAxis>>
 in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
   for (int const first : ortho) {
@@ -358,10 +354,9 @@ in_plane_axes(Principal const &p, std::vector<int> const &ortho) {
   return kRotAxes[idx][aperiodic_axis];
 }
 
-// Of the three chosen axes, exactly two must lie in the periodic plane
-// (aperiodic component 0) and one along the aperiodic axis (component +/-1).
-// Move the aperiodic axis to c, then orient for a positive determinant.
-// nullopt for an invalid (e.g. inclined) configuration.
+// Exactly two of the three axes must lie in the periodic plane and one along
+// the aperiodic axis. Move that one to c and orient for a positive
+// determinant; nullopt for an inclined configuration.
 [[nodiscard]] std::optional<AxisTriple> layer_sort_axes(AxisTriple axes,
                                                         int aperiodic_axis) {
   auto const component = [&](int i) {

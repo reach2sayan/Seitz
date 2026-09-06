@@ -21,13 +21,10 @@
 #include <ranges>
 #include <utility>
 
-// The symmetry-operation search:
-//   1. Delaunay-reduce the lattice and enumerate the lattice point group by
-//      trying every unimodular integer matrix built from 26 candidate axes that
-//      preserves the metric.
-//   2. Transform those rotations into the input cell's basis.
-//   3. For each rotation, find the translations that map the cell onto itself
-//      via the OverlapChecker.
+// The symmetry-operation search: Delaunay-reduce, enumerate the lattice point
+// group over unimodular matrices from 26 candidate axes that preserve the
+// metric, carry those rotations into the cell basis, then find each one's
+// translations with the OverlapChecker.
 namespace seitz::symmetry {
 
 namespace {
@@ -48,14 +45,11 @@ constexpr int kRelativeAxes[26][3] = {
 
 [[nodiscard]] Vector3i axis(int const (&a)[3]) { return {a[0], a[1], a[2]}; }
 
-// The axis triples worth testing: those whose matrix is unimodular. A property
-// of kRelativeAxes alone, so it is decided once at compile time rather than
-// 26^3 times per pass, up to kNumAttempt passes per attempt. Index triples, not
-// matrices: 3 bytes an entry instead of 9.
-//
-// The order is the cartesian-product order of the loop this replaces, and the
-// two filters (determinant here, couples_aperiodic at runtime) commute, so the
-// same candidates are visited in the same sequence.
+// The unimodular axis triples. A property of kRelativeAxes alone, so decided
+// once at compile time instead of 26^3 times per pass. Index triples, not
+// matrices: 3 bytes an entry. The order is the cartesian-product order of the
+// loop this replaces, and the two filters commute, so candidates are visited
+// in the same sequence.
 using AxisTriple = std::array<std::uint8_t, 3>;
 
 // 6960 of the 17576 triples are unimodular; `count` below pins that.
@@ -91,11 +85,9 @@ inline constexpr UnimodularAxes kUnimodularAxes = [] {
 }();
 static_assert(kUnimodularAxes.count == kUnimodularAxes.triples.size());
 
-// Every pairwise dot product among the 26 candidate axes mapped into Cartesian
-// space. The metric of a candidate basis (a_i, a_j, a_k) IS the 3x3 of those
-// dot products -- metric(p, q) = (L.a_p).(L.a_q) -- so the whole scan shares
-// 676 values computed once, instead of each of its 6960 candidates doing two
-// 3x3 matrix products to rediscover six of them.
+// Every pairwise dot product among the 26 Cartesian candidate axes. A
+// candidate basis's metric IS the 3x3 of those, so the scan shares 676 values
+// instead of 6960 candidates each doing two 3x3 products for six of them.
 struct AxisMetrics {
   static constexpr std::size_t kAxes = std::size(kRelativeAxes);
   std::array<double, kAxes * kAxes> dot{};
@@ -153,10 +145,8 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{
   return ref;
 }
 
-// For a layer group the aperiodic axis must map to itself: no candidate axis
-// matrix may couple the aperiodic axis with the periodic plane. True if the
-// off-diagonal block for `aperiodic_axis` has any nonzero entry. Candidate
-// vectors are the columns of `axes`.
+// For a layer group no candidate may couple the aperiodic axis with the
+// periodic plane: true if its off-diagonal block has a nonzero entry.
 [[nodiscard]] bool couples_aperiodic(Matrix3i const &axes,
                                      int aperiodic_axis) noexcept {
   return std::ranges::any_of(std::views::iota(0, 3), [&](int p) {
@@ -165,13 +155,10 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{
   });
 }
 
-// Whether a candidate metric agrees with the reference one. An unset
-// angle_tolerance uses the sin-based criterion; a positive angle_tolerance
-// compares angles in degrees. math::metric_cosine clamps to [-1, 1] -- see
-// there for why.
-// The cheap half: the basis-vector lengths must agree. Split out so the scan
-// runs it off three table lookups and never assembles the rest of the metric
-// for the candidates it rejects, which is most of them.
+// Whether a candidate metric agrees with the reference. Unset angle_tolerance
+// uses the sin-based criterion; a positive one compares degrees.
+// The cheap half. Split out so the scan runs it off three table lookups and
+// never assembles the rest of the metric for the many candidates it rejects.
 [[nodiscard]] bool lengths_agree(MetricReference const &orig,
                                  Eigen::Array3d const &length_rot,
                                  double symprec) {

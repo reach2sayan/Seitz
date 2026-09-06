@@ -21,11 +21,9 @@
 #include <utility>
 #include <vector>
 
-// Given a primitive cell's symmetry operations, find the Hall number,
-// conventional/bravais lattice and origin shift: identify the point group,
-// clean up the triclinic/monoclinic basis, determine the centering, build the
-// conventional symmetry, then loop candidate Hall numbers permuting
-// axis/setting choices and matching against the Hall database.
+// Primitive operations -> Hall number, conventional lattice, origin shift:
+// point group, basis cleanup, centering, conventional symmetry, then candidate
+// Hall numbers over axis/setting choices matched against the database.
 namespace seitz {
 
 data::SpacegroupType const &SpacegroupMatch::type() const noexcept {
@@ -60,9 +58,8 @@ make_matrices(double const (&data)[Rows][3][3]) {
 
 // ---- change-of-basis tables ------------------------------------------------
 
-// One axis/setting choice: the change-of-basis matrix, the centering that
-// replaces C-centering under it, and the resulting unique axis. Stored as one
-// row per choice so the three properties can never drift apart.
+// One axis/setting choice: change of basis, the centering replacing C under
+// it, the resulting unique axis. One row per choice, so they cannot drift.
 struct AxisChoice {
   Matrix3d basis;
   Centering centering;
@@ -177,9 +174,8 @@ make_axis_choices(double const (&bases)[N][3][3],
   return t[static_cast<std::size_t>(lg_number - 19)];
 }
 
-// The 59 orthorhombic space groups are 16..74 and the 30 orthorhombic layer
-// groups are 19..48; the tables are indexed off those origins, so their sizes
-// are the ranges themselves.
+// Orthorhombic space groups are 16..74, layer groups 19..48; the tables are
+// indexed off those origins, so their sizes are the ranges.
 static_assert(num_axis_choices_ortho(16) == 6); // P222
 static_assert(num_axis_choices_ortho(74) == 2); // Imma
 static_assert(layer_num_axis_choices_ortho(19) == 2);
@@ -468,10 +464,8 @@ change_basis_tricli(Matrix3d const &conv_lattice,
   return math::round_to_int(tmat);
 }
 
-// 2D-Delaunay-reduce the plane orthogonal to the kept axis and update the
-// integer transformation matrix. For a 3D monoclinic cell the kept axis is the
-// unique axis b; for a layer the kept axis is the aperiodic axis (in its
-// conventional position), so the reduction acts on the periodic plane.
+// 2D-Delaunay-reduce the plane orthogonal to the kept axis, updating tmat.
+// Kept axis: unique b for 3D monoclinic, the aperiodic axis for a layer.
 [[nodiscard]] std::optional<Matrix3i>
 change_basis_monocli(Matrix3d const &conv_lattice,
                      Matrix3d const &primitive_lattice, double symprec,
@@ -508,10 +502,8 @@ try_hall(Matrix3d const &conv_lattice, HallNumber hall, Centering centering,
   return MatchResult{*shift, conv_lattice};
 }
 
-// The two-pass preference loop shared by the per-system matchers: when the
-// input lattice is usable, first try every choice constrained to it (so a
-// basis matching the input wins), then retry unconstrained.
-// `attempt(choice, orig_lattice_or_null)` produces the candidate result.
+// Two-pass preference shared by the per-system matchers: with a usable input
+// lattice, try every choice constrained to it first, then unconstrained.
 template <std::ranges::input_range R, class Try>
   requires std::convertible_to<
       std::invoke_result_t<Try &, std::ranges::range_reference_t<R>,
@@ -841,10 +833,9 @@ match_hall_symbol_db(Matrix3d const &conv_lattice, Matrix3d const *orig_lattice,
 
   case Holohedry::orthorhombic: {
     int const num_free_axes = num_axis_choices_ortho_for<F>(sg.number);
-    // Two-axis case: first fix the principal axis for the representative Hall
-    // symbol, then match the requested one in the resulting basis. This
-    // representative-Hall two-step is a 3D-only refinement; layer groups match
-    // directly with the c-preserving axis choices.
+    // Two-axis case: fix the principal axis for the representative Hall
+    // symbol, then match the requested one in that basis. 3D only -- layer
+    // groups match directly with the c-preserving choices.
     if constexpr (F == GroupFamily::space) {
       if (num_free_axes == 2) {
         auto const rep = match_db_ortho<F>(conv_lattice, orig_lattice,
@@ -891,10 +882,9 @@ struct SearchResult {
   Vector3d origin_shift;
 };
 
-// For the given operations, find the conventional setting and the first
-// matching Hall number. A forced Hall number is the only candidate; otherwise
-// the candidates are the default settings of every group sharing the found
-// point group (space groups for a 3D cell, layer groups for a layer cell).
+// The conventional setting and first matching Hall number. A forced Hall
+// number is the only candidate; otherwise the default settings of every group
+// sharing the found point group.
 template <GroupFamily F>
 [[nodiscard]] std::optional<SearchResult>
 search_hall_number(std::optional<HallNumber> forced_hall,
@@ -977,10 +967,8 @@ search_hall_number(std::optional<HallNumber> forced_hall,
   return std::nullopt;
 }
 
-// Exact, element-wise equality of two operation sets. Not a tolerance
-// comparison: reduce() copies surviving operations through unchanged, so two
-// runs that keep the same operations produce bitwise-identical values, and
-// that is precisely the question asked below.
+// Exact, element-wise. Not a tolerance comparison: reduce() copies survivors
+// through unchanged, so equal sets are bitwise identical.
 [[nodiscard]] bool same_operations(Operations const &a, Operations const &b) {
   return std::ranges::equal(
       a, b, [](SymmetryOperation const &x, SymmetryOperation const &y) {
@@ -1002,13 +990,10 @@ iterative_search_hall_number(std::optional<HallNumber> forced_hall,
 
   symmetry::SymmetrySearch<F> const search(primitive.cell, tol);
   Tolerance tightened = tol;
-  // search_hall_number sees the original tol.symprec, not the tightened one,
-  // so the reduced operation set is the only input that varies: an attempt
-  // filtering down to the previous set reaches the same answer. The search (up
-  // to 530 Hall candidates against every operation) far outweighs the filtering,
-  // and a 5% tightening usually leaves the set unchanged for many attempts, so
-  // skipping repeats is most of this loop's work. Held by value -- `reduced`
-  // dies each iteration -- trading one copy against up to 100 Hall searches.
+  // The reduced set is the only input that varies, so an attempt filtering to
+  // the previous set reaches the same answer. Skipping those repeats is most of
+  // this loop's work: the search is up to 530 Hall candidates against every
+  // operation. By value, trading one copy against up to 100 searches.
   Operations last_tried = symmetry;
   for (int attempt = 0; attempt < kNumAttempt; ++attempt) {
     tightened.symprec *= kReduceRate;
@@ -1102,9 +1087,8 @@ spacegroup_type_from_symmetry(Operations const &operations,
     prim_lat = lattice;
   }
 
-  // Niggli-reduce the primitive cell (required by the Hall-symbol matcher),
-  // then bring the operations into that reduced basis (the rotations are
-  // already distinct, so it is just the change of basis).
+  // Niggli-reduce (the matcher requires it), then carry the operations into
+  // that basis -- the rotations are distinct already, so it is just a change.
   BOOST_LEAF_AUTO(red, Lattice{prim_lat}.niggli(symprec));
   Matrix3d const &red_lat = red.matrix();
   Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;

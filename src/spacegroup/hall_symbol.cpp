@@ -21,13 +21,11 @@
 #include <span>
 #include <vector>
 
-// Given the symmetry operations of the conventional (bravais) cell and a
-// candidate Hall number, determine whether the operations match that Hall
-// setting and, if so, the origin shift that aligns them with the database
-// operations. The Grosse-Kunstleve (1999) origin-shift formula shift = VSpU .
-// dw is precomputed per setting (the VSpU tables); dw is the per-generator
-// translation difference vs the database, over every representative of the
-// generator rotation the operations offer.
+// Whether the conventional cell's operations match a candidate Hall setting
+// and, if so, the origin shift aligning them with the database. The
+// Grosse-Kunstleve (1999) formula shift = VSpU . dw is precomputed per setting;
+// dw is the per-generator translation difference against the database, over
+// every representative of that generator rotation.
 namespace seitz::spacegroup {
 
 using data::Centering;
@@ -50,10 +48,9 @@ namespace {
          centering_matrix_inv(c);
 }
 
-// Everything fixed for one (Hall setting, operation set) match: both operation
-// lists with their rotation indices, so every "the operation with rotation R"
-// question below is a logarithmic lookup. The family is a template parameter,
-// so the layer path's aperiodic c axis is an `if constexpr` branch.
+// Everything fixed for one (setting, operation set) match: both lists with
+// their rotation indices, so "the operation with rotation R" is a logarithmic
+// lookup. Family is a template parameter, so the layer path is if constexpr.
 template <GroupFamily F> struct MatchContext {
   HallNumber hall;
   Matrix3d const &primitive_lattice;
@@ -90,15 +87,13 @@ using DwChoices = std::array<DwCandidates, 3>;
           data::generator_matrix(g, 2)};
 }
 
-// Every distinct dw a generator rotation admits: the folded translation
-// difference (primitive setting) between an operation with that rotation and
-// the first database operation carrying it. Two operations of one rotation
-// differ by a lattice translation, integral in the primitive setting, so a
-// declared centering folds them onto one value. The B-centered monoclinic and
-// orthorhombic settings (13, 15, 34, ... 333) are declared PRIMITIVE while
-// their operations still carry the B translation, so each representative gives
-// its own dw and only trying all of them makes the match independent of input
-// order. A zero generator contributes the single zero block.
+// Every distinct dw a generator rotation admits: the folded primitive-setting
+// translation difference against the first database operation carrying it. Two
+// operations of one rotation differ by a lattice translation, so a declared
+// centering folds them onto one value. The B-centered monoclinic and
+// orthorhombic settings are declared PRIMITIVE while still carrying the B
+// translation, so each representative gives its own dw and only trying all of
+// them makes the match independent of input order.
 template <GroupFamily F>
 [[nodiscard]] std::optional<DwCandidates>
 dw_candidates(MatchContext<F> const &s, Centering c, Matrix3i const &rot) {
@@ -155,11 +150,9 @@ origin_shift(MatchContext<F> const &s, data::VSpUSet const &vspu,
   return s.wrap(data::vspu_matrix(vspu) * dw);
 }
 
-// The two operation lists re-expressed in the primitive setting: everything
-// matches_database needs that does NOT depend on the origin shift. It runs once
-// per element of the dw product below, and rebuilding M.t and M.R.M^-1 for up
-// to 192 operations each time was the bulk of its cost. Built once per
-// (operation set, centering), i.e. once per match_hall.
+// Both lists in the primitive setting: everything matches_database needs that
+// does not depend on the origin shift. It runs once per dw, and rebuilding
+// M.t and M.R.M^-1 for up to 192 operations each time was the bulk of its cost.
 struct CenteredOperations {
   std::vector<Vector3d> sym_translation; // M . t, per input operation
   std::vector<Matrix3d> sym_rotation;    // M . R . M^-1, per input operation
@@ -211,10 +204,9 @@ template <GroupFamily F>
   return true;
 }
 
-// One (generators, VSpU) candidate: the origin shift if some choice of
-// generator representatives makes the operations match the setting. The
-// product varies the last generator fastest, so the first combination tried is
-// the reference implementation's — the first operation carrying each rotation.
+// One (generators, VSpU) candidate: the origin shift, if some choice of
+// generator representatives matches. The product varies the last generator
+// fastest, so the first combination tried is the reference implementation's.
 template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d>
 hall_symbol_shift(MatchContext<F> const &s, Centering c,
@@ -309,11 +301,9 @@ template <GroupFamily F>
 [[nodiscard]] std::optional<Vector3d> dispatch(MatchContext<F> const &s,
                                                Centering c) {
   using namespace data;
-  // Crystal system and the rhombohedral subsets are pure functions of the Hall
-  // number, precomputed once in data::kHallClass. Layer groups (negative hall
-  // numbers) carry no 3D hall-range bucket, so their crystal system is derived
-  // from the point-group number; they are never rhombohedral and reuse the
-  // same per-system generator families.
+  // Crystal system and rhombohedral subsets are functions of the Hall number,
+  // precomputed in data::kHallClass. Layer groups have no 3D bucket, so theirs
+  // comes from the point-group number; never rhombohedral.
   HallClass const hc = [&] {
     if constexpr (F == GroupFamily::layer) {
       return HallClass{

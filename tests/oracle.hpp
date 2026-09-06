@@ -4,12 +4,10 @@
 // spglib C API (target Spglib::symspg). Compiled only into the oracle test
 // targets, gated by SEITZ_BUILD_ORACLE_TESTS.
 //
-// FOOTGUN: spglib's C `double lattice[3][3]` is row-major with the basis
-// vectors stored as COLUMNS (a = {L[0][0], L[1][0], L[2][0]}). Our Matrix3d
-// stores the basis vectors as columns too and indexes [row][col], so the bridge
-// is a plain element-wise copy `L[i][j] = M(i, j)`. Never
-// `Eigen::Map<Matrix3d>(&L[0][0])` (column-major map of row-major data silently
-// transposes).
+// FOOTGUN: spglib's `double lattice[3][3]` is row-major with the basis vectors
+// as COLUMNS. Matrix3d also stores them as columns and indexes [row][col], so
+// the bridge is an element-wise copy `L[i][j] = M(i, j)`. Never
+// `Eigen::Map<Matrix3d>(&L[0][0])` -- that silently transposes.
 
 #include <seitz/core/cell.hpp>
 #include <seitz/core/operation_set.hpp>
