@@ -803,9 +803,11 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
                          return std::get<0>(pair);
                        })};
   Positions images(static_cast<Index>(site_of.size()), 3);
+  // Index cast: MSVC's cartesian_product has a 128-bit difference type, so
+  // enumerate's counter is not an Eigen::Index there.
   for (auto const [i, pair] : std::views::enumerate(pairs)) {
     auto const &[index, operation] = pair;
-    images.row(i) =
+    images.row(static_cast<Index>(i)) =
         math::wrap_to_unit_cell(operation.apply(site_at(index).position))
             .transpose();
   }
