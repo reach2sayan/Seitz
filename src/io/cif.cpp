@@ -18,12 +18,11 @@
 // visible where those templates are defined, not merely where they are used.
 #include <iosfwd>
 namespace seitz::io {
-template <class Stop, int MinLength> struct RunParser;
+template <class Token> struct TokenParser;
 }
 namespace boost::parser::detail {
-template <class Context, class Stop, int MinLength>
-void print_parser(Context const &,
-                  seitz::io::RunParser<Stop, MinLength> const &,
+template <class Context, class Token>
+void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
                   std::ostream &os, int components = 0);
 }
 
@@ -35,6 +34,7 @@ void print_parser(Context const &,
 #include <cctype>
 #include <locale>
 #include <cmath>
+#include <cstdint>
 #include <format>
 #include <iterator>
 #include <numbers>
@@ -72,20 +72,19 @@ struct Block {
   std::vector<Entry> entries;
 };
 
-// Classic locale: a CIF tag is ASCII, and a Turkish one dotless-Is it.
-[[nodiscard]] std::string ascii_lower(std::string const &s) {
-  return boost::algorithm::to_lower_copy(s, std::locale::classic());
-}
-
-// ---- bulk token parsers -----------------------------------------------------
+// ---- token parsers ----------------------------------------------------------
 //
 // Boost.Parser charges per parser invocation, not per character: every
 // sub-parser (even inside lexeme[]) enters the skip machinery and sets up a
 // parse context before it looks at a byte, so `*(char_ - ws)` over a value
-// cost ~30 ns a character and the parse was two thirds of a CIF read. These
-// parsers consume a whole token in one invocation instead. Each stops before
-// the first position where `Stop` holds, appends the run to the attribute as
-// string_parser does, and fails on an empty run unless `MinLength` is zero.
+// cost ~30 ns a character and the parse was two thirds of a CIF read, and
+// `!no_case[keyword]` case-folded every value through Unicode tables. Each
+// CIF token is therefore one leaf parser, built the way the library's own
+// char_ and string_ leaves are (the two `call` overloads, detail::append for
+// the attribute, a print_parser hook for tracing) so it composes with >>, |,
+// lexeme[] and rules like any other. A Token policy says how a token opens,
+// where it ends, how it closes, and whether the text is acceptable; the
+// grammar below is still the combinator one.
 //
 // Whitespace and line ends are the ASCII ones bp::ws and bp::eol match on
 // `char` input: space, tab through carriage return; \n, \r (\r\n as one),
@@ -96,10 +95,29 @@ struct Block {
 [[nodiscard]] constexpr bool is_eol(char c) noexcept {
   return c == '\n' || c == '\r' || c == '\v' || c == '\f';
 }
+[[nodiscard]] constexpr char ascii_lower(char c) noexcept {
+  return 'A' <= c && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+// Reserved words a value may not begin with (case-insensitively); they end
+// whatever list they follow. `save_` here means a dictionary's save frames
+// stop the parse -- out of scope.
+[[nodiscard]] bool starts_with_keyword(Iterator first, Iterator last) {
+  std::string_view const text(first, last);
+  return std::ranges::any_of(
+      std::array{std::string_view{"data_"}, std::string_view{"loop_"},
+                 std::string_view{"save_"}, std::string_view{"global_"},
+                 std::string_view{"stop_"}},
+      [&](std::string_view keyword) {
+        return text.size() >= keyword.size() &&
+               std::ranges::equal(keyword, text.substr(0, keyword.size()), {},
+                                  {}, ascii_lower);
+      });
+}
 
 } // namespace
 
-template <class Stop, int MinLength> struct RunParser {
+template <class Token> struct TokenParser {
   template <class Iter, class Sentinel, class Context, class SkipParser>
   std::string call(Iter &first, Sentinel last, Context const &context,
                    SkipParser const &skip, bp::detail::flags flags,
@@ -110,38 +128,108 @@ template <class Stop, int MinLength> struct RunParser {
   }
   template <class Iter, class Sentinel, class Context, class SkipParser,
             class Attribute>
-  void call(Iter &first, Sentinel last, Context const &, SkipParser const &,
-            bp::detail::flags flags, bool &success, Attribute &out) const {
+  void call(Iter &first, Sentinel last, Context const &context,
+            SkipParser const &, bp::detail::flags flags, bool &success,
+            Attribute &out) const {
     Iter it = first;
-    while (it != last && !Stop{}(it, last)) {
-      ++it;
-    }
-    if (it - first < MinLength) {
+    if (!Token::open(it, last, context)) {
       success = false;
       return;
     }
-    bp::detail::append(out, first, it, bp::detail::gen_attrs(flags));
+    Iter const begin = it;
+    while (it != last && !Token::at_end(it, last)) {
+      ++it;
+    }
+    Iter const end = it;
+    if (!Token::accept(begin, end) || !Token::close(it, last)) {
+      success = false;
+      return;
+    }
+    // Appended as a range, not through detail::append, whose range form
+    // push_backs one character at a time.
+    if constexpr (!bp::detail::is_nope_v<Attribute>) {
+      if (bp::detail::gen_attrs(flags)) {
+        auto const at = out.size();
+        out.insert(out.end(), begin, end);
+        if constexpr (Token::lowercase) {
+          std::ranges::transform(out.begin() + static_cast<std::ptrdiff_t>(at),
+                                 out.end(),
+                                 out.begin() + static_cast<std::ptrdiff_t>(at),
+                                 ascii_lower);
+        }
+      }
+    }
     first = it;
   }
 };
 
 namespace {
 
-struct AtBlank {
-  bool operator()(auto it, auto) const { return is_blank(*it); }
+// The default policy: no delimiters, any text, ends at whitespace.
+struct Bare {
+  static constexpr bool lowercase = false;
+  static bool open(auto &, auto, auto const &) { return true; }
+  static bool at_end(auto it, auto) { return is_blank(*it); }
+  static bool accept(auto, auto) { return true; }
+  static bool close(auto &, auto) { return true; }
 };
-struct AtEol {
-  bool operator()(auto it, auto) const { return is_eol(*it); }
+// The rest of the line, for comments.
+struct LineRest : Bare {
+  static bool at_end(auto it, auto) { return is_eol(*it); }
 };
-// A quote closes only when whitespace or the end follows it: 'it's here'.
-template <char Quote> struct AtClosingQuote {
-  bool operator()(auto it, auto last) const {
-    return *it == Quote && (std::next(it) == last || is_blank(*std::next(it)));
+// `_tag`, underscore included, lowercased: a CIF tag is ASCII, and a Turkish
+// one dotless-Is it.
+struct Tag : Bare {
+  static constexpr bool lowercase = true;
+  static bool open(auto &it, auto last, auto const &) {
+    return it != last && *it == '_';
+  }
+  static bool accept(auto begin, auto end) { return end - begin > 1; }
+};
+// An unquoted value: may not start like a tag, a quote, a comment, a text
+// field or a reserved character, and may not be a keyword.
+struct Unquoted : Bare {
+  static bool open(auto &it, auto last, auto const &) {
+    return it != last && !is_blank(*it) &&
+           std::string_view{"_'\"#;$[]"}.find(*it) == std::string_view::npos;
+  }
+  static bool accept(auto begin, auto end) {
+    return !starts_with_keyword(begin, end);
   }
 };
-// A text field closes at a line end followed by ';'.
-struct AtEolSemicolon {
-  bool operator()(auto it, auto last) const {
+// A quoted value; the closing quote is the one followed by whitespace or the
+// end, so 'it's here' holds.
+template <char Quote> struct Quoted : Bare {
+  static bool open(auto &it, auto last, auto const &) {
+    if (it == last || *it != Quote) {
+      return false;
+    }
+    ++it;
+    return true;
+  }
+  static bool at_end(auto it, auto last) {
+    return *it == Quote && (std::next(it) == last || is_blank(*std::next(it)));
+  }
+  static bool close(auto &it, auto last) {
+    if (it == last) {
+      return false;
+    }
+    ++it;
+    return true;
+  }
+};
+// A text field: ';' opening a line through the next line end followed by ';'.
+struct TextField : Bare {
+  static bool open(auto &it, auto last, auto const &context) {
+    bool const at_column_1 =
+        it == bp::_begin(context) || *std::prev(it) == '\n';
+    if (!at_column_1 || it == last || *it != ';') {
+      return false;
+    }
+    ++it;
+    return true;
+  }
+  static bool at_end(auto it, auto last) {
     if (!is_eol(*it)) {
       return false;
     }
@@ -151,6 +239,17 @@ struct AtEolSemicolon {
     }
     return next != last && *next == ';';
   }
+  static bool close(auto &it, auto last) {
+    if (it == last) {
+      return false;
+    }
+    if (*it == '\r' && std::next(it) != last && *std::next(it) == '\n') {
+      ++it;
+    }
+    ++it; // the line end
+    ++it; // the ';'
+    return true;
+  }
 };
 
 } // namespace
@@ -159,67 +258,33 @@ struct AtEolSemicolon {
 // The tracing hook declared above the parser headers; nothing here traces,
 // but the sequence parser instantiates it regardless.
 namespace boost::parser::detail {
-template <class Context, class Stop, int MinLength>
-void print_parser(Context const &,
-                  seitz::io::RunParser<Stop, MinLength> const &,
+template <class Context, class Token>
+void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
                   std::ostream &os, int) {
-  os << "run";
+  os << "token";
 }
 } // namespace boost::parser::detail
 
 namespace seitz::io {
 namespace {
 
-bp::parser_interface<RunParser<AtBlank, 1>> const nonblank_run;
-bp::parser_interface<RunParser<AtBlank, 0>> const nonblank_run0;
-bp::parser_interface<RunParser<AtEol, 0>> const line_rest;
-bp::parser_interface<RunParser<AtClosingQuote<'\''>, 0>> const squoted_body;
-bp::parser_interface<RunParser<AtClosingQuote<'"'>, 0>> const dquoted_body;
-bp::parser_interface<RunParser<AtEolSemicolon, 0>> const text_field_body;
+bp::parser_interface<TokenParser<Bare>> const bare;
+bp::parser_interface<TokenParser<LineRest>> const line_rest;
+bp::parser_interface<TokenParser<Tag>> const cif_tag;
+bp::parser_interface<TokenParser<Unquoted>> const unquoted;
+bp::parser_interface<TokenParser<Quoted<'\''>>> const squoted;
+bp::parser_interface<TokenParser<Quoted<'"'>>> const dquoted;
+bp::parser_interface<TokenParser<TextField>> const text_field;
 
 auto const comment = bp::lit('#') >> bp::omit[line_rest];
 auto const skipper = bp::ws | comment;
 
-// Reserved words a value may not be; they end whatever list they follow.
-// `save_` here means a dictionary's save frames stop the parse -- out of scope.
-auto const keyword = bp::no_case[bp::lit("data_") | bp::lit("loop_") |
-                                 bp::lit("save_") | bp::lit("global_") |
-                                 bp::lit("stop_")];
-bp::rule<struct tag_tag, std::string> const cif_tag = "tag";
-auto const cif_tag_def =
-    bp::transform(ascii_lower)[bp::lexeme[bp::char_('_') >> nonblank_run]];
+// Skipped once, before the token; the alternatives are single leaves.
+auto const value = bp::lexeme[text_field | squoted | dquoted | unquoted];
 
-// A text field, which CIF recognises only when the ';' opens a line.
-auto const at_column_1 = [](auto &ctx) {
-  auto const it = bp::_where(ctx).begin();
-  return it == bp::_begin(ctx) || *std::prev(it) == '\n';
-};
-bp::rule<struct text_field_tag, std::string> const text_field = "text field";
-auto const text_field_def =
-    bp::eps(at_column_1) >>
-    bp::lexeme[';' >> text_field_body >> bp::eol >> ';'];
-
-// The closing quote is the one followed by whitespace, so 'it's here' holds.
-bp::rule<struct squoted_tag, std::string> const squoted = "quoted value";
-auto const squoted_def =
-    bp::lexeme['\'' >> squoted_body >> '\''];
-bp::rule<struct dquoted_tag, std::string> const dquoted = "quoted value";
-auto const dquoted_def =
-    bp::lexeme['"' >> dquoted_body >> '"'];
-
-bp::rule<struct unquoted_tag, std::string> const unquoted = "value";
-auto const unquoted_def =
-    bp::lexeme[!keyword >> (bp::char_ - bp::char_("_'\"#;$[]")) >>
-               nonblank_run0];
-
-// lexeme[]: the skipper runs once, before the value, not again for each of
-// the four alternatives -- and the skip call, not the whitespace it eats, was
-// the cost that made parsing dominate a CIF read.
-bp::rule<struct value_tag, std::string> const value = "value";
-auto const value_def = bp::lexeme[text_field | squoted | dquoted | unquoted];
-
+// separate[]: two adjacent string leaves would otherwise merge into one.
 bp::rule<struct item_tag, Item> const item = "tag/value item";
-auto const item_def = cif_tag >> value;
+auto const item_def = bp::separate[cif_tag >> value];
 
 // separate[]: without it the tag and value lists merge into one vector.
 bp::rule<struct loop_tag, Loop> const loop = "loop";
@@ -230,8 +295,7 @@ auto const loop_def = bp::separate[bp::transform([](auto const &r) {
 
 bp::rule<struct block_tag, Block> const data_block = "data block";
 auto const data_block_def =
-    bp::lexeme[bp::no_case[bp::lit("data_")] >> nonblank_run0] >>
-    *(loop | item);
+    bp::lexeme[bp::no_case[bp::lit("data_")] >> bare] >> *(loop | item);
 
 // The trailing `*skipper` is what lets the caller check `first == last`:
 // blocks alone stop at the last value, leaving the file's final newline.
@@ -244,8 +308,7 @@ auto const document_def = *data_block >> bp::omit[*skipper];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #endif
-BOOST_PARSER_DEFINE_RULES(cif_tag, text_field, squoted, dquoted, unquoted, value,
-                          item, loop, data_block, document);
+BOOST_PARSER_DEFINE_RULES(item, loop, data_block, document);
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
@@ -536,7 +599,22 @@ constexpr auto kNamedSources = std::array{
     NamedSource{kHmTags, &data::hall_from_hm_symbol<GroupFamily::space>},
     NamedSource{kNumberTags, &hall_of_number}};
 
-// The setting the block names outright; nullopt when it names none.
+// The setting the block names and the tables know; nullopt otherwise. For
+// the loop path, where the name only confirms the listed operations, so an
+// unknown symbol (`Aba2`, a non-standard setting) is no error.
+[[nodiscard]] std::optional<HallNumber>
+resolved_setting(CifBlock const &block) {
+  for (auto const &[tags, resolve] : kNamedSources) {
+    auto const stated = first_stated(block, tags);
+    if (auto const hall = stated ? resolve(*stated) : std::nullopt) {
+      return hall;
+    }
+  }
+  return std::nullopt;
+}
+
+// The setting the block names outright; nullopt when it names none, an error
+// when it names one the tables cannot resolve.
 [[nodiscard]] Result<std::optional<HallNumber>>
 named_setting(CifBlock const &block) {
   for (auto const &[tags, resolve] : kNamedSources) {
@@ -553,8 +631,31 @@ named_setting(CifBlock const &block) {
   return std::optional<HallNumber>{};
 }
 
+// Whether `listed` is exactly the operation set of `hall`: the same count,
+// and every listed operation present with the same rotation and a coincident
+// translation (modulo lattice translations, within symprec). n^2 over at
+// most 192 operations; the search this spares walks 530 candidate settings.
+[[nodiscard]] bool lists_setting(std::span<SymmetryOperation const> listed,
+                                 HallNumber hall, Lattice const &lattice,
+                                 double symprec) {
+  Operations const &database = data::operations_from_database(hall);
+  if (listed.size() != database.size()) {
+    return false;
+  }
+  return std::ranges::all_of(listed, [&](SymmetryOperation const &op) {
+    return std::ranges::any_of(database, [&](SymmetryOperation const &ref) {
+      return ref.rotation == op.rotation &&
+             coincident(ref.translation, op.translation, lattice.matrix(),
+                        symprec, all_periodic());
+    });
+  });
+}
+
 // The operations to expand with, and their setting. A symop loop wins -- it is
 // what the file asserts; failing to recover its Hall setting is not fatal.
+// A setting the block also names is taken when the loop lists exactly its
+// operations, which is what a well-formed file does; otherwise the setting is
+// searched for from the operations alone.
 [[nodiscard]] Result<std::pair<std::vector<SymmetryOperation>,
                                std::optional<HallNumber>>>
 symmetry_of(CifBlock const &block, Lattice const &lattice,
@@ -570,10 +671,16 @@ symmetry_of(CifBlock const &block, Lattice const &lattice,
       BOOST_LEAF_AUTO(operation, from_xyz(text));
       operations.push_back(operation);
     }
-    std::optional<HallNumber> hall;
-    if (auto const match =
-            Operations{operations}.spacegroup(lattice.matrix(), tol)) {
-      hall = match->hall;
+    std::optional<HallNumber> const named = resolved_setting(block);
+    std::optional<HallNumber> hall =
+        named && lists_setting(operations, *named, lattice, tol.symprec)
+            ? named
+            : std::nullopt;
+    if (!hall) {
+      if (auto const match =
+              Operations{operations}.spacegroup(lattice.matrix(), tol)) {
+        hall = match->hall;
+      }
     }
     return std::pair{std::move(operations), hall};
   }
@@ -639,26 +746,44 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   BOOST_LEAF_AUTO(symmetry, symmetry_of(block, lattice, tol));
   auto const &[operations, hall] = symmetry;
 
-  std::vector<Vector3d> positions;
-  Types types;
-  std::vector<std::string> labels;
-  // Against everything placed so far, not just this site's images: files do
-  // list a row and its own image, and collapse_shared_sites only sees rows
-  // already coincident before the symmetry is applied.
+  // Every image of every kept site, in (site, operation) order; an image is
+  // placed unless an earlier placed one coincides with it -- against
+  // everything placed so far, not just this site's images: files do list a
+  // row and its own image, and collapse_shared_sites only sees rows already
+  // coincident before the symmetry is applied. One index over all the
+  // candidates answers "an earlier placed coincident image?" in order, which
+  // is the same rule as placing one by one against the placed list.
+  Positions images(static_cast<Index>(kept.size() * operations.size()), 3);
+  std::vector<int> site_of;
+  site_of.reserve(static_cast<std::size_t>(images.rows()));
   for (int const index : kept) {
     CifSite const &site = sites[static_cast<std::size_t>(index)];
     for (SymmetryOperation const &operation : operations) {
-      Vector3d const image =
-          math::wrap_to_unit_cell(operation.apply(site.position));
-      if (std::ranges::none_of(positions, [&](Vector3d const &other) {
-            return coincident(image, other, lattice.matrix(), tol.symprec,
-                              all_periodic());
-          })) {
-        positions.push_back(image);
-        types.push_back(site.type);
-        labels.push_back(site.label);
-      }
+      images.row(site_of.size()) =
+          math::wrap_to_unit_cell(operation.apply(site.position)).transpose();
+      site_of.push_back(index);
     }
+  }
+  Types const untyped(site_of.size(), 0); // coincidence ignores the species
+  PositionIndex const index(images, untyped, lattice.matrix(), tol.symprec,
+                            all_periodic());
+  PositionIndex::Scratch scratch;
+  std::vector<std::uint8_t> placed(site_of.size(), 0);
+  std::vector<Vector3d> positions;
+  Types types;
+  std::vector<std::string> labels;
+  for (auto const [i, site_index] : std::views::enumerate(site_of)) {
+    auto const earlier = index.first_match(
+        images.row(i).transpose(), 0, scratch,
+        [&](int j) { return j < i && placed[static_cast<std::size_t>(j)]; });
+    if (earlier) {
+      continue;
+    }
+    placed[static_cast<std::size_t>(i)] = 1;
+    CifSite const &site = sites[static_cast<std::size_t>(site_index)];
+    positions.push_back(images.row(i).transpose());
+    types.push_back(site.type);
+    labels.push_back(site.label);
   }
   if (positions.empty()) {
     return leaf::new_error(e_empty_cell{});
