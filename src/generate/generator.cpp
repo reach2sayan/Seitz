@@ -1,8 +1,9 @@
 #include <seitz/generate/generator.hpp>
 
 #include "generate/random_lattice.hpp"
-#include <seitz/data/element_data.hpp>
 #include <seitz/generate/distance_check.hpp>
+
+#include <boost/leaf.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -28,37 +29,50 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                       GenerateOptions const &options) {
   return std::ranges::fold_left(comp, 0.0, [&](double sum, auto const &entry) {
     auto const &[type, count] = entry;
-    double const r =
-        data::covalent_radius(type).value_or(options.distance.fallback_radius);
-    return sum + static_cast<double>(count) * 2.0 * r;
+    return sum + static_cast<double>(count) * 2.0 *
+                     options.distance.radius(type);
   });
 }
 
-// One structure for one assignment: each placement's seed is drawn from the
-// family's box, projected onto its Wyckoff locus and expanded into the full
-// orbit, folding only the periodic axes.
-[[nodiscard]] Cell assemble(Assignment<group::Wyckoff> const &assignment,
-                            Matrix3d const &lattice,
-                            CellPeriodicity const &periodicity,
-                            SeedBox const &box, std::mt19937_64 &rng) {
-  auto const total = std::ranges::fold_left(
-      assignment, std::size_t{0}, [](std::size_t sum, auto const &placed) {
-        return sum + static_cast<std::size_t>(placed.position->multiplicity());
-      });
+// One structure for one assignment: each placement's generating point is its
+// pinned coordinate or a draw from the family's box, projected onto its
+// Wyckoff locus (recorded on the returned assignment) and expanded into the
+// full orbit, folding only the periodic axes.
+[[nodiscard]] Generated assemble(Assignment<group::Wyckoff> assignment,
+                                 Matrix3d const &lattice,
+                                 CellPeriodicity const &periodicity,
+                                 SeedBox const &box, std::mt19937_64 &rng) {
   std::vector<Vector3d> rows;
-  rows.reserve(total);
   Types types;
-  types.reserve(total);
-  for (auto const &placed : assignment) {
+  for (auto &placed : assignment) {
+    placed.coordinate = placed.position->canonical(
+        placed.coordinate.value_or(box.sample(rng)));
     Positions const orbit =
-        placed.position->orbit(box.sample(rng), periodicity);
-    for (Index i = 0; i < orbit.rows(); ++i) {
-      rows.push_back(orbit.row(i).transpose());
-      types.push_back(placed.type);
-    }
+        placed.position->orbit(*placed.coordinate, periodicity);
+    rows.append_range(std::views::iota(Index{0}, orbit.rows()) |
+                      std::views::transform([&](Index i) {
+                        return Vector3d(orbit.row(i).transpose());
+                      }));
+    types.insert(types.end(), static_cast<std::size_t>(orbit.rows()),
+                 placed.type);
   }
-  return Cell{Lattice{lattice}, to_positions(rows), std::move(types),
-              periodicity};
+  return Generated{Cell{Lattice{lattice}, to_positions(rows), std::move(types),
+                        periodicity},
+                   std::move(assignment)};
+}
+
+// Whether `lattice`'s metric is invariant under every rotation of `ops`
+// (R^T G R == G), so the integer operations are true isometries on it.
+[[nodiscard]] bool
+lattice_compatible(Lattice const &lattice,
+                   std::span<SymmetryOperation const> ops) noexcept {
+  Matrix3d const metric = lattice.metric();
+  double const tolerance = 1e-6 * metric.cwiseAbs().maxCoeff();
+  return std::ranges::all_of(ops, [&](SymmetryOperation const &op) {
+    Matrix3d const r = op.rotation.cast<double>();
+    return (r.transpose() * metric * r - metric).cwiseAbs().maxCoeff() <=
+           tolerance;
+  });
 }
 
 // A seed box spanning the full repeat along every periodic axis and a band
@@ -185,15 +199,50 @@ Matrix3d GroupTraits<group::RodGroup>::lattice(group::RodGroup const &g,
 }
 
 template <GeneratableGroup G>
+Result<Assignment<group::Wyckoff>> Generator<G>::fixed_placements() const {
+  Assignment<group::Wyckoff> fixed;
+  fixed.reserve(options_.sites.size());
+  for (FixedSite const &site : options_.sites) {
+    BOOST_LEAF_AUTO(position, group_->wyckoff(site.letter));
+    fixed.push_back({site.type, position, site.coordinate});
+  }
+  return fixed;
+}
+
+template <GeneratableGroup G>
+bool Generator<G>::compatible(Composition const &comp) const {
+  return !assignments(comp, 1).empty();
+}
+
+template <GeneratableGroup G>
+std::vector<Assignment<group::Wyckoff>>
+Generator<G>::assignments(Composition const &comp, std::size_t max) const {
+  return leaf::try_handle_all(
+      [&]() -> Result<std::vector<Assignment<group::Wyckoff>>> {
+        BOOST_LEAF_AUTO(fixed, fixed_placements());
+        return std::vector<Assignment<group::Wyckoff>>{
+            std::from_range,
+            enumerate_assignments(group_->wyckoffs(), comp, std::move(fixed)) |
+                std::views::take(max)};
+      },
+      [](leaf::error_info const &) {
+        return std::vector<Assignment<group::Wyckoff>>{};
+      });
+}
+
+template <GeneratableGroup G>
 Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   using Traits = GroupTraits<G>;
   auto const positions = group_->wyckoffs();
   auto const kind = Traits::kind(*group_);
 
+  BOOST_LEAF_AUTO(fixed, fixed_placements());
+  std::size_t const pinned = fixed.size();
   // Not const: shuffled below.
   std::vector<Assignment<group::Wyckoff>> assignments(
-      std::from_range, enumerate_assignments(positions, comp) |
-                           std::views::take(kMaxAssignments));
+      std::from_range,
+      enumerate_assignments(positions, comp, std::move(fixed)) |
+          std::views::take(kMaxAssignments));
   if (assignments.empty()) {
     return leaf::new_error(e_message{
         std::format("generate: the composition is not compatible with the "
@@ -204,9 +253,9 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   if (options_.placement == Placement::general_only) {
     group::Wyckoff const *general = &positions.back();
     std::erase_if(assignments, [&](Assignment<group::Wyckoff> const &a) {
-      return std::ranges::any_of(a, [&](Placed<group::Wyckoff> const &p) {
-        return p.position != general;
-      });
+      return std::ranges::any_of(
+          a | std::views::drop(pinned),
+          [&](Placed<group::Wyckoff> const &p) { return p.position != general; });
     });
     if (assignments.empty()) {
       return leaf::new_error(e_message{std::format(
@@ -214,6 +263,15 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
           "multiple of the general-position multiplicity of the requested {}",
           kind)});
     }
+  }
+
+  if (options_.lattice &&
+      !lattice_compatible(*options_.lattice, group_->operations())) {
+    return leaf::new_error(
+        e_incompatible_lattice{},
+        e_message{std::format("generate: the given lattice's metric is not "
+                              "invariant under the requested {}",
+                              kind)});
   }
 
   std::mt19937_64 rng(options_.seed.value_or(0));
@@ -227,10 +285,12 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
     for (int attempt = 0; attempt < options_.attempts_per_combination;
          ++attempt) {
       Matrix3d const lattice =
-          Traits::lattice(*group_, comp, options_, attempt, rng);
-      Cell cell = assemble(assignment, lattice, periodicity, box, rng);
-      if (distances_valid(cell, options_.distance)) {
-        return Generated{std::move(cell), assignment};
+          options_.lattice
+              ? options_.lattice->matrix()
+              : Traits::lattice(*group_, comp, options_, attempt, rng);
+      Generated candidate = assemble(assignment, lattice, periodicity, box, rng);
+      if (distances_valid(candidate.cell, options_.distance)) {
+        return candidate;
       }
     }
   }

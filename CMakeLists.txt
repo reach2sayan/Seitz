@@ -47,7 +47,6 @@ endif ()
 option(SEITZ_BUILD_TESTS "Build the test suite" ON)
 option(SEITZ_BUILD_DEMO "Build the demo executable" ON)
 option(SEITZ_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
-option(SEITZ_BUILD_TOOLS "Build offline data generators" OFF)
 option(SEITZ_BUILD_PYTHON "Build the pybind11 extension module" OFF)
 option(SEITZ_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
@@ -71,22 +70,44 @@ include(Dependencies)
 # different spglib versions.
 #
 # Two of the tables have a source of truth a C++ build cannot reach: PyXtal
-# (rod groups) and this library itself (the t-subgroup graph, derived by
-# tools/generate_subgroup_relations.cpp, which links the library that includes
-# the table). Both are split the same way as the elements: the extraction is
-# offline and writes a CSV under tools/, which is the tracked input, and the
-# build transcribes that CSV like any other. So no generated header is tracked,
-# and no build needs PyXtal, a two-stage bootstrap, or the slow derivation.
+# (rod groups) and a derivation over spglib (the maximal-subgroup graph,
+# tools/generate_subgroup_relations.py). Both are split the same way as the
+# elements: the extraction is offline and writes a CSV under tools/, which is
+# the tracked input, and the build transcribes that CSV like any other. So no
+# generated header is tracked, and no build needs PyXtal or spglib's Python.
 #
 # Still not generated here: python/seitz/_core/*.pyi describe the built
 # extension module, so they are downstream of the build, not upstream of it. CI
 # already fails on a stale one.
 #
-# COMPONENTS Interpreter only: the transcribers are stdlib-only scripts, no
-# third-party imports, so no virtualenv is needed to build C++. Spelled
-# `Python` rather than `Python3` so it resolves the same cache variable
+# The interpreter comes from uv: `uv sync` materialises .venv from pyproject's
+# dev group (numpy and pandas for the transcribers in tools/, pytest, stubgen)
+# and `uv run python` is that interpreter -- overriding a stale cache entry, so
+# an old build tree cannot keep a bare system python. The wheel build is the
+# exception: scikit-build-core (SKBUILD) passes the interpreter it builds for.
+# Spelled `Python` rather than `Python3` so it resolves the same cache variable
 # pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
+if (NOT SKBUILD)
+    find_program(UV_EXECUTABLE uv)
+    if (UV_EXECUTABLE)
+        execute_process(COMMAND "${UV_EXECUTABLE}" sync --quiet
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_sync)
+        execute_process(COMMAND "${UV_EXECUTABLE}" run --no-sync python -c "import sys; print(sys.executable)"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_run
+                OUTPUT_VARIABLE seitz_uv_python OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        if (seitz_uv_sync EQUAL 0 AND seitz_uv_run EQUAL 0)
+            set(Python_EXECUTABLE "${seitz_uv_python}" CACHE FILEPATH "uv's interpreter" FORCE)
+        endif ()
+    endif ()
+endif ()
 find_package(Python 3.9 REQUIRED COMPONENTS Interpreter)
+execute_process(COMMAND "${Python_EXECUTABLE}" -c "import numpy, pandas"
+        RESULT_VARIABLE seitz_python_modules OUTPUT_QUIET ERROR_QUIET)
+if (NOT seitz_python_modules EQUAL 0)
+    message(FATAL_ERROR "${Python_EXECUTABLE} lacks numpy and/or pandas, which the table "
+            "transcribers in tools/ need. Install uv (the configure step then runs `uv sync`), "
+            "or pass -DPython_EXECUTABLE pointing at an interpreter that has them.")
+endif ()
 
 set(SEITZ_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
 set(SEITZ_GENERATED_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/src")
@@ -111,9 +132,9 @@ configure_file(cmake/version.hpp.in
 
 # One custom command per generator. Every transcriber takes its inputs then its
 # outputs as positional arguments, which is what lets this be one function
-# rather than five near-identical add_custom_command() blocks. The script is a
-# DEPENDS as well as the data, so editing a transcriber regenerates its tables
-# and recompiles whatever includes them.
+# rather than five near-identical add_custom_command() blocks. The script and
+# the shared tools/cxx_tables.py are DEPENDS as well as the data, so editing
+# either regenerates the tables and recompiles whatever includes them.
 function(seitz_transcribe script)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "INPUTS;OUTPUTS")
     add_custom_command(
@@ -121,7 +142,8 @@ function(seitz_transcribe script)
             COMMAND ${Python_EXECUTABLE}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}"
             ${arg_INPUTS} ${arg_OUTPUTS}
-            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}" ${arg_INPUTS}
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/cxx_tables.py" ${arg_INPUTS}
             COMMENT "Transcribing data tables with ${script}"
             VERBATIM)
 endfunction()
@@ -166,8 +188,8 @@ seitz_transcribe(transcribe_sitesym_database.py
         INPUTS "${SEITZ_SPGLIB_SOURCE}/sitesym_database.c"
         OUTPUTS "${SEITZ_GENERATED_SRC_DIR}/data/sitesym_tables.hpp")
 
-# The two whose CSV inputs are extracted offline: tools/extract_rod_groups.py
-# (PyXtal) and tools/generate_subgroup_relations.cpp (this library).
+# The two whose CSV inputs are derived offline: tools/extract_rod_groups.py
+# (PyXtal) and tools/generate_subgroup_relations.py (spglib + numpy).
 seitz_transcribe(transcribe_rod_groups.py
         INPUTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/rod_group_data.csv"
         OUTPUTS "${SEITZ_GENERATED_SRC_DIR}/data/rod_group_tables.hpp")
@@ -253,6 +275,7 @@ target_sources(seitz PRIVATE
         # tools/rod_group_data.csv.
         src/data/rod_database.cpp
         src/group/rod_group.cpp
+        src/core/cell.cpp
         src/core/lattice.cpp
         src/core/periodicity.cpp
         src/core/symmetry_operation.cpp
@@ -307,7 +330,7 @@ target_include_directories(seitz PRIVATE
 target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
-        Boost::leaf Threads::Threads)
+        Boost::graph Boost::leaf Threads::Threads)
 target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry)
 
 # The conversion warnings are applied to the library only — the oracle tests
@@ -321,7 +344,8 @@ target_compile_options(seitz PRIVATE
 
 # The magnetic database decodes all 76683 operations + the alternative
 # transformations into constexpr tables at compile time, subgroup_graph.hpp
-# closes the 230-group t-subgroup relation at compile time, and
+# closes the 230-group maximal-subgroup relation (both kinds) at compile time,
+# and
 # find_symmetry.cpp filters the 26^3 candidate axis triples down to the 6960
 # unimodular ones; each blows past the compilers' default constant-evaluation
 # budget (find_symmetry.cpp on Clang only -- GCC clears it on the default).
@@ -465,15 +489,6 @@ endif ()
 if (SEITZ_BUILD_DEMO)
     add_executable(seitz_demo main.cpp)
     target_link_libraries(seitz_demo PRIVATE seitz::seitz)
-endif ()
-
-# Offline generator for tools/subgroup_relations.csv, the input the t-subgroup
-# table is transcribed from. Not built by default — it re-runs the slow in-house
-# derivation. Build with -DSEITZ_BUILD_TOOLS=ON, run it, and redirect stdout
-# over the CSV.
-if (SEITZ_BUILD_TOOLS)
-    add_executable(generate_subgroup_relations tools/generate_subgroup_relations.cpp)
-    target_link_libraries(generate_subgroup_relations PRIVATE seitz::seitz)
 endif ()
 
 if (SEITZ_BUILD_TESTS)

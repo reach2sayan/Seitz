@@ -2,12 +2,10 @@
 #include <seitz/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
-#include "core/position_index.hpp"
-#include "math/fractional.hpp"
+#include <seitz/core/fractional.hpp>
 #include "math/integer_matrix.hpp"
 #include <seitz/data/spg_database.hpp>
 
-#include <algorithm>
 #include <ranges>
 
 // Refined-operation recovery chain (3D path).
@@ -37,48 +35,6 @@ namespace {
                                                Operations const &conv_sym) {
   return Operations{unique_by_rotation(conv_sym, &SymmetryOperation::rotation)}
       .conjugated_by(t_mat, t_mat.inverse());
-}
-
-// Bounding-box extent of the parallelepiped spanned by the columns of the
-// integer transformation matrix. Each corner is an independent 0/1 choice per
-// column, so the per-row max (min) over the corners is the sum of the
-// positive (negative) entries of that row.
-[[nodiscard]] Vector3i surrounding_frame(Matrix3i const &t_mat) {
-  return t_mat.cwiseMax(0).rowwise().sum() - t_mat.cwiseMin(0).rowwise().sum();
-}
-
-// Every integer point of the surrounding frame mapped by T^-1 and folded into
-// the input cell.
-[[nodiscard]] std::vector<Vector3d>
-lattice_translations(Vector3i const &frame, Matrix3d const &inv_tmat) {
-  std::vector<Vector3d> out;
-  out.reserve(static_cast<std::size_t>(frame[0]) *
-              static_cast<std::size_t>(frame[1]) *
-              static_cast<std::size_t>(frame[2]));
-
-  for (auto const [i, j, k] : std::views::cartesian_product(
-           std::views::iota(0, frame[0]), std::views::iota(0, frame[1]),
-           std::views::iota(0, frame[2]))) {
-    out.emplace_back(
-        math::wrap_to_unit_cell(Vector3d(inv_tmat * Vector3d(i, j, k))));
-  }
-
-  return out;
-}
-
-// Remove overlapping lattice points.
-[[nodiscard]] std::vector<Vector3d>
-unique_translations(Matrix3d const &lattice,
-                    std::vector<Vector3d> const &candidates, double symprec) {
-  std::vector<Vector3d> out;
-  out.reserve(candidates.size());
-  for (const auto &t : candidates) {
-    push_unique(out, t, [&](Vector3d const &kept, Vector3d const &cand) {
-      return coincident(cand, kept, lattice, symprec, all_periodic());
-    });
-  }
-
-  return out;
 }
 
 // Transform the primitive ops to the input cell (R' = T^-1 R T), keeping only
@@ -126,9 +82,7 @@ recover_in_original_cell(Operations const &prim_sym, Matrix3i const &t_mat,
                          Matrix3d const &lattice, int multiplicity,
                          double symprec) {
   Matrix3d const inv_tmat = t_mat.cast<double>().inverse();
-  std::vector<Vector3d> const pure_trans = unique_translations(
-      lattice, lattice_translations(surrounding_frame(t_mat), inv_tmat),
-      symprec);
+  std::vector const pure_trans = math::lattice_points_in_cell(t_mat);
   Operations const t_sym =
       symmetry_in_original_cell(t_mat, inv_tmat, lattice, prim_sym, symprec);
 

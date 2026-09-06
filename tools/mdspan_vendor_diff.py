@@ -25,37 +25,14 @@ PINNED = "c3fc07b607db2a43cd65aabc12ffda9328833d95"
 VENDORED = Path(__file__).resolve().parent.parent / "include/seitz/third_party/mdspan.hpp"
 
 TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|[A-Za-z_]\w*|\d[\w.\']*|\S')
+COMMENT = re.compile(r'("(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\')|//[^\n]*|/\*.*?\*/', re.S)
+
+
 def strip_comments(src: str) -> str:
-    """Drop // and /* */ comments without tripping over // inside a literal."""
-    out: list[str] = []
-    i, n = 0, len(src)
-    while i < n:
-        c = src[i]
-        if c in "\"'":
-            out.append(c)
-            i += 1
-            while i < n:
-                if src[i] == "\\":
-                    out.append(src[i : i + 2])
-                    i += 2
-                    continue
-                out.append(src[i])
-                i += 1
-                if src[i - 1] == c:
-                    break
-            continue
-        if src.startswith("//", i):
-            j = src.find("\n", i)
-            i = n if j < 0 else j
-            continue
-        if src.startswith("/*", i):
-            j = src.find("*/", i + 2)
-            i = n if j < 0 else j + 2
-            out.append(" ")
-            continue
-        out.append(c)
-        i += 1
-    return "".join(out)
+    """Drop // and /* */ comments; a literal that looks like one is kept."""
+    return COMMENT.sub(lambda m: m.group(1) or " ", src)
+
+
 def normalize(src: str) -> list[str]:
     """One token per line, except directives: those stay whole, since a
     preprocessor directive ends at its newline and the line break is meaning."""

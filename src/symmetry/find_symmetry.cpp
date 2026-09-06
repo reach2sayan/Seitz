@@ -103,7 +103,6 @@ struct AxisMetrics {
   // on which of the 26 axes it is, not on the triple it appears in, so the
   // scan reads 26 roots instead of taking 3 per candidate (20880 per pass).
   std::array<double, kAxes> length{};
-
   [[nodiscard]] double operator()(std::size_t a, std::size_t b) const noexcept {
     return dot[a * kAxes + b];
   }

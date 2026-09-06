@@ -41,6 +41,16 @@ struct e_atoms_too_close {
   double distance;
 };
 
+// A change of basis a Cell cannot take: a singular integer matrix, or one that
+// mixes an aperiodic axis with a periodic one.
+struct e_invalid_transformation {
+  int determinant;
+};
+
+// A caller-supplied lattice whose metric the requested group's operations do
+// not preserve, so no structure on it could carry that symmetry.
+struct e_incompatible_lattice {};
+
 // Free-form human-readable context, attached alongside a tag for diagnostics.
 struct e_message {
   std::string text;

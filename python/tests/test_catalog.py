@@ -81,8 +81,15 @@ def test_the_subgroup_graph_is_consistent() -> None:
 
     path = sz.subgroups.path(229, 1)
     assert path is not None
-    assert path[0] == 229 and path[-1] == 1
+    assert path[0].super == 229 and path[-1].sub == 1
+    assert all(a.sub == b.super for a, b in zip(path, path[1:]))
+    assert sz.subgroups.path(229, 229) == []
     assert sz.subgroups.path(1, 229) is None
+    # Every relation names a real setting, and its kind is one of the two.
+    edge = sz.subgroups.maximal_subgroups(221, sz.SubgroupKind.translationengleiche)[0]
+    assert edge.super == 221 and edge.hall.index >= 1
+    assert sz.subgroups.edge(edge.id).sub == edge.sub
+    assert edge.basis.shape == (3, 3)
 
 
 def test_point_group_metadata_is_aligned_to_its_numbering() -> None:

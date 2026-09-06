@@ -17,6 +17,7 @@ add_executable(seitz_tests
         test_kpoint.cpp
         test_error_paths.cpp
         test_oo.cpp
+        test_subgroups.cpp
         test_layer.cpp
         test_alloy.cpp
         test_standardize.cpp

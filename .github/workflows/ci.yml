@@ -75,13 +75,14 @@ jobs:
         uses: actions/checkout@v7
 
       # Pinned rather than inherited from the runner image. The data tables are
-      # transcribed at build time by tools/transcribe_*.py (stdlib only, no uv
-      # sync needed), so an image that ever dropped python3 would fail every
-      # job at configure time at once.
+      # transcribed at build time by tools/transcribe_*.py under the uv-managed
+      # interpreter: configure runs `uv sync`, so uv has to be on PATH.
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       # GCC 15 goes on for every entry, not just the GCC ones: Clang here uses
       # libstdc++, and <generator> plus the C++23 range adaptors only exist in
@@ -183,13 +184,14 @@ jobs:
         uses: actions/checkout@v7
 
       # Pinned rather than inherited from the runner image. The data tables are
-      # transcribed at build time by tools/transcribe_*.py (stdlib only, no uv
-      # sync needed), so an image that ever dropped python3 would fail every
-      # job at configure time at once.
+      # transcribed at build time by tools/transcribe_*.py under the uv-managed
+      # interpreter: configure runs `uv sync`, so uv has to be on PATH.
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install GCC 15
         run: |
@@ -321,13 +323,14 @@ jobs:
         uses: actions/checkout@v7
 
       # Pinned rather than inherited from the runner image. The data tables are
-      # transcribed at build time by tools/transcribe_*.py (stdlib only, no uv
-      # sync needed), so an image that ever dropped python3 would fail every
-      # job at configure time at once.
+      # transcribed at build time by tools/transcribe_*.py under the uv-managed
+      # interpreter: configure runs `uv sync`, so uv has to be on PATH.
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       # Puts cl.exe and the SDK on PATH, via GITHUB_ENV so the later steps
       # inherit it. That is all the presets' Ninja generator needs -- no

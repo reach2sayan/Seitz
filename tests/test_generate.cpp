@@ -110,17 +110,14 @@ std::set<Canonical> enumerated_assignments(group::SpaceGroup const &sg,
 }
 
 bool reference_distances_valid(Cell const &cell,
-                               generate::DistanceTolerance tol) {
-  auto const radius = [&](Index i) {
-    return data::covalent_radius(cell.type(i)).value_or(tol.fallback_radius);
-  };
+                               generate::DistanceTolerance const &tol) {
   for (Index i = 0; i < cell.size(); ++i) {
     for (Index j = i; j < cell.size(); ++j) {
       double const d = generate::minimum_image_distance(
           cell.position(i), cell.position(j), cell.lattice().matrix(),
           cell.periodicity(),
           i == j ? generate::Images::nontrivial : generate::Images::all);
-      if (d < tol.scale * (radius(i) + radius(j))) {
+      if (d < tol.min_distance(cell.type(i), cell.type(j))) {
         return false;
       }
     }
@@ -195,7 +192,8 @@ TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
       types.push_back(std::array{1, 6, 8, 26, 55}[rng() % 5]);
     }
     Cell const cell(Lattice{lattice}, pos, types, periodicity);
-    generate::DistanceTolerance const tol{.scale = 0.4 + 0.6 * unit(rng)};
+    auto const tol = generate::DistanceTolerance::preset(
+        data::RadiusKind::covalent, 0.4 + 0.6 * unit(rng));
     bool const expected = reference_distances_valid(cell, tol);
     CHECK(generate::distances_valid(cell, tol) == expected);
     agreements += expected ? 1 : 0;

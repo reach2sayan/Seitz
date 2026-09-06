@@ -36,10 +36,13 @@ concept WyckoffLike = requires(W const &w) {
 };
 
 // An atom type placed on a chosen Wyckoff position (non-owning pointer into
-// the group, which must outlive it).
+// the group, which must outlive it). `coordinate` is the fractional generating
+// point of the orbit: set by the caller to pin it, filled in by the generator
+// on the assignment it returns.
 template <WyckoffLike W> struct Placed {
   int type;
   W const *position{};
+  std::optional<Vector3d> coordinate = std::nullopt;
 };
 
 // One complete Wyckoff assignment of a composition.
@@ -51,6 +54,14 @@ template <WyckoffLike W> using Assignment = std::vector<Placed<W>>;
 // N_atoms to be a multiple of the general multiplicity.
 enum class Placement { any, general_only };
 
+// An atom pre-assigned to a Wyckoff position by letter, and optionally to a
+// generating coordinate on it (projected onto the position's locus).
+struct FixedSite {
+  int type;
+  char letter;
+  std::optional<Vector3d> coordinate = std::nullopt;
+};
+
 // What a Generator may vary while searching for a structure.
 struct GenerateOptions {
   // Multiplies the element-aware size estimate.
@@ -60,6 +71,11 @@ struct GenerateOptions {
   int attempts_per_combination = 50;
   DistanceTolerance distance = {}; // min-distance acceptance limit
   Placement placement = Placement::any;
+  // Generate into this lattice instead of a random one. Its metric must be
+  // invariant under the group's operations (e_incompatible_lattice).
+  std::optional<Lattice> lattice = std::nullopt;
+  // Atoms placed before the search; counted against the composition.
+  std::vector<FixedSite> sites = {};
 };
 
 namespace detail {
@@ -168,19 +184,46 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
 } // namespace detail
 
 // Every valid Wyckoff assignment of `comp` on `positions`, lazily, depth
-// first. The yielded reference points at a reused buffer: copy what you keep.
-// Compose with views::take to bound it; a composition with no assignment
-// yields nothing, usually without walking the tree (reachability prune).
+// first, each beginning with the `fixed` placements (which must point into
+// `positions` and are deducted from `comp`). The yielded reference points at a
+// reused buffer: copy what you keep. Compose with views::take to bound it; a
+// composition with no assignment yields nothing, usually without walking the
+// tree (reachability prune).
 template <WyckoffLike W>
 [[nodiscard]] std::generator<Assignment<W> const &>
-enumerate_assignments(std::span<W const> positions, Composition comp) {
-  auto const ctx = detail::AssignmentContext<W>::of(positions, comp);
-  if (ctx.elements.empty() || positions.size() > detail::kMaxPositions) {
+enumerate_assignments(std::span<W const> positions, Composition comp,
+                      Assignment<W> fixed = {}) {
+  if (positions.size() > detail::kMaxPositions) {
     co_return;
   }
-  Assignment<W> placements;
-  co_yield std::ranges::elements_of(
-      detail::walk(ctx, placements, {}, 0, 0, ctx.elements.front().second));
+  detail::UsedSpecial used;
+  for (auto const &placed : fixed) {
+    auto const index = static_cast<std::size_t>(placed.position - positions.data());
+    if (index >= positions.size()) {
+      co_return; // not a position of this group
+    }
+    comp[placed.type] -= placed.position->multiplicity();
+    if (placed.position->degrees_of_freedom() == 0) {
+      if (used[index]) {
+        co_return; // one fixed orbit, placed twice
+      }
+      used.set(index);
+    }
+  }
+  if (std::ranges::any_of(comp | std::views::values,
+                          [](int count) { return count < 0; })) {
+    co_return; // the fixed sites overshoot the composition
+  }
+  auto const ctx = detail::AssignmentContext<W>::of(positions, comp);
+  if (ctx.elements.empty()) {
+    if (!fixed.empty()) {
+      co_yield fixed; // the fixed sites are the whole structure
+    }
+    co_return;
+  }
+  Assignment<W> placements = std::move(fixed);
+  co_yield std::ranges::elements_of(detail::walk(
+      ctx, placements, used, 0, 0, ctx.elements.front().second));
 }
 
 // Whether `comp` has at least one assignment on `positions`.

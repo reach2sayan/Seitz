@@ -178,9 +178,10 @@ requirements are version floors, not vendor gates: each is enforced because the
 failure without it is a wall of template errors inside a header rather than
 "your toolchain is too old". Python is a build-time tool rather than a
 dependency: the symmetry tables are transcriptions of spglib's C arrays,
-generated at build time by the stdlib-only scripts in `tools/` instead of being
-committed, so any system interpreter will do — no virtualenv, and nothing to
-`pip install`, to build C++. Everything else is fetched, unconditionally —
+generated at build time by the scripts in `tools/` instead of being committed.
+Those scripts run under the uv-managed interpreter: the configure step runs
+`uv sync` (numpy, pandas) and uses that `.venv`, unless `-DPython_EXECUTABLE` is
+given. Everything else is fetched, unconditionally —
 there is no system lookup and no `find_package` fallback to go stale: **Eigen
 5.0.0**, **Boost 1.88** (`container`, `flyweight`, `geometry`, `leaf`) and
 **Catch2 3** for the tests. No library needs to be installed on the system.
@@ -224,7 +225,6 @@ cmake --preset release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl   # MSVC
 | `SEITZ_BUILD_DEMO` | ON | `seitz_demo` executable |
 | `SEITZ_BUILD_ORACLE_TESTS` | OFF | validate against reference spglib v2.7.0 (every preset turns this ON) |
 | `SEITZ_ENABLE_SANITIZERS` | OFF | Address + UndefinedBehavior sanitizers |
-| `SEITZ_BUILD_TOOLS` | OFF | the offline t-subgroup table generator (the transcribers run as part of every build) |
 | `SEITZ_BUILD_PYTHON` | OFF | pybind11 extension module |
 
 Every preset turns the oracle on. It builds reference spglib via `FetchContent`

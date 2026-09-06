@@ -7,6 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <random>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -73,6 +74,37 @@ template <ResultProducer F> [[nodiscard]] bool errored(F &&make) {
         return false;
       },
       [](leaf::error_info const &) { return true; });
+}
+
+// The two-atom rocksalt motif (types 0 and 1) in a cubic cell of edge `a`: the
+// seed the supercell-shaped tests and benchmarks grow from.
+[[nodiscard]] inline Cell rocksalt_motif(double a) {
+  Positions pos(2, 3);
+  pos.row(0) << 0.0, 0.0, 0.0;
+  pos.row(1) << 0.5, 0.5, 0.5;
+  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 1});
+}
+
+// Every atom displaced by a random Cartesian vector of amplitude
+// `cart_amplitude` per component.
+[[nodiscard]] inline Cell jitter(Cell const &cell, std::mt19937 &rng,
+                                 double cart_amplitude) {
+  Matrix3d const lattice_inv = cell.lattice().matrix().inverse();
+  std::uniform_real_distribution<double> dist(-cart_amplitude, cart_amplitude);
+  Positions positions = cell.positions();
+  for (auto row : positions.rowwise()) {
+    row += (lattice_inv * Vector3d::NullaryExpr([&](Index) { return dist(rng); }))
+               .transpose();
+  }
+  return Cell(cell.lattice(), positions, cell.types(), cell.periodicity());
+}
+
+// The k x k x k rocksalt supercell (edge 4k angstrom, 2 k^3 atoms), jittered by
+// `noise` in fractional units of the supercell.
+[[nodiscard]] inline Cell rocksalt_supercell(int k, double noise,
+                                             std::mt19937 &rng) {
+  return jitter(must(rocksalt_motif(4.0).supercell(Vector3i::Constant(k))), rng,
+                noise * 4.0 * k);
 }
 
 } // namespace seitz::test

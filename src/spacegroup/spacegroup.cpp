@@ -131,12 +131,12 @@ make_axis_choices(double const (&bases)[N][3][3],
       {{0, 0, -1}, {-1, 0, 0}, {0, 1, -1}},
   };
   using enum Centering;
-  static constexpr std::array<Centering, 36> centerings = {
+  static constexpr std::array centerings = {
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
       a_face, b_face, b_face, body,   body,   body,   body,   body,   body,
       c_face, a_face, b_face, b_face, a_face, c_face, a_face, c_face, c_face,
       a_face, b_face, b_face, body,   body,   body,   body,   body,   body};
-  static constexpr std::array<int, 36> unique_axes = {
+  static constexpr std::array unique_axes = {
       1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0,
       1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0, 1, 1, 0, 2, 2, 0};
   static auto const table = make_axis_choices<36>(d, centerings, unique_axes);
@@ -150,9 +150,9 @@ make_axis_choices(double const (&bases)[N][3][3],
       {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},  {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
       {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}}, {{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}}};
   using enum Centering;
-  static constexpr std::array<Centering, 6> centerings = {
-      c_face, b_face, a_face, c_face, b_face, a_face};
-  static constexpr std::array<int, 6> unique_axes = {2, 1, 0, 2, 1, 0};
+  static constexpr std::array centerings = {c_face, b_face, a_face,
+                                            c_face, b_face, a_face};
+  static constexpr std::array unique_axes = {2, 1, 0, 2, 1, 0};
   static auto const table = make_axis_choices<6>(d, centerings, unique_axes);
   return table;
 }

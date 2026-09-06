@@ -33,11 +33,12 @@ FetchContent_Declare(Eigen3
 #   container  — static_vector/small_vector/flat_map/flat_set
 #   flyweight  — one shared immutable SpaceGroup per Hall setting
 #   geometry   — the R-tree behind PositionIndex
+#   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
 #   leaf       — the error model (Result<T>)
 # Nothing here parses text at runtime: the tables are constexpr, generated
 # offline by tools/transcribe_*.py. So boost::parser is not configured; were
 # that to change, 1.87 is the floor for it.
-set(BOOST_INCLUDE_LIBRARIES container flyweight geometry leaf)
+set(BOOST_INCLUDE_LIBRARIES container flyweight geometry graph leaf)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON

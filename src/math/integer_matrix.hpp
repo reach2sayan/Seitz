@@ -5,10 +5,14 @@
 
 #include <Eigen/Dense>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <optional>
+#include <ranges>
+#include <vector>
 
 // Where the symmetry search needs exact semantics: a checked real inverse, and
 // the integer adjugate/determinant giving a unimodular rotation its inverse
@@ -96,6 +100,49 @@ integer_inverse(Matrix3i const &a) noexcept {
   }
   Matrix3i const adj = as_matrix(adjugate(rows));
   return det == 1 ? adj : Matrix3i(-adj);
+}
+
+// The |det P| coset representatives of Z^3 / P Z^3, as fractional points of the
+// P-cell: P^-1 n folded into [0, 1)^3 for every integer n of the frame
+// surrounding P [0, 1)^3. Kept in integer arithmetic -- P^-1 n = adjugate(P) n
+// / det P, reduced mod det -- so coinciding cosets compare exactly and no
+// tolerance is involved. Empty for a singular P.
+[[nodiscard]] inline std::vector<Vector3d>
+lattice_points_in_cell(Matrix3i const &p) {
+  Mat3Rows const rows = as_rows(p);
+  int const det = determinant(rows);
+  if (det == 0) {
+    return {};
+  }
+  int const modulus = std::abs(det);
+  Matrix3i const adj = as_matrix(adjugate(rows));
+  // Bounding box of the parallelepiped: each corner is an independent 0/1
+  // choice per column, so a row's extent is its positive minus its negative
+  // entry sum.
+  Vector3i const frame =
+      p.cwiseMax(0).rowwise().sum() - p.cwiseMin(0).rowwise().sum();
+
+  auto const residue = [&](int numerator) {
+    int const r = (det > 0 ? numerator : -numerator) % modulus;
+    return r < 0 ? r + modulus : r;
+  };
+  std::vector<std::array<int, 3>> keys{
+      std::from_range,
+      std::views::cartesian_product(std::views::iota(0, frame[0]),
+                                    std::views::iota(0, frame[1]),
+                                    std::views::iota(0, frame[2])) |
+          std::views::transform([&](auto const &n) {
+            auto const [i, j, k] = n;
+            Vector3i const m = adj * Vector3i(i, j, k);
+            return std::array{residue(m[0]), residue(m[1]), residue(m[2])};
+          })};
+  std::ranges::sort(keys);
+  auto const [first, last] = std::ranges::unique(keys);
+  keys.erase(first, last);
+  return {std::from_range,
+          keys | std::views::transform([&](std::array<int, 3> const &key) {
+            return Vector3d(Vector3d(key[0], key[1], key[2]) / modulus);
+          })};
 }
 
 } // namespace seitz::math

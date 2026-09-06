@@ -24,17 +24,13 @@ struct Primitive {
   // space-group search to prefer a conventional setting whose basis vectors
   // resemble the input.
   Matrix3d orig_lattice{Matrix3d::Identity()};
-  // The (possibly tightened) tolerance at which the primitive cell was found,
-  // carried into the space-group search that follows.
   Tolerance tolerance{};
 };
 
-// Finds the primitive cell of one cell at one tolerance. The family is a
-// compile-time parameter: the layer path fixes the third basis vector to the
+// Finds the primitive cell of one cell at one tolerance.
+// the layer path fixes the third basis vector to the
 // aperiodic lattice vector and reduces only the periodic plane, which is an
 // `if constexpr` branch rather than a runtime test.
-//
-// Non-owning: `cell` must outlive the finder.
 template <GroupFamily F> class SEITZ_TESTABLE PrimitiveFinder {
 public:
   PrimitiveFinder(Cell const &cell, Tolerance const &tol) noexcept
@@ -58,9 +54,7 @@ public:
   lattice_from_pure_translations(std::span<Vector3d const> pure_trans) const;
 
   // Fold the atoms into the given (smaller) lattice, de-duplicating
-  // translationally-equivalent atoms and averaging their positions. Returns the
-  // trimmed cell and the input->trimmed atom mapping, or std::nullopt if the
-  // atoms do not divide evenly into the lattice.
+  // translationally-equivalent atoms and averaging their positions.
   [[nodiscard]] std::optional<std::pair<Cell, std::vector<int>>>
   trim_to(Lattice const &trimmed_lattice) const;
 

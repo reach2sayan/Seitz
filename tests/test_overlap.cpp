@@ -1,5 +1,7 @@
 #include "core/overlap.hpp"
 
+#include "helpers.hpp"
+
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -49,34 +51,6 @@ bool reference_total_overlap(Cell const &cell, Vector3d const &trans,
     }
   }
   return true;
-}
-
-// A k x k x k supercell of a 2-atom rocksalt-like motif, with the second
-// species split across two types so that type filtering matters.
-Cell supercell(int k, double noise, std::mt19937 &rng) {
-  Index const n = 2 * k * k * k;
-  Matrix3d const lattice = Matrix3d::Identity() * (4.0 * k);
-  Positions pos(n, 3);
-  Types types;
-  std::uniform_real_distribution<double> jitter(-noise, noise);
-  Index row = 0;
-  for (int a = 0; a < k; ++a) {
-    for (int b = 0; b < k; ++b) {
-      for (int c = 0; c < k; ++c) {
-        Vector3d const base(a, b, c);
-        pos.row(row++) = ((base + Vector3d::Zero()) / k).transpose();
-        types.push_back(0);
-        pos.row(row++) = ((base + Vector3d(0.5, 0.5, 0.5)) / k).transpose();
-        types.push_back((a + b + c) % 2);
-      }
-    }
-  }
-  for (Index i = 0; i < n; ++i) {
-    for (Index d = 0; d < 3; ++d) {
-      pos(i, d) += jitter(rng);
-    }
-  }
-  return Cell(Lattice{lattice}, pos, types);
 }
 
 Matrix3i random_rotation(std::mt19937 &rng) {
@@ -143,7 +117,7 @@ TEST_CASE("the indexed checker agrees with the greedy scan it replaced",
   for (int k : {2, 4, 6}) {
     for (double noise : {0.0, 1e-6, 1e-3}) {
       for (double symprec : {1e-5, 1e-2, 0.3}) {
-        Cell const cell = supercell(k, noise, rng);
+        Cell const cell = test::rocksalt_supercell(k, noise, rng);
         OverlapChecker const checker(cell, symprec);
         std::uniform_real_distribution<double> unit(0.0, 1.0);
         for (int trial = 0; trial < 40; ++trial) {
@@ -170,7 +144,7 @@ TEST_CASE("the indexed checker agrees with the greedy scan it replaced",
 
 TEST_CASE("check_total_overlap on a 432-atom supercell", "[!benchmark]") {
   std::mt19937 rng(7);
-  Cell const cell = supercell(6, 1e-4, rng);
+  Cell const cell = test::rocksalt_supercell(6, 1e-4, rng);
   OverlapChecker const checker(cell, 1e-3);
   Vector3d const centering(0.5 / 6, 0.5 / 6, 0.5 / 6);
   BENCHMARK("accepted centering translation") {

@@ -104,29 +104,34 @@ template <GeneratableGroup G> class Generator {
 public:
   explicit Generator(G const &group, GenerateOptions options = {}) noexcept
       : group_{&group}, options_{options} {}
-  // Whether `comp` can be placed on this group at all.
-  [[nodiscard]] bool compatible(Composition const &comp) const {
-    return assignable(group_->wyckoffs(), comp);
-  }
+  // Whether `comp` can be placed on this group at all, the option's fixed
+  // sites included.
+  [[nodiscard]] bool compatible(Composition const &comp) const;
 
-  // The first `max` valid Wyckoff assignments of `comp`;
-  // fewer when there are fewer, exactly `max` when the enumeration was cut
-  // short.
+  // The first `max` valid Wyckoff assignments of `comp`, each beginning with
+  // the fixed sites; fewer when there are fewer, exactly `max` when the
+  // enumeration was cut short.
   [[nodiscard]] std::vector<Assignment<group::Wyckoff>>
   assignments(Composition const &comp,
-              std::size_t max = kMaxAssignments) const {
-    return {std::from_range, enumerate_assignments(group_->wyckoffs(), comp) |
-                                 std::views::take(max)};
-  }
+              std::size_t max = kMaxAssignments) const;
 
   // A random structure with this group's symmetry and `comp`'s composition,
-  // deterministic in options.seed.
-  // Errors : (1) the composition has no Wyckoff assignment here,
-  //          (2) Placement::general_only cannot be met,
-  //          (3) or when no distance-valid structure turns up within the attempt budget.
+  // deterministic in options.seed. The returned assignment carries every
+  // orbit's generating coordinate.
+  // Errors : (1) the composition has no Wyckoff assignment here (the fixed
+  //              sites counted),
+  //          (2) a fixed site names no position of this group,
+  //          (3) Placement::general_only cannot be met,
+  //          (4) the caller's lattice is not invariant under the group,
+  //          (5) or no distance-valid structure turns up within the attempt
+  //              budget.
   [[nodiscard]] Result<Generated> operator()(Composition const &comp) const;
 
 private:
+  // options_.sites resolved to placements on this group; errors on a letter
+  // the group does not have.
+  [[nodiscard]] Result<Assignment<group::Wyckoff>> fixed_placements() const;
+
   G const *group_;
   GenerateOptions options_;
 };

@@ -18,13 +18,32 @@ namespace seitz::data {
   return z >= 1 && z <= kNumElements;
 }
 
-// Single-bond covalent radius (angstrom) of atomic number `z`; std::nullopt for
-// an untabulated element (no magic sentinel).
-[[nodiscard]] constexpr std::optional<double> covalent_radius(int z) noexcept {
+// The tabulated radius families a distance criterion can be built on.
+enum class RadiusKind { covalent, metallic, van_der_waals };
+
+// Radius (angstrom) of `kind` for atomic number `z`; std::nullopt for an
+// untabulated element, or one the table carries no such radius for (no magic
+// sentinel). Every known element has a covalent radius.
+[[nodiscard]] constexpr std::optional<double> radius(RadiusKind kind,
+                                                     int z) noexcept {
   if (!is_known_element(z)) {
     return std::nullopt;
   }
-  return kCovalentRadii[static_cast<std::size_t>(z - 1)];
+  auto const i = static_cast<std::size_t>(z - 1);
+  switch (kind) {
+  case RadiusKind::covalent:
+    return kCovalentRadii[i];
+  case RadiusKind::metallic:
+    return kMetallicRadii[i];
+  case RadiusKind::van_der_waals:
+    return kVdwRadii[i];
+  }
+  return std::nullopt;
+}
+
+// Single-bond covalent radius (angstrom) of atomic number `z`.
+[[nodiscard]] constexpr std::optional<double> covalent_radius(int z) noexcept {
+  return radius(RadiusKind::covalent, z);
 }
 
 [[nodiscard]] constexpr std::optional<double> atomic_volume(int z) noexcept {
@@ -69,6 +88,8 @@ atomic_number(std::string_view symbol) noexcept {
   return it->second;
 }
 
+static_assert(radius(RadiusKind::covalent, 1).has_value());
+static_assert(!radius(RadiusKind::metallic, 2).has_value()); // no metallic He
 static_assert(atomic_number("H") == 1);
 static_assert(atomic_number(*element_symbol(kNumElements)) == kNumElements);
 static_assert(!atomic_number("Xx"));

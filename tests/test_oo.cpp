@@ -11,12 +11,12 @@
 #include <seitz/group/point_group.hpp>
 #include <seitz/group/rod_group.hpp>
 #include <seitz/group/space_group.hpp>
-#include <seitz/group/subgroup_graph.hpp>
 #include <seitz/warmup.hpp>
 
 #include "helpers.hpp"
 
 #include <boost/leaf.hpp>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -202,6 +202,83 @@ TEST_CASE("incompatible composition is rejected", "[generate]") {
       generate::Generator{*sg}.compatible(generate::Composition{{1, 3}}));
 }
 
+TEST_CASE("fixed sites pin their Wyckoff letters and are counted",
+          "[generate]") {
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+  generate::Composition const comp{{11, 4}, {17, 4}};
+  generate::GenerateOptions options{.seed = 5u};
+  options.sites = {{.type = 11, .letter = 'a'}, {.type = 17, .letter = 'b'}};
+  generate::Generator const gen{*sg, options};
+
+  // Everything is pinned: exactly one assignment, the fixed one.
+  auto const all = gen.assignments(comp);
+  REQUIRE(all.size() == 1);
+  CHECK(all.front()[0].position->letter() == 'a');
+  CHECK(all.front()[1].position->letter() == 'b');
+
+  auto const generated = must(gen(comp));
+  REQUIRE(generated.assignment.size() == 2);
+  CHECK(generated.assignment[0].coordinate.has_value());
+  CHECK(data::spacegroup_type(must(test::dataset_of(generated.cell)).hall)
+            .number == 225);
+
+  // A letter the group lacks is an error; overshooting the composition is
+  // an incompatibility.
+  options.sites = {{.type = 11, .letter = 'z'}};
+  CHECK(test::errored([&] { return generate::Generator{*sg, options}(comp); }));
+  options.sites = {{.type = 11, .letter = 'a'}, {.type = 11, .letter = 'b'}};
+  CHECK_FALSE(generate::Generator{*sg, options}.compatible(comp));
+}
+
+TEST_CASE("a fixed coordinate is kept, projected onto its locus",
+          "[generate]") {
+  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 1));
+  Vector3d const pinned(0.1, 0.2, 0.3);
+  generate::GenerateOptions options{.seed = 3u};
+  options.sites = {{.type = 6, .letter = 'a', .coordinate = pinned}};
+  auto const generated =
+      must(generate::Generator{*sg, options}(generate::Composition{{6, 2}}));
+  REQUIRE(generated.cell.size() == 2);
+  CHECK(generated.assignment.front().coordinate->isApprox(pinned));
+  CHECK(generated.cell.position(0).isApprox(pinned));
+}
+
+TEST_CASE("a caller's lattice is used as given or rejected", "[generate]") {
+  auto const *sg =
+      must(group::SpaceGroup::from_number(GroupFamily::space, 221));
+  generate::Composition const comp{{55, 1}, {17, 1}}; // CsCl
+  generate::GenerateOptions options{.seed = 1u};
+  options.lattice = Lattice{Matrix3d::Identity() * 4.1};
+  auto const generated = must(generate::Generator{*sg, options}(comp));
+  CHECK(generated.cell.lattice().matrix().isApprox(Matrix3d::Identity() * 4.1));
+
+  Matrix3d sheared = Matrix3d::Identity() * 4.1;
+  sheared(0, 1) = 0.7; // no longer cubic
+  options.lattice = Lattice{sheared};
+  CHECK(test::errored([&] { return generate::Generator{*sg, options}(comp); }));
+}
+
+TEST_CASE("DistanceTolerance presets and overrides", "[generate]") {
+  using generate::DistanceTolerance;
+  DistanceTolerance const covalent;
+  auto const metallic = DistanceTolerance::preset(data::RadiusKind::metallic);
+  CHECK(covalent.min_distance(26, 26) ==
+        Catch::Approx(2 * 0.7 * *data::covalent_radius(26)));
+  CHECK(metallic.min_distance(26, 26) ==
+        Catch::Approx(2 * 0.7 * *data::radius(data::RadiusKind::metallic, 26)));
+  CHECK(metallic.min_distance(26, 26) != covalent.min_distance(26, 26));
+  // He has no metallic radius: the fallback stands in.
+  CHECK(metallic.radius(2) == 1.0);
+  CHECK(covalent.radius(2) == *data::covalent_radius(2));
+
+  DistanceTolerance pinned;
+  pinned.set(17, 11, 3.0);
+  CHECK(pinned.min_distance(11, 17) == 3.0);
+  CHECK(pinned.min_distance(17, 11) == 3.0);
+  CHECK(pinned.min_distance(11, 11) == covalent.min_distance(11, 11));
+}
+
 TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
           "[layergen]") {
   // The same three-way check as for the space groups; the orbit folds only
@@ -281,93 +358,6 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
         gen.cell.with_periodicity(aperiodic_along(2)), {1e-4}));
     REQUIRE(data::spacegroup_type(ds.hall).number ==
             number); // exact layer-group recovery
-  }
-}
-
-namespace {
-// Point-group order of a space group: distinct rotation parts of its
-// operations.
-int pg_order(int number) {
-  auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, number));
-  std::vector<Matrix3i> rots;
-  for (auto const &op : sg->operations()) {
-    if (std::ranges::none_of(
-            rots, [&](Matrix3i const &r) { return r == op.rotation; })) {
-      rots.push_back(op.rotation);
-    }
-  }
-  return static_cast<int>(rots.size());
-}
-
-bool has_relation(std::span<group::SubgroupRelation const> rels, int number,
-                  int index) {
-  return std::ranges::any_of(rels, [&](group::SubgroupRelation const &r) {
-    return r.number == number && r.index == index;
-  });
-}
-} // namespace
-
-TEST_CASE("Pm-3m maximal t-subgroups match the textbook relations",
-          "[subgroup]") {
-  auto const subs = group::SubgroupGraph::maximal_subgroups(221); // Oh
-  // The five maximal translationengleiche subgroups of Pm-3m (ITA): Pm-3 (200,
-  // Th), P432 (207, O), P-43m (215, Td) at index 2; P4/mmm (123, D4h) at index
-  // 3; R-3m (166, D3d, along a body diagonal) at index 4 — maximal subgroups of
-  // a non-nilpotent group may have composite index.
-  REQUIRE(has_relation(subs, 200, 2));
-  REQUIRE(has_relation(subs, 207, 2));
-  REQUIRE(has_relation(subs, 215, 2));
-  REQUIRE(has_relation(subs, 123, 3));
-  REQUIRE(has_relation(subs, 166, 4));
-  REQUIRE(subs.size() == 5);
-}
-
-TEST_CASE("P-1 has the single maximal t-subgroup P1", "[subgroup]") {
-  auto const subs = group::SubgroupGraph::maximal_subgroups(2);
-  REQUIRE(subs.size() == 1);
-  REQUIRE(subs.front().number == 1);
-  REQUIRE(subs.front().index == 2);
-  // P1 itself has no proper subgroup.
-  REQUIRE(group::SubgroupGraph::maximal_subgroups(1).empty());
-}
-
-TEST_CASE("every t-subgroup edge is order-consistent", "[subgroup]") {
-  int edges = 0;
-  for (int n = 1; n <= 230; ++n) {
-    for (auto const &rel : group::SubgroupGraph::maximal_subgroups(n)) {
-      REQUIRE(rel.index >= 2);
-      REQUIRE(rel.number != n);
-      // A translationengleiche subgroup keeps the lattice, so the index equals
-      // the ratio of point-group orders.
-      REQUIRE(pg_order(n) == rel.index * pg_order(rel.number));
-      // The in-edges are the same edge set read the other way round.
-      auto const supers = group::SubgroupGraph::minimal_supergroups(rel.number);
-      REQUIRE(std::ranges::any_of(supers, [&](auto const &up) {
-        return up.number == n && up.index == rel.index;
-      }));
-      ++edges;
-    }
-  }
-  REQUIRE(edges > 200); // the graph is richly connected
-}
-
-TEST_CASE("reachability and symmetry-breaking paths", "[subgroup]") {
-  REQUIRE(group::SubgroupGraph::is_subgroup(221, 221)); // reflexive
-  REQUIRE(
-      group::SubgroupGraph::is_subgroup(1, 221)); // P1 is a t-subgroup of Pm-3m
-  REQUIRE_FALSE(group::SubgroupGraph::is_subgroup(221, 1));
-
-  auto chain = group::SubgroupGraph::path(221, 1);
-  REQUIRE(chain.has_value());
-  REQUIRE(chain->front() == 221);
-  REQUIRE(chain->back() == 1);
-  // Each step descends along a real maximal-subgroup edge (any index).
-  for (std::size_t i = 0; i + 1 < chain->size(); ++i) {
-    auto const subs = group::SubgroupGraph::maximal_subgroups((*chain)[i]);
-    REQUIRE(std::ranges::any_of(subs, [&](group::SubgroupRelation const &r) {
-      return r.number == (*chain)[i + 1];
-    }));
   }
 }
 

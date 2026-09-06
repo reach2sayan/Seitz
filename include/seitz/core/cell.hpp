@@ -1,5 +1,6 @@
 #pragma once
 
+#include <seitz/core/error.hpp>
 #include <seitz/core/lattice.hpp>
 #include <seitz/core/periodicity.hpp>
 #include <seitz/core/types.hpp>
@@ -59,6 +60,25 @@ public:
   [[nodiscard]] Cell with_periodicity(CellPeriodicity periodicity) const {
     return Cell{lattice_, positions_, types_, periodicity};
   }
+
+  // The same crystal in the basis (a' b' c') = (a b c) . basis with its origin
+  // at `origin` (fractional, this cell): x' = basis^-1 (x - origin), every atom
+  // repeated over the |det basis| lattice points of the new cell, folded along
+  // the periodic axes. Errors e_invalid_transformation for a singular matrix
+  // or one that mixes an aperiodic axis into a periodic one (an aperiodic
+  // axis may only be kept or flipped).
+  [[nodiscard]] Result<Cell>
+  transformed(Matrix3i const &basis,
+              Vector3d const &origin = Vector3d::Zero()) const;
+
+  // The diagonal supercell n[0] x n[1] x n[2].
+  [[nodiscard]] Result<Cell> supercell(Vector3i const &n) const {
+    return transformed(n.asDiagonal());
+  }
+
+  // Every atom shifted by the fractional `shift`, folded along the periodic
+  // axes.
+  [[nodiscard]] Cell translated(Vector3d const &shift) const;
 
 private:
   Lattice lattice_{};
