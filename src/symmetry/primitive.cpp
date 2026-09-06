@@ -152,40 +152,33 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
     cand.push_back(Vector3d::UnitX());
     cand.push_back(Vector3d::UnitY());
     cand.push_back(Vector3d::UnitZ());
-    // The first triple (in lexicographic order) spanning a cell of the right
-    // volume. Plain loops rather than a filtered cartesian product: a zero
-    // candidate (the reference atom's own translation, always first) gives an
-    // exactly zero determinant, so every triple holding it fails the volume
-    // test, and only a loop can skip those O(n^2) triples as one range
-    // instead of visiting each.
-    auto const zero = [&](std::size_t i) {
-      return (cand[i].array() == 0.0).all();
-    };
-    for (std::size_t i = 0; i < cand.size(); ++i) {
-      if (zero(i)) {
+    // The first triple (in lexicographic order) of non-zero candidates
+    // spanning a cell of the right volume. The zero candidate (the reference
+    // atom's own translation, always first) gives an exactly zero determinant,
+    // so it is filtered out before the product rather than visited in the
+    // O(n^2) triples that hold it.
+    std::vector<std::size_t> const nonzero{
+        std::from_range, std::views::iota(std::size_t{0}, cand.size()) |
+                             std::views::filter([&](std::size_t i) {
+                               return !(cand[i].array() == 0.0).all();
+                             })};
+    for (auto const [i, j, k] :
+         std::views::cartesian_product(nonzero, nonzero, nonzero) |
+             std::views::filter([](auto const &ijk) {
+               auto const [i, j, k] = ijk;
+               return i < j && j < k;
+             })) {
+      Matrix3d relative;
+      relative.col(0) = cand[i];
+      relative.col(1) = cand[j];
+      relative.col(2) = cand[k];
+      double const volume =
+          std::abs((cell.lattice().matrix() * relative).determinant());
+      if (volume <= symprec || math::nint(init_volume / volume) != multi) {
         continue;
       }
-      for (std::size_t j = i + 1; j < cand.size(); ++j) {
-        if (zero(j)) {
-          continue;
-        }
-        for (std::size_t k = j + 1; k < cand.size(); ++k) {
-          if (zero(k)) {
-            continue;
-          }
-          Matrix3d relative;
-          relative.col(0) = cand[i];
-          relative.col(1) = cand[j];
-          relative.col(2) = cand[k];
-          double const volume =
-              std::abs((cell.lattice().matrix() * relative).determinant());
-          if (volume <= symprec || math::nint(init_volume / volume) != multi) {
-            continue;
-          }
-          return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
-                                             cell.periodicity(), symprec);
-        }
-      }
+      return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
+                                         cell.periodicity(), symprec);
     }
     return std::nullopt;
   }
@@ -236,15 +229,15 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
     // `ratio` atoms onto each site, and each of those queries returned them
     // all.
     std::ranges::iota(overlap, 0);
-    for (int i = 0; i < n; ++i) {
-      if (overlap[static_cast<std::size_t>(i)] != i) {
-        continue;
-      }
-      for (int const k : index.matches(row(pos, i), cell.type(i), scratch)) {
-        auto const uk = static_cast<std::size_t>(k);
-        if (k > i && overlap[uk] == k) {
-          overlap[uk] = i;
-        }
+    auto const unclaimed = [&](int i) {
+      return overlap[static_cast<std::size_t>(i)] == i;
+    };
+    for (int const i : std::views::iota(0, n) | std::views::filter(unclaimed)) {
+      for (int const k : index.matches(row(pos, i), cell.type(i), scratch) |
+                             std::views::filter([&](int k) {
+                               return k > i && unclaimed(k);
+                             })) {
+        overlap[static_cast<std::size_t>(k)] = i;
       }
     }
 

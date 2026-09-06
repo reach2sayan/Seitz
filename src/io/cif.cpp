@@ -99,10 +99,33 @@ struct Block {
   return 'A' <= c && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
 }
 
+// A character iterator the token policies scan with.
+template <class I>
+concept CharIterator =
+    std::forward_iterator<I> && std::same_as<std::iter_value_t<I>, char>;
+
+// A Boost.Parser parse context, as far as the tokens need one.
+template <class C>
+concept ParseContext = requires(C const &context) { bp::_begin(context); };
+
+// What a token policy provides: whether a token opens at `it` (advancing past
+// any opening delimiter), whether it ends at `it`, whether its text is
+// acceptable, and whether it closes at `it` (advancing past the delimiter).
+template <class T, class I, class C>
+concept TokenPolicy =
+    CharIterator<I> && ParseContext<C> && requires(I &it, I last, C const &c) {
+      { T::lowercase } -> std::convertible_to<bool>;
+      { T::open(it, last, c) } -> std::same_as<bool>;
+      { T::at_end(it, last) } -> std::same_as<bool>;
+      { T::accept(it, last) } -> std::same_as<bool>;
+      { T::close(it, last) } -> std::same_as<bool>;
+    };
+
 // Reserved words a value may not begin with (case-insensitively); they end
 // whatever list they follow. `save_` here means a dictionary's save frames
 // stop the parse -- out of scope.
-[[nodiscard]] bool starts_with_keyword(Iterator first, Iterator last) {
+[[nodiscard]] bool starts_with_keyword(CharIterator auto first,
+                                       CharIterator auto last) {
   std::string_view const text(first, last);
   return std::ranges::any_of(
       std::array{std::string_view{"data_"}, std::string_view{"loop_"},
@@ -118,29 +141,33 @@ struct Block {
 } // namespace
 
 template <class Token> struct TokenParser {
-  template <class Iter, class Sentinel, class Context, class SkipParser>
+  template <CharIterator Iter, std::sentinel_for<Iter> Sentinel,
+            ParseContext Context>
+    requires TokenPolicy<Token, Iter, Context>
   std::string call(Iter &first, Sentinel last, Context const &context,
-                   SkipParser const &skip, bp::detail::flags flags,
+                   auto const &skip, bp::detail::flags flags,
                    bool &success) const {
     std::string out;
     call(first, last, context, skip, flags, success, out);
     return out;
   }
-  template <class Iter, class Sentinel, class Context, class SkipParser,
-            class Attribute>
-  void call(Iter &first, Sentinel last, Context const &context,
-            SkipParser const &, bp::detail::flags flags, bool &success,
-            Attribute &out) const {
+  template <CharIterator Iter, std::sentinel_for<Iter> Sentinel,
+            ParseContext Context, class Attribute>
+    requires TokenPolicy<Token, Iter, Context>
+  void call(Iter &first, Sentinel last, Context const &context, auto const &,
+            bp::detail::flags flags, bool &success, Attribute &out) const {
     Iter it = first;
     if (!Token::open(it, last, context)) {
       success = false;
       return;
     }
     Iter const begin = it;
-    while (it != last && !Token::at_end(it, last)) {
-      ++it;
-    }
-    Iter const end = it;
+    // The end is a property of the position (a closing quote is one only
+    // when whitespace follows), so the search runs over iterators.
+    Iter const end = *std::ranges::find_if(
+        std::views::iota(begin, Iter(last)),
+        [&](Iter at) { return Token::at_end(at, last); });
+    it = end;
     if (!Token::accept(begin, end) || !Token::close(it, last)) {
       success = false;
       return;
@@ -149,13 +176,11 @@ template <class Token> struct TokenParser {
     // push_backs one character at a time.
     if constexpr (!bp::detail::is_nope_v<Attribute>) {
       if (bp::detail::gen_attrs(flags)) {
-        auto const at = out.size();
+        auto const at = static_cast<std::ptrdiff_t>(out.size());
         out.insert(out.end(), begin, end);
         if constexpr (Token::lowercase) {
-          std::ranges::transform(out.begin() + static_cast<std::ptrdiff_t>(at),
-                                 out.end(),
-                                 out.begin() + static_cast<std::ptrdiff_t>(at),
-                                 ascii_lower);
+          std::ranges::transform(out | std::views::drop(at),
+                                 out.begin() + at, ascii_lower);
         }
       }
     }
@@ -168,49 +193,61 @@ namespace {
 // The default policy: no delimiters, any text, ends at whitespace.
 struct Bare {
   static constexpr bool lowercase = false;
-  static bool open(auto &, auto, auto const &) { return true; }
-  static bool at_end(auto it, auto) { return is_blank(*it); }
-  static bool accept(auto, auto) { return true; }
-  static bool close(auto &, auto) { return true; }
+  static bool open(CharIterator auto &, CharIterator auto,
+                   ParseContext auto const &) {
+    return true;
+  }
+  static bool at_end(CharIterator auto it, CharIterator auto) {
+    return is_blank(*it);
+  }
+  static bool accept(CharIterator auto, CharIterator auto) { return true; }
+  static bool close(CharIterator auto &, CharIterator auto) { return true; }
 };
 // The rest of the line, for comments.
 struct LineRest : Bare {
-  static bool at_end(auto it, auto) { return is_eol(*it); }
+  static bool at_end(CharIterator auto it, CharIterator auto) {
+    return is_eol(*it);
+  }
 };
 // `_tag`, underscore included, lowercased: a CIF tag is ASCII, and a Turkish
 // one dotless-Is it.
 struct Tag : Bare {
   static constexpr bool lowercase = true;
-  static bool open(auto &it, auto last, auto const &) {
+  static bool open(CharIterator auto &it, CharIterator auto last,
+                   ParseContext auto const &) {
     return it != last && *it == '_';
   }
-  static bool accept(auto begin, auto end) { return end - begin > 1; }
+  static bool accept(CharIterator auto begin, CharIterator auto end) {
+    return std::ranges::distance(begin, end) > 1;
+  }
 };
 // An unquoted value: may not start like a tag, a quote, a comment, a text
 // field or a reserved character, and may not be a keyword.
 struct Unquoted : Bare {
-  static bool open(auto &it, auto last, auto const &) {
+  static bool open(CharIterator auto &it, CharIterator auto last,
+                   ParseContext auto const &) {
     return it != last && !is_blank(*it) &&
            std::string_view{"_'\"#;$[]"}.find(*it) == std::string_view::npos;
   }
-  static bool accept(auto begin, auto end) {
+  static bool accept(CharIterator auto begin, CharIterator auto end) {
     return !starts_with_keyword(begin, end);
   }
 };
 // A quoted value; the closing quote is the one followed by whitespace or the
 // end, so 'it's here' holds.
 template <char Quote> struct Quoted : Bare {
-  static bool open(auto &it, auto last, auto const &) {
+  static bool open(CharIterator auto &it, CharIterator auto last,
+                   ParseContext auto const &) {
     if (it == last || *it != Quote) {
       return false;
     }
     ++it;
     return true;
   }
-  static bool at_end(auto it, auto last) {
+  static bool at_end(CharIterator auto it, CharIterator auto last) {
     return *it == Quote && (std::next(it) == last || is_blank(*std::next(it)));
   }
-  static bool close(auto &it, auto last) {
+  static bool close(CharIterator auto &it, CharIterator auto last) {
     if (it == last) {
       return false;
     }
@@ -220,7 +257,8 @@ template <char Quote> struct Quoted : Bare {
 };
 // A text field: ';' opening a line through the next line end followed by ';'.
 struct TextField : Bare {
-  static bool open(auto &it, auto last, auto const &context) {
+  static bool open(CharIterator auto &it, CharIterator auto last,
+                   ParseContext auto const &context) {
     bool const at_column_1 =
         it == bp::_begin(context) || *std::prev(it) == '\n';
     if (!at_column_1 || it == last || *it != ';') {
@@ -229,7 +267,7 @@ struct TextField : Bare {
     ++it;
     return true;
   }
-  static bool at_end(auto it, auto last) {
+  static bool at_end(CharIterator auto it, CharIterator auto last) {
     if (!is_eol(*it)) {
       return false;
     }
@@ -239,7 +277,7 @@ struct TextField : Bare {
     }
     return next != last && *next == ';';
   }
-  static bool close(auto &it, auto last) {
+  static bool close(CharIterator auto &it, CharIterator auto last) {
     if (it == last) {
       return false;
     }
@@ -547,12 +585,13 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
     int const winner = std::ranges::max(chunk, {}, occupancy_of);
     kept.push_back(winner);
     if (std::ranges::distance(chunk) > 1 || occupancy_of(winner) < 1.0) {
-      // Named first: MSVC cannot parse a capturing lambda inside a designated
-      // initializer's nested braces, and loses the enclosing scope after it.
+      // Both named first: MSVC cannot parse a capturing lambda literal inside
+      // an initializer's braces or parentheses, and loses the enclosing scope
+      // after it.
+      auto const not_winner = [&](int i) { return i != winner; };
       std::vector<std::string> dropped(
-          std::from_range, chunk | std::views::filter([&](int i) {
-                             return i != winner;
-                           }) | std::views::transform(label_of));
+          std::from_range, chunk | std::views::filter(not_winner) |
+                               std::views::transform(label_of));
       collapsed.push_back(OccupancyCollapse{.kept = label_of(winner),
                                             .occupancy = occupancy_of(winner),
                                             .dropped = std::move(dropped)});
@@ -755,16 +794,20 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   // coincident before the symmetry is applied. One index over all the
   // candidates answers "an earlier placed coincident image?" in order, which
   // is the same rule as placing one by one against the placed list.
-  Positions images(static_cast<Index>(kept.size() * operations.size()), 3);
-  std::vector<int> site_of;
-  site_of.reserve(static_cast<std::size_t>(images.rows()));
-  for (int const index : kept) {
-    CifSite const &site = sites[static_cast<std::size_t>(index)];
-    for (SymmetryOperation const &operation : operations) {
-      images.row(static_cast<Index>(site_of.size())) =
-          math::wrap_to_unit_cell(operation.apply(site.position)).transpose();
-      site_of.push_back(index);
-    }
+  auto const site_at = [&](int index) -> CifSite const & {
+    return sites[static_cast<std::size_t>(index)];
+  };
+  auto const pairs = std::views::cartesian_product(kept, operations);
+  std::vector<int> const site_of{
+      std::from_range, pairs | std::views::transform([](auto const &pair) {
+                         return std::get<0>(pair);
+                       })};
+  Positions images(static_cast<Index>(site_of.size()), 3);
+  for (auto const [i, pair] : std::views::enumerate(pairs)) {
+    auto const &[index, operation] = pair;
+    images.row(i) =
+        math::wrap_to_unit_cell(operation.apply(site_at(index).position))
+            .transpose();
   }
   Types const untyped(site_of.size(), 0); // coincidence ignores the species
   PositionIndex const index(images, untyped, lattice.matrix(), tol.symprec,
@@ -782,7 +825,7 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
       continue;
     }
     placed[static_cast<std::size_t>(i)] = 1;
-    CifSite const &site = sites[static_cast<std::size_t>(site_index)];
+    CifSite const &site = site_at(site_index);
     positions.push_back(images.row(i).transpose());
     types.push_back(site.type);
     labels.push_back(site.label);

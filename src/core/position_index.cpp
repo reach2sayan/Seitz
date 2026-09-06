@@ -4,8 +4,10 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <numeric>
+#include <ranges>
 
 namespace seitz {
 
@@ -55,40 +57,43 @@ PositionIndex::PositionIndex(Positions const &positions, Types const &types,
           symprec + 64 * std::numeric_limits<double>::epsilon() *
                         (symprec + lattice.cwiseAbs().maxCoeff()))),
       periodicity_(periodicity), positions_(&positions), types_(&types) {
-  Index const n = positions.rows();
+  auto const n = static_cast<int>(positions.rows());
   int const divisions = divisions_for(n, image_reach_);
-  for (std::size_t axis = 0; axis < 3; ++axis) {
-    divisions_[axis] =
-        periodicity[axis] == AxisKind::periodic ? divisions : 1;
-  }
-  everything_.resize(static_cast<std::size_t>(n));
-  std::iota(everything_.begin(), everything_.end(), 0);
+  std::ranges::transform(periodicity, divisions_.begin(), [&](AxisKind kind) {
+    return kind == AxisKind::periodic ? divisions : 1;
+  });
+  everything_ = {std::from_range, std::views::iota(0, n)};
   if (divisions_ == std::array{1, 1, 1}) {
     return; // one bucket: every query is `everything_`
   }
-  auto const buckets = static_cast<std::size_t>(divisions_[0]) *
-                       static_cast<std::size_t>(divisions_[1]) *
-                       static_cast<std::size_t>(divisions_[2]);
+  auto const buckets = static_cast<std::size_t>(
+      std::ranges::fold_left(divisions_, 1, std::multiplies{}));
 
-  // Counting sort by bucket; a stable pass keeps each bucket in index order.
-  std::vector<int> bucket_of(static_cast<std::size_t>(n));
+  // Counting sort by bucket: a histogram, its prefix sums as bucket starts,
+  // and a stable scatter that keeps each bucket in index order.
+  std::vector<int> const bucket_of{
+      std::from_range, std::views::iota(0, n) | std::views::transform([&](int i) {
+                         return bucket(wrap(positions.row(i).transpose(),
+                                            periodicity));
+                       })};
   starts_.assign(buckets + 1, 0);
-  for (Index i = 0; i < n; ++i) {
-    Vector3d const folded = wrap(positions.row(i).transpose(), periodicity);
-    int const b = (bucket_along(folded[0], 0) * divisions_[1] +
-                   bucket_along(folded[1], 1)) *
-                      divisions_[2] +
-                  bucket_along(folded[2], 2);
-    bucket_of[static_cast<std::size_t>(i)] = b;
+  for (int const b : bucket_of) {
     ++starts_[static_cast<std::size_t>(b) + 1];
   }
-  std::partial_sum(starts_.begin(), starts_.end(), starts_.begin());
-  std::vector<int> cursor(starts_.begin(), starts_.end() - 1);
+  std::inclusive_scan(starts_.begin(), starts_.end(), starts_.begin());
+  std::vector<int> cursor(starts_.begin(), std::prev(starts_.end()));
   atoms_.resize(static_cast<std::size_t>(n));
-  for (Index i = 0; i < n; ++i) {
-    auto const b = static_cast<std::size_t>(bucket_of[static_cast<std::size_t>(i)]);
-    atoms_[static_cast<std::size_t>(cursor[b]++)] = static_cast<int>(i);
+  for (auto const [i, b] : std::views::enumerate(bucket_of)) {
+    atoms_[static_cast<std::size_t>(cursor[static_cast<std::size_t>(b)]++)] =
+        static_cast<int>(i);
   }
+}
+
+int PositionIndex::bucket(Vector3d const &folded) const noexcept {
+  return (bucket_along(folded[0], 0) * divisions_[1] +
+          bucket_along(folded[1], 1)) *
+             divisions_[2] +
+         bucket_along(folded[2], 2);
 }
 
 PositionIndex::PositionIndex(Cell const &cell, double symprec)
@@ -133,18 +138,18 @@ std::span<int const> PositionIndex::candidates(Vector3d const &point,
   if (count == divisions_) {
     return everything_; // already ascending, nothing to gather
   }
-  for (int i0 = 0; i0 < count[0]; ++i0) {
-    int const b0 = wrap_index(first[0] + i0, divisions_[0]);
-    for (int i1 = 0; i1 < count[1]; ++i1) {
-      int const b1 = wrap_index(first[1] + i1, divisions_[1]);
-      for (int i2 = 0; i2 < count[2]; ++i2) {
-        int const b2 = wrap_index(first[2] + i2, divisions_[2]);
-        auto const b =
-            static_cast<std::size_t>((b0 * divisions_[1] + b1) * divisions_[2] + b2);
-        out.insert(out.end(), atoms_.begin() + starts_[b],
-                   atoms_.begin() + starts_[b + 1]);
-      }
-    }
+  auto const run = [&](std::size_t axis) {
+    return std::views::iota(0, count[axis]) |
+           std::views::transform([=, this](int i) {
+             return wrap_index(first[axis] + i, divisions_[axis]);
+           });
+  };
+  for (auto const [b0, b1, b2] :
+       std::views::cartesian_product(run(0), run(1), run(2))) {
+    auto const b =
+        static_cast<std::size_t>((b0 * divisions_[1] + b1) * divisions_[2] + b2);
+    out.insert(out.end(), atoms_.begin() + starts_[b],
+               atoms_.begin() + starts_[b + 1]);
   }
 
   // Each bucket is ascending and holds each atom once; several buckets need

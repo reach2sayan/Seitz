@@ -131,8 +131,9 @@ public:
 
 private:
   // Bucket along `axis` of a folded fractional coordinate, wrapped into
-  // [0, divisions_[axis]).
+  // [0, divisions_[axis]); and the flat bucket of a folded point.
   [[nodiscard]] int bucket_along(double x, std::size_t axis) const noexcept;
+  [[nodiscard]] int bucket(Vector3d const &folded) const noexcept;
   [[nodiscard]] bool coincides(Vector3d const &point, int atom) const noexcept {
     return coincident(point, positions_->row(atom).transpose(), lattice_,
                       symprec_, periodicity_);

@@ -138,14 +138,16 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
     if (wc.multiplicity != ref_multiplicity) {
       continue;
     }
-    fixed.clear();
-    for (auto const [k, point] : orbit | std::views::enumerate) {
+    auto const fixes = [&](int k) {
+      Vector3d const &point = orbit[static_cast<std::size_t>(k)];
       Vector3d const mapped =
           wc.rotation.cast<double>() * point + wc.translation;
-      if (coincident(point, mapped, lattice, symprec, periodicity)) {
-        fixed.push_back(static_cast<int>(k));
-      }
-    }
+      return coincident(point, mapped, lattice, symprec, periodicity);
+    };
+    fixed.clear();
+    std::ranges::copy(std::views::iota(0, static_cast<int>(orbit.size())) |
+                          std::views::filter(fixes),
+                      std::back_inserter(fixed));
     if (fixed.empty()) {
       continue;
     }

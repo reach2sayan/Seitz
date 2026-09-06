@@ -299,15 +299,19 @@ void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
                              PositionIndex::Scratch &scratch,
                              Vector3d const &trans) {
   int const n = static_cast<int>(cell.size());
+  auto const is_found = [](std::vector<std::uint8_t> const &flags) {
+    return [&flags](int atom) {
+      return flags[static_cast<std::size_t>(atom)] != 0;
+    };
+  };
   std::vector<std::uint8_t> const seeds = found;
-  for (int seed = 0; seed < n; ++seed) {
-    if (!seeds[static_cast<std::size_t>(seed)]) {
-      continue;
-    }
+  for (int const seed : std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
+    // The walk: seed, its image, that one's image, ... until it closes or
+    // dead-ends; a cycle is at most n long.
     int atom = seed;
-    for (int step = 0; step < n; ++step) {
-      Vector3d const image = cell.position(atom) + trans;
-      auto const next = index.first_match(image, cell.type(atom), scratch);
+    for ([[maybe_unused]] int const step : std::views::iota(0, n)) {
+      auto const next = index.first_match(cell.position(atom) + trans,
+                                          cell.type(atom), scratch);
       if (!next) {
         break;
       }
@@ -337,11 +341,13 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
   std::optional<PositionIndex> index;
   PositionIndex::Scratch scratch;
   std::vector<std::uint8_t> found(static_cast<std::size_t>(n), 0);
-  for (int i = 0; i < n; ++i) {
-    if (found[static_cast<std::size_t>(i)] ||
-        cell.type(i) != cell.type(min_index)) {
-      continue;
-    }
+  // `found` changes under the loop, so the filter re-reads it per candidate.
+  auto const untested_of_type = [&](int i) {
+    return found[static_cast<std::size_t>(i)] == 0 &&
+           cell.type(i) == cell.type(min_index);
+  };
+  for (int const i :
+       std::views::iota(0, n) | std::views::filter(untested_of_type)) {
     Vector3d const trans = cell.position(i) - origin;
     if (checker.check_total_overlap(trans, rot)) {
       found[static_cast<std::size_t>(i)] = 1;
@@ -353,15 +359,14 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
       }
     }
   }
-  std::vector<Vector3d> result;
-  for (int i = 0; i < n; ++i) {
-    if (found[static_cast<std::size_t>(i)]) {
-      // Layer translations live in the periodic plane; the aperiodic component
-      // is kept raw rather than folded into [0, 1).
-      result.push_back(wrap(cell.position(i) - origin, cell.periodicity()));
-    }
-  }
-  return result;
+  // Layer translations live in the periodic plane; the aperiodic component
+  // is kept raw rather than folded into [0, 1).
+  return {std::from_range,
+          std::views::iota(0, n) | std::views::filter([&](int i) {
+            return found[static_cast<std::size_t>(i)] != 0;
+          }) | std::views::transform([&](int i) {
+            return wrap(cell.position(i) - origin, cell.periodicity());
+          })};
 }
 
 } // namespace
