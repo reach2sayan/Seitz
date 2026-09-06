@@ -336,6 +336,9 @@ target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
         Boost::graph Boost::leaf Threads::Threads)
 target_link_libraries(seitz PRIVATE Boost::flyweight
         Boost::parser Boost::algorithm Boost::range)
+# Boost.Parser's MSVC debug stream includes <Windows.h>, whose min/max macros
+# would otherwise rewrite std::ranges::max(...) in the two grammar TUs.
+target_compile_definitions(seitz PRIVATE $<$<PLATFORM_ID:Windows>:NOMINMAX>)
 
 # The conversion warnings are applied to the library only — the oracle tests
 # bridge to the reference C API (reinterpret_cast, size_t<->int), which would
