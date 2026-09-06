@@ -37,7 +37,7 @@ Everything ships behind one header:
 | [Structure generation](#structure-generation) | random crystals on a group |
 | [Alloy configurations](#alloy-configurations) | cluster orbits, CVM |
 | [Error model and invariants](#error-model-and-invariants) | `Result<T>`, total functions |
-| [Building](#building) · [Python](#python) · [License and attribution](#license-and-attribution) | |
+| [Building](#building) · [Python](#python) · [Benchmarks](#benchmarks) · [License and attribution](#license-and-attribution) | |
 
 ---
 
@@ -536,6 +536,24 @@ suite against the build tree:
 
 ```bash
 cmake --preset python && cmake --build --preset python && ctest --preset python
+```
+
+### Benchmarks
+
+[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) times the Python layer against
+spglib, [moyopy](https://github.com/spglib/moyo), pymatgen's
+`SpacegroupAnalyzer`, ASE and PyXtal on the same cells: rocksalt supercells of
+16 to 1024 atoms and a 48-atom triclinic cell for determination, standardized
+and primitive cells, and PyXtal's real-structure corpus for CIF reading. The
+suite is `python/benchmarks/` (pytest-benchmark); only the engine call is timed,
+with each package's native object built beforehand and a fresh analyzer per
+call. It is not a CI gate -- the numbers come from one machine, three
+interleaved passes, min of medians:
+
+```bash
+uv sync --group bench
+cmake --preset python && cmake --build --preset python
+PYTHONPATH=build/python/python uv run --group bench python python/benchmarks/report.py --runs 3 --label "$(git describe --always)"
 ```
 
 ---

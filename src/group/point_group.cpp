@@ -37,7 +37,7 @@ constexpr std::array kRepresentativeSpacegroup = {
 [[nodiscard]] Operations
 coset_representatives(std::span<SymmetryOperation const> ops,
                       Operations const &stab) {
-  RotationMultimap const by_rotation =
+  RotationMultimap<int> const by_rotation =
       index_by_rotation(ops, &SymmetryOperation::rotation);
   std::vector covered(ops.size(), false);
   std::vector<SymmetryOperation> reps;
