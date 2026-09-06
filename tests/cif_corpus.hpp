@@ -1,14 +1,10 @@
 #pragma once
 
-// Loader for PyXtal's two CIF corpora, at <pyxtal>/miscellaneous/cifs (209
-// files named after the space group they were built for, `P6_3=mmc.cif` with
-// `=` standing in for `/`) and <pyxtal>/database/cifs (77 real structures plus
-// some non-CIF files). The path comes from the SEITZ_PYXTAL_CIF_DIR compile
-// definition, set in tests/CMakeLists.txt from the FetchContent source dir.
+// PyXtal's two CIF corpora: <pyxtal>/miscellaneous/cifs (209 files named after
+// their space group, `=` standing in for `/`) and <pyxtal>/database/cifs (77
+// real structures among non-CIF files). Path from SEITZ_PYXTAL_CIF_DIR.
 //
-// The reader takes text, not a path -- there is no std::filesystem in the
-// public API -- so reading the file is the test suite's job, and it is these
-// five lines.
+// The reader takes text, not a path, so opening the file is the suite's job.
 
 #include <algorithm>
 #include <filesystem>
@@ -31,8 +27,7 @@ struct CifFile {
   return std::move(buffer).str();
 }
 
-// Every `.cif` in one corpus directory, in name order so a failure is
-// reproducible.
+// Every `.cif` in one corpus directory, name-ordered for reproducibility.
 [[nodiscard]] inline std::vector<CifFile> cif_corpus(std::string_view corpus) {
   std::filesystem::path const directory =
       std::filesystem::path{SEITZ_PYXTAL_CIF_DIR} / corpus / "cifs";

@@ -30,7 +30,7 @@ namespace {
   return std::move(blocks.front());
 }
 
-// The rows of a tag, as a vector so a whole column compares in one CHECK.
+// A whole column as a vector, so it compares in one CHECK.
 [[nodiscard]] std::vector<std::string> rows(io::CifBlock const &block,
                                             std::string_view tag) {
   auto const column = block.column(tag);
@@ -98,8 +98,7 @@ TEST_CASE("the two null tokens read as an absent value", "[cif]") {
   CHECK(!block.value("_a").has_value());
   CHECK(!block.value("_b").has_value());
   CHECK(block.value("_c") == "0");
-  // Absent as a *value*, still present as a column: the file did say
-  // something.
+  // Absent as a value, present as a column: the file did say something.
   CHECK(block.column("_a").has_value());
 }
 
@@ -169,8 +168,7 @@ TEST_CASE("a ragged loop reports the line of its own loop_ keyword", "[cif]") {
 }
 
 TEST_CASE("text that stops making sense reports where", "[cif]") {
-  // An unterminated quote: the value never closes, so the item never
-  // completes and the block stops before it.
+  // The value never closes, so the item never completes.
   CHECK(errored([] { return io::parse_cif("data_x\n_a 'unterminated\n"); }));
   CHECK(errored([] { return io::parse_cif("not a cif at all\n"); }));
 }
@@ -184,8 +182,7 @@ TEST_CASE("an empty or comment-only document has no blocks", "[cif]") {
 
 namespace {
 
-// The six cell parameters every reader test needs, written once. `body` is
-// whatever that test is actually about.
+// The six cell parameters every reader test needs, written once.
 [[nodiscard]] std::string cubic_block(std::string_view body, double edge = 4.0,
                                       std::string_view name = "x") {
   return std::format("data_{0}\n"
@@ -196,8 +193,7 @@ namespace {
                      name, edge, body);
 }
 
-// Rocksalt as a file writes it: the asymmetric unit plus whatever the block
-// says about symmetry, which each test varies.
+// Rocksalt as a file writes it; each test varies the symmetry part.
 [[nodiscard]] std::string nacl_block(std::string_view symmetry) {
   return cubic_block(std::string{symmetry} +
                          "loop_\n"
@@ -209,8 +205,7 @@ namespace {
                      5.64, "nacl");
 }
 
-// The eight operations of the primitive face-centred set: enough to build the
-// conventional cell from the two asymmetric-unit sites.
+// The face-centring translations: enough to build the conventional cell.
 constexpr std::string_view kFccSymops =
     "loop_ _space_group_symop_operation_xyz\n"
     "'x,y,z' 'x,y+1/2,z+1/2' 'x+1/2,y,z+1/2' 'x+1/2,y+1/2,z'\n";
@@ -277,9 +272,8 @@ TEST_CASE("a shared site collapses to its majority species", "[cif]") {
 }
 
 TEST_CASE("an over-specified asymmetric unit reads as one orbit", "[cif]") {
-  // Both rows are the same site: the second is the first's image under the
-  // stated operation, which a file listing its asymmetric unit redundantly
-  // will happily write out.
+  // The second row is the first's image under the stated operation, which a
+  // redundantly written asymmetric unit does list.
   auto const text =
       cubic_block(
                   "loop_ _space_group_symop_operation_xyz\n"
@@ -395,10 +389,8 @@ TEST_CASE("symbol lookup accepts the spellings files use", "[cif]") {
 
 namespace {
 
-// The caesium-chloride motif with real atomic numbers as its types. Not
-// test::rocksalt_motif, whose types are the labels 0 and 1: those are not
-// elements, so the writer spells them `X` and the document deliberately does
-// not read back.
+// Real atomic numbers as types. Not test::rocksalt_motif, whose 0 and 1 are
+// labels: the writer spells 0 as `X` and that does not read back.
 [[nodiscard]] Cell nacl_cell() {
   Positions positions(2, 3);
   positions.row(0) << 0.0, 0.0, 0.0;
@@ -433,8 +425,7 @@ TEST_CASE("a symmetrized document names the group it was determined as",
       analysis::SymmetryAnalyzer::from_cell(cell, io::kCifTolerance);
   auto const text = must(io::write_cif(analyzer, "rocksalt"));
 
-  // The header states the setting three ways, and the loop states its
-  // operations; all four have to agree on the group.
+  // Header states the setting three ways plus the loop; all must agree.
   auto const block = one_block(text);
   CHECK(block.value("_space_group_it_number") == "221");
   REQUIRE(block.column("_space_group_symop_operation_xyz").has_value());
@@ -458,10 +449,8 @@ TEST_CASE("as_cif prints what write_cif returns", "[cif]") {
 }
 
 TEST_CASE("a type that is not an element is written as X", "[cif]") {
-  // Documented: a type outside 1..96 has no chemical symbol, so the document
-  // says `X` and does not read back as a structure. Type 1 is a real atomic
-  // number and comes out as hydrogen -- which is exactly why the round-trip
-  // tests above use a cell whose types mean elements.
+  // A type outside 1..96 has no symbol, so `X`, and does not read back. Type 1
+  // is a real atomic number and comes out as hydrogen.
   auto const text = io::write_cif(test::rocksalt_motif(5.64));
   auto const block = one_block(text);
   CHECK(rows(block, "_atom_site_type_symbol") ==

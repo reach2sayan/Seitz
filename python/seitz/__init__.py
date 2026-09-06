@@ -165,25 +165,17 @@ def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = 
         -> SymmetryAnalyzer:
     """Determine the symmetry of ``cell``.
 
-    Accepts a validated :class:`~seitz.options.Tolerance`, a plain dict, or
-    nothing at all; :func:`_tolerance` is where any of the three becomes the
-    struct the extension takes.
+    Takes a :class:`~seitz.options.Tolerance`, a dict, or nothing.  An unset
+    ``setting`` searches every Hall setting of the cell's family; a set one
+    fixes it.
 
-    An unset ``setting`` searches every Hall setting of the cell's family; a set
-    one fixes it.
-
-    Nothing is computed here.  The returned analyzer computes on first query and
-    caches, so asking it several questions costs one determination.
+    Nothing is computed here: the analyzer computes on first query and caches.
     """
     return SymmetryAnalyzer.from_cell(cell, _tolerance(tolerance).to_core(), setting)
 
 
 def _tolerance(tolerance: Tolerance | dict[str, float | None] | None) -> Tolerance:
-    """The one place a tolerance argument becomes a validated model.
-
-    Shared by :func:`analyze` and :func:`read_cif`, which differ only in the
-    default they fall back to when the argument is ``None``.
-    """
+    """A tolerance argument as a validated model; shared by analyze/read_cif."""
     if tolerance is None: return Tolerance()
     if isinstance(tolerance, Tolerance): return tolerance
     return Tolerance.model_validate(tolerance)
@@ -193,14 +185,11 @@ def read_cif(source: str | os.PathLike[str],
              tolerance: Tolerance | dict[str, float | None] | None = None) -> list[CifStructure]:
     """Read every structure in a CIF document.
 
-    ``source`` is either the CIF text itself or a path to a file holding it; a
-    :class:`os.PathLike` is always read, a ``str`` is always the text.  The
-    split is by type rather than by guessing, so a one-line CIF and a filename
-    can never be confused.
+    A :class:`os.PathLike` ``source`` is read from disk, a ``str`` is the text
+    itself -- by type, so a one-line CIF and a filename cannot be confused.
 
-    The default tolerance is :data:`CIF_SYMPREC` (1e-3 A), not the search
-    default: CIF coordinates are written to five decimals, which puts two
-    images of one site as much as 1e-4 apart.
+    Defaults to :data:`CIF_SYMPREC` (1e-3 A), not the search default:
+    five-decimal coordinates put two images of a site ~1e-4 apart.
     """
     text = Path(source).read_text() if isinstance(source, os.PathLike) else source
     validated = _tolerance(tolerance) if tolerance is not None else Tolerance(symprec=CIF_SYMPREC)
@@ -211,14 +200,12 @@ def write_cif(obj: Cell | SymmetryAnalyzer, *, name: str = "seitz",
               path: str | os.PathLike[str] | None = None) -> str:
     """Render ``obj`` as a CIF document, and optionally write it to ``path``.
 
-    A :class:`Cell` is written in P1, every atom spelled out.  A
-    :class:`SymmetryAnalyzer` is written symmetrized: its standardized cell, the
-    database operations of the setting it determined, and one representative
-    atom per orbit with its Wyckoff letter and multiplicity.
+    A :class:`Cell` is written in P1.  A :class:`SymmetryAnalyzer` is written
+    symmetrized: standardized cell, its setting's database operations, and one
+    atom per orbit with Wyckoff letter and multiplicity.
 
-    The text is returned either way, so this is also the printable form::
-
-        print(seitz.write_cif(cell))
+    The text is returned either way, so ``print(seitz.write_cif(cell))`` is the
+    printable form.
     """
     if isinstance(obj, Cell): text = _core.write_cif_cell(obj, name)
     elif isinstance(obj, SymmetryAnalyzer): text = _core.write_cif_analyzer(obj, name)

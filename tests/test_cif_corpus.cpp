@@ -20,10 +20,9 @@ using seitz::test::must;
 
 namespace {
 
-// The space group a `miscellaneous/cifs` filename names, for the files whose
-// name is a symbol the tables carry. The rest are non-standard settings
-// (`Bmab`, `Cmca`, `C-1`, `F1`) that no table lists; the count assertion below
-// is what keeps that set from silently growing.
+// The group a filename names, where the tables carry that symbol. The rest are
+// non-standard settings (`Bmab`, `C-1`, `F1`); the count assertion below is
+// what keeps that set from silently growing.
 [[nodiscard]] std::optional<int> number_from_name(std::string const &name) {
   auto const hall = data::hall_from_hm_symbol<GroupFamily::space>(name);
   return hall ? std::optional{data::spacegroup_type(*hall).number}
@@ -54,10 +53,8 @@ TEST_CASE("every per-space-group CIF reads", "[oracle][cif]") {
       continue;
     }
     ++resolved;
-    // What the file itself says has to be the group its name promises. This
-    // is a statement about the reader's symbol resolution, not about the
-    // atoms: the arrangement often has a higher symmetry than the setting it
-    // is described in, which the determination below is free to find.
+    // About symbol resolution, not the atoms: an arrangement often has higher
+    // symmetry than the setting describing it, which the next case may find.
     REQUIRE(structure.hall.has_value());
     CHECK(data::spacegroup_type(*structure.hall).number == *expected);
   }
@@ -88,8 +85,8 @@ TEST_CASE("a written CIF reads back as the same structure", "[oracle][cif]") {
     REQUIRE(plain.size() == 1);
     CHECK(plain.front().cell.size() == structure.cell.size());
 
-    // Symmetrized: one representative per orbit plus the database operations,
-    // which have to expand back to the same standardized cell.
+    // Symmetrized: one atom per orbit plus the operations, which must expand
+    // back to the same standardized cell.
     auto const analyzer = analysis::SymmetryAnalyzer::from_cell(
         structure.cell, io::kCifTolerance);
     auto const text = io::write_cif(analyzer);

@@ -4,9 +4,7 @@
 #include <seitz/core/tolerance.hpp>
 #include <seitz/core/types.hpp>
 
-// Fractional-coordinate comparisons used by the symmetry search. The folding
-// primitives themselves (wrap_to_unit_cell, nearest_offset) are public, in
-// core/fractional.hpp.
+// Fractional-coordinate comparisons used by the symmetry search
 namespace seitz::math {
 
 // Minimal-image fractional displacement b - a, each component folded to

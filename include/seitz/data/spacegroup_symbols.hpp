@@ -11,17 +11,13 @@
 #include <optional>
 #include <string_view>
 
-// The symbol -> Hall setting direction of the database, which nothing else
-// needed until a CIF arrived carrying `P 21/c` instead of a symop loop. Its own
-// header rather than part of spg_database.hpp: three translation units want it
-// and it costs a few thousand consteval normalisations.
+// The symbol -> Hall setting direction of the database. Its own header: three
+// TUs want it and it costs a few thousand consteval normalisations.
 //
-// Symbols in the wild are written every way at once -- `P 21/c`, `P 1 21/c 1`,
-// `P2_1/c`, `P2(1)/c` are the same group -- so both sides of the comparison are
-// normalised to a canonical key: spaces, underscores and parentheses dropped,
-// and everything after a ':' taken as the setting the writer asked for
-// (`R -3 m :H`). Case is kept, because it is what separates a space group's `P`
-// from a layer group's `p`.
+// `P 21/c`, `P 1 21/c 1`, `P2_1/c`, `P2(1)/c` are one group, so both sides are
+// normalised: spaces, underscores and parentheses dropped, everything after a
+// ':' taken as the setting asked for (`R -3 m :H`). Case is kept -- it is what
+// separates a space group's `P` from a layer group's `p`.
 
 #pragma GCC visibility push(default)
 
@@ -29,19 +25,15 @@ namespace seitz::data {
 
 namespace detail {
 
-// Longest normalised symbol in either table is 13 characters (the longest Hall
-// symbol, 11); the setting suffix is at most a few.
+// Longest normalised symbol in either table is 13 characters.
 inline constexpr std::size_t kSymbolCapacity = 16;
 
-// How many keys one catalog row contributes: the short symbol, the full
-// symbol, up to three ` = ` alternatives of the international symbol, and for
-// the monoclinic rows the full symbol with its lone `1` axes removed
-// (`P 1 2_1/n 1` -> `P21/n`). Absent kinds normalise to the empty key, which
-// no query can equal.
+// Keys per catalog row: short symbol, full symbol, up to three ` = `
+// alternatives, and for monoclinic rows the full symbol with its lone `1` axes
+// removed (`P 1 2_1/n 1` -> `P21/n`). Absent kinds normalise to the empty key.
 inline constexpr int kSymbolKinds = 6;
 inline constexpr std::size_t kSymbolBuckets = 4096;
 
-// A normalised symbol, as a value a consteval table can hold.
 struct SymbolKey {
   std::array<char, kSymbolCapacity> text{};
   std::uint8_t size = 0;
@@ -65,9 +57,8 @@ struct NormalizedSymbol {
   return c == ' ' || c == '_' || c == '(' || c == ')';
 }
 
-// Append `c`, or report the overflow. A symbol longer than the capacity is one
-// no row carries, so its caller abandons the whole key rather than truncating
-// it into something that could collide with a real one.
+// An over-long symbol is one no row carries, so the caller abandons the key
+// rather than truncating it into something that could collide with a real one.
 [[nodiscard]] constexpr bool push(SymbolKey &key, char c) noexcept {
   if (key.size >= kSymbolCapacity) {
     return false;
@@ -76,9 +67,8 @@ struct NormalizedSymbol {
   return true;
 }
 
-// `symbol` split into its canonical key and the setting the writer asked for.
-// `drop_lone_ones` removes whole `1` tokens, which is what turns a monoclinic
-// full symbol into the short one everybody writes.
+// `symbol` split into canonical key and requested setting. `drop_lone_ones`
+// turns a monoclinic full symbol into the short one everybody writes.
 [[nodiscard]] constexpr NormalizedSymbol
 normalize_symbol(std::string_view symbol, bool drop_lone_ones = false) noexcept {
   NormalizedSymbol out{};
@@ -122,9 +112,8 @@ normalize_symbol(std::string_view symbol, bool drop_lone_ones = false) noexcept 
   return at == std::string_view::npos ? symbol : symbol.substr(0, at);
 }
 
-// The pre-1983 cubic spelling modernised: `Pm3m` is `Pm-3m`, and CIF files
-// written before the change are still in every database. Empty when the symbol
-// carries no such `3`, so the retry is skipped.
+// The pre-1983 cubic spelling modernised: `Pm3m` is `Pm-3m`. Empty when the
+// symbol carries no such `3`, so the retry is skipped.
 [[nodiscard]] constexpr SymbolKey modernized_cubic(SymbolKey const &key) noexcept {
   auto const text = key.view();
   SymbolKey out{};
@@ -181,8 +170,7 @@ template <GroupFamily F>
     return normalize_symbol(alternative(type.international, hm_kind_of(id) - 2))
         .key;
   default:
-    // Monoclinic only: `P312` and `P321` are different trigonal groups, so
-    // dropping lone `1`s there would merge them.
+    // Monoclinic only: dropping lone `1`s would merge `P312` and `P321`.
     return type.number >= 3 && type.number <= 15
                ? normalize_symbol(type.international_full, true).key
                : SymbolKey{};
@@ -194,8 +182,7 @@ inline constexpr auto kHmSymbolIndex =
     bucket_index<static_cast<std::size_t>(hall_settings(F)) * kSymbolKinds,
                  kSymbolBuckets>([](int id) { return bucket_of(hm_key_of<F>(id)); });
 
-// A Hall symbol is already one per setting, so its index is keyed by the row
-// itself rather than by a (row, kind) pair.
+// A Hall symbol is one per setting, so this index is keyed by the row.
 template <GroupFamily F>
 [[nodiscard]] constexpr SymbolKey hall_key_of(int row) noexcept {
   return normalize_symbol(row_at<F>(row).hall_symbol).key;
@@ -206,18 +193,16 @@ inline constexpr auto kHallSymbolIndex =
     bucket_index<static_cast<std::size_t>(hall_settings(F)), kSymbolBuckets>(
         [](int row) { return bucket_of(hall_key_of<F>(row)); });
 
-// An unset setting takes whatever the first matching row offers; a set one has
-// to prefix the row's choice, so `:H` and `:R` pick different rows of the same
-// group and `:b` picks the first of `b1`, `b2`, `b3`.
+// An unset setting takes the first match; a set one must prefix the row's
+// choice, so `:b` picks the first of `b1`, `b2`, `b3`.
 template <GroupFamily F>
 [[nodiscard]] constexpr bool choice_accepts(int row,
                                             SymbolKey const &setting) noexcept {
   return setting.empty() || row_at<F>(row).choice.starts_with(setting.view());
 }
 
-// The first (lowest-index, therefore default) setting whose `key_of` equals
-// `key` and whose choice accepts `setting`. Bucket entries are ascending in id,
-// so the scan meets the rows in catalog order.
+// The first (lowest-index, therefore default) matching setting. Bucket entries
+// are ascending in id, so the scan meets the rows in catalog order.
 template <GroupFamily F, class Index, class KeyOf, class RowOf>
 [[nodiscard]] constexpr std::optional<HallNumber>
 find_setting(Index const &index, KeyOf key_of, RowOf row_of,
@@ -235,14 +220,12 @@ find_setting(Index const &index, KeyOf key_of, RowOf row_of,
 
 } // namespace detail
 
-// The Hall setting a Hermann-Mauguin symbol names, in whichever of the
-// spellings the tables carry: short, full, an alternative of the international
-// symbol, or a monoclinic full symbol with its lone axes dropped. A trailing
-// `:choice` selects among a group's settings; without one the default (lowest
-// Hall number) wins. std::nullopt when nothing matches.
+// The Hall setting a Hermann-Mauguin symbol names, in any spelling the tables
+// carry. A trailing `:choice` selects among a group's settings; without one the
+// default (lowest Hall number) wins. nullopt when nothing matches.
 //
-// Layer-group short symbols are not unique -- `p2` is both layer group 3 and 8
-// -- and there the lower group number wins.
+// Layer-group short symbols are not unique -- `p2` is layer group 3 and 8 --
+// and there the lower number wins.
 template <GroupFamily F>
 [[nodiscard]] constexpr std::optional<HallNumber>
 hall_from_hm_symbol(std::string_view symbol) noexcept {
@@ -258,9 +241,8 @@ hall_from_hm_symbol(std::string_view symbol) noexcept {
   return search(detail::modernized_cubic(query.key));
 }
 
-// The Hall setting a Hall symbol names (`-P 2ybc`, `-F 4 2 3`). Hall symbols
-// are already one per setting, so no choice suffix is needed -- one is still
-// honoured if written.
+// The setting a Hall symbol names (`-P 2ybc`). One per setting, so no choice
+// suffix is needed; one is still honoured if written.
 template <GroupFamily F>
 [[nodiscard]] constexpr std::optional<HallNumber>
 hall_from_hall_symbol(std::string_view symbol) noexcept {

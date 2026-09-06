@@ -58,7 +58,7 @@ struct RodGeometry {
   }
 
   [[nodiscard]] Locus whole_space() const {
-    return Locus{Vector3d::Zero(), Matrix3d::Identity()};
+    return Locus{.point = Vector3d::Zero(), .dir = Matrix3d::Identity()};
   }
 
   // The fixed loci of one operation h(p) = R p + t within one period: the
@@ -77,7 +77,7 @@ struct RodGeometry {
           -op.translation + static_cast<double>(n) * unit_axis(axis);
       Vector3d const particular = lu.solve(rhs);
       if (approx_equal(m * particular, rhs, kTol)) {
-        loci.push_back(Locus{reduce(particular), ker});
+        loci.push_back(Locus{.point = reduce(particular), .dir = ker});
       }
     }
     return loci;
@@ -113,8 +113,9 @@ struct RodGeometry {
         if (ka > 0) {
           common += a.dir * w.head(ka);
         }
-        results.push_back(Locus{
-            reduce(common), math::intersect_column_spaces(a.dir, b.dir, kTol)});
+        results.push_back(
+            Locus{.point = reduce(common),
+                  .dir = math::intersect_column_spaces(a.dir, b.dir, kTol)});
       }
     }
     return results;
@@ -192,11 +193,8 @@ struct RodGeometry {
   // aperiodic axes left raw.
   [[nodiscard]] detail::DerivedLocus derive(Locus const &locus) const {
     auto partition = detail::partition_orbit(
-        ops, generic_point(locus),
-        [this](Vector3d const &p) { return reduce(p); },
-        [this](Vector3d const &a, Vector3d const &b) {
-          return same_point(a, b);
-        });
+        ops, generic_point(locus), [&](Vector3d const &p) { return reduce(p); },
+        [&](Vector3d const &a, Vector3d const &b) { return same_point(a, b); });
     // Zero-pad the axis-separated direction basis into a fixed Matrix3d (only
     // the first dof columns are meaningful).
     Eigen::MatrixXd const cdir = canonicalize_dir(locus.dir);
@@ -204,12 +202,13 @@ struct RodGeometry {
     if (cdir.cols() > 0) {
       locus_basis.leftCols(cdir.cols()) = cdir;
     }
-    return detail::DerivedLocus{static_cast<int>(partition.points.size()),
-                                locus.dim(),
-                                reduce(locus.point),
-                                locus_basis,
-                                std::move(partition.orbit_ops),
-                                std::move(partition.site_symmetry)};
+    return detail::DerivedLocus{
+        .multiplicity = static_cast<int>(partition.points.size()),
+        .dof = locus.dim(),
+        .origin = reduce(locus.point),
+        .locus_basis = locus_basis,
+        .orbit_ops = std::move(partition.orbit_ops),
+        .site_symmetry = std::move(partition.site_symmetry)};
   }
 };
 

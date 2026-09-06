@@ -23,11 +23,10 @@ FetchContent_Declare(Eigen3
 #   geometry   — the R-tree behind PositionIndex
 #   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
 #   leaf       — the error model (Result<T>)
-#   parser     — the CIF and xyz-triplet grammars; header-only, hana/type_index/
-#                assert transitive, numerics via <charconv> (no compiled lib)
-#   algorithm  — the string algorithms the CIF layer would otherwise hand-roll
-#                (to_lower_copy, join); pulls Boost.Range transitively
-#   range      — join(), for concatenating two ranges of unlike type
+#   parser     — the CIF and xyz-triplet grammars; header-only, numerics via
+#                <charconv> (no compiled lib)
+#   algorithm  — to_lower_copy/join, so the CIF layer hand-rolls neither
+#   range      — join(), for concatenating two ranges
 set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight geometry graph leaf
         parser range)
 FetchContent_Declare(Boost
@@ -94,12 +93,10 @@ FetchContent_Declare(spglib_reference
 FetchContent_MakeAvailable(spglib_reference)
 unset(SEITZ_SPGLIB_SUBDIR)
 
-# PyXtal, for its two CIF corpora only: 209 per-space-group files under
-# miscellaneous/cifs and 77 real structures under database/cifs, which the CIF
-# reader is exercised against. Populate-only -- SOURCE_SUBDIR names a directory
-# that does not exist, so FetchContent checks the tree out and adds no targets,
-# builds no Python and needs no interpreter. Offline: point
-# FETCHCONTENT_SOURCE_DIR_PYXTAL_REFERENCE at an existing checkout.
+# PyXtal, for its two CIF corpora only (209 per-group files, 77 real
+# structures). Populate-only: SOURCE_SUBDIR names a directory that does not
+# exist, so FetchContent checks the tree out and adds no targets. Offline:
+# FETCHCONTENT_SOURCE_DIR_PYXTAL_REFERENCE.
 if (SEITZ_BUILD_ORACLE_TESTS)
     FetchContent_Declare(pyxtal_reference
             GIT_REPOSITORY https://github.com/MaterSim/PyXtal.git

@@ -16,18 +16,16 @@
 #include <variant>
 #include <vector>
 
-// The Jones-faithful coordinate triplet, in both directions. The grammar is
-// private to this translation unit -- Boost::parser is a PRIVATE dependency and
-// no installed header names it.
+// The Jones-faithful coordinate triplet, both directions. The grammar is
+// private to this TU: Boost::parser is PRIVATE and no installed header names it.
 namespace seitz {
 
 namespace {
 
 namespace bp = boost::parser;
 
-// One summand of one coordinate: either a multiple of an axis or a bare
-// number. The sign is its own field rather than folded into the value because
-// the grammar reads it before knowing which of the two follows.
+// One summand: an axis multiple or a bare number. The sign is its own field
+// because the grammar reads it before knowing which of the two follows.
 struct RotTerm {
   std::optional<char> sign;
   std::optional<unsigned> coefficient;
@@ -49,8 +47,7 @@ bp::symbols<int> const axis_symbol{
     {"x", 0}, {"y", 1}, {"z", 2}, {"X", 0}, {"Y", 1}, {"Z", 2}};
 auto const sign = bp::char_("+-");
 
-// A fraction first, so "1/2" is one term and not the integer 1; the alternative
-// backtracks to a plain decimal on the missing '/'.
+// Fraction first, so "1/2" is one term; backtracks to a decimal on no '/'.
 bp::rule<struct number_tag, double> const number = "number";
 auto const number_def =
     bp::transform([](std::tuple<unsigned, unsigned> const &pq) {
@@ -66,19 +63,17 @@ bp::rule<struct trans_term_tag, TransTerm> const trans_term =
     "translation term";
 auto const trans_term_def = -sign >> number;
 
-// The rotation reading is tried first: on "1/2+x" it consumes the 1 and then
-// fails at the '/', and the sequence backtracks into the translation reading.
+// Rotation first: on "1/2+x" it takes the 1, fails at '/', and backtracks.
 bp::rule<struct coordinate_tag, Coordinate> const coordinate = "coordinate";
 auto const coordinate_def = +(rot_term | trans_term);
 
-// separate[]: without it the three coordinates' vectors would merge into one.
+// separate[]: without it the three coordinates' vectors merge into one.
 bp::rule<struct triplet_tag, Triplet> const triplet = "xyz triplet";
 auto const triplet_def =
     bp::separate[coordinate >> ',' >> coordinate >> ',' >> coordinate];
 
-// BOOST_PARSER_DEFINE_RULES generates each rule's parse function with a
-// `dont_assign` parameter it does not use. parser.hpp is a SYSTEM include, but
-// the macro expands *here*, so Clang attributes the warning to this file.
+// The macro's generated functions take an unused `dont_assign`; it expands
+// here, so Clang blames this file despite parser.hpp being a SYSTEM include.
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -94,13 +89,12 @@ BOOST_PARSER_DEFINE_RULES(number, rot_term, trans_term, coordinate, triplet);
 
 constexpr std::string_view kAxisNames = "xyz";
 
-// The denominators a crystallographic translation can have exactly: the
-// twelfths and the eighths (Hall settings carry 1/8 and 3/8).
+// The denominators a translation can have exactly (Hall settings carry 3/8).
 constexpr std::array kDenominators = {1, 2, 3, 4, 6, 8, 12};
 constexpr double kFractionPrec = 1e-6;
 
-// `t` as "+p/q" / "-p/q" when that is exact, else a short decimal. `signed_`
-// says whether a leading '+' is needed, i.e. whether anything precedes it.
+// `t` as "+p/q" when exact, else a short decimal. `signed_`: does anything
+// precede it, so is a leading '+' needed.
 void append_translation(std::string &out, double t, bool signed_) {
   if (std::abs(t) < kFractionPrec) {
     return;
@@ -123,8 +117,7 @@ void append_translation(std::string &out, double t, bool signed_) {
   out += std::format("{:.6g}", t);
 }
 
-// One coordinate of the triplet: the axis terms that have a coefficient, then
-// the translation. "0" when the row is empty, so the result always reads back.
+// The axis terms, then the translation. "0" for an empty row, so it reads back.
 [[nodiscard]] std::string coordinate_text(SymmetryOperation const &op,
                                           Index row) {
   std::string out;

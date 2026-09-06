@@ -33,9 +33,8 @@
 #include <variant>
 #include <vector>
 
-// The CIF 1.1 grammar and the raw aggregates it parses into. Both are private
-// to this translation unit: Boost::parser is a PRIVATE dependency and
-// seitz/io/cif.hpp names none of it.
+// Grammar and raw aggregates are private to this TU: Boost::parser is a
+// PRIVATE dependency and no installed header names it.
 namespace seitz::io {
 
 namespace {
@@ -44,15 +43,12 @@ namespace bp = boost::parser;
 
 using Iterator = std::string_view::const_iterator;
 
-// The document as written, before anything is folded into columns.
 struct Item {
   std::string tag;
   std::string value;
 };
 struct Loop {
-  // Where the `loop_` keyword stood, so a ragged loop reports its own line
-  // rather than the end of the file.
-  Iterator where{};
+  Iterator where{}; // the `loop_` keyword, so a ragged loop reports its line
   std::vector<std::string> tags;
   std::vector<std::string> values; // row-major
 };
@@ -62,8 +58,7 @@ struct Block {
   std::vector<Entry> entries;
 };
 
-// The classic locale explicitly: a CIF tag is ASCII, and the default locale
-// would let a Turkish environment lowercase `I` to a dotless one.
+// Classic locale: a CIF tag is ASCII, and a Turkish one dotless-Is it.
 [[nodiscard]] std::string ascii_lower(std::string const &s) {
   return boost::algorithm::to_lower_copy(s, std::locale::classic());
 }
@@ -71,10 +66,8 @@ struct Block {
 auto const comment = bp::lit('#') >> *(bp::char_ - bp::eol);
 auto const skipper = bp::ws | comment;
 
-// The reserved words a value may not be: they end whatever list they follow.
-// `save_` among them means a dictionary's save frames stop the parse at the
-// keyword with e_cif_syntax; structure CIFs carry none, and dictionaries are
-// out of scope.
+// Reserved words a value may not be; they end whatever list they follow.
+// `save_` here means a dictionary's save frames stop the parse -- out of scope.
 auto const keyword = bp::no_case[bp::lit("data_") | bp::lit("loop_") |
                                  bp::lit("save_") | bp::lit("global_") |
                                  bp::lit("stop_")];
@@ -84,8 +77,7 @@ bp::rule<struct tag_tag, std::string> const cif_tag = "tag";
 auto const cif_tag_def =
     bp::transform(ascii_lower)[bp::lexeme[bp::char_('_') >> +nonblank]];
 
-// A semicolon-delimited text field, which CIF only recognises when the
-// semicolon opens a line.
+// A text field, which CIF recognises only when the ';' opens a line.
 auto const at_column_1 = [](auto &ctx) {
   auto const it = bp::_where(ctx).begin();
   return it == bp::_begin(ctx) || *std::prev(it) == '\n';
@@ -95,8 +87,7 @@ auto const text_field_def =
     bp::eps(at_column_1) >>
     bp::lexeme[';' >> *(bp::char_ - (bp::eol >> ';')) >> bp::eol >> ';'];
 
-// The closing quote is the one followed by whitespace, so an apostrophe inside
-// a single-quoted value ('it's here') does not end it.
+// The closing quote is the one followed by whitespace, so 'it's here' holds.
 bp::rule<struct squoted_tag, std::string> const squoted = "quoted value";
 auto const squoted_def =
     bp::lexeme['\'' >> *(bp::char_ - ('\'' >> (bp::ws | bp::eoi))) >> '\''];
@@ -114,8 +105,7 @@ auto const value_def = text_field | squoted | dquoted | unquoted;
 bp::rule<struct item_tag, Item> const item = "tag/value item";
 auto const item_def = cif_tag >> value;
 
-// separate[]: without it the tag list and the value list would merge into one
-// vector<std::string>.
+// separate[]: without it the tag and value lists merge into one vector.
 bp::rule<struct loop_tag, Loop> const loop = "loop";
 auto const loop_def = bp::separate[bp::transform([](auto const &r) {
                                      return r.begin();
@@ -126,16 +116,13 @@ bp::rule<struct block_tag, Block> const data_block = "data block";
 auto const data_block_def =
     bp::lexeme[bp::no_case[bp::lit("data_")] >> *nonblank] >> *(loop | item);
 
-// The trailing `*skipper` is what lets the caller check `first == last`: the
-// blocks alone stop at the last value, leaving a file's final newline behind.
-// Written with the skipper itself rather than a hand-rolled scan so there is
-// one definition of what whitespace and a comment are.
+// The trailing `*skipper` is what lets the caller check `first == last`:
+// blocks alone stop at the last value, leaving the file's final newline.
 bp::rule<struct document_tag, std::vector<Block>> const document = "CIF";
 auto const document_def = *data_block >> bp::omit[*skipper];
 
-// BOOST_PARSER_DEFINE_RULES generates each rule's parse function with a
-// `dont_assign` parameter it does not use. parser.hpp is a SYSTEM include, but
-// the macro expands *here*, so Clang attributes the warning to this file.
+// The macro's generated functions take an unused `dont_assign`; it expands
+// here, so Clang blames this file despite parser.hpp being a SYSTEM include.
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -180,8 +167,7 @@ namespace {
 
 // ---- the value grammar the semantic layer needs -----------------------------
 
-// A number with its estimated standard deviation stripped: `1.234(5)` is
-// 1.234, and an unclosed `0.25(` is still 0.25 -- files carry both.
+// esd stripped: `1.234(5)` is 1.234, and an unclosed `0.25(` is still 0.25.
 [[nodiscard]] std::optional<double> number_of(std::string_view text) {
   double out = 0.0;
   auto const number =
@@ -193,18 +179,15 @@ namespace {
   return out;
 }
 
-// The element a site label or type symbol names: its leading run of letters,
-// two characters first so `Cl1` is chlorine and not carbon, then one so
-// `O1W`, `Fe3+` and `Na+` all resolve. Title-cased, because files write `FE`
-// and `fe` as often as `Fe`.
+// The element a label or type symbol names: leading letters, two first so
+// `Cl1` is chlorine not carbon, then one for `O1W`, `Fe3+`, `Na+`.
 [[nodiscard]] std::optional<int> species_of(std::string_view symbol) {
   std::string letters{
       std::from_range,
       symbol | std::views::take_while([](unsigned char c) {
         return std::isalpha(c) != 0;
       })};
-  // Neutron structures name the hydrogen isotopes, which are no element of
-  // their own: D and T are hydrogen wherever they appear.
+  // The hydrogen isotopes neutron structures name are no element of their own.
   if (letters == "D" || letters == "T") {
     return data::atomic_number("H");
   }
@@ -254,8 +237,7 @@ struct CifSite {
   return *number;
 }
 
-// A column the reader can do without, padded to `rows` so every site column
-// zips against every other one.
+// An optional column, padded to `rows` so every site column zips.
 [[nodiscard]] std::vector<std::string>
 column_or_blank(CifBlock const &block, std::string_view tag,
                 std::size_t rows) {
@@ -325,12 +307,10 @@ column_or_blank(CifBlock const &block, std::string_view tag,
     CifSite site;
     site.label = label.empty() ? std::format("site{}", row) : label;
     site.position = Vector3d{*coordinate[0], *coordinate[1], *coordinate[2]};
-    // The occupancy is optional and its two null tokens mean "not stated",
-    // which for a structure read permissively is a full site.
+    // "Not stated" is a full site when reading permissively.
     site.occupancy = number_of(occupancy).value_or(1.0);
 
-    // A type symbol of '?' or '.' says the file has none, not that the
-    // element is called "?".
+    // '?' or '.' says the file has none, not that the element is called "?".
     bool const stated =
         !symbol.empty() && symbol != "?" && symbol != ".";
     std::string_view const named = stated ? symbol : site.label;
@@ -344,15 +324,13 @@ column_or_blank(CifBlock const &block, std::string_view tag,
   return sites;
 }
 
-// Sites written at the same position -- a mixed or partially occupied site --
-// collapsed to the majority species. Fills in each site's representative and
-// returns the surviving site indices, ascending, with a record per collapse.
+// Sites sharing a position collapsed to the majority species. Fills in each
+// site's representative; returns the survivors, ascending, and the records.
 [[nodiscard]] std::pair<std::vector<int>, std::vector<OccupancyCollapse>>
 collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
                       double symprec) {
-  // Non-owning index: both arrays are named locals so they outlive it. One
-  // type for every site, because sharing a position is geometric -- a mixed
-  // site is exactly the case where the species differ.
+  // Non-owning index, so both arrays are named locals. One type throughout:
+  // sharing a position is geometric, and a mixed site is where species differ.
   std::vector<Vector3d> const points{
       std::from_range, sites | std::views::transform(&CifSite::position)};
   Positions const positions = to_positions(points);
@@ -431,9 +409,7 @@ hall_of_number(std::string_view text) {
                 : std::nullopt;
 }
 
-// The three ways a block can name its setting, most specific first. One table
-// rather than three copies of "if the block states it, resolve it, and say so
-// when it does not resolve".
+// The three ways a block can name its setting, most specific first.
 struct NamedSource {
   std::span<std::string_view const> tags;
   std::optional<HallNumber> (*resolve)(std::string_view);
@@ -443,8 +419,7 @@ constexpr auto kNamedSources = std::array{
     NamedSource{kHmTags, &data::hall_from_hm_symbol<GroupFamily::space>},
     NamedSource{kNumberTags, &hall_of_number}};
 
-// The Hall setting the block names outright, without looking at any operation.
-// nullopt when the block names none of the three.
+// The setting the block names outright; nullopt when it names none.
 [[nodiscard]] Result<std::optional<HallNumber>>
 named_setting(CifBlock const &block) {
   for (auto const &[tags, resolve] : kNamedSources) {
@@ -461,10 +436,8 @@ named_setting(CifBlock const &block) {
   return std::optional<HallNumber>{};
 }
 
-// The operations to expand the asymmetric unit with, and the setting they
-// belong to. A symop loop wins: it is what the file actually asserts, and its
-// Hall setting is then recovered from the operations themselves -- failing to
-// recover one is not fatal, the operations still expand the cell.
+// The operations to expand with, and their setting. A symop loop wins -- it is
+// what the file asserts; failing to recover its Hall setting is not fatal.
 [[nodiscard]] Result<std::pair<std::vector<SymmetryOperation>,
                                std::optional<HallNumber>>>
 symmetry_of(CifBlock const &block, Lattice const &lattice,
@@ -552,11 +525,9 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   std::vector<Vector3d> positions;
   Types types;
   std::vector<std::string> labels;
-  // Deduplicated against everything placed so far, not just this site's own
-  // images: files over-specify their asymmetric unit often enough (a row and
-  // its own symmetry image both listed) that a per-site scope would let the
-  // duplicates through, and collapse_shared_sites only sees rows that already
-  // coincide before the symmetry is applied.
+  // Against everything placed so far, not just this site's images: files do
+  // list a row and its own image, and collapse_shared_sites only sees rows
+  // already coincident before the symmetry is applied.
   for (int const index : kept) {
     CifSite const &site = sites[static_cast<std::size_t>(index)];
     for (SymmetryOperation const &operation : operations) {
@@ -612,8 +583,7 @@ struct Row {
   Vector3d position{Vector3d::Zero()};
 };
 
-// A CIF value that has to survive being read back: quoted, since every symbol
-// worth writing carries spaces.
+// Quoted, since every symbol worth writing carries spaces.
 [[nodiscard]] std::string quoted_value(std::string_view text) {
   return std::format("'{}'", text);
 }
@@ -629,8 +599,7 @@ labelled(std::vector<Row> rows) {
 }
 
 [[nodiscard]] std::string_view symbol_of(int type) {
-  // A type that is not an atomic number has no symbol to write; `X` is what
-  // CIF readers treat as an unknown scatterer.
+  // `X` is what CIF readers treat as an unknown scatterer.
   return data::element_symbol(type).value_or("X");
 }
 
@@ -642,15 +611,12 @@ labelled(std::vector<Row> rows) {
   constexpr double kDegree = 180.0 / std::numbers::pi;
   Matrix3d const metric = lattice.metric();
 
-  // The full Hermann-Mauguin symbol as CIF spells it: the underscores of
-  // `P 1 2_1/c 1` are a table convention, not part of the symbol.
+  // The underscores of `P 1 2_1/c 1` are a table convention, not the symbol.
   std::string hm{std::from_range,
                  type.international_full |
                      std::views::filter([](char c) { return c != '_'; })};
-  // A non-default setting has to say which one it is, or a reader that only
-  // looks at the symbol lands on the group's default (`R -3 2/m` alone means
-  // the hexagonal setting, never the rhombohedral one). Our own reader takes
-  // the symop loop first and never needs this; someone else's might not.
+  // A non-default setting must say so, or a symbol-only reader lands on the
+  // group's default (`R -3 2/m` alone is hexagonal, never rhombohedral).
   if (data::default_hall<GroupFamily::space>(type.number) != hall) {
     hm += std::format(" :{}", type.choice);
   }
@@ -660,10 +626,8 @@ labelled(std::vector<Row> rows) {
   out += std::format("_space_group_name_Hall         {}\n",
                      quoted_value(type.hall_symbol));
   out += std::format("_space_group_IT_number         {}\n", type.number);
-  // The six cell parameters as one sequence, so the row format is written
-  // once. boost::range::join concatenates the lengths and the angles without
-  // materialising either. Each angle is named by the axis it is opposite:
-  // alpha = b^c, beta = c^a, gamma = a^b.
+  // One sequence, so the row format is written once. Each angle is named by
+  // the axis it is opposite: alpha = b^c, beta = c^a, gamma = a^b.
   constexpr auto kCellTags =
       std::array{"_cell_length_a",    "_cell_length_b",   "_cell_length_c",
                  "_cell_angle_alpha", "_cell_angle_beta", "_cell_angle_gamma"};
@@ -719,9 +683,8 @@ Result<std::string> write_cif(analysis::SymmetryAnalyzer const &analyzer,
   BOOST_LEAF_AUTO(hall, analyzer.hall());
   BOOST_LEAF_AUTO(standardized, analyzer.standardized_cell());
 
-  // Re-analysed in its own basis with the setting fixed: the standardized
-  // cell's Wyckoff assignment and the operations that go with it have to be
-  // the ones valid in the basis actually being written, not the input cell's.
+  // Re-analysed with the setting fixed: the Wyckoff assignment and operations
+  // must be the ones valid in the basis being written, not the input cell's.
   auto const restated = analysis::SymmetryAnalyzer::from_cell(
       standardized, analyzer.tolerance(), hall);
   BOOST_LEAF_AUTO(sites, restated.sites());

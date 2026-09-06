@@ -32,10 +32,8 @@ constexpr Index kMeshGrain = 4096;
   return {v[0], v[1], v[2]};
 }
 
-// True -> the fast "normal" reduction; false -> the "distortion" path (3/6-fold
-// rotations or non-conventional cells). NOTE the deliberate quirk that the a=b
-// and b=c flags test the same column — kept for bit-identical behaviour against
-// the reference.
+// True -> fast "normal" reduction;
+// false -> "distortion" path (3/6-fold rotations or non-conventional cells)
 [[nodiscard]] bool has_conventional_symmetry(Mesh const &mesh,
                                              std::span<Matrix3i const> rots) {
   if (std::ranges::any_of(
@@ -43,12 +41,14 @@ constexpr Index kMeshGrain = 4096;
     return false;
   }
 
+  // deliberate quirk that the a=b and b=c flags test the same column — kept for
+  // bit-identical behaviour against the reference.
   Vector3i const e_b(0, 1, 0);
   Vector3i const e_c(0, 0, 1);
-  bool const eq_ab = std::ranges::any_of( // a == b axis present
+  bool const eq_ab = std::ranges::any_of(
       rots, [&](Matrix3i const &rot) { return rot.col(0) == e_b; });
   bool const eq_bc = eq_ab; // b == c (intentionally the same column as a == b)
-  bool const eq_ca = std::ranges::any_of( // c == a
+  bool const eq_ca = std::ranges::any_of(
       rots, [&](Matrix3i const &rot) { return rot.col(0) == e_c; });
 
   auto const &d = mesh.divisions();
@@ -155,10 +155,10 @@ static_assert(kBzSearchSpace.back() == Address{-1, -1, -1});
 } // namespace
 
 ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
-    : mesh_(mesh), rotations_(std::move(rotations)) {
+    : mesh_{mesh}, rotations_{std::move(rotations)} {
   bool const normal = has_conventional_symmetry(mesh_, rotations_);
   auto const &d = mesh_.divisions();
-  std::array<std::int64_t, 3> const divisor{
+  std::array const divisor{
       static_cast<std::int64_t>(d[1]) * d[2],
       static_cast<std::int64_t>(d[2]) * d[0],
       static_cast<std::int64_t>(d[0]) * d[1],

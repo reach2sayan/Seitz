@@ -14,9 +14,8 @@
 #include <utility>
 #include <vector>
 
-// The CIF layer. Text in, text out: no std::filesystem crosses this boundary,
-// because a Path is something the pure-Python wrapper reads far more naturally
-// than a binding could.
+// Text in, text out: no std::filesystem crosses this boundary -- the
+// pure-Python wrapper reads a Path far more naturally than a binding could.
 namespace seitz::python {
 
 void bind_io(py::module_ &m) {
@@ -28,8 +27,7 @@ void bind_io(py::module_ &m) {
       .def_property_readonly(
           "columns",
           [](io::CifBlock const &self) {
-            // flat_map has no caster of its own, and a dict is what a caller
-            // wants anyway.
+            // flat_map has no caster, and a dict is what a caller wants.
             py::dict out;
             for (auto const &[tag, rows] : self.columns) {
               out[py::str(tag)] = py::cast(rows);

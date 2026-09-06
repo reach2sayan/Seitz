@@ -280,9 +280,7 @@ target_sources(seitz PRIVATE
         src/core/periodicity.cpp
         src/core/symmetry_operation.cpp
         src/core/xyz_string.cpp
-        # I/O: the CIF reader and writer. The only other place a grammar
-        # lives is src/core/xyz_string.cpp, and both keep Boost::parser out of
-        # the installed headers.
+        # The CIF reader and writer; the only grammars besides xyz_string.cpp.
         src/io/cif.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp

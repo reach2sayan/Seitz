@@ -60,10 +60,8 @@ intersect_column_spaces(Eigen::MatrixXd const &a, Eigen::MatrixXd const &b,
   stacked.leftCols(a.cols()) = a;
   stacked.rightCols(b.cols()) = -b;
   Eigen::MatrixXd const ker = null_space(stacked, tol); // (da+db) x k
-  if (ker.cols() == 0) {
-    return Eigen::MatrixXd(3, 0);
-  }
-  return column_space(a * ker.topRows(a.cols()), tol);
+  return (ker.cols() == 0) ? Eigen::MatrixXd(3, 0)
+                           : column_space(a * ker.topRows(a.cols()), tol);
 }
 
 } // namespace seitz::math
