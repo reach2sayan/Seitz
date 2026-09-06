@@ -88,10 +88,7 @@ jobs:
       # libstdc++, and <generator> plus the C++23 range adaptors only exist in
       # libstdc++ 15.
       - name: Install GCC 15
-        run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15 ninja-build
+        uses: ./.github/actions/gcc-15
 
       - name: Install Clang 20
         if: startsWith(matrix.cc, 'clang')
@@ -194,10 +191,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install GCC 15
-        run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15 ninja-build
+        uses: ./.github/actions/gcc-15
 
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2.24
@@ -254,10 +248,7 @@ jobs:
       # so the toolchain PPA has to come first. ninja-build because the presets
       # ask for the Ninja generator.
       - name: Install GCC 15
-        run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15 ninja-build
+        uses: ./.github/actions/gcc-15
 
       - name: Cache fetched dependencies
         uses: actions/cache@v6

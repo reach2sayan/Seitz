@@ -1,0 +1,28 @@
+name: Install GCC 15
+description: >
+  gcc-15/g++-15 and ninja-build from the Ubuntu toolchain PPA, retried around
+  Launchpad's bad moments.
+
+# One copy of what four jobs across ci.yml and release.yml were each spelling
+# out. The retry is the reason it stopped being three inline lines:
+# add-apt-repository asks the Launchpad API for the PPA's signing key, and that
+# call answers `HTTP Error 504: Gateway Time-out` often enough to redden a run
+# that has nothing wrong with it. apt-get update and install share the loop
+# because a mirror times out just as readily; all three are idempotent, so a
+# partial first pass costs only the repeat.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        for attempt in 1 2 3 4 5; do
+          if sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+            && sudo apt-get update \
+            && sudo apt-get install -y gcc-15 g++-15 ninja-build; then
+            exit 0
+          fi
+          echo "::warning::toolchain install attempt $attempt failed; retrying in $((attempt * 15))s"
+          sleep $((attempt * 15))
+        done
+        echo "::error::gcc-15 could not be installed after 5 attempts"
+        exit 1

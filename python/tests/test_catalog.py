@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 import pytest
 
 import seitz as sz
@@ -73,8 +75,17 @@ def test_unknown_elements_answer_none() -> None:
 
 
 def test_the_subgroup_graph_is_consistent() -> None:
-    # P1 is a t-subgroup of everything and has no maximal subgroups of its own.
-    assert sz.subgroups.maximal_subgroups(1) == []
+    # P1 is a t-subgroup of everything and has no maximal t-subgroup of its
+    # own -- its point group is already trivial, so there is nothing left to
+    # take away. What it does have, as every group does, are the isomorphic
+    # k-subgroups: P1 on a cell enlarged by a prime index p, one per sublattice
+    # of that index, p**2 + p + 1 of them.
+    t_of_p1 = sz.subgroups.maximal_subgroups(1, sz.SubgroupKind.translationengleiche)
+    assert t_of_p1 == []
+    k_of_p1 = sz.subgroups.maximal_subgroups(1, sz.SubgroupKind.klassengleiche)
+    assert all(e.super == 1 and e.sub == 1 for e in k_of_p1)
+    assert Counter(e.index for e in k_of_p1) == {2: 7, 3: 13}
+    assert len(sz.subgroups.maximal_subgroups(1)) == len(k_of_p1)
     assert sz.subgroups.is_subgroup(1, 229)
     assert sz.subgroups.is_subgroup(229, 229)
     assert not sz.subgroups.is_subgroup(229, 1)
