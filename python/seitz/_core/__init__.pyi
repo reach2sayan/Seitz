@@ -11,7 +11,7 @@ import numpy.typing
 import typing
 from . import elements
 from . import subgroups
-__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'NiggliFailedError', 'Operations', 'PointGroupType', 'PointgroupNotFoundError', 'SeitzError', 'Setting', 'Site', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupRelation', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TimeReversal', 'Tolerance', 'UniNumber', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'minimal_image', 'none_periodic', 'operations_from_database', 'periodic_along', 'pointgroup_by_number', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'version_string', 'warmup', 'wrap']
+__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'NiggliFailedError', 'Operations', 'PointGroupType', 'PointgroupNotFoundError', 'SeitzError', 'Setting', 'Site', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupEdge', 'SubgroupKind', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TimeReversal', 'Tolerance', 'UniNumber', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'minimal_image', 'none_periodic', 'operations_from_database', 'periodic_along', 'pointgroup_by_number', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'version_string', 'warmup', 'wrap']
 class AtomsTooCloseError(SeitzError):
     """
     Two atoms closer than the distance tolerance allows. Carries .distance.
@@ -612,18 +612,53 @@ class SpacegroupType:
     @property
     def schoenflies(self) -> str:
         ...
-class SubgroupRelation:
+class SubgroupEdge:
     """
-    A maximal-subgroup (or minimal-supergroup) relation: the related space-group number and the prime index of the relation.
+    One maximal-subgroup relation: `sub` is a maximal subgroup of `super` (space-group numbers; `sub` in the Hall setting `hall`) of the given kind and index. The subgroup's conventional cell in the supergroup's frame: (a_H b_H c_H) = (a_G b_G c_G) @ basis, x_G = basis @ x_H + origin.
     """
     def __repr__(self) -> str:
+        ...
+    def in_subgroup_frame(self, op: SymmetryOperation) -> seitz._core.SymmetryOperation | None:
+        """
+        An operation of the supergroup's frame expressed in the subgroup's, or None if it does not map the subgroup's lattice onto itself.
+        """
+    @property
+    def basis(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 3]"]:
+        ...
+    @property
+    def hall(self) -> HallNumber:
+        ...
+    @property
+    def id(self) -> int:
         ...
     @property
     def index(self) -> int:
         ...
     @property
-    def number(self) -> int:
+    def kind(self) -> SubgroupKind:
         ...
+    @property
+    def origin(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
+        ...
+    @property
+    def sub(self) -> int:
+        ...
+    @property
+    def super(self) -> int:
+        ...
+class SubgroupKind(enum.IntEnum):
+    """
+    How a maximal subgroup sits in its supergroup: the same lattice and a smaller point group (translationengleiche), or the same point group and a smaller lattice (klassengleiche).
+    """
+    klassengleiche: typing.ClassVar[SubgroupKind]  # value = <SubgroupKind.klassengleiche: 1>
+    translationengleiche: typing.ClassVar[SubgroupKind]  # value = <SubgroupKind.translationengleiche: 0>
+    @classmethod
+    def __new__(cls, value):
+        ...
+    def __format__(self, format_spec):
+        """
+        Convert to a string according to format_spec.
+        """
 class SymmetryAnalyzer:
     """
     A persistent view over a cell plus tolerances that lazily computes and memoizes its determination. The object you keep, not a call you repeat. Every const query is thread-safe.
