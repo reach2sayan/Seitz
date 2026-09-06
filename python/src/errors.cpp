@@ -51,6 +51,18 @@ void raise(py::handle type, char const *text, char const *name, double value) {
   throw py::error_already_set();
 }
 
+void raise(py::handle type, char const *text, char const *name,
+           py::object value) {
+  py::object const error = py::reinterpret_steal<py::object>(
+      PyObject_CallFunction(type.ptr(), "s", text));
+  if (!error) {
+    throw py::error_already_set();
+  }
+  py::setattr(error, name, value);
+  PyErr_SetObject(type.ptr(), error.ptr());
+  throw py::error_already_set();
+}
+
 } // namespace detail
 
 ErrorTypes const &error_types() noexcept { return g_types; }
@@ -100,6 +112,33 @@ void register_errors(py::module_ &m) {
       make(m, "AtomsTooCloseError",
            "Two atoms closer than the distance tolerance allows. Carries "
            ".distance.",
+           g_types.base);
+
+  // The CIF layer's five, all payload-carrying: what a caller does about a
+  // file it could not read depends entirely on which part of it failed.
+  g_types.cif_syntax =
+      make(m, "CifSyntaxError",
+           "The CIF text stopped parsing. Carries .line and .column, both "
+           "1-based.",
+           g_types.base);
+  g_types.cif_missing_tag =
+      make(m, "CifMissingTagError",
+           "The block does not carry a tag the reader needs, or carries one it "
+           "could not read as a number. Carries .tag.",
+           g_types.base);
+  g_types.invalid_xyz =
+      make(m, "InvalidXyzError",
+           "Not a coordinate triplet, or one whose rotation is not unimodular. "
+           "Carries .text.",
+           g_types.base);
+  g_types.unknown_element =
+      make(m, "UnknownElementError",
+           "No tabulated element has this chemical symbol. Carries .symbol.",
+           g_types.base);
+  g_types.unknown_spacegroup_symbol =
+      make(m, "UnknownSpacegroupSymbolError",
+           "No tabulated setting has this Hermann-Mauguin or Hall symbol. "
+           "Carries .symbol.",
            g_types.base);
 }
 

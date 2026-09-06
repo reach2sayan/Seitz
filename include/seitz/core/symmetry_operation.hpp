@@ -1,10 +1,13 @@
 #pragma once
 
+#include <seitz/core/error.hpp>
 #include <seitz/core/fractional.hpp>
 #include <seitz/core/types.hpp>
 
 #include <concepts>
 #include <optional>
+#include <string>
+#include <string_view>
 
 #pragma GCC visibility push(default)
 
@@ -58,6 +61,19 @@ struct SymmetryOperation {
   op.translation = t * op.translation;
   return op;
 }
+// The operation as a Jones-faithful coordinate triplet ("x,y,z",
+// "-y,x-y,z+1/2"): no spaces, translations as p/q where q divides 12 or 8 and
+// the fraction is exact to 1e-6, otherwise a short decimal. This is the form
+// CIF's _space_group_symop_operation_xyz loop carries.
+[[nodiscard]] std::string to_xyz(SymmetryOperation const &op);
+
+// The inverse reading, permissive about what CIF files contain in practice:
+// upper or lower case axes, spaces anywhere, an explicit coefficient
+// ("2y", "-2y+1/2"), and a translation written either as a fraction or a
+// decimal, before or after the rotation terms. Errors e_invalid_xyz when the
+// text is not three coordinates or its rotation is not unimodular.
+[[nodiscard]] Result<SymmetryOperation> from_xyz(std::string_view text);
+
 [[nodiscard]] inline bool same_operation(SymmetryOperation const &a,
                                          SymmetryOperation const &b,
                                          double symprec) noexcept {

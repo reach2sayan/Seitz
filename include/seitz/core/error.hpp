@@ -3,6 +3,7 @@
 #include <boost/leaf.hpp>
 
 #include <concepts>
+#include <cstdint>
 #include <string>
 #include <type_traits>
 
@@ -50,6 +51,34 @@ struct e_invalid_transformation {
 // A caller-supplied lattice whose metric the requested group's operations do
 // not preserve, so no structure on it could carry that symmetry.
 struct e_incompatible_lattice {};
+
+// A CIF document the grammar could not consume to the end: the 1-based line
+// and column the parse stopped at.
+struct e_cif_syntax {
+  std::int64_t line;
+  std::int64_t column;
+};
+
+// A CIF tag the reader needs and the block does not carry.
+struct e_cif_missing {
+  std::string tag;
+};
+
+// A coordinate triplet ("x,-y,z+1/2") that is not three coordinates, or whose
+// rotation part is not unimodular.
+struct e_invalid_xyz {
+  std::string text;
+};
+
+// A chemical symbol no tabulated element matches.
+struct e_unknown_element {
+  std::string symbol;
+};
+
+// A Hermann-Mauguin or Hall symbol no tabulated setting matches.
+struct e_unknown_spacegroup_symbol {
+  std::string symbol;
+};
 
 // Free-form human-readable context, attached alongside a tag for diagnostics.
 struct e_message {

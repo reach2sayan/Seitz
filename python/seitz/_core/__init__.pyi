@@ -11,7 +11,7 @@ import numpy.typing
 import typing
 from . import elements
 from . import subgroups
-__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'NiggliFailedError', 'Operations', 'PointGroupType', 'PointgroupNotFoundError', 'SeitzError', 'Setting', 'Site', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupEdge', 'SubgroupKind', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TimeReversal', 'Tolerance', 'UniNumber', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'minimal_image', 'none_periodic', 'operations_from_database', 'periodic_along', 'pointgroup_by_number', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'version_string', 'warmup', 'wrap']
+__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'CIF_SYMPREC', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CifBlock', 'CifMissingTagError', 'CifStructure', 'CifSyntaxError', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'InvalidXyzError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'NiggliFailedError', 'OccupancyCollapse', 'Operations', 'PointGroupType', 'PointgroupNotFoundError', 'SeitzError', 'Setting', 'Site', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupEdge', 'SubgroupKind', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TimeReversal', 'Tolerance', 'UniNumber', 'UnknownElementError', 'UnknownSpacegroupSymbolError', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'minimal_image', 'none_periodic', 'operations_from_database', 'parse_cif', 'periodic_along', 'pointgroup_by_number', 'read_cif', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'version_string', 'warmup', 'wrap', 'write_cif_analyzer', 'write_cif_cell']
 class AtomsTooCloseError(SeitzError):
     """
     Two atoms closer than the distance tolerance allows. Carries .distance.
@@ -117,6 +117,68 @@ class Centering(enum.IntEnum):
         """
         Convert to a string according to format_spec.
         """
+class CifBlock:
+    """
+    One `data_` block as written: tags lowercased, values still the file's own strings. Nothing here is interpreted as crystallography.
+    """
+    def __repr__(self) -> str:
+        ...
+    def column(self, tag: str) -> list[str] | None:
+        """
+        The rows of `tag`, or None if the block lacks it.
+        """
+    def value(self, tag: str) -> str | None:
+        """
+        The scalar reading of `tag`: its first row, with CIF's '?' and '.' reported as None like an absent tag.
+        """
+    @property
+    def columns(self) -> dict:
+        """
+        Every tag's rows, as a dict. A scalar item is a one-row column.
+        """
+    @property
+    def loops(self) -> list[list[str]]:
+        """
+        The tags of each `loop_`, in file order.
+        """
+    @property
+    def name(self) -> str:
+        ...
+class CifMissingTagError(SeitzError):
+    """
+    The block does not carry a tag the reader needs, or carries one it could not read as a number. Carries .tag.
+    """
+class CifStructure:
+    """
+    One block read as crystallography.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def cell(self) -> Cell:
+        ...
+    @property
+    def collapsed(self) -> list[OccupancyCollapse]:
+        """
+        What the reader had to decide; empty for an ordered file.
+        """
+    @property
+    def hall(self) -> seitz._core.HallNumber | None:
+        """
+        The setting the file named, or None when it named none and P1 was assumed.
+        """
+    @property
+    def labels(self) -> list[str]:
+        """
+        Per cell atom, its asymmetric-unit label.
+        """
+    @property
+    def name(self) -> str:
+        ...
+class CifSyntaxError(SeitzError):
+    """
+    The CIF text stopped parsing. Carries .line and .column, both 1-based.
+    """
 class CrystalClass(enum.IntEnum):
     """
     The 32 crystallographic point groups, named by Schoenflies symbol.
@@ -272,6 +334,10 @@ class InvalidLatticeError(SeitzError):
     """
     A (near-)singular lattice basis, rejected before its inverse could propagate NaN through the pipeline. Carries .determinant.
     """
+class InvalidXyzError(SeitzError):
+    """
+    Not a coordinate triplet, or one whose rotation is not unimodular. Carries .text.
+    """
 class Lattice:
     """
     A crystal lattice: the three basis vectors as the COLUMNS of a 3x3 matrix.
@@ -404,6 +470,27 @@ class NiggliFailedError(SeitzError):
     """
     Niggli reduction did not converge.
     """
+class OccupancyCollapse:
+    """
+    A site the file could not state exactly: a partially occupied or mixed-species position, collapsed to its majority species.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def dropped(self) -> list[str]:
+        """
+        The labels that shared the site.
+        """
+    @property
+    def kept(self) -> str:
+        """
+        The label that survived.
+        """
+    @property
+    def occupancy(self) -> float:
+        """
+        Its stated occupancy.
+        """
 class Operations:
     """
     An immutable set of space-group operations.
@@ -729,6 +816,11 @@ class SymmetryOperation:
     """
     x -> rotation . x + translation, on fractional coordinates.
     """
+    @staticmethod
+    def from_xyz(text: str) -> SymmetryOperation:
+        """
+        The inverse reading, permissive about spacing, case and whether translations are fractions or decimals. Raises InvalidXyzError on text that is not three coordinates.
+        """
     def __copy__(self) -> SymmetryOperation:
         ...
     def __deepcopy__(self, memo: dict) -> SymmetryOperation:
@@ -745,6 +837,10 @@ class SymmetryOperation:
         ...
     def apply(self, x: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
         ...
+    def to_xyz(self) -> str:
+        """
+        The Jones-faithful coordinate triplet ('x,y,z', '-y,x-y,z+1/2') CIF's symop loop carries.
+        """
     @property
     def inverse(self) -> seitz._core.SymmetryOperation | None:
         """
@@ -830,6 +926,14 @@ class UniNumber:
     @property
     def value(self) -> int:
         ...
+class UnknownElementError(SeitzError):
+    """
+    No tabulated element has this chemical symbol. Carries .symbol.
+    """
+class UnknownSpacegroupSymbolError(SeitzError):
+    """
+    No tabulated setting has this Hermann-Mauguin or Hall symbol. Carries .symbol.
+    """
 class Version:
     """
     A major.minor.patch triple.
@@ -957,6 +1061,10 @@ def operations_from_database(hall: HallNumber) -> Operations:
     """
     The symmetry operations of a Hall setting.
     """
+def parse_cif(text: str) -> list[CifBlock]:
+    """
+    The blocks of a CIF document, in file order, uninterpreted.
+    """
 def periodic_along(axis: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[list[AxisKind], "FixedSize(3)"]:
     """
     Periodic along `axis` only -- a rod.
@@ -964,6 +1072,10 @@ def periodic_along(axis: typing.SupportsInt | typing.SupportsIndex) -> typing.An
 def pointgroup_by_number(number: typing.SupportsInt | typing.SupportsIndex) -> PointGroupType:
     """
     Metadata for point group 1..32; number 0 or out of range gives an empty row.
+    """
+def read_cif(text: str, tolerance: Tolerance = ...) -> list[CifStructure]:
+    """
+    Every block that carries a cell, read as a structure.
     """
 def same_operation(a: SymmetryOperation, b: SymmetryOperation, symprec: typing.SupportsFloat | typing.SupportsIndex) -> bool:
     """
@@ -989,6 +1101,15 @@ def wrap(vector: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]
     """
     A fractional coordinate folded into [0, 1) along every periodic axis.
     """
+def write_cif_analyzer(analyzer: SymmetryAnalyzer, name: str) -> str:
+    """
+    The determination as a CIF document: standardized cell, database operations, one representative per orbit.
+    """
+def write_cif_cell(cell: Cell, name: str) -> str:
+    """
+    The cell as a CIF document, in P1.
+    """
+CIF_SYMPREC: float = 0.001
 K_DEFAULT_SYMPREC: float = 1e-05
 K_LAYER_HALL_SETTINGS: int = 116
 K_NUM_LAYER_GROUPS: int = 80

@@ -10,11 +10,14 @@ find_dependency(Eigen3)
 # only required where the library is a static archive: a shared object has
 # already resolved them and keeps them out of its exported interface, while a
 # static one records them as $<LINK_ONLY:...> in INTERFACE_LINK_LIBRARIES and
-# the consumer's link line does need the targets to exist.
+# the consumer's link line does need the targets to exist. Boost::parser joins
+# them there: the grammars live entirely in two .cpp files, so no installed
+# header names it.
 if ("@SEITZ_LIBRARY_TYPE@" STREQUAL "SHARED")
     find_dependency(Boost COMPONENTS container graph leaf)
 else ()
-    find_dependency(Boost COMPONENTS container graph leaf flyweight geometry)
+    find_dependency(Boost COMPONENTS container graph leaf flyweight geometry
+            parser algorithm range)
 endif ()
 find_dependency(Threads)
 

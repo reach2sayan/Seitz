@@ -4,7 +4,7 @@
 #include <seitz/core/types.hpp>
 
 #include "casters.hpp" // to_str
-#include "errors.hpp"  // detail::raise
+#include "errors.hpp"  // detail::raise, unwrap
 
 #include <pybind11/eigen.h>
 #include <pybind11/native_enum.h>
@@ -14,6 +14,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace seitz::python {
 
@@ -139,6 +140,18 @@ void bind_core_symmetry(py::module_ &m) {
           "__deepcopy__",
           [](SymmetryOperation const &self, py::dict const &) { return self; },
           py::arg("memo"))
+      .def("to_xyz", &to_xyz,
+           py::doc("The Jones-faithful coordinate triplet ('x,y,z', "
+                   "'-y,x-y,z+1/2') CIF's symop loop carries."))
+      .def_static(
+          "from_xyz",
+          [](std::string_view text) {
+            return unwrap([&] { return from_xyz(text); });
+          },
+          py::arg("text"),
+          py::doc("The inverse reading, permissive about spacing, case and "
+                  "whether translations are fractions or decimals. Raises "
+                  "InvalidXyzError on text that is not three coordinates."))
       .def("__repr__", &operation_repr);
 
   m.def("same_operation", &same_operation, py::arg("a"), py::arg("b"),

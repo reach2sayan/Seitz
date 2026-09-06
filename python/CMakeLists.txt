@@ -7,7 +7,8 @@ pybind11_add_module(_core
         src/core_symmetry.cpp
         src/analysis.cpp
         src/group.cpp
-        src/data.cpp)
+        src/data.cpp
+        src/io.cpp)
 
 # Linking the target, not naming its include directory, is what keeps the
 # module's ABI in step with the library's: seitz::seitz carries

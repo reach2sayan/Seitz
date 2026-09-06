@@ -31,6 +31,11 @@ struct ErrorTypes {
   py::handle empty_cell;
   py::handle invalid_lattice;
   py::handle atoms_too_close;
+  py::handle cif_syntax;
+  py::handle cif_missing_tag;
+  py::handle invalid_xyz;
+  py::handle unknown_element;
+  py::handle unknown_spacegroup_symbol;
 };
 
 void register_errors(py::module_ &m);
@@ -45,6 +50,11 @@ namespace detail {
 [[noreturn]] void raise(py::handle type, char const *text);
 [[noreturn]] void raise(py::handle type, char const *text, char const *name,
                         double value);
+// The same, for a payload that is not a number: a tag, a symbol, the text that
+// would not parse. Takes an already-built object so one call site can attach a
+// string and another an int.
+[[noreturn]] void raise(py::handle type, char const *text, char const *name,
+                        py::object value);
 
 // The message LEAF carried, or the tag's own default when it carried none.
 [[nodiscard]] inline char const *message_or(e_message const *m,
@@ -93,6 +103,38 @@ template <ResultProducer F> [[nodiscard]] auto unwrap(F &&make) {
         raise(types.atoms_too_close,
               message_or(m, "atoms overlap within the tolerance"), "distance",
               e.distance);
+      },
+      [&](e_cif_syntax const &e, e_message const *m) -> Value {
+        py::object const error = py::reinterpret_steal<py::object>(
+            PyObject_CallFunction(types.cif_syntax.ptr(), "s",
+                                  message_or(m, "the CIF could not be read")));
+        if (!error) {
+          throw py::error_already_set();
+        }
+        py::setattr(error, "line", py::int_(e.line));
+        py::setattr(error, "column", py::int_(e.column));
+        PyErr_SetObject(types.cif_syntax.ptr(), error.ptr());
+        throw py::error_already_set();
+      },
+      [&](e_cif_missing const &e, e_message const *m) -> Value {
+        raise(types.cif_missing_tag,
+              message_or(m, "the block does not carry a tag the reader needs"),
+              "tag", py::str(e.tag));
+      },
+      [&](e_invalid_xyz const &e, e_message const *m) -> Value {
+        raise(types.invalid_xyz,
+              message_or(m, "not a coordinate triplet"), "text",
+              py::str(e.text));
+      },
+      [&](e_unknown_element const &e, e_message const *m) -> Value {
+        raise(types.unknown_element,
+              message_or(m, "no tabulated element has this symbol"), "symbol",
+              py::str(e.symbol));
+      },
+      [&](e_unknown_spacegroup_symbol const &e, e_message const *m) -> Value {
+        raise(types.unknown_spacegroup_symbol,
+              message_or(m, "no tabulated setting has this symbol"), "symbol",
+              py::str(e.symbol));
       },
       [&](e_empty_cell const &, e_message const *m) -> Value {
         raise(types.empty_cell, message_or(m, "the cell has no atoms"));

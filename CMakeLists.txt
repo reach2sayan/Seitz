@@ -279,6 +279,11 @@ target_sources(seitz PRIVATE
         src/core/lattice.cpp
         src/core/periodicity.cpp
         src/core/symmetry_operation.cpp
+        src/core/xyz_string.cpp
+        # I/O: the CIF reader and writer. The only other place a grammar
+        # lives is src/core/xyz_string.cpp, and both keep Boost::parser out of
+        # the installed headers.
+        src/io/cif.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp
         src/core/centering.cpp
@@ -331,7 +336,8 @@ target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
         Boost::graph Boost::leaf Threads::Threads)
-target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry)
+target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry
+        Boost::parser Boost::algorithm Boost::range)
 
 # The conversion warnings are applied to the library only — the oracle tests
 # bridge to the reference C API (reinterpret_cast, size_t<->int), which would

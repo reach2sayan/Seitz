@@ -26,7 +26,24 @@ InvalidLatticeError = _core.InvalidLatticeError
 #: Carries ``.distance``, how close the offending pair actually was.
 AtomsTooCloseError = _core.AtomsTooCloseError
 
-__all__ = ["AtomsTooCloseError", "CellStandardizationFailedError", "SeitzError", "DelaunayFailedError",
-           "EmptyCellError", "InvalidLatticeError", "MagneticSymmetrySearchFailedError", "NiggliFailedError",
-           "PointgroupNotFoundError", "SpacegroupSearchFailedError", "SymmetryOperationSearchFailedError",
+#: Carries ``.line`` and ``.column``, both 1-based.
+CifSyntaxError = _core.CifSyntaxError
+
+#: Carries ``.tag``, the tag the reader needed.
+CifMissingTagError = _core.CifMissingTagError
+
+#: Carries ``.text``, the triplet that would not parse.
+InvalidXyzError = _core.InvalidXyzError
+
+#: Carries ``.symbol``, the chemical symbol no element matches.
+UnknownElementError = _core.UnknownElementError
+
+#: Carries ``.symbol``, the space-group symbol no setting matches.
+UnknownSpacegroupSymbolError = _core.UnknownSpacegroupSymbolError
+
+__all__ = ["AtomsTooCloseError", "CellStandardizationFailedError", "CifMissingTagError", "CifSyntaxError",
+           "SeitzError", "DelaunayFailedError", "EmptyCellError", "InvalidLatticeError", "InvalidXyzError",
+           "MagneticSymmetrySearchFailedError", "NiggliFailedError", "PointgroupNotFoundError",
+           "SpacegroupSearchFailedError", "SymmetryOperationSearchFailedError", "UnknownElementError",
+           "UnknownSpacegroupSymbolError",
 ]

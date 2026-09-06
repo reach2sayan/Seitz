@@ -23,7 +23,13 @@ FetchContent_Declare(Eigen3
 #   geometry   — the R-tree behind PositionIndex
 #   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
 #   leaf       — the error model (Result<T>)
-set(BOOST_INCLUDE_LIBRARIES container flyweight geometry graph leaf)
+#   parser     — the CIF and xyz-triplet grammars; header-only, hana/type_index/
+#                assert transitive, numerics via <charconv> (no compiled lib)
+#   algorithm  — the string algorithms the CIF layer would otherwise hand-roll
+#                (to_lower_copy, join); pulls Boost.Range transitively
+#   range      — join(), for concatenating two ranges of unlike type
+set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight geometry graph leaf
+        parser range)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON
@@ -87,6 +93,30 @@ FetchContent_Declare(spglib_reference
         ${SEITZ_SPGLIB_SUBDIR})
 FetchContent_MakeAvailable(spglib_reference)
 unset(SEITZ_SPGLIB_SUBDIR)
+
+# PyXtal, for its two CIF corpora only: 209 per-space-group files under
+# miscellaneous/cifs and 77 real structures under database/cifs, which the CIF
+# reader is exercised against. Populate-only -- SOURCE_SUBDIR names a directory
+# that does not exist, so FetchContent checks the tree out and adds no targets,
+# builds no Python and needs no interpreter. Offline: point
+# FETCHCONTENT_SOURCE_DIR_PYXTAL_REFERENCE at an existing checkout.
+if (SEITZ_BUILD_ORACLE_TESTS)
+    FetchContent_Declare(pyxtal_reference
+            GIT_REPOSITORY https://github.com/MaterSim/PyXtal.git
+            GIT_TAG v1.1.4
+            GIT_SHALLOW TRUE
+            SOURCE_SUBDIR seitz-cifs-only)
+    FetchContent_MakeAvailable(pyxtal_reference)
+
+    foreach (dir IN ITEMS miscellaneous database)
+        if (NOT EXISTS "${pyxtal_reference_SOURCE_DIR}/pyxtal/${dir}/cifs")
+            message(FATAL_ERROR
+                    "The PyXtal checkout is missing pyxtal/${dir}/cifs (looked "
+                    "in ${pyxtal_reference_SOURCE_DIR}). The CIF corpus tests "
+                    "read both directories; see tests/cif_corpus.hpp.")
+        endif ()
+    endforeach ()
+endif ()
 
 if (NOT EXISTS "${spglib_reference_SOURCE_DIR}/src/spg_database.c")
     message(FATAL_ERROR
