@@ -547,13 +547,15 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
     int const winner = std::ranges::max(chunk, {}, occupancy_of);
     kept.push_back(winner);
     if (std::ranges::distance(chunk) > 1 || occupancy_of(winner) < 1.0) {
-      collapsed.push_back(OccupancyCollapse{
-          .kept = label_of(winner),
-          .occupancy = occupancy_of(winner),
-          .dropped = {std::from_range,
-                      chunk | std::views::filter([&](int i) {
-                        return i != winner;
-                      }) | std::views::transform(label_of)}});
+      // Named first: MSVC cannot parse a capturing lambda inside a designated
+      // initializer's nested braces, and loses the enclosing scope after it.
+      std::vector<std::string> dropped(
+          std::from_range, chunk | std::views::filter([&](int i) {
+                             return i != winner;
+                           }) | std::views::transform(label_of));
+      collapsed.push_back(OccupancyCollapse{.kept = label_of(winner),
+                                            .occupancy = occupancy_of(winner),
+                                            .dropped = std::move(dropped)});
     }
   }
   std::ranges::sort(kept);
@@ -759,7 +761,7 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   for (int const index : kept) {
     CifSite const &site = sites[static_cast<std::size_t>(index)];
     for (SymmetryOperation const &operation : operations) {
-      images.row(site_of.size()) =
+      images.row(static_cast<Index>(site_of.size())) =
           math::wrap_to_unit_cell(operation.apply(site.position)).transpose();
       site_of.push_back(index);
     }
