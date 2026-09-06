@@ -25,7 +25,7 @@ constexpr double kTol = 1e-7;
 // indexed directly (entry 0 unused). Its conventional rotation set IS the point
 // group; symmorphic P groups are chosen so the rotation count equals the point
 // group order exactly.
-constexpr std::array<int, 33> kRepresentativeSpacegroup = {
+constexpr std::array kRepresentativeSpacegroup = {
     0,   1,   2,   3,   6,   10,  16,  25,  47,  75,  81,
     83,  89,  99,  111, 123, 143, 147, 149, 156, 164, 168,
     174, 175, 177, 183, 187, 191, 195, 200, 207, 215, 221};
@@ -39,7 +39,7 @@ coset_representatives(std::span<SymmetryOperation const> ops,
                       Operations const &stab) {
   RotationMultimap<int> const by_rotation =
       index_by_rotation(ops, &SymmetryOperation::rotation);
-  std::vector<bool> covered(ops.size(), false);
+  std::vector covered(ops.size(), false);
   std::vector<SymmetryOperation> reps;
   for (auto const [i, g] : ops | std::views::enumerate) {
     if (covered[static_cast<std::size_t>(i)]) {
@@ -66,7 +66,7 @@ struct PointGeometry {
   // to build both operands' projectors on every one of those comparisons.
   struct Locus {
     explicit Locus(Eigen::MatrixXd b)
-        : basis(std::move(b)), projector(math::projector(basis)) {}
+        : basis{std::move(b)}, projector{math::projector(basis)} {}
 
     Eigen::MatrixXd basis;
     Matrix3d projector;
@@ -99,11 +99,9 @@ struct PointGeometry {
   // dimension; re-orthonormalised because integer rotations need not be
   // Cartesian-orthogonal in the conventional basis).
   [[nodiscard]] Locus image(SymmetryOperation const &op, Locus const &l) const {
-    if (l.dim() == 0) {
-      return Locus{Eigen::MatrixXd(3, 0)};
-    }
-    return Locus{
-        math::column_space(op.rotation.cast<double>() * l.basis, kTol)};
+    return (l.dim() == 0) ? Locus{Eigen::MatrixXd(3, 0)}
+                          : Locus{math::column_space(
+                                op.rotation.cast<double>() * l.basis, kTol)};
   }
 
   // Whether the subspace is fixed pointwise by `rot` (rot v == v for every v
@@ -130,12 +128,13 @@ struct PointGeometry {
     Matrix3d locus_basis = Matrix3d::Zero();
     locus_basis.leftCols(l.dim()) = l.basis;
 
-    return detail::DerivedLocus{static_cast<int>(orbit_ops.size()),
-                                l.dim(),
-                                Vector3d::Zero(),
-                                locus_basis,
-                                std::move(orbit_ops),
-                                std::move(site_symmetry)};
+    return detail::DerivedLocus{.multiplicity =
+                                    static_cast<int>(orbit_ops.size()),
+                                .dof = l.dim(),
+                                .origin = Vector3d::Zero(),
+                                .locus_basis = locus_basis,
+                                .orbit_ops = std::move(orbit_ops),
+                                .site_symmetry = std::move(site_symmetry)};
   }
 };
 

@@ -22,12 +22,11 @@ using detail::lattice_box;
 using detail::mixed_radix;
 using detail::radix_of;
 
-// Every subset of the maximal cluster's ACTIVE points, deduplicated by the full
-// space group and inserted so the list stays ordered by (point count,
-// diameter). Inserted rather than collected-and-sorted so a tie keeps the
-// FIRST-generated representative, which everything downstream -- the
-// Kikuchi-Barker recursion above all -- depends on. The list accumulates over
-// all maximal clusters, so a shared subcluster is recorded once.
+// Every subset of the maximal cluster's ACTIVE points, deduplicated by the
+// space group, inserted so the list stays ordered by (point count, diameter).
+// Inserted rather than sorted after: a tie must keep the FIRST-generated
+// representative, which the Kikuchi-Barker recursion depends on. Accumulates
+// over all maximal clusters, so a shared subcluster is recorded once.
 void collect_subclusters(std::vector<Cluster> &subclusters,
                          Cluster const &maximal, Operations const &ops,
                          Lattice const &lattice, double tol) {
@@ -96,14 +95,11 @@ build_functions(std::span<Cluster const> subclusters, Operations const &ops,
   return functions;
 }
 
-// Every species assignment on `sub`, grouped into orbits of the subcluster's
-// own site symmetry.
-//
-// Occupations are compared through PERMUTATIONS of the point indices, not by
-// rebuilding and matching decorated geometry per candidate: each stabilizer
-// element permutes the subcluster's own points (what site_symmetry()'s
-// translation correction buys), so the permutations are computed once and
-// equivalence is ranges::equal against the permuted occupation.
+// Every species assignment on `sub`, in orbits of its own site symmetry.
+// Compared through PERMUTATIONS of the point indices rather than by rebuilding
+// decorated geometry per candidate: each stabilizer element permutes the
+// subcluster's points, so the permutations are computed once and equivalence
+// is ranges::equal against the permuted occupation.
 [[nodiscard]] std::vector<Configuration>
 build_configurations(Cluster const &sub, Operations const &ops, double tol) {
   Operations const stabilizer = site_symmetry(sub, ops, tol);
@@ -148,11 +144,9 @@ struct TranslationBox {
   Vector3d high{Vector3d::Constant(std::numeric_limits<double>::lowest())};
 };
 
-// The correlation of one species assignment on `sites` under a set of cluster
-// images: the sum, over every lattice placement of every image that lands
-// entirely on the assignment's points, of the product of the point functions.
-//
-// A raw sum, not an average -- the normalization is the v-matrix's prefactor.
+// The correlation of one assignment on `sites`: over every lattice placement
+// of every image landing entirely on the assignment's points, the product of
+// the point functions. A raw sum -- normalization is the v-matrix's prefactor.
 [[nodiscard]] double
 configuration_correlation(Cluster const &sites,
                           std::span<int const> occupation,
@@ -162,20 +156,17 @@ configuration_correlation(Cluster const &sites,
     return 1.0; // the empty cluster function correlates to one by definition
   }
   if (sites.empty()) {
-    // The empty subcluster: no point for an image point to land on, so no
-    // placement contributes. Its one configuration then has probability
-    // V . xi = 1 * xi_empty = 1, which is the identity the whole expansion is
-    // normalized against. (The reference implementation misses this case and
-    // sizes its translation box off an empty range.)
+    // The empty subcluster: nothing for an image point to land on, so no
+    // placement contributes and its one configuration has probability 1 -- the
+    // identity the expansion is normalized against. The reference
+    // implementation misses this and sizes its box off an empty range.
     return 0.0;
   }
 
-  // The translations worth trying are those aligning some image point onto some
-  // occupied point. In the parent's fractional frame a lattice translation is
-  // an integer triple, so the box is the componentwise range of the rounded
-  // differences over every (image, occupied point, image point) triple.
-  // Not const: the joined inner views are prvalues, so join_view keeps the
-  // current one in a member and cannot iterate through a const reference.
+  // Only translations aligning some image point onto an occupied point matter.
+  // A lattice translation is an integer triple in the parent's frame, so the
+  // box is the componentwise range of the rounded differences. Not const: the
+  // joined inner views are prvalues, which join_view holds in a member.
   auto offsets =
       images | std::views::transform([&sites](Cluster const &image) {
         return std::views::cartesian_product(sites, image) |
@@ -232,10 +223,9 @@ configuration_correlation(Cluster const &sites,
       });
 }
 
-// The v-matrix of one subcluster: rows are its configurations, columns are ALL
-// cluster functions (columns for functions that cannot overlap this subcluster
-// come out zero, which is what makes rho = V . xi a plain matrix product over
-// the whole correlation vector).
+// The v-matrix of one subcluster: rows its configurations, columns ALL cluster
+// functions. Non-overlapping functions come out zero, which is what makes
+// rho = V . xi a plain product over the whole correlation vector.
 [[nodiscard]] MatrixXd
 build_vmatrix(Cluster const &sub,
               std::span<Configuration const> configurations,
@@ -288,10 +278,9 @@ overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
       for (auto const &[centre, anchor] : std::views::enumerate(image)) {
         Vector3d const shift = site - anchor.position;
         // A plain integrality test on the fractional shift. The reference
-        // implementation multiplies by the inverse cell first, which is a
-        // second change of basis on coordinates that are already fractional; it
-        // agrees with this only because the fcc case it is tuned on happens to
-        // have an integer inverse.
+        // multiplies by the inverse cell first -- a second change of basis on
+        // already-fractional coordinates, which agrees only because its fcc
+        // case happens to have an integer inverse.
         if (!integral(shift, tol)) {
           continue;
         }
@@ -317,12 +306,9 @@ overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
 }
 
 // The Kikuchi-Barker coefficients: Moebius inversion over the subcluster
-// inclusion lattice,
-//
-//   k_c = 1 - sum_{c' > c, c' contains c} k_c',
-//
-// the empty cluster at zero. Walked from the largest index down, valid because
-// the list is ordered by point count: every term on the right is already final.
+// inclusion lattice, k_c = 1 - sum_{c' contains c} k_c', empty cluster at zero.
+// Walked from the largest index down -- the list is ordered by point count, so
+// every term on the right is already final.
 [[nodiscard]] std::vector<double>
 build_kikuchi_barker(std::span<Cluster const> subclusters,
                      Operations const &ops, double tol) {

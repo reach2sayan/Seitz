@@ -50,10 +50,9 @@ namespace {
 void bind_core(py::module_ &m) {
   // ---- enums -------------------------------------------------------------
   //
-  // Real enum.IntEnum classes, not pybind11's enum type: Python prints, hashes,
-  // aliases, pickles and pattern-matches those already. Member names keep the
-  // C++ lower_snake_case against Python's UPPER_CASE convention -- a rename
-  // would be a second vocabulary for one concept.
+  // Real enum.IntEnum, not pybind11's enum type: Python already prints, hashes,
+  // pickles and pattern-matches those. Members keep the C++ lower_snake_case --
+  // a rename would be a second vocabulary for one concept.
   py::native_enum<GroupFamily>(m, "GroupFamily", "enum.IntEnum",
                                "The two families the determination handles: "
                                "3D space groups, and 2D-periodic layer groups.")
@@ -79,9 +78,8 @@ void bind_core(py::module_ &m) {
   // ---- periodicity -------------------------------------------------------
   //
   // CellPeriodicity is std::array<AxisKind, 3>, which pybind11/stl.h already
-  // converts to and from a 3-tuple, so only the named constructors need
-  // binding. They are what a caller should reach for -- the tuple spelling is
-  // the escape hatch, not the API.
+  // converts, so only the named constructors need binding -- the tuple
+  // spelling is the escape hatch, not the API.
   m.def("all_periodic", &all_periodic,
         py::doc("The fully periodic descriptor: a 3D space-group cell."));
   m.def("aperiodic_along", &aperiodic_along, py::arg("axis"),
@@ -105,9 +103,8 @@ void bind_core(py::module_ &m) {
 
   // ---- validated keys ----------------------------------------------------
   //
-  // HallNumber has a private constructor and a static of() returning optional.
-  // Both Python idioms are bound, uniformly for every such type here:
-  // `X.of(...)` answers None, `X(...)` raises -- as re.match and int("x") do.
+  // Both Python idioms, uniformly for every such type: `X.of(...)` answers
+  // None, `X(...)` raises -- as re.match and int("x") do.
   py::class_<HallNumber>(m, "HallNumber",
                          "A validated Hall setting: a family plus a 1-based "
                          "index into that family's settings.")
@@ -204,9 +201,8 @@ void bind_core(py::module_ &m) {
 
   // ---- tolerances --------------------------------------------------------
   //
-  // Bound as a plain struct even though the pure-Python layer models it with
-  // pydantic: the model validates and then hands one of these across, so this
-  // is the boundary type, not the user-facing one.
+  // A plain struct even though the pure-Python layer models it with pydantic:
+  // the model validates and hands one of these across. Boundary type, not API.
   py::class_<Tolerance>(m, "Tolerance",
                         "The tolerances threaded through the symmetry search.")
       .def(py::init([](double symprec, AngleTolerance angle_tolerance) {
@@ -337,12 +333,10 @@ void bind_core(py::module_ &m) {
       .def_property_readonly("periodicity", &Cell::periodicity)
       .def("position", &Cell::position, py::arg("i"))
       .def("type", &Cell::type, py::arg("i"))
-      // Cell::atoms() is an iota|transform view that captures `this`, and its
-      // iterators hold a pointer to the view object -- so py::make_iterator
-      // over the temporary returned here would hand Python an iterator into
-      // storage that is already gone. Materialised instead; a caller who wants
-      // the columns rather than the rows has .positions and .types, which are
-      // the arrays themselves.
+      // Cell::atoms() is a view capturing `this`, and its iterators point at
+      // the view object, so py::make_iterator over this temporary would hand
+      // Python an iterator into dead storage. Materialised instead; for the
+      // columns there are .positions and .types.
       .def_property_readonly(
           "atoms",
           [](Cell const &self) {

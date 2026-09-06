@@ -7,9 +7,7 @@
 
 // The cell-parameter <-> basis-matrix conversion, in the standard
 // crystallographic orientation: a along x, b in the xy-plane, c completing a
-// right-handed set. Shared by the conventional-cell idealiser (refine) and the
-// random-lattice generator (generate), which previously transcribed the same
-// two expressions independently.
+// right-handed set.
 namespace seitz::math {
 
 // sqrt of the i-th diagonal of a metric (Gram) matrix: |a_i|.
@@ -18,10 +16,7 @@ namespace seitz::math {
 }
 
 // The cosine of the angle between basis vectors i and j of a metric, clamped
-// to [-1, 1]. The quotient can exceed 1 by an ulp for a near-degenerate cell,
-// where acos would return NaN and sqrt(1 - cos^2) the root of a negative;
-// clamping only affects inputs that are already outside the domain, so no
-// in-range result changes.
+// to [-1, 1].
 [[nodiscard]] inline double metric_cosine(Matrix3d const &g, int i, int j) {
   return std::clamp(g(i, j) / metric_length(g, i) / metric_length(g, j), -1.0,
                     1.0);

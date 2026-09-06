@@ -3,6 +3,8 @@ add_executable(seitz_tests
         test_error.cpp
         test_cell.cpp
         test_symmetry_operation.cpp
+        test_xyz.cpp
+        test_cif.cpp
         test_overlap.cpp
         test_position_index.cpp
         test_mdspan.cpp
@@ -24,7 +26,6 @@ add_executable(seitz_tests
         test_benchmark.cpp)
 target_link_libraries(seitz_tests PRIVATE
         seitz::seitz
-        Boost::geometry
         Catch2::Catch2WithMain)
 # The granular unit tests validate each pipeline stage, so they see the private
 # headers under src/ (which are not part of the installed interface) — including
@@ -59,10 +60,10 @@ if (SEITZ_BUILD_ORACLE_TESTS)
             test_oracle_kpoint_mesh.cpp
             test_oracle_kpoint_bz.cpp
             test_oracle_corpus.cpp
+            test_cif_corpus.cpp
             test_robustness.cpp)
     target_link_libraries(seitz_oracle_tests PRIVATE
             seitz::seitz
-            Boost::geometry
             Spglib::symspg
             Catch2::Catch2WithMain)
     target_include_directories(seitz_oracle_tests PRIVATE
@@ -71,6 +72,8 @@ if (SEITZ_BUILD_ORACLE_TESTS)
     # The reference corpus (one input cell per space group) lives in the
     # FetchContent source tree; the corpus loader reads it via this path.
     target_compile_definitions(seitz_oracle_tests PRIVATE
-            SPGLIB_REF_DATA_DIR="${spglib_reference_SOURCE_DIR}/test/functional/python/data")
+            SPGLIB_REF_DATA_DIR="${spglib_reference_SOURCE_DIR}/test/functional/python/data"
+            # PyXtal's two CIF corpora; tests/cif_corpus.hpp reads both.
+            SEITZ_PYXTAL_CIF_DIR="${pyxtal_reference_SOURCE_DIR}/pyxtal")
     catch_discover_tests(seitz_oracle_tests)
 endif ()

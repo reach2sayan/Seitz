@@ -18,45 +18,72 @@ import urllib.request
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from pygments.lexers import CppLexer
+from pygments.token import Comment, Number, String, Text
+
 REPO = "kokkos/mdspan"
 BRANCH = "single-header"
 # The commit include/seitz/third_party/mdspan.hpp was taken from.  Bump on re-vendor.
 PINNED = "c3fc07b607db2a43cd65aabc12ffda9328833d95"
 VENDORED = Path(__file__).resolve().parent.parent / "include/seitz/third_party/mdspan.hpp"
 
-TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|[A-Za-z_]\w*|\d[\w.\']*|\S')
-COMMENT = re.compile(r'("(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\')|//[^\n]*|/\*.*?\*/', re.S)
+LEXER = CppLexer()
 
-
-def strip_comments(src: str) -> str:
-    """Drop // and /* */ comments; a literal that looks like one is kept."""
-    return COMMENT.sub(lambda m: m.group(1) or " ", src)
+# Pygments lexes a whole `#if 0` block as one comment, which would hide a local
+# patch inside one -- and the vendored header has two of them. `#if (0)` means
+# the same and does not trip that rule. Both sides get it, so it is never itself
+# a difference.
+IF_ZERO = re.compile(r"^#if\s+0\s*$", re.M)
 
 
 def normalize(src: str) -> list[str]:
-    """One token per line, except directives: those stay whole, since a
-    preprocessor directive ends at its newline and the line break is meaning."""
-    text = strip_comments(src.replace("\\\n", ""))
-    toks: list[str] = []
-    for line in text.split("\n"):
-        s = line.strip()
-        if not s:             continue
-        if s.startswith("#"): toks.append("#DIRECTIVE " + " ".join(TOKEN.findall(s)))
-        else:                 toks.extend(TOKEN.findall(s))
-    # "abc " "def" and "abc def" are the same string to the compiler, and
-    # clang-format moves the split around freely.
-    merged: list[str] = []
-    for t in toks:
-        if (t.startswith('"') and
-                t.endswith('"') and
-                merged[-1:] and
-                merged[-1].startswith('"') and
-                merged[-1].endswith('"')
-        ):
-            merged[-1] = merged[-1][:-1] + t[1:]
+    """One token per line, comments and whitespace dropped.
+
+    A directive stays whole: it ends at its newline, so that one line break is
+    meaning where every other one is formatting. Adjacent string literals are
+    joined, because "abc " "def" and "abc def" are the same string to the
+    compiler and clang-format moves the split around freely.
+
+    Most of what follows is undoing Pygments' own line-sensitivity, since the
+    whole point here is to be blind to formatting: it hands back a directive in
+    raw chunks (re-lexed below, so spacing inside one cannot show up as a
+    difference), a string literal in pieces, and a sign folded into the number
+    after it -- but only when nothing separates them, so `x-1` and `x - 1`
+    would differ.
+    """
+    out: list[str] = []
+    directive: list[str] | None = None
+    literal: str | None = None
+
+    def flush() -> None:
+        nonlocal directive, literal
+        if directive is not None: out.append(" ".join(["#DIRECTIVE", *directive]))
+        if literal is not None: out.append(literal)
+        directive = literal = None
+
+    for kind, value in LEXER.get_tokens(IF_ZERO.sub("#if (0)", src).replace("\\\n", "")):
+        if kind in Comment.Preproc or kind in Comment.PreprocFile:
+            # The leading `#` is dropped, which is also what keeps the re-lex
+            # from finding a directive all over again.
+            if value == "\n": flush()
+            elif value != "#": directive = (directive or []) + [
+                v for k, v in LEXER.get_tokens(value)
+                if k not in Text and k not in Comment and v.strip()]
+        elif kind in Comment:
+            # A `//` comment ends the directive it sits on: Pygments leaves the
+            # state without the newline that would otherwise close it.
+            if "\n" in value: flush()
+        elif kind in Text:
+            pass                            # never ends a run of literals
+        elif kind in String:
+            literal = value if literal is None else (
+                literal[:-1] + value[1:] if literal.endswith('"') and value.startswith('"')
+                else literal + value)
         else:
-            merged.append(t)
-    return merged
+            flush()
+            out += [value[:1], value[1:]] if kind in Number and value[:1] in "+-" else [value]
+    flush()
+    return out
 
 
 def diff(a: list[str], b: list[str], context: int = 3) -> list[str]:

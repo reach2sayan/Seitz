@@ -165,11 +165,10 @@ cartesian_rotations(Matrix3d const &lattice, auto const &operations) {
   return out;
 }
 
-// The core filter: for each spatial operation, check that it consistently maps
-// every site's moment onto the moment of the site it overlaps, determining the
-// spin-flip sign. Undetermined operations (all touched moments zero) are kept
-// as ordinary, or — with time reversal — as both an ordinary and an
-// anti-operation.
+// For each spatial operation, whether it consistently maps every site's moment
+// onto that of the site it overlaps, fixing the spin-flip sign. Undetermined
+// operations (all touched moments zero) are kept as ordinary, or -- with time
+// reversal -- as both ordinary and anti.
 template <MomentKind M>
 [[nodiscard]] MagneticOperations
 get_operations(Operations const &sym_nonspin, MagneticCell const &mcell,

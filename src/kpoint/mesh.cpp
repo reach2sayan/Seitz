@@ -32,10 +32,8 @@ constexpr Index kMeshGrain = 4096;
   return {v[0], v[1], v[2]};
 }
 
-// True -> the fast "normal" reduction; false -> the "distortion" path (3/6-fold
-// rotations or non-conventional cells). NOTE the deliberate quirk that the a=b
-// and b=c flags test the same column — kept for bit-identical behaviour against
-// the reference.
+// True -> fast "normal" reduction;
+// false -> "distortion" path (3/6-fold rotations or non-conventional cells)
 [[nodiscard]] bool has_conventional_symmetry(Mesh const &mesh,
                                              std::span<Matrix3i const> rots) {
   if (std::ranges::any_of(
@@ -43,12 +41,14 @@ constexpr Index kMeshGrain = 4096;
     return false;
   }
 
+  // deliberate quirk that the a=b and b=c flags test the same column — kept for
+  // bit-identical behaviour against the reference.
   Vector3i const e_b(0, 1, 0);
   Vector3i const e_c(0, 0, 1);
-  bool const eq_ab = std::ranges::any_of( // a == b axis present
+  bool const eq_ab = std::ranges::any_of(
       rots, [&](Matrix3i const &rot) { return rot.col(0) == e_b; });
   bool const eq_bc = eq_ab; // b == c (intentionally the same column as a == b)
-  bool const eq_ca = std::ranges::any_of( // c == a
+  bool const eq_ca = std::ranges::any_of(
       rots, [&](Matrix3i const &rot) { return rot.col(0) == e_c; });
 
   auto const &d = mesh.divisions();
@@ -118,11 +118,10 @@ distortion_representative(Address doubled, Mesh const &mesh, std::size_t self,
   return best;
 }
 
-// The 125 reciprocal-lattice offsets searched per grid point: the +-2 cube over
-// the digits 0,1,2,-2,-1 per axis. cartesian_product varies its last range
-// fastest (x outermost, z fastest), pinned by the static_asserts below. Plain
-// int triples, not Vector3i: Eigen fixed-size matrices are literal types for
-// construction and access, not for arithmetic.
+// The 125 offsets searched per grid point: the +-2 cube over 0,1,2,-2,-1 per
+// axis. cartesian_product varies its last range fastest, pinned by the
+// static_asserts below. Plain int triples -- Eigen fixed-size matrices are
+// literal for construction and access, not arithmetic.
 inline constexpr std::array<Address, 125> kBzSearchSpace = [] {
   constexpr std::array<int, 5> digits{0, 1, 2, -2, -1};
   std::array<Address, 125> table{};
@@ -155,20 +154,18 @@ static_assert(kBzSearchSpace.back() == Address{-1, -1, -1});
 } // namespace
 
 ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
-    : mesh_(mesh), rotations_(std::move(rotations)) {
+    : mesh_{mesh}, rotations_{std::move(rotations)} {
   bool const normal = has_conventional_symmetry(mesh_, rotations_);
   auto const &d = mesh_.divisions();
-  std::array<std::int64_t, 3> const divisor{
+  std::array const divisor{
       static_cast<std::int64_t>(d[1]) * d[2],
       static_cast<std::int64_t>(d[2]) * d[0],
       static_cast<std::int64_t>(d[0]) * d[1],
   };
 
-  // Indexed writes, not push_back: each mapping_[i] depends only on i, both
-  // representative functions are pure, and normal_representative has no early
-  // exit at all -- it is a min-reduction over the rotations. This is the
-  // largest raw iteration count in the library (divisions can reach 10^6
-  // points), and the only loop in it worth threading.
+  // Indexed writes, not push_back: each mapping_[i] depends only on i and both
+  // representative functions are pure. The largest raw iteration count in the
+  // library (up to 10^6 points), and the only loop worth threading.
   mapping_.resize(mesh_.size());
   parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
     auto const i = static_cast<std::size_t>(index);
@@ -249,10 +246,9 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
   std::vector<Address> addresses(mesh_.size());
 
   // Split so the expensive half can be threaded: the distance scan is 125
-  // reciprocal-space products per grid point and depends on that point alone,
-  // while the pass consuming it appends to a shared vector in index order.
-  // Phase one records, per point, the qualifying images (ascending) and the
-  // closest; phase two replays the single loop's sequence exactly.
+  // products per grid point and depends on that point alone, while the pass
+  // consuming it appends to a shared vector in order. Phase one records the
+  // qualifying images and the closest; phase two replays the same sequence.
   struct Candidates {
     std::uint8_t closest = 0;
     boost::container::small_vector<std::uint8_t, 4> qualifying;

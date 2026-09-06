@@ -138,11 +138,10 @@ template <WyckoffLike W> struct AssignmentContext {
   }
 };
 
-// Depth-first walk of the assignments: per element, choose each position's
-// copy count (0 or 1 with no DOF, any number with free coordinates) so the
-// multiplicities sum to the element's count. `used_special` enforces one use
-// per no-DOF position across the structure -- it is a single fixed orbit.
-// Yields the shared `placements` buffer for each complete assignment.
+// Depth-first: per element, choose each position's copy count (0 or 1 with no
+// DOF, any number with free coordinates) so the multiplicities sum to that
+// element's count. `used_special` enforces one use per no-DOF position -- it is
+// a single fixed orbit. Yields the shared `placements` buffer.
 template <WyckoffLike W>
 std::generator<Assignment<W> const &>
 walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
@@ -183,12 +182,10 @@ walk(AssignmentContext<W> const &ctx, Assignment<W> &placements,
 
 } // namespace detail
 
-// Every valid Wyckoff assignment of `comp` on `positions`, lazily, depth
-// first, each beginning with the `fixed` placements (which must point into
-// `positions` and are deducted from `comp`). The yielded reference points at a
-// reused buffer: copy what you keep. Compose with views::take to bound it; a
-// composition with no assignment yields nothing, usually without walking the
-// tree (reachability prune).
+// Every valid Wyckoff assignment of `comp` on `positions`, lazily, each
+// beginning with the `fixed` placements (which point into `positions` and are
+// deducted from `comp`). The yielded reference points at a reused buffer: copy
+// what you keep. Bound it with views::take.
 template <WyckoffLike W>
 [[nodiscard]] std::generator<Assignment<W> const &>
 enumerate_assignments(std::span<W const> positions, Composition comp,

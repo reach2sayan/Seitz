@@ -14,6 +14,8 @@ the same answers as parallel NumPy arrays with no per-site object at all.
 
 from __future__ import annotations
 
+from typing import Any, Self
+
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
@@ -52,6 +54,19 @@ class _Frozen(BaseModel):
     # hashable and a value hash would have to copy them on every lookup.
     __hash__ = object.__hash__
 
+    @classmethod
+    def from_core(cls, obj: Any) -> Self:
+        """Copy out of the extension type of the same shape, field by name.
+
+        Every field below is named after the attribute it reads, so the model
+        is the only place the list of them is written down: adding a field to
+        one of these records is a one-line change, and a field the C++ side
+        does not have fails here rather than silently arriving as None.
+        Pydantic does the rest -- an IntEnum into an ``int``, an array through
+        the annotations in ``_arrays``.
+        """
+        return cls(**{name: getattr(obj, name) for name in cls.model_fields})
+
 class Site(_Frozen):
     """The per-atom result of a determination."""
 
@@ -61,30 +76,12 @@ class Site(_Frozen):
     orbit: int
     primitive_atom: int
 
-    @classmethod
-    def from_core(cls, site: _core.Site) -> Site:
-        return cls(
-            wyckoff=site.wyckoff,
-            site_symmetry=site.site_symmetry,
-            equivalent_atom=site.equivalent_atom,
-            orbit=site.orbit,
-            primitive_atom=site.primitive_atom,
-        )
-
 class Setting(_Frozen):
     """How the input cell maps onto the standardized setting."""
 
     transformation: Basis
     origin_shift: Vector3
     rigid_rotation: Basis
-
-    @classmethod
-    def from_core(cls, setting: _core.Setting) -> Setting:
-        return cls(
-            transformation=setting.transformation,
-            origin_shift=setting.origin_shift,
-            rigid_rotation=setting.rigid_rotation,
-        )
 
 class SpacegroupType(_Frozen):
     """One Hall setting's metadata."""
@@ -98,20 +95,6 @@ class SpacegroupType(_Frozen):
     choice: str
     centering: int
     pointgroup_number: int
-
-    @classmethod
-    def from_core(cls, spacegroup_type: _core.SpacegroupType) -> SpacegroupType:
-        return cls(
-            number=spacegroup_type.number,
-            schoenflies=spacegroup_type.schoenflies,
-            hall_symbol=spacegroup_type.hall_symbol,
-            international=spacegroup_type.international,
-            international_full=spacegroup_type.international_full,
-            international_short=spacegroup_type.international_short,
-            choice=spacegroup_type.choice,
-            centering=int(spacegroup_type.centering),
-            pointgroup_number=spacegroup_type.pointgroup_number,
-        )
 
 
 class CellRecord(_Frozen):

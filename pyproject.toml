@@ -9,7 +9,7 @@ description = "Modern C++23 crystallography and symmetry analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
-dependencies = ["numpy>=1.24", "pydantic>=2.7"]
+dependencies = ["numpy>=1.24", "pydantic>=2.9"]
 
 [project.urls]
 Homepage = "https://github.com/reach2sayan/Seitz"
@@ -60,12 +60,28 @@ dev = [
   "pytest>=8",
   "numpy>=1.24",
   "pandas>=2.0",
-  "pydantic>=2.7",
+  "pydantic>=2.9",
   "pybind11-stubgen>=2.5",
+  # tools/mdspan_vendor_diff.py lexes C++ with it, rather than carrying a
+  # tokenizer of its own. Already present transitively; named here because
+  # something imports it directly now.
+  "pygments>=2.15",
   # Needed at runtime, not just at build time, for the editable rebuild above.
   "scikit-build-core>=0.10",
   "cmake>=3.28",
   "ninja",
+]
+# `uv sync --group bench` -- the comparison suite under python/benchmarks. Kept
+# out of dev so CI's sync stays small; pymatgen and PyXtal are large.
+bench = [
+  "pytest-benchmark>=5",
+  "spglib>=2.5",
+  "moyopy>=0.3",
+  "pymatgen>=2024",
+  "ase>=3.23",
+  "pyxtal>=1.0",
+  "gemmi>=0.6",
+  "tabulate",
 ]
 
 [tool.pytest.ini_options]

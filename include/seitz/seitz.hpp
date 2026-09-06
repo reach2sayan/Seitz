@@ -32,6 +32,7 @@
 // The catalogs: the databases as queryable objects, structure-free.
 #include <seitz/data/element_data.hpp>
 #include <seitz/data/msg_database.hpp>
+#include <seitz/data/spacegroup_symbols.hpp>
 #include <seitz/data/spg_database.hpp>
 #include <seitz/group/point_group.hpp>
 #include <seitz/group/rod_group.hpp>
@@ -54,5 +55,8 @@
 #include <seitz/alloy/site_basis.hpp>
 
 #include <seitz/kpoint/mesh.hpp>
+
+// I/O: crystal structures as files.
+#include <seitz/io/cif.hpp>
 
 #include <seitz/warmup.hpp>

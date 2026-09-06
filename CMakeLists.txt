@@ -212,7 +212,7 @@ endif ()
 #
 # SHARED where a shared object is the deliverable -- the standalone library a
 # consumer links against. Being shared is what makes the exported dependency set
-# below exact: PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the
+# below exact: PRIVATE links (Boost::flyweight, Boost::parser) stay out of the
 # interface, which a static archive cannot promise (see
 # cmake/SeitzConfig.cmake.in, which branches on exactly that).
 #
@@ -279,6 +279,9 @@ target_sources(seitz PRIVATE
         src/core/lattice.cpp
         src/core/periodicity.cpp
         src/core/symmetry_operation.cpp
+        src/core/xyz_string.cpp
+        # The CIF reader and writer; the only grammars besides xyz_string.cpp.
+        src/io/cif.cpp
         src/core/overlap.cpp
         src/core/position_index.cpp
         src/core/centering.cpp
@@ -331,7 +334,11 @@ target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
         Boost::graph Boost::leaf Threads::Threads)
-target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry)
+target_link_libraries(seitz PRIVATE Boost::flyweight
+        Boost::parser Boost::algorithm Boost::range)
+# Boost.Parser's MSVC debug stream includes <Windows.h>, whose min/max macros
+# would otherwise rewrite std::ranges::max(...) in the two grammar TUs.
+target_compile_definitions(seitz PRIVATE $<$<PLATFORM_ID:Windows>:NOMINMAX>)
 
 # The conversion warnings are applied to the library only — the oracle tests
 # bridge to the reference C API (reinterpret_cast, size_t<->int), which would

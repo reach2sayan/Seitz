@@ -24,13 +24,10 @@
 #include <utility>
 #include <vector>
 
-// Find the primitive cell, plus the cell-trimming helpers:
-//   1. Collect the pure translations of the cell.
-//   2. If there is only the trivial one, the cell is already primitive; just
-//      Delaunay-reduce its lattice.
-//   3. Otherwise pick three pure-translation/unit vectors that span the
-//      primitive volume, Delaunay-reduce, then fold and de-duplicate the atoms
-//      into the smaller cell.
+// The primitive cell, plus the cell-trimming helpers. Collect the pure
+// translations; with only the trivial one the cell is already primitive and
+// just needs Delaunay reduction. Otherwise pick three translation/unit vectors
+// spanning the primitive volume, reduce, then fold and dedupe the atoms.
 namespace seitz::symmetry {
 
 namespace {
@@ -115,11 +112,9 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
 
   if constexpr (F == GroupFamily::layer) {
     auto const layer_axis = aperiodic_axis(cell.periodicity());
-    // Layer: the third basis vector is fixed to the aperiodic lattice vector
-    // (the cell is not periodic along it); the two periodic vectors are chosen
-    // from the in-plane pure translations and the other two unit vectors. The
-    // aperiodic axis is kept at its own column index so the 2D reduction below
-    // leaves it untouched.
+    // Layer: the third basis vector is the aperiodic lattice vector; the two
+    // periodic ones come from the in-plane translations and unit vectors. The
+    // aperiodic axis keeps its column so the 2D reduction leaves it alone.
     int const ap = layer_axis.value_or(2);
     std::vector<Vector3d> cand(pure_trans.begin(),
                                pure_trans.end()); // in-plane, includes zero
@@ -157,14 +152,21 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
     cand.push_back(Vector3d::UnitX());
     cand.push_back(Vector3d::UnitY());
     cand.push_back(Vector3d::UnitZ());
-    auto const ids = std::views::iota(std::size_t{0}, cand.size());
-    // The first triple (in lexicographic order) spanning a cell of the right
-    // volume.
+    // The first triple (in lexicographic order) of non-zero candidates
+    // spanning a cell of the right volume. The zero candidate (the reference
+    // atom's own translation, always first) gives an exactly zero determinant,
+    // so it is filtered out before the product rather than visited in the
+    // O(n^2) triples that hold it.
+    std::vector<std::size_t> const nonzero{
+        std::from_range, std::views::iota(std::size_t{0}, cand.size()) |
+                             std::views::filter([&](std::size_t i) {
+                               return !(cand[i].array() == 0.0).all();
+                             })};
     for (auto const [i, j, k] :
-         std::views::cartesian_product(ids, ids, ids) |
+         std::views::cartesian_product(nonzero, nonzero, nonzero) |
              std::views::filter([](auto const &ijk) {
-               return std::get<0>(ijk) < std::get<1>(ijk) &&
-                      std::get<1>(ijk) < std::get<2>(ijk);
+               auto const [i, j, k] = ijk;
+               return i < j && j < k;
              })) {
       Matrix3d relative;
       relative.col(0) = cand[i];
@@ -205,10 +207,9 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   Positions const pos = transformed_positions(tmat.cast<double>(), cell);
   CellPeriodicity const &periodicity = cell.periodicity();
 
-  // Representative table with tolerance adjustment until each class has
-  // `ratio` atoms: overlap[i] is the lowest-index class representative (an
-  // atom that is its own representative) of i's type coinciding with i, or i
-  // itself, which then starts a class.
+  // Representatives, with tolerance adjusted until each class has `ratio`
+  // atoms: overlap[i] is the lowest-index representative of i's type coinciding
+  // with i, or i itself, which then starts a class.
   std::vector<int> overlap(static_cast<std::size_t>(n));
   // Hoisted out of the retry loop below: the keys change every attempt but the
   // capacity does not, and this loop runs up to kTrimNumAttempt times.
@@ -220,17 +221,24 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
     PositionIndex const index(pos, cell.types(), trimmed_lattice.matrix(), tol,
                               periodicity);
-    for (int i = 0; i < n; ++i) {
-      auto const ui = static_cast<std::size_t>(i);
-      overlap[ui] = i; // i is a representative until a lower one claims it
-      overlap[ui] =
-          index
-              .first_match(row(pos, i), cell.type(i), scratch,
-                           [&](int j) {
-                             return j <= i &&
-                                    overlap[static_cast<std::size_t>(j)] == j;
-                           })
-              .value_or(i);
+    // Representatives claim, in index order, every unclaimed later atom of
+    // their type they coincide with; an atom still unclaimed when its turn
+    // comes is the next representative. Same classes as asking each atom for
+    // its lowest coinciding representative (coincidence is symmetric), but
+    // one query per representative rather than per atom -- a supercell folds
+    // `ratio` atoms onto each site, and each of those queries returned them
+    // all.
+    std::ranges::iota(overlap, 0);
+    auto const unclaimed = [&](int i) {
+      return overlap[static_cast<std::size_t>(i)] == i;
+    };
+    for (int const i : std::views::iota(0, n) | std::views::filter(unclaimed)) {
+      for (int const k : index.matches(row(pos, i), cell.type(i), scratch) |
+                             std::views::filter([&](int k) {
+                               return k > i && unclaimed(k);
+                             })) {
+        overlap[static_cast<std::size_t>(k)] = i;
+      }
     }
 
     // Class sizes in one pass: every overlap entry names its representative,
@@ -301,10 +309,10 @@ operation_pure_translations(std::span<SymmetryOperation const> operations) {
           }) | std::views::transform(&SymmetryOperation::translation)};
 }
 
-// The primitive lattice in "translation space": a unit cell whose atoms sit at
-// the pure translations is reduced to its primitive cell; that cell's lattice
-// is the (primitive-to-conventional)^-1 transformation. std::nullopt unless the
-// translations span exactly one primitive point.
+// The primitive lattice in "translation space": reduce a cell whose atoms sit
+// at the pure translations, and its lattice is the
+// (primitive-to-conventional)^-1 transformation. nullopt unless they span
+// exactly one primitive point.
 [[nodiscard]] std::optional<Matrix3d>
 primitive_in_translation_space(std::vector<Vector3d> const &pure_trans,
                                std::size_t symmetry_size, double symprec) {

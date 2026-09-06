@@ -72,3 +72,57 @@ def test_the_hierarchy_is_rooted_at_seitzerror() -> None:
 def test_an_out_of_range_group_number_raises() -> None:
     with pytest.raises(errors.SeitzError):
         sz.SpaceGroup.from_number(sz.GroupFamily.space, 231)
+
+
+# The CIF layer's five, each of which exists so a caller can act on its payload
+# rather than parse a sentence.
+
+
+def test_cif_syntax_carries_its_position() -> None:
+    with pytest.raises(errors.CifSyntaxError) as caught:
+        sz.parse_cif("data_x\n_a 1\nloop_ _p _q\n1 2 3\n")
+    assert caught.value.line == 3
+    assert caught.value.column == 1
+
+
+def test_a_missing_tag_names_itself() -> None:
+    text = (
+        "data_x\n_cell_length_a 4.0\n_cell_length_c 4.0\n"
+        "_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
+        "loop_ _atom_site_label _atom_site_fract_x _atom_site_fract_y "
+        "_atom_site_fract_z\nNa1 0 0 0\n"
+    )
+    with pytest.raises(errors.CifMissingTagError) as caught:
+        sz.read_cif(text)
+    assert caught.value.tag == "_cell_length_b"
+
+
+def test_an_unknown_element_names_the_symbol() -> None:
+    text = (
+        "data_x\n_cell_length_a 4.0\n_cell_length_b 4.0\n_cell_length_c 4.0\n"
+        "_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
+        "loop_ _atom_site_label _atom_site_fract_x _atom_site_fract_y "
+        "_atom_site_fract_z\nZz1 0 0 0\n"
+    )
+    with pytest.raises(errors.UnknownElementError) as caught:
+        sz.read_cif(text)
+    assert caught.value.symbol == "Zz1"
+
+
+def test_an_unknown_spacegroup_symbol_names_itself() -> None:
+    text = (
+        "data_x\n_cell_length_a 4.0\n_cell_length_b 4.0\n_cell_length_c 4.0\n"
+        "_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
+        "_space_group_name_H-M_alt 'Q q q'\n"
+        "loop_ _atom_site_label _atom_site_fract_x _atom_site_fract_y "
+        "_atom_site_fract_z\nNa1 0 0 0\n"
+    )
+    with pytest.raises(errors.UnknownSpacegroupSymbolError) as caught:
+        sz.read_cif(text)
+    assert caught.value.symbol == "Q q q"
+
+
+def test_an_invalid_triplet_carries_its_text() -> None:
+    with pytest.raises(errors.InvalidXyzError) as caught:
+        sz.SymmetryOperation.from_xyz("x,y")
+    assert caught.value.text == "x,y"

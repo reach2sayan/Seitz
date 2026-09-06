@@ -20,10 +20,14 @@ FetchContent_Declare(Eigen3
 # Boost 1.88.0, from the CMake-ready release archive.
 #   container  — static_vector/small_vector/flat_map/flat_set
 #   flyweight  — one shared immutable SpaceGroup per Hall setting
-#   geometry   — the R-tree behind PositionIndex
 #   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
 #   leaf       — the error model (Result<T>)
-set(BOOST_INCLUDE_LIBRARIES container flyweight geometry graph leaf)
+#   parser     — the CIF and xyz-triplet grammars; header-only, numerics via
+#                <charconv> (no compiled lib)
+#   algorithm  — to_lower_copy/join, so the CIF layer hand-rolls neither
+#   range      — join(), for concatenating two ranges
+set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight graph leaf parser
+        range)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON
@@ -87,6 +91,28 @@ FetchContent_Declare(spglib_reference
         ${SEITZ_SPGLIB_SUBDIR})
 FetchContent_MakeAvailable(spglib_reference)
 unset(SEITZ_SPGLIB_SUBDIR)
+
+# PyXtal, for its two CIF corpora only (209 per-group files, 77 real
+# structures). Populate-only: SOURCE_SUBDIR names a directory that does not
+# exist, so FetchContent checks the tree out and adds no targets. Offline:
+# FETCHCONTENT_SOURCE_DIR_PYXTAL_REFERENCE.
+if (SEITZ_BUILD_ORACLE_TESTS)
+    FetchContent_Declare(pyxtal_reference
+            GIT_REPOSITORY https://github.com/MaterSim/PyXtal.git
+            GIT_TAG v1.1.4
+            GIT_SHALLOW TRUE
+            SOURCE_SUBDIR seitz-cifs-only)
+    FetchContent_MakeAvailable(pyxtal_reference)
+
+    foreach (dir IN ITEMS miscellaneous database)
+        if (NOT EXISTS "${pyxtal_reference_SOURCE_DIR}/pyxtal/${dir}/cifs")
+            message(FATAL_ERROR
+                    "The PyXtal checkout is missing pyxtal/${dir}/cifs (looked "
+                    "in ${pyxtal_reference_SOURCE_DIR}). The CIF corpus tests "
+                    "read both directories; see tests/cif_corpus.hpp.")
+        endif ()
+    endforeach ()
+endif ()
 
 if (NOT EXISTS "${spglib_reference_SOURCE_DIR}/src/spg_database.c")
     message(FATAL_ERROR

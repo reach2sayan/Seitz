@@ -33,7 +33,9 @@ constexpr int kMaxDenominator = 100;
 using MagOps = std::vector<MagneticSymmetryOperation>;
 
 [[nodiscard]] MagneticSymmetryOperation identity_operation(bool time_reversal) {
-  return {{Matrix3i::Identity(), Vector3d::Zero()}, time_reversal};
+  return {.spatial = {.rotation = Matrix3i::Identity(),
+                      .translation = Vector3d::Zero()},
+          .time_reversal = time_reversal};
 }
 
 // Whether a magnetic space group is built as the family (ignore time reversal)
@@ -104,13 +106,15 @@ get_representative(MagneticOperations const &magnetic_symmetry) {
         return op.spatial.is_identity_rotation() && op.time_reversal;
       });
   if (anti_translation != magnetic_symmetry.end()) {
-    rep.push_back({anti_translation->spatial, true}); // type IV
+    rep.push_back({.spatial = anti_translation->spatial,
+                   .time_reversal = true}); // type IV
     return rep;
   }
   auto const primed = std::ranges::find_if(
       magnetic_symmetry, [](auto const &op) { return op.time_reversal; });
   if (primed != magnetic_symmetry.end()) {
-    rep.push_back({primed->spatial, true}); // type III
+    rep.push_back(
+        {.spatial = primed->spatial, .time_reversal = true}); // type III
     return rep;
   }
   return std::nullopt;
@@ -189,7 +193,9 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
         Vector3d const trans = math::wrap_to_unit_cell(
             Vector3d(shift - rot.cast<double>() * shift +
                      tmat * op.spatial.translation));
-        return MagneticSymmetryOperation{{rot, trans}, op.time_reversal};
+        return MagneticSymmetryOperation{
+            .spatial = {.rotation = rot, .translation = trans},
+            .time_reversal = op.time_reversal};
       });
   return changed;
 }

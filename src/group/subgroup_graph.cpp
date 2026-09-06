@@ -48,7 +48,6 @@ namespace {
 
 // A vertex the search has not reached carries no predecessor edge.
 constexpr int kNoEdge = -1;
-
 [[nodiscard]] constexpr bool in_range(int number) noexcept {
   return number >= 1 && number <= kNumSpaceGroups;
 }
@@ -73,11 +72,9 @@ SubgroupGraph::path(int super, int sub, std::optional<SubgroupKind> kind) {
       color.data(), boost::identity_property_map{});
   auto const predecessor_map = boost::make_iterator_property_map(
       predecessor.data(), boost::identity_property_map{});
-  boost::breadth_first_search(
-      view, super,
-      boost::visitor(boost::make_bfs_visitor(boost::record_edge_predecessors(
-                         predecessor_map, boost::on_tree_edge{})))
-          .color_map(color_map));
+  auto&& bfs_visitor = boost::visitor(boost::make_bfs_visitor(
+      boost::record_edge_predecessors(predecessor_map, boost::on_tree_edge{})));
+  boost::breadth_first_search(view, super, bfs_visitor.color_map(color_map));
 
   if (predecessor[static_cast<std::size_t>(sub)] == kNoEdge) {
     return std::nullopt;

@@ -25,12 +25,18 @@ the family carried by the Hall key it resolves to.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from . import _core, errors, records
 from ._core import (
+    CIF_SYMPREC,
     K_DEFAULT_SYMPREC,
     K_ZERO_PREC,
     AxisKind,
     Cell,
+    CifBlock,
+    CifStructure,
     Centering,
     CellSetting,
     CrystalClass,
@@ -41,6 +47,7 @@ from ._core import (
     Lattice,
     LatticeSetting,
     Laue,
+    OccupancyCollapse,
     Operations,
     PointGroupType,
     Setting,
@@ -65,6 +72,7 @@ from ._core import (
     halls_with_number,
     minimal_image,
     none_periodic,
+    parse_cif,
     operations_from_database,
     periodic_along,
     pointgroup_by_number,
@@ -85,11 +93,14 @@ from .records import CellRecord, DatasetRecord
 __version__ = _core.__version__
 
 __all__ = [
+    "CIF_SYMPREC",
     "K_DEFAULT_SYMPREC",
     "K_ZERO_PREC",
     "AxisKind",
     "Cell",
     "CellRecord",
+    "CifBlock",
+    "CifStructure",
     "CellSetting",
     "Centering",
     "SeitzError",
@@ -103,6 +114,7 @@ __all__ = [
     "LatticeSetting",
     "Laue",
     "MagneticTolerance",
+    "OccupancyCollapse",
     "Operations",
     "PointGroupType",
     "Setting",
@@ -130,6 +142,8 @@ __all__ = [
     "halls_with_number",
     "minimal_image",
     "none_periodic",
+    "parse_cif",
+    "read_cif",
     "operations_from_database",
     "periodic_along",
     "pointgroup_by_number",
@@ -143,6 +157,7 @@ __all__ = [
     "version_string",
     "warmup",
     "wrap",
+    "write_cif",
 ]
 
 
@@ -150,17 +165,50 @@ def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = 
         -> SymmetryAnalyzer:
     """Determine the symmetry of ``cell``.
 
-    This is the single place a validated :class:`~seitz.options.Tolerance`
-    becomes the plain struct the extension takes, which is why it accepts a
-    model, a plain dict, or nothing at all.
+    Takes a :class:`~seitz.options.Tolerance`, a dict, or nothing.  An unset
+    ``setting`` searches every Hall setting of the cell's family; a set one
+    fixes it.
 
-    An unset ``setting`` searches every Hall setting of the cell's family; a set
-    one fixes it.
-
-    Nothing is computed here.  The returned analyzer computes on first query and
-    caches, so asking it several questions costs one determination.
+    Nothing is computed here: the analyzer computes on first query and caches.
     """
-    if tolerance is None: validated = Tolerance()
-    elif isinstance(tolerance, Tolerance): validated = tolerance
-    else: validated = Tolerance.model_validate(tolerance)
-    return SymmetryAnalyzer.from_cell(cell, validated.to_core(), setting)
+    return SymmetryAnalyzer.from_cell(cell, _tolerance(tolerance).to_core(), setting)
+
+
+def _tolerance(tolerance: Tolerance | dict[str, float | None] | None) -> Tolerance:
+    """A tolerance argument as a validated model; shared by analyze/read_cif."""
+    if tolerance is None: return Tolerance()
+    if isinstance(tolerance, Tolerance): return tolerance
+    return Tolerance.model_validate(tolerance)
+
+
+def read_cif(source: str | os.PathLike[str],
+             tolerance: Tolerance | dict[str, float | None] | None = None) -> list[CifStructure]:
+    """Read every structure in a CIF document.
+
+    A :class:`os.PathLike` ``source`` is read from disk, a ``str`` is the text
+    itself -- by type, so a one-line CIF and a filename cannot be confused.
+
+    Defaults to :data:`CIF_SYMPREC` (1e-3 A), not the search default:
+    five-decimal coordinates put two images of a site ~1e-4 apart.
+    """
+    text = Path(source).read_text() if isinstance(source, os.PathLike) else source
+    validated = _tolerance(tolerance) if tolerance is not None else Tolerance(symprec=CIF_SYMPREC)
+    return _core.read_cif(text, validated.to_core())
+
+
+def write_cif(obj: Cell | SymmetryAnalyzer, *, name: str = "seitz",
+              path: str | os.PathLike[str] | None = None) -> str:
+    """Render ``obj`` as a CIF document, and optionally write it to ``path``.
+
+    A :class:`Cell` is written in P1.  A :class:`SymmetryAnalyzer` is written
+    symmetrized: standardized cell, its setting's database operations, and one
+    atom per orbit with Wyckoff letter and multiplicity.
+
+    The text is returned either way, so ``print(seitz.write_cif(cell))`` is the
+    printable form.
+    """
+    if isinstance(obj, Cell): text = _core.write_cif_cell(obj, name)
+    elif isinstance(obj, SymmetryAnalyzer): text = _core.write_cif_analyzer(obj, name)
+    else: raise TypeError(f"write_cif takes a Cell or a SymmetryAnalyzer, not {type(obj).__name__}")
+    if path is not None: Path(path).write_text(text)
+    return text

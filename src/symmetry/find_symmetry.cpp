@@ -2,6 +2,7 @@
 
 #include "core/matrix_order.hpp"
 #include "core/overlap.hpp"
+#include "core/position_index.hpp"
 #include "core/validation.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
@@ -21,13 +22,10 @@
 #include <ranges>
 #include <utility>
 
-// The symmetry-operation search:
-//   1. Delaunay-reduce the lattice and enumerate the lattice point group by
-//      trying every unimodular integer matrix built from 26 candidate axes that
-//      preserves the metric.
-//   2. Transform those rotations into the input cell's basis.
-//   3. For each rotation, find the translations that map the cell onto itself
-//      via the OverlapChecker.
+// The symmetry-operation search: Delaunay-reduce, enumerate the lattice point
+// group over unimodular matrices from 26 candidate axes that preserve the
+// metric, carry those rotations into the cell basis, then find each one's
+// translations with the OverlapChecker.
 namespace seitz::symmetry {
 
 namespace {
@@ -48,14 +46,11 @@ constexpr int kRelativeAxes[26][3] = {
 
 [[nodiscard]] Vector3i axis(int const (&a)[3]) { return {a[0], a[1], a[2]}; }
 
-// The axis triples worth testing: those whose matrix is unimodular. A property
-// of kRelativeAxes alone, so it is decided once at compile time rather than
-// 26^3 times per pass, up to kNumAttempt passes per attempt. Index triples, not
-// matrices: 3 bytes an entry instead of 9.
-//
-// The order is the cartesian-product order of the loop this replaces, and the
-// two filters (determinant here, couples_aperiodic at runtime) commute, so the
-// same candidates are visited in the same sequence.
+// The unimodular axis triples. A property of kRelativeAxes alone, so decided
+// once at compile time instead of 26^3 times per pass. Index triples, not
+// matrices: 3 bytes an entry. The order is the cartesian-product order of the
+// loop this replaces, and the two filters commute, so candidates are visited
+// in the same sequence.
 using AxisTriple = std::array<std::uint8_t, 3>;
 
 // 6960 of the 17576 triples are unimodular; `count` below pins that.
@@ -91,11 +86,9 @@ inline constexpr UnimodularAxes kUnimodularAxes = [] {
 }();
 static_assert(kUnimodularAxes.count == kUnimodularAxes.triples.size());
 
-// Every pairwise dot product among the 26 candidate axes mapped into Cartesian
-// space. The metric of a candidate basis (a_i, a_j, a_k) IS the 3x3 of those
-// dot products -- metric(p, q) = (L.a_p).(L.a_q) -- so the whole scan shares
-// 676 values computed once, instead of each of its 6960 candidates doing two
-// 3x3 matrix products to rediscover six of them.
+// Every pairwise dot product among the 26 Cartesian candidate axes. A
+// candidate basis's metric IS the 3x3 of those, so the scan shares 676 values
+// instead of 6960 candidates each doing two 3x3 products for six of them.
 struct AxisMetrics {
   static constexpr std::size_t kAxes = std::size(kRelativeAxes);
   std::array<double, kAxes * kAxes> dot{};
@@ -153,10 +146,8 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{
   return ref;
 }
 
-// For a layer group the aperiodic axis must map to itself: no candidate axis
-// matrix may couple the aperiodic axis with the periodic plane. True if the
-// off-diagonal block for `aperiodic_axis` has any nonzero entry. Candidate
-// vectors are the columns of `axes`.
+// For a layer group no candidate may couple the aperiodic axis with the
+// periodic plane: true if its off-diagonal block has a nonzero entry.
 [[nodiscard]] bool couples_aperiodic(Matrix3i const &axes,
                                      int aperiodic_axis) noexcept {
   return std::ranges::any_of(std::views::iota(0, 3), [&](int p) {
@@ -165,13 +156,10 @@ constexpr std::array<std::pair<int, int>, 3> kElemSets{
   });
 }
 
-// Whether a candidate metric agrees with the reference one. An unset
-// angle_tolerance uses the sin-based criterion; a positive angle_tolerance
-// compares angles in degrees. math::metric_cosine clamps to [-1, 1] -- see
-// there for why.
-// The cheap half: the basis-vector lengths must agree. Split out so the scan
-// runs it off three table lookups and never assembles the rest of the metric
-// for the candidates it rejects, which is most of them.
+// Whether a candidate metric agrees with the reference. Unset angle_tolerance
+// uses the sin-based criterion; a positive one compares degrees.
+// The cheap half. Split out so the scan runs it off three table lookups and
+// never assembles the rest of the metric for the many candidates it rejects.
 [[nodiscard]] bool lengths_agree(MetricReference const &orig,
                                  Eigen::Array3d const &length_rot,
                                  double symprec) {
@@ -301,25 +289,84 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
   return static_cast<int>(first - cell.types().begin());
 }
 
-// Translations t such that x -> rot . x + t maps the cell onto itself.
-[[nodiscard]] std::vector<Vector3d>
-translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
-                          Matrix3i const &rot, int min_index) {
-  Vector3d const origin = rot.cast<double>() * cell.position(min_index);
-  std::vector<Vector3d> result;
+// Mark, by walking, every atom that repeated application of `trans` reaches
+// from an already-found atom: the found set stays closed under the group the
+// accepted translations generate, so those atoms never need the full overlap
+// test. The walk from each seed follows lowest-index coincidences, exactly as
+// the reference does, and stops when it returns to its seed.
+void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
+                             PositionIndex const &index,
+                             PositionIndex::Scratch &scratch,
+                             Vector3d const &trans) {
   int const n = static_cast<int>(cell.size());
-  for (int i = 0; i < n; ++i) {
-    if (cell.type(i) != cell.type(min_index)) {
-      continue;
-    }
-    Vector3d const trans = cell.position(i) - origin;
-    if (checker.check_total_overlap(trans, rot)) {
-      // Layer translations live in the periodic plane; the aperiodic component
-      // is kept raw rather than folded into [0, 1).
-      result.push_back(wrap(trans, cell.periodicity()));
+  auto const is_found = [](std::vector<std::uint8_t> const &flags) {
+    return [&flags](int atom) {
+      return flags[static_cast<std::size_t>(atom)] != 0;
+    };
+  };
+  std::vector<std::uint8_t> const seeds = found;
+  for (int const seed : std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
+    // The walk: seed, its image, that one's image, ... until it closes or
+    // dead-ends; a cycle is at most n long.
+    int atom = seed;
+    for ([[maybe_unused]] int const step : std::views::iota(0, n)) {
+      auto const next = index.first_match(cell.position(atom) + trans,
+                                          cell.type(atom), scratch);
+      if (!next) {
+        break;
+      }
+      found[static_cast<std::size_t>(*next)] = 1;
+      atom = *next;
+      if (atom == seed) {
+        break;
+      }
     }
   }
-  return result;
+}
+
+// Translations t such that x -> rot . x + t maps the cell onto itself. For the
+// identity rotation the accepted translations form a group, and every atom
+// the group carries the reference atom onto is a candidate that is known to
+// pass -- so it is marked instead of tested. A supercell then pays for about
+// log2(multiplicity) full checks rather than one per lattice point.
+[[nodiscard]] std::vector<Vector3d>
+translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
+                          Matrix3i const &rot, int min_index, double symprec) {
+  Vector3d const origin = rot.cast<double>() * cell.position(min_index);
+  int const n = static_cast<int>(cell.size());
+  bool const identity = rot == Matrix3i::Identity();
+  // Built on the first accepted translation other than the reference atom's
+  // own zero one (whose walk marks nothing), so a primitive cell never pays
+  // for it.
+  std::optional<PositionIndex> index;
+  PositionIndex::Scratch scratch;
+  std::vector<std::uint8_t> found(static_cast<std::size_t>(n), 0);
+  // `found` changes under the loop, so the filter re-reads it per candidate.
+  auto const untested_of_type = [&](int i) {
+    return found[static_cast<std::size_t>(i)] == 0 &&
+           cell.type(i) == cell.type(min_index);
+  };
+  for (int const i :
+       std::views::iota(0, n) | std::views::filter(untested_of_type)) {
+    Vector3d const trans = cell.position(i) - origin;
+    if (checker.check_total_overlap(trans, rot)) {
+      found[static_cast<std::size_t>(i)] = 1;
+      if (identity && i != min_index) {
+        if (!index) {
+          index.emplace(cell, symprec);
+        }
+        close_under_translation(found, cell, *index, scratch, trans);
+      }
+    }
+  }
+  // Layer translations live in the periodic plane; the aperiodic component
+  // is kept raw rather than folded into [0, 1).
+  return {std::from_range,
+          std::views::iota(0, n) | std::views::filter([&](int i) {
+            return found[static_cast<std::size_t>(i)] != 0;
+          }) | std::views::transform([&](int i) {
+            return wrap(cell.position(i) - origin, cell.periodicity());
+          })};
 }
 
 } // namespace
@@ -376,7 +423,8 @@ Result<Operations> SymmetrySearch<F>::operations() const {
   std::vector<SymmetryOperation> ops;
   for (Matrix3i const &rot : lat_sym)
     for (Vector3d const &t :
-         translations_for_rotation(cell, checker, rot, *min_index))
+         translations_for_rotation(cell, checker, rot, *min_index,
+                                   tol_.symprec))
       ops.push_back({rot, t});
 
   return Operations{std::move(ops)};
@@ -407,7 +455,7 @@ std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
     return {};
   OverlapChecker const checker(cell, tol_.symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
-                                   *min_index);
+                                   *min_index, tol_.symprec);
 }
 
 template class SymmetrySearch<GroupFamily::space>;
