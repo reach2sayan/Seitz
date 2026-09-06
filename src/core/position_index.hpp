@@ -6,12 +6,8 @@
 #include <seitz/core/types.hpp>
 
 #include <boost/container/small_vector.hpp>
-#include <boost/geometry/algorithms/disjoint.hpp>
-#include <boost/geometry/algorithms/intersects.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/geometries/point.hpp>
-#include <boost/geometry/index/rtree.hpp>
 
+#include <array>
 #include <concepts>
 #include <optional>
 #include <ranges>
@@ -25,27 +21,34 @@ namespace seitz {
 // folded to the minimal image along the periodic axes only, is within a
 // Cartesian distance of symprec (inclusive). The one definition of "same site"
 // for any periodicity.
-[[nodiscard]] SEITZ_TESTABLE bool
-coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
-           double symprec, CellPeriodicity const &periodicity) noexcept;
+// Inline: it is the innermost test of every search, and out of line its 3x3
+// product and fold were half again the cost of the call itself.
+[[nodiscard]] inline bool coincident(Vector3d const &a, Vector3d const &b,
+                                     Matrix3d const &lattice, double symprec,
+                                     CellPeriodicity const &periodicity) noexcept {
+  return (lattice * minimal_image(a - b, periodicity)).norm() <= symprec;
+}
 
 // Build-once, query-many index of "which atoms sit at this fractional point":
-// an R-tree over Cartesian positions folded along the periodic axes. A query
-// folds the same way and takes a symprec-sized box around each image
-// `coincident`'s minimal-image fold can pick. The sphere is inside the box, so
-// candidates() is a superset and matches() re-tests exactly; candidates come
-// out ascending, so a first hit is the linear scan's first hit.
+// a uniform grid over the cell, atoms bucketed by the cell their folded
+// fractional position falls in, about one atom per bucket. A query folds the
+// same way and scans every bucket that `coincident`'s minimal-image fold could
+// land a match in: a Cartesian offset of at most half_width is a fractional
+// one of at most ||lattice^-1||_inf * half_width (image_reach_), so those are
+// the buckets within image_reach_ of the point along each periodic axis,
+// wrapping at the cell boundary -- typically one, never more than eight for a
+// sane lattice. The buckets over-approximate the sphere, so candidates() is a
+// superset and matches() re-tests exactly; buckets hold atoms in index order
+// and a multi-bucket scan is sorted, so candidates come out ascending and a
+// first hit is the linear scan's first hit. An aperiodic axis has a single
+// bucket: its coordinate is unbounded and unfolded.
 //
-// Only images that can contain a match are queried: a Cartesian offset of at
-// most half_width_ is a fractional one of at most ||lattice^-1||_inf *
-// half_width_, so the +-1 image matters only near 0 or 1 -- typically one box
-// per query, not 27.
+// This replaced a Boost.Geometry R-tree once the algorithmic work made the
+// query itself the hot spot: the tree cost ~150 ns per lookup and a sizeable
+// build even for 16 atoms, the grid a few tens of ns and a counting sort.
 //
 // Queries take a caller-owned Scratch: the hot paths run once per atom per
 // candidate operation and must not allocate.
-//
-// A uniform bucket grid was measured and REJECTED: ~5% faster on determination,
-// ~14% slower on generation, where the bucket array never amortizes.
 //
 // Non-owning: the positions and types must outlive the index.
 class SEITZ_TESTABLE PositionIndex {
@@ -62,8 +65,9 @@ public:
   PositionIndex(PositionIndex const &) = delete;
   PositionIndex &operator=(PositionIndex const &) = delete;
 
-  // Atoms in the box neighbourhood of `point`: a superset of the coincident
-  // ones, ascending, each once. Refills `out` and returns a view of it.
+  // Atoms in the bucket neighbourhood of `point`: a superset of the coincident
+  // ones, ascending, each once. A view of `out`, which it refills -- or of
+  // the index's own all-atoms list when the neighbourhood is the whole cell.
   [[nodiscard]] std::span<int const> candidates(Vector3d const &point,
                                                 Scratch &out) const;
 
@@ -126,33 +130,27 @@ public:
   }
 
 private:
-  using Point =
-      boost::geometry::model::point<double, 3, boost::geometry::cs::cartesian>;
-  using Box = boost::geometry::model::box<Point>;
-  // Node capacity 8, measured: ~1% over the default 16 on the determination
-  // driver, ~12% on generation, where cells are small (12-60 atoms) and a
-  // fatter node costs more box tests per level than the shallower tree saves.
-  // 4 and 32 were worse (32 by 14%); rstar / linear matched quadratic at 16.
-  using Tree =
-      boost::geometry::index::rtree<std::pair<Point, int>,
-                                    boost::geometry::index::quadratic<8>>;
-
-  // Cartesian position of a fractional point folded into the cell.
-  [[nodiscard]] Vector3d cartesian(Vector3d const &frac) const noexcept;
-  [[nodiscard]] bool coincides(Vector3d const &point, int atom) const noexcept;
+  // Bucket along `axis` of a folded fractional coordinate, wrapped into
+  // [0, divisions_[axis]).
+  [[nodiscard]] int bucket_along(double x, std::size_t axis) const noexcept;
+  [[nodiscard]] bool coincides(Vector3d const &point, int atom) const noexcept {
+    return coincident(point, positions_->row(atom).transpose(), lattice_,
+                      symprec_, periodicity_);
+  }
   [[nodiscard]] int type_of(int atom) const noexcept {
     return (*types_)[static_cast<std::size_t>(atom)];
   }
 
   Matrix3d lattice_;
-  Matrix3d lattice_inv_;
   double symprec_;
-  double half_width_;  // of the query box: symprec plus a rounding margin
-  double image_reach_; // half_width_ expressed as a fractional coordinate
+  double image_reach_; // fractional reach of a coincident atom, per axis
   CellPeriodicity periodicity_;
   Positions const *positions_;
   Types const *types_;
-  Tree tree_;
+  std::array<int, 3> divisions_; // buckets per axis; 1 on an aperiodic axis
+  std::vector<int> starts_;      // bucket -> first entry of atoms_, plus end
+  std::vector<int> atoms_;       // atom indices by bucket, ascending within
+  std::vector<int> everything_;  // 0..n-1, the answer when every bucket is hit
 };
 
 } // namespace seitz

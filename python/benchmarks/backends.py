@@ -10,7 +10,7 @@ from typing import Any
 
 from structures import Structure
 
-SYMPREC = 1e-5
+SYMPREC = 1e-3  # the relaxed-structure regime; the jitter in structures.py sits below it
 
 
 @dataclass(frozen=True)

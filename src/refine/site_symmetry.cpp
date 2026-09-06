@@ -8,6 +8,7 @@
 #include <seitz/core/periodicity.hpp>
 
 #include <algorithm>
+#include <array>
 #include <iterator>
 #include <optional>
 #include <ranges>
@@ -113,43 +114,59 @@ get_wyckoff_notation(Vector3d const &position, Operations const &conv_sym,
                          return op.apply(position);
                        }));
 
-  // Coincidence classes of the orbit, found once through an index over it.
   Positions const orbit_positions = to_positions(orbit);
   Types const orbit_types(orbit.size(), 0);
   PositionIndex const index(orbit_positions, orbit_types, lattice, symprec,
                             periodicity);
-  std::vector<std::vector<int>> classes;
-  classes.reserve(orbit.size());
   PositionIndex::Scratch scratch;
-  for (auto const &point : orbit) {
-    classes.emplace_back(std::from_range, index.matches(point, scratch));
-  }
 
   auto const group_order = static_cast<int>(conv_sym.size());
   data::WyckoffRange const range = data::wyckoff_indices(hall);
-  // Hoisted: every candidate below overwrites all of it, so one buffer does.
-  std::vector<char> fixed(orbit.size());
+  // A candidate is consistent when some orbit point j has exactly
+  // group_order / multiplicity fixed points among the orbit points coinciding
+  // with it. Counted from the fixed side: coincidence is symmetric, so every
+  // fixed point k adds one to the count of each j coinciding with k -- which
+  // needs one index query per fixed point instead of one per orbit point, and
+  // none at all for the usual wrong candidate, whose generator fixes nothing.
+  // Fixed points at identical coordinates share their query.
+  std::vector<int> fixed;
+  fixed.reserve(orbit.size());
+  std::vector<int> counts(orbit.size());
   for (int wi = 0; wi < range.count; ++wi) {
     data::WyckoffCoordinate const wc =
         data::wyckoff_coordinate(range.start + wi);
     if (wc.multiplicity != ref_multiplicity) {
       continue;
     }
-    // Which orbit points the candidate's site-symmetry generator fixes.
+    fixed.clear();
     for (auto const [k, point] : orbit | std::views::enumerate) {
       Vector3d const mapped =
           wc.rotation.cast<double>() * point + wc.translation;
-      fixed[static_cast<std::size_t>(k)] = static_cast<char>(
-          coincident(point, mapped, lattice, symprec, periodicity));
+      if (coincident(point, mapped, lattice, symprec, periodicity)) {
+        fixed.push_back(static_cast<int>(k));
+      }
     }
-    bool const consistent =
-        std::ranges::any_of(classes, [&](std::vector<int> const &cls) {
-          auto const fixed_in_class = std::ranges::count_if(cls, [&](int k) {
-            return fixed[static_cast<std::size_t>(k)] != 0;
-          });
-          return static_cast<int>(fixed_in_class) * wc.multiplicity ==
-                 group_order;
-        });
+    if (fixed.empty()) {
+      continue;
+    }
+    auto const coordinates = [&](int k) {
+      auto const &p = orbit[static_cast<std::size_t>(k)];
+      return std::array{p[0], p[1], p[2]};
+    };
+    std::ranges::sort(fixed, {}, coordinates);
+    std::ranges::fill(counts, 0);
+    for (auto const chunk : fixed | std::views::chunk_by([&](int a, int b) {
+                              return coordinates(a) == coordinates(b);
+                            })) {
+      auto const weight = static_cast<int>(std::ranges::size(chunk));
+      for (int const j : index.matches(
+               orbit[static_cast<std::size_t>(chunk.front())], scratch)) {
+        counts[static_cast<std::size_t>(j)] += weight;
+      }
+    }
+    bool const consistent = std::ranges::any_of(counts, [&](int count) {
+      return count * wc.multiplicity == group_order;
+    });
     if (consistent) {
       // The database stores Wyckoff positions in reverse order (g f e ... a).
       return WyckoffLabel{range.count - wi - 1,

@@ -212,7 +212,7 @@ endif ()
 #
 # SHARED where a shared object is the deliverable -- the standalone library a
 # consumer links against. Being shared is what makes the exported dependency set
-# below exact: PRIVATE links (Boost::flyweight, Boost::geometry) stay out of the
+# below exact: PRIVATE links (Boost::flyweight, Boost::parser) stay out of the
 # interface, which a static archive cannot promise (see
 # cmake/SeitzConfig.cmake.in, which branches on exactly that).
 #
@@ -334,7 +334,7 @@ target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
 target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
         Boost::graph Boost::leaf Threads::Threads)
-target_link_libraries(seitz PRIVATE Boost::flyweight Boost::geometry
+target_link_libraries(seitz PRIVATE Boost::flyweight
         Boost::parser Boost::algorithm Boost::range)
 
 # The conversion warnings are applied to the library only — the oracle tests

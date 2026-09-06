@@ -2,6 +2,7 @@
 
 #include "core/matrix_order.hpp"
 #include "core/overlap.hpp"
+#include "core/position_index.hpp"
 #include "core/validation.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
@@ -288,22 +289,76 @@ transform_pointsymmetry(PointSymmetry const &orig, Matrix3d const &new_lat,
   return static_cast<int>(first - cell.types().begin());
 }
 
-// Translations t such that x -> rot . x + t maps the cell onto itself.
+// Mark, by walking, every atom that repeated application of `trans` reaches
+// from an already-found atom: the found set stays closed under the group the
+// accepted translations generate, so those atoms never need the full overlap
+// test. The walk from each seed follows lowest-index coincidences, exactly as
+// the reference does, and stops when it returns to its seed.
+void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
+                             PositionIndex const &index,
+                             PositionIndex::Scratch &scratch,
+                             Vector3d const &trans) {
+  int const n = static_cast<int>(cell.size());
+  std::vector<std::uint8_t> const seeds = found;
+  for (int seed = 0; seed < n; ++seed) {
+    if (!seeds[static_cast<std::size_t>(seed)]) {
+      continue;
+    }
+    int atom = seed;
+    for (int step = 0; step < n; ++step) {
+      Vector3d const image = cell.position(atom) + trans;
+      auto const next = index.first_match(image, cell.type(atom), scratch);
+      if (!next) {
+        break;
+      }
+      found[static_cast<std::size_t>(*next)] = 1;
+      atom = *next;
+      if (atom == seed) {
+        break;
+      }
+    }
+  }
+}
+
+// Translations t such that x -> rot . x + t maps the cell onto itself. For the
+// identity rotation the accepted translations form a group, and every atom
+// the group carries the reference atom onto is a candidate that is known to
+// pass -- so it is marked instead of tested. A supercell then pays for about
+// log2(multiplicity) full checks rather than one per lattice point.
 [[nodiscard]] std::vector<Vector3d>
 translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
-                          Matrix3i const &rot, int min_index) {
+                          Matrix3i const &rot, int min_index, double symprec) {
   Vector3d const origin = rot.cast<double>() * cell.position(min_index);
-  std::vector<Vector3d> result;
   int const n = static_cast<int>(cell.size());
+  bool const identity = rot == Matrix3i::Identity();
+  // Built on the first accepted translation other than the reference atom's
+  // own zero one (whose walk marks nothing), so a primitive cell never pays
+  // for it.
+  std::optional<PositionIndex> index;
+  PositionIndex::Scratch scratch;
+  std::vector<std::uint8_t> found(static_cast<std::size_t>(n), 0);
   for (int i = 0; i < n; ++i) {
-    if (cell.type(i) != cell.type(min_index)) {
+    if (found[static_cast<std::size_t>(i)] ||
+        cell.type(i) != cell.type(min_index)) {
       continue;
     }
     Vector3d const trans = cell.position(i) - origin;
     if (checker.check_total_overlap(trans, rot)) {
+      found[static_cast<std::size_t>(i)] = 1;
+      if (identity && i != min_index) {
+        if (!index) {
+          index.emplace(cell, symprec);
+        }
+        close_under_translation(found, cell, *index, scratch, trans);
+      }
+    }
+  }
+  std::vector<Vector3d> result;
+  for (int i = 0; i < n; ++i) {
+    if (found[static_cast<std::size_t>(i)]) {
       // Layer translations live in the periodic plane; the aperiodic component
       // is kept raw rather than folded into [0, 1).
-      result.push_back(wrap(trans, cell.periodicity()));
+      result.push_back(wrap(cell.position(i) - origin, cell.periodicity()));
     }
   }
   return result;
@@ -363,7 +418,8 @@ Result<Operations> SymmetrySearch<F>::operations() const {
   std::vector<SymmetryOperation> ops;
   for (Matrix3i const &rot : lat_sym)
     for (Vector3d const &t :
-         translations_for_rotation(cell, checker, rot, *min_index))
+         translations_for_rotation(cell, checker, rot, *min_index,
+                                   tol_.symprec))
       ops.push_back({rot, t});
 
   return Operations{std::move(ops)};
@@ -394,7 +450,7 @@ std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
     return {};
   OverlapChecker const checker(cell, tol_.symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
-                                   *min_index);
+                                   *min_index, tol_.symprec);
 }
 
 template class SymmetrySearch<GroupFamily::space>;

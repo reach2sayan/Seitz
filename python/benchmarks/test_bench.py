@@ -26,8 +26,17 @@ def cif_files() -> list:
         try: return all(BACKENDS[n].read_cif(p) is not None for n in CIF_BACKENDS)
         except Exception: return False
     files = [p for p in cif_corpus() if readable(p)]
-    print(f"\ncif corpus: {len(files)} of {len(cif_corpus())} files readable by all backends")
+    _say(f"cif corpus: {len(files)} of {len(cif_corpus())} files readable by every backend ({', '.join(CIF_BACKENDS)})")
     return files
+
+
+def _say(text: str, end: str = "\n") -> None:
+    print(text, end=end, flush=True)
+
+
+def _done(benchmark, extra: str = "") -> None:
+    st = benchmark.stats.stats
+    _say(f"median {st.median * 1e3:10.3f} ms   min {st.min * 1e3:10.3f} ms   {st.rounds:5d} rounds{extra}")
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
@@ -36,19 +45,27 @@ def cif_files() -> list:
 def test_symmetry(benchmark, workload, case, backend, reference_numbers) -> None:
     b: Backend = BACKENDS[backend]
     fn = getattr(b, workload)
-    if fn is None: pytest.skip(f"{backend} has no {workload}")
-    if len(CASES[case]) > b.max_atoms: pytest.skip(f"{backend} capped at {b.max_atoms} atoms")
+    label = f"{workload:11s} {case:14s} {backend:9s}"
+    if fn is None:
+        _say(f"{label} skipped: no {workload}"); pytest.skip(f"{backend} has no {workload}")
+    if len(CASES[case]) > b.max_atoms:
+        _say(f"{label} skipped: capped at {b.max_atoms} atoms"); pytest.skip(f"{backend} capped at {b.max_atoms} atoms")
+    _say(f"{label} {len(CASES[case]):5d} atoms ... ", end="")
     benchmark.group = f"{workload}:{case}"
     benchmark.extra_info["backend"] = backend
     result = benchmark(fn, b.prepare(CASES[case]))
-    if workload == "dataset" and case in reference_numbers:
-        assert b.number(result) == reference_numbers[case]
+    found = b.number(result) if workload == "dataset" else None
+    _done(benchmark, f"   space group {found}" if found else "")
+    if found is not None and case in reference_numbers:
+        assert found == reference_numbers[case], f"spglib says {reference_numbers[case]}"
 
 
 @pytest.mark.parametrize("backend", CIF_BACKENDS)
 def test_read_cif(benchmark, backend, cif_files) -> None:
     read = BACKENDS[backend].read_cif
+    _say(f"{'read_cif':11s} {len(cif_files):3d} files       {backend:9s} ... ", end="")
     benchmark.group = "read_cif"
     benchmark.extra_info["backend"] = backend
     benchmark.extra_info["files"] = len(cif_files)
     benchmark(lambda: [read(p) for p in cif_files])
+    _done(benchmark)

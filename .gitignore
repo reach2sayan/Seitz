@@ -40,3 +40,6 @@ __pycache__/
 # Tracked on purpose: uv.lock, .python-version, python/seitz/py.typed, and the
 # stubs python/seitz/_core/*.pyi (CI regenerates them with
 # tools/fix_core_stubs.py and fails on a diff).
+
+# the local comparison suite, deliberately untracked
+python/benchmarks/

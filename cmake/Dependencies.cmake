@@ -20,15 +20,14 @@ FetchContent_Declare(Eigen3
 # Boost 1.88.0, from the CMake-ready release archive.
 #   container  — static_vector/small_vector/flat_map/flat_set
 #   flyweight  — one shared immutable SpaceGroup per Hall setting
-#   geometry   — the R-tree behind PositionIndex
 #   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
 #   leaf       — the error model (Result<T>)
 #   parser     — the CIF and xyz-triplet grammars; header-only, numerics via
 #                <charconv> (no compiled lib)
 #   algorithm  — to_lower_copy/join, so the CIF layer hand-rolls neither
 #   range      — join(), for concatenating two ranges
-set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight geometry graph leaf
-        parser range)
+set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight graph leaf parser
+        range)
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON

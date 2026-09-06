@@ -152,26 +152,40 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
     cand.push_back(Vector3d::UnitX());
     cand.push_back(Vector3d::UnitY());
     cand.push_back(Vector3d::UnitZ());
-    auto const ids = std::views::iota(std::size_t{0}, cand.size());
     // The first triple (in lexicographic order) spanning a cell of the right
-    // volume.
-    for (auto const [i, j, k] :
-         std::views::cartesian_product(ids, ids, ids) |
-             std::views::filter([](auto const &ijk) {
-               return std::get<0>(ijk) < std::get<1>(ijk) &&
-                      std::get<1>(ijk) < std::get<2>(ijk);
-             })) {
-      Matrix3d relative;
-      relative.col(0) = cand[i];
-      relative.col(1) = cand[j];
-      relative.col(2) = cand[k];
-      double const volume =
-          std::abs((cell.lattice().matrix() * relative).determinant());
-      if (volume <= symprec || math::nint(init_volume / volume) != multi) {
+    // volume. Plain loops rather than a filtered cartesian product: a zero
+    // candidate (the reference atom's own translation, always first) gives an
+    // exactly zero determinant, so every triple holding it fails the volume
+    // test, and only a loop can skip those O(n^2) triples as one range
+    // instead of visiting each.
+    auto const zero = [&](std::size_t i) {
+      return (cand[i].array() == 0.0).all();
+    };
+    for (std::size_t i = 0; i < cand.size(); ++i) {
+      if (zero(i)) {
         continue;
       }
-      return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
-                                         cell.periodicity(), symprec);
+      for (std::size_t j = i + 1; j < cand.size(); ++j) {
+        if (zero(j)) {
+          continue;
+        }
+        for (std::size_t k = j + 1; k < cand.size(); ++k) {
+          if (zero(k)) {
+            continue;
+          }
+          Matrix3d relative;
+          relative.col(0) = cand[i];
+          relative.col(1) = cand[j];
+          relative.col(2) = cand[k];
+          double const volume =
+              std::abs((cell.lattice().matrix() * relative).determinant());
+          if (volume <= symprec || math::nint(init_volume / volume) != multi) {
+            continue;
+          }
+          return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
+                                             cell.periodicity(), symprec);
+        }
+      }
     }
     return std::nullopt;
   }
@@ -214,17 +228,24 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   for (int attempt = 0; attempt < kTrimNumAttempt && !ok; ++attempt) {
     PositionIndex const index(pos, cell.types(), trimmed_lattice.matrix(), tol,
                               periodicity);
+    // Representatives claim, in index order, every unclaimed later atom of
+    // their type they coincide with; an atom still unclaimed when its turn
+    // comes is the next representative. Same classes as asking each atom for
+    // its lowest coinciding representative (coincidence is symmetric), but
+    // one query per representative rather than per atom -- a supercell folds
+    // `ratio` atoms onto each site, and each of those queries returned them
+    // all.
+    std::ranges::iota(overlap, 0);
     for (int i = 0; i < n; ++i) {
-      auto const ui = static_cast<std::size_t>(i);
-      overlap[ui] = i; // i is a representative until a lower one claims it
-      overlap[ui] =
-          index
-              .first_match(row(pos, i), cell.type(i), scratch,
-                           [&](int j) {
-                             return j <= i &&
-                                    overlap[static_cast<std::size_t>(j)] == j;
-                           })
-              .value_or(i);
+      if (overlap[static_cast<std::size_t>(i)] != i) {
+        continue;
+      }
+      for (int const k : index.matches(row(pos, i), cell.type(i), scratch)) {
+        auto const uk = static_cast<std::size_t>(k);
+        if (k > i && overlap[uk] == k) {
+          overlap[uk] = i;
+        }
+      }
     }
 
     // Class sizes in one pass: every overlap entry names its representative,

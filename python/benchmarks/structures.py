@@ -23,15 +23,16 @@ class Structure:
     def __len__(self) -> int: return len(self.numbers)
 
 
-def rocksalt_supercell(k: int, noise: float = 1e-4, seed: int = 7) -> Structure:
-    """k x k x k NaCl in a 4 A cube, jittered by ``noise`` (fractional, of the supercell)."""
+def rocksalt_supercell(k: int, jitter: float = 1e-4, seed: int = 7) -> Structure:
+    """k x k x k NaCl in a 4 A cube, each coordinate jittered by up to ``jitter`` angstrom.
+
+    Below SYMPREC, so the search still resolves Fm-3m but pays for real numerics."""
     rng = np.random.default_rng(seed)
     basis = np.eye(3) * 4.0 * k
     offsets = np.indices((k, k, k)).reshape(3, -1).T / k
     motif = np.array([[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]]) / k
     positions = (offsets[:, None, :] + motif).reshape(-1, 3)
-    amp = noise * 4.0 * k
-    positions += rng.uniform(-amp, amp, positions.shape) @ np.linalg.inv(basis)
+    positions += rng.uniform(-jitter, jitter, positions.shape) @ np.linalg.inv(basis)
     numbers = np.tile([NA, CL], k**3)
     return Structure(f"rocksalt-{len(numbers)}", basis, positions, numbers)
 

@@ -26,7 +26,6 @@ add_executable(seitz_tests
         test_benchmark.cpp)
 target_link_libraries(seitz_tests PRIVATE
         seitz::seitz
-        Boost::geometry
         Catch2::Catch2WithMain)
 # The granular unit tests validate each pipeline stage, so they see the private
 # headers under src/ (which are not part of the installed interface) — including
@@ -65,7 +64,6 @@ if (SEITZ_BUILD_ORACLE_TESTS)
             test_robustness.cpp)
     target_link_libraries(seitz_oracle_tests PRIVATE
             seitz::seitz
-            Boost::geometry
             Spglib::symspg
             Catch2::Catch2WithMain)
     target_include_directories(seitz_oracle_tests PRIVATE

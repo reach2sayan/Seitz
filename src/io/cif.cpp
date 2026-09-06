@@ -13,6 +13,20 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/join.hpp>
+// Declared ahead of the parser headers: Boost.Parser's tracing prints every
+// sub-parser through a qualified call, so a user parser's overload has to be
+// visible where those templates are defined, not merely where they are used.
+#include <iosfwd>
+namespace seitz::io {
+template <class Stop, int MinLength> struct RunParser;
+}
+namespace boost::parser::detail {
+template <class Context, class Stop, int MinLength>
+void print_parser(Context const &,
+                  seitz::io::RunParser<Stop, MinLength> const &,
+                  std::ostream &os, int components = 0);
+}
+
 #include <boost/parser/parser.hpp>
 #include <boost/range/join.hpp>
 
@@ -63,7 +77,107 @@ struct Block {
   return boost::algorithm::to_lower_copy(s, std::locale::classic());
 }
 
-auto const comment = bp::lit('#') >> *(bp::char_ - bp::eol);
+// ---- bulk token parsers -----------------------------------------------------
+//
+// Boost.Parser charges per parser invocation, not per character: every
+// sub-parser (even inside lexeme[]) enters the skip machinery and sets up a
+// parse context before it looks at a byte, so `*(char_ - ws)` over a value
+// cost ~30 ns a character and the parse was two thirds of a CIF read. These
+// parsers consume a whole token in one invocation instead. Each stops before
+// the first position where `Stop` holds, appends the run to the attribute as
+// string_parser does, and fails on an empty run unless `MinLength` is zero.
+//
+// Whitespace and line ends are the ASCII ones bp::ws and bp::eol match on
+// `char` input: space, tab through carriage return; \n, \r (\r\n as one),
+// \v, \f.
+[[nodiscard]] constexpr bool is_blank(char c) noexcept {
+  return c == ' ' || ('\t' <= c && c <= '\r');
+}
+[[nodiscard]] constexpr bool is_eol(char c) noexcept {
+  return c == '\n' || c == '\r' || c == '\v' || c == '\f';
+}
+
+} // namespace
+
+template <class Stop, int MinLength> struct RunParser {
+  template <class Iter, class Sentinel, class Context, class SkipParser>
+  std::string call(Iter &first, Sentinel last, Context const &context,
+                   SkipParser const &skip, bp::detail::flags flags,
+                   bool &success) const {
+    std::string out;
+    call(first, last, context, skip, flags, success, out);
+    return out;
+  }
+  template <class Iter, class Sentinel, class Context, class SkipParser,
+            class Attribute>
+  void call(Iter &first, Sentinel last, Context const &, SkipParser const &,
+            bp::detail::flags flags, bool &success, Attribute &out) const {
+    Iter it = first;
+    while (it != last && !Stop{}(it, last)) {
+      ++it;
+    }
+    if (it - first < MinLength) {
+      success = false;
+      return;
+    }
+    bp::detail::append(out, first, it, bp::detail::gen_attrs(flags));
+    first = it;
+  }
+};
+
+namespace {
+
+struct AtBlank {
+  bool operator()(auto it, auto) const { return is_blank(*it); }
+};
+struct AtEol {
+  bool operator()(auto it, auto) const { return is_eol(*it); }
+};
+// A quote closes only when whitespace or the end follows it: 'it's here'.
+template <char Quote> struct AtClosingQuote {
+  bool operator()(auto it, auto last) const {
+    return *it == Quote && (std::next(it) == last || is_blank(*std::next(it)));
+  }
+};
+// A text field closes at a line end followed by ';'.
+struct AtEolSemicolon {
+  bool operator()(auto it, auto last) const {
+    if (!is_eol(*it)) {
+      return false;
+    }
+    auto next = std::next(it);
+    if (*it == '\r' && next != last && *next == '\n') {
+      ++next;
+    }
+    return next != last && *next == ';';
+  }
+};
+
+} // namespace
+} // namespace seitz::io
+
+// The tracing hook declared above the parser headers; nothing here traces,
+// but the sequence parser instantiates it regardless.
+namespace boost::parser::detail {
+template <class Context, class Stop, int MinLength>
+void print_parser(Context const &,
+                  seitz::io::RunParser<Stop, MinLength> const &,
+                  std::ostream &os, int) {
+  os << "run";
+}
+} // namespace boost::parser::detail
+
+namespace seitz::io {
+namespace {
+
+bp::parser_interface<RunParser<AtBlank, 1>> const nonblank_run;
+bp::parser_interface<RunParser<AtBlank, 0>> const nonblank_run0;
+bp::parser_interface<RunParser<AtEol, 0>> const line_rest;
+bp::parser_interface<RunParser<AtClosingQuote<'\''>, 0>> const squoted_body;
+bp::parser_interface<RunParser<AtClosingQuote<'"'>, 0>> const dquoted_body;
+bp::parser_interface<RunParser<AtEolSemicolon, 0>> const text_field_body;
+
+auto const comment = bp::lit('#') >> bp::omit[line_rest];
 auto const skipper = bp::ws | comment;
 
 // Reserved words a value may not be; they end whatever list they follow.
@@ -71,11 +185,9 @@ auto const skipper = bp::ws | comment;
 auto const keyword = bp::no_case[bp::lit("data_") | bp::lit("loop_") |
                                  bp::lit("save_") | bp::lit("global_") |
                                  bp::lit("stop_")];
-auto const nonblank = bp::char_ - bp::ws;
-
 bp::rule<struct tag_tag, std::string> const cif_tag = "tag";
 auto const cif_tag_def =
-    bp::transform(ascii_lower)[bp::lexeme[bp::char_('_') >> +nonblank]];
+    bp::transform(ascii_lower)[bp::lexeme[bp::char_('_') >> nonblank_run]];
 
 // A text field, which CIF recognises only when the ';' opens a line.
 auto const at_column_1 = [](auto &ctx) {
@@ -85,22 +197,26 @@ auto const at_column_1 = [](auto &ctx) {
 bp::rule<struct text_field_tag, std::string> const text_field = "text field";
 auto const text_field_def =
     bp::eps(at_column_1) >>
-    bp::lexeme[';' >> *(bp::char_ - (bp::eol >> ';')) >> bp::eol >> ';'];
+    bp::lexeme[';' >> text_field_body >> bp::eol >> ';'];
 
 // The closing quote is the one followed by whitespace, so 'it's here' holds.
 bp::rule<struct squoted_tag, std::string> const squoted = "quoted value";
 auto const squoted_def =
-    bp::lexeme['\'' >> *(bp::char_ - ('\'' >> (bp::ws | bp::eoi))) >> '\''];
+    bp::lexeme['\'' >> squoted_body >> '\''];
 bp::rule<struct dquoted_tag, std::string> const dquoted = "quoted value";
 auto const dquoted_def =
-    bp::lexeme['"' >> *(bp::char_ - ('"' >> (bp::ws | bp::eoi))) >> '"'];
+    bp::lexeme['"' >> dquoted_body >> '"'];
 
 bp::rule<struct unquoted_tag, std::string> const unquoted = "value";
 auto const unquoted_def =
-    bp::lexeme[!keyword >> (bp::char_ - bp::char_("_'\"#;$[]")) >> *nonblank];
+    bp::lexeme[!keyword >> (bp::char_ - bp::char_("_'\"#;$[]")) >>
+               nonblank_run0];
 
+// lexeme[]: the skipper runs once, before the value, not again for each of
+// the four alternatives -- and the skip call, not the whitespace it eats, was
+// the cost that made parsing dominate a CIF read.
 bp::rule<struct value_tag, std::string> const value = "value";
-auto const value_def = text_field | squoted | dquoted | unquoted;
+auto const value_def = bp::lexeme[text_field | squoted | dquoted | unquoted];
 
 bp::rule<struct item_tag, Item> const item = "tag/value item";
 auto const item_def = cif_tag >> value;
@@ -114,7 +230,8 @@ auto const loop_def = bp::separate[bp::transform([](auto const &r) {
 
 bp::rule<struct block_tag, Block> const data_block = "data block";
 auto const data_block_def =
-    bp::lexeme[bp::no_case[bp::lit("data_")] >> *nonblank] >> *(loop | item);
+    bp::lexeme[bp::no_case[bp::lit("data_")] >> nonblank_run0] >>
+    *(loop | item);
 
 // The trailing `*skipper` is what lets the caller check `first == last`:
 // blocks alone stop at the last value, leaving the file's final newline.

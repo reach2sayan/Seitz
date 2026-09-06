@@ -3,43 +3,16 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <concepts>
 #include <cstddef>
-#include <iterator>
 #include <limits>
-#include <ranges>
+#include <numeric>
 
 namespace seitz {
 
-namespace bgi = boost::geometry::index;
-
 namespace {
 
-// Output iterator that keeps only the atom index of each tree value.
-template <typename Buffer> struct IndexCollector {
-  using iterator_category = std::output_iterator_tag;
-  using value_type = void;
-  using difference_type = std::ptrdiff_t;
-  using pointer = void;
-  using reference = void;
-
-  Buffer *out;
-
-  template <class Value>
-    requires requires(Value const &v) {
-      { v.second } -> std::convertible_to<typename Buffer::value_type>;
-    }
-  IndexCollector &operator=(Value const &value) {
-    out->push_back(value.second);
-    return *this;
-  }
-  IndexCollector &operator*() { return *this; }
-  IndexCollector &operator++() { return *this; }
-  IndexCollector operator++(int) { return *this; }
-};
-
 // Safety factor on the derived image reach. The bound below is exact, but it
-// is cheap to be generous -- an over-estimate only queries a box that turns
+// is cheap to be generous -- an over-estimate only scans a bucket that turns
 // out to be empty, while an under-estimate would drop a real match.
 constexpr double kImageMargin = 2.0;
 
@@ -53,105 +26,131 @@ constexpr double kImageMargin = 2.0;
   return std::isfinite(reach) ? reach : kImageMargin;
 }
 
-} // namespace
-
-bool coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
-                double symprec, CellPeriodicity const &periodicity) noexcept {
-  return (lattice * minimal_image(a - b, periodicity)).norm() <= symprec;
+// Buckets per periodic axis: about one atom per bucket, but never so many
+// that a query's reach spans more than one of them anyway -- a generation
+// distance check, whose "symprec" is a bond length, gets a single bucket and
+// therefore the plain pairwise scan, with no bucketing on top.
+[[nodiscard]] int divisions_for(Index n, double reach) noexcept {
+  double const by_atoms = std::cbrt(static_cast<double>(n));
+  double const by_reach = reach > 0.0 ? 0.5 / reach : 64.0;
+  return std::clamp(static_cast<int>(std::min(by_atoms, by_reach)), 1, 64);
 }
+
+[[nodiscard]] int wrap_index(long i, int n) noexcept {
+  long const m = i % n;
+  return static_cast<int>(m < 0 ? m + n : m);
+}
+
+} // namespace
 
 PositionIndex::PositionIndex(Positions const &positions, Types const &types,
                              Matrix3d const &lattice, double symprec,
                              CellPeriodicity const &periodicity)
-    : lattice_(lattice), lattice_inv_(lattice.inverse()), symprec_(symprec),
-      // The sphere test in `coincident` and the box test here round
+    : lattice_(lattice), symprec_(symprec),
+      // The sphere test in `coincident` and the bucket walk here round
       // differently; a few ulps of the coordinate scale keep a match on the
-      // sphere's surface from landing just outside the box.
-      half_width_(symprec + 64 * std::numeric_limits<double>::epsilon() *
-                                (symprec + lattice.cwiseAbs().maxCoeff())),
-      image_reach_(image_reach_of(lattice_inv_, half_width_)),
+      // sphere's surface from landing just outside the scanned buckets.
+      image_reach_(image_reach_of(
+          lattice.inverse(),
+          symprec + 64 * std::numeric_limits<double>::epsilon() *
+                        (symprec + lattice.cwiseAbs().maxCoeff()))),
       periodicity_(periodicity), positions_(&positions), types_(&types) {
-  std::vector<Tree::value_type> values;
-  values.reserve(types.size());
-  for (Index i = 0; i < positions.rows(); ++i) {
-    Vector3d const c = cartesian(positions.row(i).transpose());
-    values.emplace_back(Point(c[0], c[1], c[2]), static_cast<int>(i));
+  Index const n = positions.rows();
+  int const divisions = divisions_for(n, image_reach_);
+  for (std::size_t axis = 0; axis < 3; ++axis) {
+    divisions_[axis] =
+        periodicity[axis] == AxisKind::periodic ? divisions : 1;
   }
-  tree_ = Tree(values);
+  everything_.resize(static_cast<std::size_t>(n));
+  std::iota(everything_.begin(), everything_.end(), 0);
+  if (divisions_ == std::array{1, 1, 1}) {
+    return; // one bucket: every query is `everything_`
+  }
+  auto const buckets = static_cast<std::size_t>(divisions_[0]) *
+                       static_cast<std::size_t>(divisions_[1]) *
+                       static_cast<std::size_t>(divisions_[2]);
+
+  // Counting sort by bucket; a stable pass keeps each bucket in index order.
+  std::vector<int> bucket_of(static_cast<std::size_t>(n));
+  starts_.assign(buckets + 1, 0);
+  for (Index i = 0; i < n; ++i) {
+    Vector3d const folded = wrap(positions.row(i).transpose(), periodicity);
+    int const b = (bucket_along(folded[0], 0) * divisions_[1] +
+                   bucket_along(folded[1], 1)) *
+                      divisions_[2] +
+                  bucket_along(folded[2], 2);
+    bucket_of[static_cast<std::size_t>(i)] = b;
+    ++starts_[static_cast<std::size_t>(b) + 1];
+  }
+  std::partial_sum(starts_.begin(), starts_.end(), starts_.begin());
+  std::vector<int> cursor(starts_.begin(), starts_.end() - 1);
+  atoms_.resize(static_cast<std::size_t>(n));
+  for (Index i = 0; i < n; ++i) {
+    auto const b = static_cast<std::size_t>(bucket_of[static_cast<std::size_t>(i)]);
+    atoms_[static_cast<std::size_t>(cursor[b]++)] = static_cast<int>(i);
+  }
 }
 
 PositionIndex::PositionIndex(Cell const &cell, double symprec)
     : PositionIndex(cell.positions(), cell.types(), cell.lattice().matrix(),
                     symprec, cell.periodicity()) {}
 
-Vector3d PositionIndex::cartesian(Vector3d const &frac) const noexcept {
-  return lattice_ * wrap(frac, periodicity_);
+int PositionIndex::bucket_along(double x, std::size_t axis) const noexcept {
+  int const n = divisions_[axis];
+  return n == 1 ? 0 : wrap_index(static_cast<long>(std::floor(x * n)), n);
 }
 
 std::span<int const> PositionIndex::candidates(Vector3d const &point,
                                                Scratch &out) const {
+  if (divisions_ == std::array{1, 1, 1}) {
+    return everything_;
+  }
   out.clear();
-
   Vector3d const folded = wrap(point, periodicity_);
-  Vector3d const base = lattice_ * folded;
-  double const h = half_width_;
 
-  // The images worth querying, per axis. Both `folded` and the indexed atoms
-  // live in [0, 1), so the +1 image can only hold a match when the folded
-  // coordinate is within image_reach_ of 0, and the -1 image only when it is
-  // within image_reach_ of 1. An aperiodic axis has no images at all.
-  std::array<std::array<int, 3>, 3> shifts{};
-  std::array<int, 3> counts{};
+  // Per axis, the cyclic run of buckets covering [x - reach, x + reach]: its
+  // first bucket and how many. A run that would lap the axis is the whole
+  // axis. Bucket indices are taken before wrapping so the count is exact.
+  std::array<int, 3> first{};
+  std::array<int, 3> count{};
   for (std::size_t axis = 0; axis < 3; ++axis) {
-    int n = 0;
-    shifts[axis][static_cast<std::size_t>(n++)] = 0;
-    if (periodicity_[axis] == AxisKind::periodic) {
-      if (folded[static_cast<Index>(axis)] < image_reach_) {
-        shifts[axis][static_cast<std::size_t>(n++)] = 1;
-      }
-      if (folded[static_cast<Index>(axis)] > 1.0 - image_reach_) {
-        shifts[axis][static_cast<std::size_t>(n++)] = -1;
-      }
+    int const n = divisions_[axis];
+    if (n == 1) {
+      count[axis] = 1;
+      continue;
     }
-    counts[axis] = n;
+    double const x = folded[static_cast<Index>(axis)];
+    auto const lo = static_cast<long>(std::floor((x - image_reach_) * n));
+    auto const hi = static_cast<long>(std::floor((x + image_reach_) * n));
+    if (hi - lo + 1 >= n) {
+      count[axis] = n;
+    } else {
+      first[axis] = wrap_index(lo, n);
+      count[axis] = static_cast<int>(hi - lo + 1);
+    }
   }
-  bool const single = counts[0] == 1 && counts[1] == 1 && counts[2] == 1;
 
-  for (int i0 = 0; i0 < counts[0]; ++i0) {
-    for (int i1 = 0; i1 < counts[1]; ++i1) {
-      for (int i2 = 0; i2 < counts[2]; ++i2) {
-        int const s0 = shifts[0][static_cast<std::size_t>(i0)];
-        int const s1 = shifts[1][static_cast<std::size_t>(i1)];
-        int const s2 = shifts[2][static_cast<std::size_t>(i2)];
-        // base + lattice * (s0, s1, s2), written as column combinations
-        // because the shifts are 0 or +-1.
-        Vector3d c = base;
-        if (s0 != 0) {
-          c += static_cast<double>(s0) * lattice_.col(0);
-        }
-        if (s1 != 0) {
-          c += static_cast<double>(s1) * lattice_.col(1);
-        }
-        if (s2 != 0) {
-          c += static_cast<double>(s2) * lattice_.col(2);
-        }
-        Box const box(Point(c[0] - h, c[1] - h, c[2] - h),
-                      Point(c[0] + h, c[1] + h, c[2] + h));
-        tree_.query(bgi::intersects(box), IndexCollector<Scratch>{&out});
+  if (count == divisions_) {
+    return everything_; // already ascending, nothing to gather
+  }
+  for (int i0 = 0; i0 < count[0]; ++i0) {
+    int const b0 = wrap_index(first[0] + i0, divisions_[0]);
+    for (int i1 = 0; i1 < count[1]; ++i1) {
+      int const b1 = wrap_index(first[1] + i1, divisions_[1]);
+      for (int i2 = 0; i2 < count[2]; ++i2) {
+        int const b2 = wrap_index(first[2] + i2, divisions_[2]);
+        auto const b =
+            static_cast<std::size_t>((b0 * divisions_[1] + b1) * divisions_[2] + b2);
+        out.insert(out.end(), atoms_.begin() + starts_[b],
+                   atoms_.begin() + starts_[b + 1]);
       }
     }
   }
 
-  // The tree yields each atom once per box, so duplicates only arise when a
-  // second image was queried -- and the ascending order is contract. A single
-  // hit is already sorted, which is the common case by far.
-  if (out.size() < 2) {
-    return {out.data(), out.size()};
-  }
-  std::ranges::sort(out);
-  if (!single) {
-    auto const [dup, end] = std::ranges::unique(out);
-    out.erase(dup, end);
+  // Each bucket is ascending and holds each atom once; several buckets need
+  // one sort to restore the ascending contract.
+  if (count[0] * count[1] * count[2] > 1) {
+    std::ranges::sort(out);
   }
   return {out.data(), out.size()};
 }
@@ -160,11 +159,6 @@ std::vector<int> PositionIndex::candidates(Vector3d const &point) const {
   Scratch scratch;
   auto const found = candidates(point, scratch);
   return {found.begin(), found.end()};
-}
-
-bool PositionIndex::coincides(Vector3d const &point, int atom) const noexcept {
-  return coincident(point, positions_->row(atom).transpose(), lattice_,
-                    symprec_, periodicity_);
 }
 
 } // namespace seitz
