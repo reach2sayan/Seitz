@@ -150,6 +150,19 @@ jobs:
           restore-keys: |
             wheels-fc-win-amd64-
 
+      # pyproject.toml asks for build-frontend = "build[uv]", and on Windows
+      # cibuildwheel creates each interpreter's build venv itself with `uv venv`.
+      # It locates the binary with find_uv(): the `uv` Python package inside its
+      # own environment, else PATH -- and the action installs plain cibuildwheel
+      # into $RUNNER_TEMP\cibw, without the uv extra. With neither, setup_python
+      # dies on `assert uv_path is not None` (cibuildwheel/venv.py) before a
+      # single wheel is built. Linux needs no equivalent: the build runs in the
+      # manylinux container, which ships its own uv, and cibuildwheel resolves it
+      # there rather than on the host.
+      - name: Install uv (Windows)
+        if: runner.os == 'Windows'
+        uses: astral-sh/setup-uv@v7
+
       # A full version: cibuildwheel publishes no floating major tag.
       - uses: pypa/cibuildwheel@v3.4.1
         env:
