@@ -73,7 +73,9 @@ jobs:
           new="${cur%.*}.$(( ${cur##*.} + 1 ))"
           sed -i -E "s/^(project\(Seitz VERSION )$cur\b/\1$new/" CMakeLists.txt
           # The one file that carries the number. version.hpp is configured from
-          # it and the wheel metadata is read out of it, so there is nothing else
+          # it, the wheel metadata is read out of it, and the committed stub
+          # deliberately omits the version value (tools/fix_core_stubs.py strips
+          # it) so CI's stub diff gate stays green on this commit. Nothing else
           # to keep in step -- but check the edit landed before tagging on it.
           grep -q "^project(Seitz VERSION $new" CMakeLists.txt \
             || { echo "::error::the version bump did not apply"; exit 1; }
