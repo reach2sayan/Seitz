@@ -492,7 +492,8 @@ extension, it is a static archive instead.
 
 The same API, NumPy-first: the C++ library does the work, and the Python layer
 adds validated inputs, serializable records via **pydantic**, and an exception
-hierarchy in place of `Result<T>`.
+hierarchy over `Result<T>` — with `seitz.results` giving the `Result<T>`
+discipline back, unchanged, to callers who want it.
 
 Wheels for CPython 3.11-3.14 (Linux x86-64, Windows x64) are attached to each
 GitHub release, and need no compiler or GCC 15 on the target machine:
@@ -530,6 +531,31 @@ a `seitz.errors.SeitzError` subclass carrying its context —
 `InvalidLatticeError.determinant`, `AtomsTooCloseError.distance`. Layer groups
 are not a separate entry point: a cell built with
 `periodicity=sz.aperiodic_along(2)` goes through the same analyzer.
+
+Raising is the default because it is what Python callers expect, but it is not
+the only door. `seitz.results` mirrors the fallible surface as `Ok`/`Err`
+values, so [the error model above](#error-model-and-invariants) survives the
+crossing rather than being traded away at it:
+
+```python
+from result import Ok, Err
+from seitz import errors, results
+
+match results.read_cif(path):
+    case Ok(structures):
+        print(len(structures))
+    case Err(errors.CifSyntaxError() as error):
+        print(error.line, error.column)
+
+results.attempt(lambda: analyzer.hall)      # for properties and methods
+results.checked(group.wyckoff)("z")         # a callable, wrapped once
+```
+
+The two surfaces share one hierarchy by identity, not by parallel definition:
+an `Err` holds the very exception object that would have been raised, payload
+attribute and all, and `raise res.err_value` is the trip back. Only a
+`SeitzError` becomes an `Err` — a `TypeError` or a pydantic `ValidationError`
+still raises, because a bug in the caller is not a crystallographic failure.
 
 From a checkout, the `python` preset builds the extension and runs the pytest
 suite against the build tree:

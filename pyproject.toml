@@ -9,7 +9,11 @@ description = "Modern C++23 crystallography and symmetry analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
-dependencies = ["numpy>=1.24", "pydantic>=2.9"]
+# result: the Ok/Err type seitz.results returns. Pure Python, no
+# dependencies of its own; a hard requirement rather than an extra because
+# an optional one would buy an import guard, a skip marker and a second
+# supported configuration for less than it costs.
+dependencies = ["numpy>=1.24", "pydantic>=2.9", "result>=0.17"]
 
 [project.urls]
 Homepage = "https://github.com/reach2sayan/Seitz"
@@ -61,6 +65,7 @@ dev = [
   "numpy>=1.24",
   "pandas>=2.0",
   "pydantic>=2.9",
+  "result>=0.17",
   "pybind11-stubgen>=2.5",
   # tools/mdspan_vendor_diff.py lexes C++ with it, rather than carrying a
   # tokenizer of its own. Already present transitively; named here because
