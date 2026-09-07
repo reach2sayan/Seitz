@@ -91,7 +91,7 @@ space_group_of_magnetic_symmetry(MagneticOperations const &magnetic_symmetry,
   // Change basis from primitive to original: (a_std,b_std,c_std) = (a,b,c) .
   // t_mat^-1 . P.
   spacegroup.bravais_lattice = t_mat.inverse() * spacegroup.bravais_lattice;
-  return std::make_pair(std::move(sym), spacegroup);
+  return std::pair{std::move(sym), spacegroup};
 }
 
 // Coset representative of XSG in MSG (assumes type III or IV).
@@ -155,13 +155,13 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
 
   if (*spatial_index == 1) {
     if (num_sym_msg == num_sym_fsg) {
-      return std::make_pair(MagneticType::type_i,
-                            MagOps{identity_operation(false)});
+      return std::pair{MagneticType::type_i,
+                       MagOps{identity_operation(false)}};
     }
     if (num_sym_msg == 2 * num_sym_fsg) {
-      return std::make_pair(
+      return std::pair{
           MagneticType::type_ii,
-          MagOps{identity_operation(false), identity_operation(true)});
+          MagOps{identity_operation(false), identity_operation(true)}};
     }
     return std::nullopt;
   }
@@ -174,7 +174,7 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
   MagneticType const type = (*rep)[1].spatial.is_identity_rotation()
                                 ? MagneticType::type_iv
                                 : MagneticType::type_iii;
-  return std::make_pair(type, std::move(*rep));
+  return std::pair{type, std::move(*rep)};
 }
 
 // Transform magnetic operations by (tmat, shift) without de-duplicating:

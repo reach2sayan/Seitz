@@ -44,9 +44,7 @@ constexpr auto kDecodedMagneticOps = [] {
 }();
 
 // Every alternative standardized-setting transformation, decoded once at
-// compile time into a flat [uni][offset][slot] table. std::nullopt is the
-// per-row terminator (the source table zero-terminates each [uni][offset]
-// row); using optional rather than a magic 0 keeps the no-sentinel house rule.
+// compile time into a flat [uni][offset][slot] table.
 constexpr std::size_t kNumAltSlots = 7;
 constexpr std::size_t kMaxHallsPerUni = 18;
 using AltTable = md::table<std::optional<DecodedOp>, kNumUniNumbers + 1,

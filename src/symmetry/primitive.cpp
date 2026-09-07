@@ -99,7 +99,7 @@ finish_primitive_lattice(Matrix3d relative, Lattice const &cell_lattice,
   }
   auto const reduced = reduce_lattice<F>(cell_lattice.transformed(relative),
                                          periodicity, symprec);
-  return reduced.has_value() ? std::optional<Lattice>(reduced.value())
+  return reduced.has_value() ? std::optional(reduced.value())
                              : std::nullopt;
 }
 
@@ -295,9 +295,9 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
                       .transpose();
   }
 
-  return std::make_pair(Cell(trimmed_lattice, std::move(tpos),
-                             std::move(trimmed_types), periodicity),
-                        std::move(mapping));
+  return std::pair{Cell(trimmed_lattice, std::move(tpos),
+                        std::move(trimmed_types), periodicity),
+                   std::move(mapping)};
 }
 
 // The translations of a symmetry-operation set whose rotation is the identity.
@@ -463,9 +463,7 @@ primitive_operations(std::span<SymmetryOperation const> operations,
 
   // (T, 0) (R, t) (T, 0)^-1 = (T R T^-1, T t).
   Operations const conjugated = prim->conjugated_by(t_mat, *t_mat_inv);
-  return std::make_pair(
-      std::vector<SymmetryOperation>(conjugated.begin(), conjugated.end()),
-      t_mat);
+  return std::pair{std::vector(conjugated.begin(), conjugated.end()), t_mat};
 }
 
 } // namespace seitz::detail

@@ -186,8 +186,8 @@ TEST_CASE("alloy: fcc tetrahedron CVM subclusters and multiplicities",
     sizes.push_back(function.cluster.size());
     multiplicities.push_back(function.multiplicity());
   }
-  CHECK(sizes == std::vector<int>{0, 1, 2, 3, 4});
-  CHECK(multiplicities == std::vector<int>{1, 1, 6, 8, 2});
+  CHECK(sizes == std::vector{0, 1, 2, 3, 4});
+  CHECK(multiplicities == std::vector{1, 1, 6, 8, 2});
 }
 
 TEST_CASE("alloy: fcc tetrahedron configurations are binomial", "[alloy]") {
@@ -205,9 +205,9 @@ TEST_CASE("alloy: fcc tetrahedron configurations are binomial", "[alloy]") {
     weights.push_back(std::move(here));
   }
   CHECK(counts == std::vector<std::size_t>{1, 2, 3, 4, 5});
-  CHECK(weights[2] == std::vector<int>{1, 2, 1});
-  CHECK(weights[3] == std::vector<int>{1, 3, 3, 1});
-  CHECK(weights[4] == std::vector<int>{1, 4, 6, 4, 1});
+  CHECK(weights[2] == std::vector{1, 2, 1});
+  CHECK(weights[3] == std::vector{1, 3, 3, 1});
+  CHECK(weights[4] == std::vector{1, 4, 6, 4, 1});
 }
 
 TEST_CASE("alloy: fcc Kikuchi-Barker coefficients and the pair v-matrix",
@@ -219,7 +219,7 @@ TEST_CASE("alloy: fcc Kikuchi-Barker coefficients and the pair v-matrix",
   for (CvmCluster const &cluster : cvm.clusters()) {
     coefficients.push_back(cluster.kikuchi_barker);
   }
-  CHECK(coefficients == std::vector<double>{0, 5, -1, 0, 1});
+  CHECK(coefficients == std::vector{0., 5., -1., 0., 1.});
 
   // Rows are the pair's three configurations, columns all five cluster
   // functions; only the empty, point and pair columns can overlap a pair.
@@ -263,12 +263,12 @@ TEST_CASE("alloy: a parent lattice validates its sublattices", "[alloy]") {
   Cell const cell{fcc_primitive(), Positions::Zero(1, 3), Types{1}};
   // Sublattice id 1 with only one entry in the species table.
   CHECK(errored([&] {
-    return ParentLattice::create(cell, std::vector<Species>{Species{kA, kB}});
+    return ParentLattice::create(cell, std::vector{Species{kA, kB}});
   }));
   CHECK(errored([&] {
     return ParentLattice::create(Cell{fcc_primitive(), Positions::Zero(1, 3),
                                       Types{0}},
-                                 std::vector<Species>{Species{kB, kA}});
+                                 std::vector{Species{kB, kA}});
   }));
   CHECK(errored([&] {
     return ParentLattice::from_sites(fcc_primitive(), std::span<SiteSpec>{});

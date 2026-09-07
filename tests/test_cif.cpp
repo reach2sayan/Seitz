@@ -19,6 +19,7 @@
 #include <vector>
 
 using namespace seitz;
+using namespace std::literals;
 using seitz::test::errored;
 using seitz::test::must;
 
@@ -48,7 +49,7 @@ TEST_CASE("the block name and scalar items come back as one-row columns",
   CHECK(block.name == "nacl");
   CHECK(block.value("_cell_length_a") == "5.64");
   CHECK(block.value("_chemical_name") == "sodium chloride");
-  CHECK(rows(block, "_cell_length_a") == std::vector<std::string>{"5.64"});
+  CHECK(rows(block, "_cell_length_a") == std::vector{"5.64"s});
   CHECK(block.loops.empty());
 }
 
@@ -111,21 +112,21 @@ TEST_CASE("a loop becomes one column per tag", "[cif]") {
                                "Cl1 0.5\n"
                                "_after 7\n");
   CHECK(rows(block, "_atom_site_label") ==
-        std::vector<std::string>{"Na1", "Cl1"});
+        std::vector{"Na1"s, "Cl1"s});
   CHECK(rows(block, "_atom_site_fract_x") ==
-        std::vector<std::string>{"0.0", "0.5"});
+        std::vector{"0.0"s, "0.5"s});
   CHECK(block.value("_after") == "7");
   REQUIRE(block.loops.size() == 1);
-  CHECK(block.loops.front() == std::vector<std::string>{"_atom_site_label",
-                                                        "_atom_site_fract_x"});
+  CHECK(block.loops.front() == std::vector{"_atom_site_label"s,
+                                           "_atom_site_fract_x"s});
 }
 
 TEST_CASE("two loops in one block stay separate", "[cif]") {
   auto const block = one_block("data_x\n"
                                "loop_ _symop 'x,y,z' '-x,-y,-z'\n"
                                "LOOP_ _label _sym Na1 Na\n");
-  CHECK(rows(block, "_symop") == std::vector<std::string>{"x,y,z", "-x,-y,-z"});
-  CHECK(rows(block, "_label") == std::vector<std::string>{"Na1"});
+  CHECK(rows(block, "_symop") == std::vector{"x,y,z"s, "-x,-y,-z"s});
+  CHECK(rows(block, "_label") == std::vector{"Na1"s});
   CHECK(block.loops.size() == 2);
 }
 
@@ -134,7 +135,7 @@ TEST_CASE("a loop mixes quoted and unquoted values", "[cif]") {
                                "loop_ _a _b\n"
                                "1 'one'\n"
                                "2 \"two\"\n");
-  CHECK(rows(block, "_b") == std::vector<std::string>{"one", "two"});
+  CHECK(rows(block, "_b") == std::vector{"one"s, "two"s});
 }
 
 TEST_CASE("a document carries every data block in file order", "[cif]") {
@@ -147,24 +148,25 @@ TEST_CASE("a document carries every data block in file order", "[cif]") {
 }
 
 TEST_CASE("a ragged loop reports the line of its own loop_ keyword", "[cif]") {
+  using Position = std::pair<std::int64_t, std::int64_t>;
   auto const text = std::string_view{"data_x\n"
                                      "_a 1\n"
                                      "loop_ _p _q\n"
                                      "1 2 3\n"};
   CHECK(errored([&] { return io::parse_cif(text); }));
   auto const position = leaf::try_handle_all(
-      [&]() -> Result<std::pair<std::int64_t, std::int64_t>> {
+      [&]() -> Result<Position> {
         BOOST_LEAF_AUTO(blocks, io::parse_cif(text));
         (void)blocks;
-        return std::pair<std::int64_t, std::int64_t>{0, 0};
+        return Position{0, 0};
       },
       [](e_cif_syntax const &e) {
         return std::pair{e.line, e.column};
       },
       [](leaf::error_info const &) {
-        return std::pair<std::int64_t, std::int64_t>{-1, -1};
+        return Position{-1, -1};
       });
-  CHECK(position == std::pair<std::int64_t, std::int64_t>{3, 1});
+  CHECK(position == Position{3, 1});
 }
 
 TEST_CASE("text that stops making sense reports where", "[cif]") {
@@ -232,11 +234,11 @@ TEST_CASE("a symop loop expands the asymmetric unit", "[cif]") {
 TEST_CASE("a named space group expands the same cell as its operations",
           "[cif]") {
   auto const from_symops = one_structure(nacl_block(kFccSymops));
-  for (auto const naming : std::array<std::string_view, 4>{
-           "_space_group_name_H-M_alt 'F m -3 m'\n",
-           "_symmetry_space_group_name_H-M 'Fm-3m'\n",
-           "_space_group_IT_number 225\n",
-           "_space_group_name_Hall '-F 4 2 3'\n"}) {
+  for (auto const naming : std::array{
+           "_space_group_name_H-M_alt 'F m -3 m'\n"sv,
+           "_symmetry_space_group_name_H-M 'Fm-3m'\n"sv,
+           "_space_group_IT_number 225\n"sv,
+           "_space_group_name_Hall '-F 4 2 3'\n"sv}) {
     INFO(naming);
     auto const structure = one_structure(nacl_block(naming));
     REQUIRE(structure.hall.has_value());
@@ -268,7 +270,7 @@ TEST_CASE("a shared site collapses to its majority species", "[cif]") {
         Types{*data::atomic_number("Na"), *data::atomic_number("Cl")});
   REQUIRE(structure.collapsed.size() == 1);
   CHECK(structure.collapsed.front().kept == "Na1");
-  CHECK(structure.collapsed.front().dropped == std::vector<std::string>{"K1"});
+  CHECK(structure.collapsed.front().dropped == std::vector{"K1"s});
 }
 
 TEST_CASE("an over-specified asymmetric unit reads as one orbit", "[cif]") {
@@ -284,7 +286,7 @@ TEST_CASE("an over-specified asymmetric unit reads as one orbit", "[cif]") {
                   "O2 O -0.3 0.0 0.0\n");
   auto const structure = one_structure(text);
   CHECK(structure.cell.size() == 2);
-  CHECK(structure.labels == std::vector<std::string>{"O1", "O1"});
+  CHECK(structure.labels == std::vector{"O1"s, "O1"s});
 }
 
 TEST_CASE("a null type symbol falls back to the label", "[cif]") {
@@ -454,7 +456,7 @@ TEST_CASE("a type that is not an element is written as X", "[cif]") {
   auto const text = io::write_cif(test::rocksalt_motif(5.64));
   auto const block = one_block(text);
   CHECK(rows(block, "_atom_site_type_symbol") ==
-        std::vector<std::string>{"X", "H"});
+        std::vector{"X"s, "H"s});
   CHECK(errored([&] { return io::read_cif(text); }));
 }
 

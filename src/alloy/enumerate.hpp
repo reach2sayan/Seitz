@@ -26,7 +26,7 @@ mixed_radix(std::span<int const> radix) {
   }
   std::vector<int> digits(radix.size(), 0);
   for (;;) {
-    co_yield std::span<int const>{digits};
+    co_yield std::span{digits};
     std::size_t digit = 0;
     for (; digit < digits.size(); ++digit) {
       if (++digits[digit] < radix[digit]) {
@@ -65,7 +65,7 @@ combinations(std::size_t n, int choose) {
                       return mask[i] != 0;
                     });
     chosen.assign(selected.begin(), selected.end());
-    co_yield std::span<std::size_t const>{chosen};
+    co_yield std::span{chosen};
   } while (std::prev_permutation(mask.begin(), mask.end()));
 }
 

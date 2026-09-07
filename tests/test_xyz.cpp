@@ -12,6 +12,7 @@
 #include <string_view>
 
 using namespace seitz;
+using namespace std::literals;
 using seitz::test::errored;
 
 namespace {
@@ -56,10 +57,10 @@ TEST_CASE("from_xyz reads the triplet forms CIF files carry", "[xyz]") {
 }
 
 TEST_CASE("from_xyz rejects text that is not three coordinates", "[xyz]") {
-  for (auto const text : std::array<std::string_view, 6>{
-           "x,y", "x,y,z,z", "x,y,w", "x,2x,z",
+  for (auto const text : std::array{
+           "x,y"sv, "x,y,z,z"sv, "x,y,w"sv, "x,2x,z"sv,
            // Parses; determinant 6, so the unimodularity gate rejects it.
-           "-2y+1/2, 3x+1/2, z-y+1/2", ""}) {
+           "-2y+1/2, 3x+1/2, z-y+1/2"sv, ""sv}) {
     INFO(text);
     CHECK(errored([&] { return from_xyz(text); }));
   }

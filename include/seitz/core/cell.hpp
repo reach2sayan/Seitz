@@ -49,7 +49,7 @@ public:
   [[nodiscard]] auto atoms() const {
     return std::views::iota(Index{0}, size()) |
            std::views::transform([this](Index i) {
-             return std::pair<Vector3d, int>{position(i), type(i)};
+             return std::pair{position(i), type(i)};
            });
   }
 

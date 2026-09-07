@@ -51,6 +51,8 @@ void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
 // PRIVATE dependency and no installed header names it.
 namespace seitz::io {
 
+using namespace std::literals;
+
 namespace {
 
 namespace bp = boost::parser;
@@ -366,7 +368,7 @@ CifBlock::column(std::string_view tag) const {
   if (it == columns.end()) {
     return std::nullopt;
   }
-  return std::span<std::string const>{it->second};
+  return std::span{it->second};
 }
 
 std::optional<std::string_view> CifBlock::value(std::string_view tag) const {
@@ -603,14 +605,14 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
 
 // ---- the symmetry the block states ------------------------------------------
 
-constexpr auto kSymopTags = std::array<std::string_view, 2>{
-    "_space_group_symop_operation_xyz", "_symmetry_equiv_pos_as_xyz"};
-constexpr auto kHallTags = std::array<std::string_view, 2>{
-    "_space_group_name_hall", "_symmetry_space_group_name_hall"};
-constexpr auto kHmTags = std::array<std::string_view, 2>{
-    "_space_group_name_h-m_alt", "_symmetry_space_group_name_h-m"};
-constexpr auto kNumberTags = std::array<std::string_view, 2>{
-    "_space_group_it_number", "_symmetry_int_tables_number"};
+constexpr auto kSymopTags = std::array{
+    "_space_group_symop_operation_xyz"sv, "_symmetry_equiv_pos_as_xyz"sv};
+constexpr auto kHallTags = std::array{
+    "_space_group_name_hall"sv, "_symmetry_space_group_name_hall"sv};
+constexpr auto kHmTags = std::array{
+    "_space_group_name_h-m_alt"sv, "_symmetry_space_group_name_h-m"sv};
+constexpr auto kNumberTags = std::array{
+    "_space_group_it_number"sv, "_symmetry_int_tables_number"sv};
 
 [[nodiscard]] std::optional<std::string_view>
 first_stated(CifBlock const &block, std::span<std::string_view const> tags) {
@@ -669,7 +671,7 @@ named_setting(CifBlock const &block) {
     }
     return hall;
   }
-  return std::optional<HallNumber>{};
+  return std::nullopt;
 }
 
 // Whether `listed` is exactly the operation set of `hall`: the same count,
@@ -728,12 +730,12 @@ symmetry_of(CifBlock const &block, Lattice const &lattice,
 
   BOOST_LEAF_AUTO(hall, named_setting(block));
   if (!hall) {
-    return std::pair{std::vector<SymmetryOperation>{SymmetryOperation{}},
+    return std::pair{std::vector{SymmetryOperation{}},
                      std::optional<HallNumber>{}};
   }
   Operations const &database = data::operations_from_database(*hall);
   return std::pair{
-      std::vector<SymmetryOperation>{database.begin(), database.end()}, hall};
+      std::vector{std::from_range, database}, hall};
 }
 
 } // namespace
@@ -756,7 +758,7 @@ Result<std::vector<CifBlock>> parse_cif(std::string_view text) {
       if (Item *scalar = std::get_if<Item>(&entry); scalar != nullptr) {
         out.columns.insert_or_assign(
             std::move(scalar->tag),
-            std::vector<std::string>{std::move(scalar->value)});
+            std::vector{std::move(scalar->value)});
         continue;
       }
       Loop &table = std::get<Loop>(entry);

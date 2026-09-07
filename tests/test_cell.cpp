@@ -34,7 +34,7 @@ TEST_CASE("Cell atoms() pairs each position with its type", "[cell]") {
     CHECK(position.isApprox(
         c.position(static_cast<Index>(seen_types.size()) - 1)));
   }
-  CHECK(seen_types == std::vector<int>{7, 9});
+  CHECK(seen_types == std::vector{7, 9});
 }
 
 TEST_CASE("Cell with_* builders replace one facet and keep the atoms",

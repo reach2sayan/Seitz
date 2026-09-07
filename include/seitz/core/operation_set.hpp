@@ -164,8 +164,8 @@ public:
     if (!primitive) {
       return std::nullopt;
     }
-    return std::make_pair(OperationSet{std::move(primitive->first)},
-                          primitive->second);
+    return std::pair{OperationSet{std::move(primitive->first)},
+                     primitive->second};
   }
 
 private:
