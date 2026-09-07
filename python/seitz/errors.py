@@ -4,6 +4,10 @@ Every error the library reports arrives as one of these.  The C++ side returns
 ``Result<T>`` and never throws; the binding layer performs the one translation,
 mapping each typed error tag to the class below and attaching its payload as an
 attribute.
+
+:mod:`seitz.results` is that translation's inverse, for callers who would
+rather have the failure back as a value: it hands the same objects back inside
+an ``Err`` instead of raising them.
 """
 
 from __future__ import annotations

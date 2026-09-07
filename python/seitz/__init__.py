@@ -16,7 +16,9 @@ A structure in, its symmetry out::
 The analyzer memoizes, so it is the object you keep rather than a call you
 repeat, and every query on it is thread-safe.  Errors are never sentinels: a
 fallible call raises a :class:`~seitz.errors.SeitzError` subclass, and
-"absent" is always ``None``.
+"absent" is always ``None``.  :mod:`seitz.results` is the same surface with the
+failure returned as an ``Ok``/``Err`` value instead, for callers who want the
+C++ layer's ``Result<T>`` discipline.
 
 Layer groups are not a separate entry point.  A cell with one aperiodic axis --
 ``periodicity=cc.aperiodic_along(2)`` -- goes through the same analyzer, with
@@ -148,6 +150,7 @@ __all__ = [
     "periodic_along",
     "pointgroup_by_number",
     "records",
+    "results",
     "same_operation",
     "spacegroup_type",
     "SubgroupEdge",
@@ -212,3 +215,9 @@ def write_cif(obj: Cell | SymmetryAnalyzer, *, name: str = "seitz",
     else: raise TypeError(f"write_cif takes a Cell or a SymmetryAnalyzer, not {type(obj).__name__}")
     if path is not None: Path(path).write_text(text)
     return text
+
+
+# Imported last, not with the others at the top: seitz.results wraps read_cif
+# and write_cif, which are defined above, so a top-of-file import would reach
+# for names this module has not bound yet.
+from . import results  # noqa: E402
