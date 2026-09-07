@@ -138,7 +138,7 @@ TEST_CASE("PositionIndex agrees with the brute-force scan",
                        });
           std::optional<int> const first =
               typed.begin() == typed.end() ? std::nullopt
-                                           : std::optional<int>(*typed.begin());
+                                           : std::optional(*typed.begin());
           CHECK(index.first_match(q, type) == first);
           CHECK(sorted(index.matches(q, type)) == sorted(typed));
         }

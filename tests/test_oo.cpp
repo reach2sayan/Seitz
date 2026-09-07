@@ -138,7 +138,7 @@ TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
   auto gen = must(generate::Generator{*sg, {.seed = 42u}}(comp));
   REQUIRE(gen.cell.size() == 8);
   std::set<int> kinds(gen.cell.types().begin(), gen.cell.types().end());
-  REQUIRE(kinds == std::set<int>{11, 17});
+  REQUIRE(kinds == std::set{11, 17});
 
   // The assembled structure actually has the requested symmetry.
   auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);

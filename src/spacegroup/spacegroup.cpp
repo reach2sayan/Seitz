@@ -1060,7 +1060,7 @@ search_spacegroup_with_symmetry(Operations const &operations,
   pos.setZero();
   symmetry::Primitive const primitive{
       .cell = Cell(Lattice{prim_lattice}, pos, Types{1}),
-      .mapping_table = std::vector<int>{0},
+      .mapping_table = std::vector{0},
       .orig_lattice = prim_lattice,
       .tolerance = {.symprec = symprec, .angle_tolerance = std::nullopt}};
   return match_primitive<GroupFamily::space>(

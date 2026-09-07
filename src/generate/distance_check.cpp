@@ -82,7 +82,7 @@ private:
   if (types.empty()) {
     return true;
   }
-  boost::container::flat_set<int> const present(types.begin(), types.end());
+  boost::container::flat_set const present(types.begin(), types.end());
   auto const pairs = std::views::cartesian_product(present, present);
   double const cutoff = std::ranges::max(
       pairs | std::views::transform([&](auto const &pair) {

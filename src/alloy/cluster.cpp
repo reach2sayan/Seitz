@@ -132,7 +132,7 @@ std::vector<int> point_permutation(Cluster const &c,
                    ? static_cast<int>(index)
                    : static_cast<int>(std::ranges::distance(c.begin(), at));
       });
-  return std::vector<int>{std::from_range, targets};
+  return std::vector{std::from_range, targets};
 }
 
 } // namespace seitz::alloy

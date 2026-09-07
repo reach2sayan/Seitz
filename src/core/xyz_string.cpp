@@ -148,7 +148,7 @@ std::string to_xyz(SymmetryOperation const &op) {
       std::views::iota(Index{0}, Index{3}) |
       std::views::transform([&](Index row) { return coordinate_text(op, row); });
   return boost::algorithm::join(
-      std::vector<std::string>{std::from_range, coordinates}, ",");
+      std::vector{std::from_range, coordinates}, ",");
 }
 
 Result<SymmetryOperation> from_xyz(std::string_view text) {
