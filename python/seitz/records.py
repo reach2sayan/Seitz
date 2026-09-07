@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict
 from . import _core
 from ._arrays import Basis, Positions, Vector3
 
-__all__ = ["CellRecord", "DatasetRecord", "Setting", "Site", "SpacegroupType"]
+__all__ = ["CellRecord", "DatasetRecord", "MagneticDatasetRecord", "Setting", "Site", "SpacegroupType"]
 
 
 class _Frozen(BaseModel):
@@ -168,4 +168,44 @@ class DatasetRecord(_Frozen):
             std_mapping_to_primitive=list(dataset.std_mapping_to_primitive),
             num_operations=len(dataset.operations),
             sites=tuple(Site.from_core(s) for s in dataset.sites),
+        )
+
+
+class MagneticDatasetRecord(_Frozen):
+    """A magnetic determination as data.
+
+    The same shape as :class:`DatasetRecord`, keyed on the UNI number instead
+    of a Hall setting: a magnetic space group's identity is its UNI number, and
+    ``hall`` here names the family (types I-III) or maximal (type IV) space
+    group it was found through.
+    """
+
+    uni: int
+    type: int
+    bns_number: str
+    og_number: str
+    hall_family: int
+    hall_index: int
+    setting: Setting
+    primitive: Basis
+    standardized: CellRecord
+    equivalent_atoms: list[int]
+    num_operations: int
+
+    @classmethod
+    def from_analyzer(cls, analyzer: _core.MagneticSymmetryAnalyzer) -> MagneticDatasetRecord:
+        dataset = analyzer.dataset
+        magnetic_type = _core.magnetic_spacegroup_type(dataset.uni)
+        return cls(
+            uni=dataset.uni.value,
+            type=int(dataset.type),
+            bns_number=magnetic_type.bns_number,
+            og_number=magnetic_type.og_number,
+            hall_family=int(dataset.hall.family),
+            hall_index=dataset.hall.index,
+            setting=Setting.from_core(dataset.setting),
+            primitive=dataset.primitive.matrix,
+            standardized=CellRecord.from_cell(dataset.standardized.cell),
+            equivalent_atoms=list(dataset.equivalent_atoms),
+            num_operations=len(dataset.operations),
         )

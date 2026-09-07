@@ -11,6 +11,7 @@ from typing import Any
 from structures import Structure
 
 SYMPREC = 1e-3  # the relaxed-structure regime; the jitter in structures.py sits below it
+MESH = (16, 16, 16)  # the reciprocal grid every backend reduces
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,14 @@ class Backend:
     standardize: Callable[[Any], Any] | None = None
     primitive: Callable[[Any], Any] | None = None
     read_cif: Callable[[Path], Any] | None = None
+    # Reciprocal-space reduction and magnetic determination take their own
+    # prepared inputs, so each carries its prepare beside it.
+    prepare_mesh: Callable[[Structure], Any] | None = None
+    reciprocal_mesh: Callable[[Any], Any] | None = None
+    num_irreducible: Callable[[Any], int] | None = None
+    prepare_magnetic: Callable[[Structure], Any] | None = None
+    magnetic_dataset: Callable[[Any], Any] | None = None
+    uni_number: Callable[[Any], int] | None = None
     max_atoms: int = 1 << 30
     note: str = ""
 
@@ -38,6 +47,18 @@ def _seitz() -> Backend:
         # space-group determination, so it is not what find_primitive does.
         primitive=lambda c: sz.analyze(c, tol).standardized_cell_in(sz.CellSetting.primitive),
         read_cif=sz.read_cif,
+        # The analyzer is built in prepare, so the timed call is the reduction
+        # itself rather than another determination.
+        prepare_mesh=lambda s: sz.analyze(
+            sz.Cell(sz.Lattice(s.basis.T), s.positions, s.numbers.tolist()), tol),
+        reciprocal_mesh=lambda a: a.reciprocal_mesh(sz.Mesh(list(MESH))),
+        num_irreducible=lambda r: r.num_irreducible,
+        prepare_magnetic=lambda s: sz.MagneticCell(
+            sz.Cell(sz.Lattice(s.basis.T), s.positions, s.numbers.tolist()),
+            moments(s), sz.TensorKind.axial),
+        magnetic_dataset=lambda c: sz.analyze_magnetic(
+            c, sz.MagneticTolerance(symprec=SYMPREC)).dataset,
+        uni_number=lambda d: d.uni.value,
     )
 
 
@@ -49,6 +70,14 @@ def _spglib() -> Backend:
         dataset=lambda c: spglib.get_symmetry_dataset(c, symprec=SYMPREC),
         standardize=lambda c: spglib.standardize_cell(c, symprec=SYMPREC),
         primitive=lambda c: spglib.find_primitive(c, symprec=SYMPREC),
+        prepare_mesh=lambda s: (s.basis, s.positions, s.numbers),
+        reciprocal_mesh=lambda c: spglib.get_ir_reciprocal_mesh(
+            MESH, c, symprec=SYMPREC),
+        num_irreducible=lambda r: len(set(r[0])),
+        prepare_magnetic=lambda s: (s.basis, s.positions, s.numbers, moments(s)),
+        magnetic_dataset=lambda c: spglib.get_magnetic_symmetry_dataset(
+            c, is_axial=True, symprec=SYMPREC),
+        uni_number=lambda d: d.uni_number,
     )
 
 
@@ -63,6 +92,15 @@ def _moyopy() -> Backend:
         primitive=lambda c: run(c).prim_std_cell,
         note="one call computes dataset, standardized and primitive cells together",
     )
+
+
+def moments(s: Structure):
+    """A collinear antiferromagnetic pattern: alternating +/- 1 per atom.
+
+    Every atom carries a moment, so the magnetic search does real work rather
+    than falling through a trivial grey group."""
+    import numpy as np
+    return np.where(np.arange(len(s)) % 2 == 0, 1.0, -1.0)
 
 
 def _pymatgen_structure(s: Structure):

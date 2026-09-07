@@ -1,9 +1,13 @@
 #include <seitz/analysis/dataset.hpp>
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
 #include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/core/cell.hpp>
 #include <seitz/core/keys.hpp>
+#include <seitz/core/magnetic_cell.hpp>
 #include <seitz/core/point_group.hpp>
 #include <seitz/core/tolerance.hpp>
+#include <seitz/data/msg_database.hpp>
+#include <seitz/kpoint/mesh.hpp>
 #include <seitz/spacegroup_match.hpp>
 
 #include "casters.hpp" // to_str
@@ -26,7 +30,8 @@ namespace {
 using analysis::CellSetting;
 using analysis::Dataset;
 using analysis::Idealize;
-using analysis::Setting;
+using analysis::MagneticDataset;
+using analysis::MagneticSymmetryAnalyzer;
 using analysis::Site;
 using analysis::SymmetryAnalyzer;
 
@@ -96,23 +101,8 @@ void bind_analysis(py::module_ &m) {
       .value("primitive", CellSetting::primitive)
       .finalize();
 
-  py::native_enum<LatticeSetting>(
-      m, "LatticeSetting", "enum.IntEnum",
-      "Whether a lattice handed to a spacegroup search is the conventional "
-      "cell or already a primitive one.")
-      .value("conventional", LatticeSetting::conventional)
-      .value("primitive", LatticeSetting::primitive)
-      .finalize();
-
   // Idealize is deliberately NOT an enum here: Python has no idiomatic
   // two-valued enum, and `idealize=False` reads better than `Idealize.no`.
-
-  py::class_<Setting>(m, "Setting",
-                      "How the input cell maps onto the standardized setting.")
-      .def_readonly("transformation", &Setting::transformation)
-      .def_readonly("origin_shift", &Setting::origin_shift)
-      .def_readonly("rigid_rotation", &Setting::rigid_rotation)
-      .def("__repr__", [](Setting const &) { return "Setting(...)"; });
 
   py::class_<Site>(m, "Site", "The per-atom result of a determination.")
       .def_readonly("wyckoff", &Site::wyckoff, "Wyckoff letter index, 0 = 'a'.")
@@ -194,11 +184,11 @@ void bind_analysis(py::module_ &m) {
       // ([temp.deduct.call]/6), so Self and T have to be given rather than
       // deduced. Naming them makes memo's parameter type concrete, which is
       // what picks the `const &` accessor back out of the set.
-      .def_property_readonly("standardized_cell",
-                             memo<SymmetryAnalyzer, Cell>(
-                                 &SymmetryAnalyzer::standardized_cell),
-                             py::doc("The standardized conventional, idealized "
-                                     "cell."))
+      .def_property_readonly(
+          "standardized_cell",
+          memo<SymmetryAnalyzer, Cell>(&SymmetryAnalyzer::standardized_cell),
+          py::doc("The standardized conventional, idealized "
+                  "cell."))
       .def_property_readonly("cell_operations",
                              memo(&SymmetryAnalyzer::cell_operations),
                              py::doc("All operations of the input cell, "
@@ -252,14 +242,84 @@ void bind_analysis(py::module_ &m) {
                ")";
       });
 
-  py::class_<SpacegroupMatch>(m, "SpacegroupMatch",
-                              "The matched space group of a cell or an "
-                              "operation set.")
-      .def_readonly("hall", &SpacegroupMatch::hall)
-      .def_readonly("bravais_lattice", &SpacegroupMatch::bravais_lattice)
-      .def_readonly("origin_shift", &SpacegroupMatch::origin_shift)
-      .def_property_readonly("type", &SpacegroupMatch::type,
-                             py::return_value_policy::reference);
+  // ---- reciprocal mesh, off the analyzer --------------------------------
+  //
+  // Bound here rather than in kpoint.cpp because it names the analyzer; the
+  // mesh types themselves live there.
+  py::object analyzer = m.attr("SymmetryAnalyzer");
+  py::cast<py::class_<SymmetryAnalyzer>>(analyzer).def(
+      "reciprocal_mesh",
+      [](SymmetryAnalyzer const &self, kpoint::Mesh mesh,
+         TimeReversal time_reversal) {
+        return unwrap([&]() -> Result<kpoint::ReciprocalMesh> {
+          py::gil_scoped_release const unlocked;
+          return self.reciprocal_mesh(mesh, time_reversal);
+        });
+      },
+      py::arg("mesh"), py::arg("time_reversal") = TimeReversal::on,
+      py::doc("The irreducible reciprocal mesh: the determination's rotations "
+              "made reciprocal, reducing `mesh`."));
+
+  // ---- magnetic ------------------------------------------------------------
+  py::class_<MagneticDataset, MagneticMatch>(
+      m, "MagneticDataset",
+      "The result of a magnetic space-group determination: the match plus "
+      "the cell-level products.")
+      .def_readonly("operations", &MagneticDataset::operations)
+      .def_readonly("equivalent_atoms", &MagneticDataset::equivalent_atoms)
+      .def_readonly("standardized", &MagneticDataset::standardized)
+      .def_readonly("primitive", &MagneticDataset::primitive)
+      .def("__repr__", [](MagneticDataset const &self) {
+        return "MagneticDataset(uni=" + std::to_string(self.uni.value()) +
+               ", " + std::to_string(self.operations.size()) + " operations)";
+      });
+
+  py::class_<MagneticSymmetryAnalyzer>(
+      m, "MagneticSymmetryAnalyzer",
+      "The magnetic counterpart of SymmetryAnalyzer: the same memoized, "
+      "thread-safe view, over a MagneticCell.")
+      .def_static(
+          "from_cell",
+          [](MagneticCell cell, MagneticTolerance tol) {
+            return MagneticSymmetryAnalyzer::from_cell(std::move(cell), tol);
+          },
+          py::arg("cell"), py::arg("tolerance") = MagneticTolerance{})
+      .def_property_readonly(
+          "cell",
+          [](MagneticSymmetryAnalyzer const &self) { return self.cell(); })
+      .def_property_readonly(
+          "tolerance",
+          [](MagneticSymmetryAnalyzer const &self) { return self.tolerance(); })
+      .def_property_readonly(
+          "dataset",
+          memo_as<MagneticSymmetryAnalyzer>(&MagneticSymmetryAnalyzer::dataset),
+          py::doc("The full determination."))
+      .def_property_readonly("uni", memo(&MagneticSymmetryAnalyzer::uni))
+      .def_property_readonly("hall", memo(&MagneticSymmetryAnalyzer::hall))
+      .def_property_readonly("operations",
+                             memo(&MagneticSymmetryAnalyzer::operations))
+      .def_property_readonly("equivalent_atoms",
+                             memo(&MagneticSymmetryAnalyzer::equivalent_atoms))
+      .def_property_readonly("standardized_cell",
+                             memo(&MagneticSymmetryAnalyzer::standardized_cell))
+      .def_property_readonly("spacegroup_type",
+                             memo(&MagneticSymmetryAnalyzer::spacegroup_type))
+      .def("__copy__",
+           [](py::object const &) -> py::object {
+             throw py::type_error("MagneticSymmetryAnalyzer is not copyable: "
+                                  "it owns a memo. Share the object instead.");
+           })
+      .def(
+          "__deepcopy__",
+          [](py::object const &, py::dict const &) -> py::object {
+            throw py::type_error("MagneticSymmetryAnalyzer is not copyable: "
+                                 "it owns a memo. Share the object instead.");
+          },
+          py::arg("memo"))
+      .def("__repr__", [](MagneticSymmetryAnalyzer const &self) {
+        return "MagneticSymmetryAnalyzer(" +
+               std::to_string(self.cell().size()) + " atoms)";
+      });
 }
 
 } // namespace seitz::python

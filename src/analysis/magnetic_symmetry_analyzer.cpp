@@ -24,30 +24,23 @@ Result<MagneticDataset> MagneticSymmetryAnalyzer::determine() const {
   spin::SpinSearch const spin_search(cell_, sym_nonspin, tol_);
   BOOST_LEAF_AUTO(search, spin_search.operations<kTimeReversal>());
 
-  // 2. Identify the magnetic space-group type.
-  magnetic::MagneticIdentification const identification(
-      cell_.cell().lattice(), search.operations, tol_);
-  BOOST_LEAF_AUTO(ident, identification.identify());
+  // 2. Identify the magnetic space-group type: the public door.
+  BOOST_LEAF_AUTO(match,
+                  search.operations.spacegroup(cell_.cell().lattice(), tol_));
 
   // 3. Idealize positions and site tensors, then transform into the
   //    standardized setting.
   MagneticCell const exact = spin_search.idealized<kTimeReversal>(search);
-  BOOST_LEAF_AUTO(standardized, identification.transform(exact, ident));
+  magnetic::MagneticIdentification const identification(
+      cell_.cell().lattice(), search.operations, tol_);
+  BOOST_LEAF_AUTO(standardized, identification.transform(exact, match));
 
-  return MagneticDataset{
-      .uni = ident.uni,
-      .type = ident.msg_type,
-      .hall = ident.hall,
-      .setting = {.transformation = ident.transformation_matrix,
-                  .origin_shift = ident.origin_shift,
-                  .rigid_rotation = ident.std_rotation_matrix},
-      // Moved: `search` is dead after this aggregate except for
-      // primitive_lattice below, which is a different member.
-      .operations = std::move(search.operations),
-      .equivalent_atoms = std::move(search.equivalent_atoms),
-      .standardized = std::move(standardized),
-      .primitive = Lattice{search.primitive_lattice},
-  };
+  // Base first, then the cell-level products. `search` is dead after this
+  // aggregate except for primitive_lattice, which is a different member.
+  return MagneticDataset{std::move(match), std::move(search.operations),
+                         std::move(search.equivalent_atoms),
+                         std::move(standardized),
+                         Lattice{search.primitive_lattice}};
 }
 
 } // namespace seitz::analysis

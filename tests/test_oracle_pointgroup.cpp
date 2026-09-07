@@ -1,6 +1,5 @@
 #include "oracle.hpp"
 
-#include "symmetry/pointgroup.hpp"
 #include "symmetry/search.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -40,7 +39,7 @@ Cell hexagonal() {
 }
 } // namespace
 
-TEST_CASE("identify_point_group matches spg_get_pointgroup",
+TEST_CASE("Operations::point_group matches spg_get_pointgroup",
           "[oracle][pointgroup]") {
   for (Cell const &cell : {primitive_cubic(4.0), rutile(), hexagonal()}) {
     auto ops =
@@ -48,15 +47,14 @@ TEST_CASE("identify_point_group matches spg_get_pointgroup",
     REQUIRE(ops);
     // Feed identical rotations to both implementations so axis selection and
     // de-duplication order match.
-    auto const rotations = ops->rotations();
-    auto ours = symmetry::identify_point_group<GroupFamily::space>(rotations);
+    auto ours = ops->point_group();
     REQUIRE(ours);
-    auto const ref = oracle::reference_pointgroup(rotations);
+    auto const ref = oracle::reference_pointgroup(ops->rotations());
 
-    INFO("ours = " << ours->pointgroup.symbol << " (" << ours->pointgroup.number
+    INFO("ours = " << ours->type.symbol << " (" << ours->type.number
                    << "), ref = " << ref.symbol << " (" << ref.number << ")");
-    CHECK(ours->pointgroup.number == ref.number);
-    CHECK(std::string(ours->pointgroup.symbol) == ref.symbol);
+    CHECK(ours->type.number == ref.number);
+    CHECK(std::string(ours->type.symbol) == ref.symbol);
     CHECK(ours->transformation == ref.transformation);
   }
 }

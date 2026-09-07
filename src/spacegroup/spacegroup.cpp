@@ -5,7 +5,6 @@
 #include "data/hall_classification.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
-#include "symmetry/pointgroup.hpp"
 #include "symmetry/search.hpp"
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/point_group.hpp>
@@ -895,14 +894,14 @@ search_hall_number(std::optional<HallNumber> forced_hall,
   // aperiodic one in the input basis. F decides whether to look at all.
   std::optional<int> const layer_axis =
       aperiodic_axis(primitive.cell.periodicity());
-  auto const ptg = symmetry::identify_point_group<F>(rotations, layer_axis);
-  if (!ptg || ptg->pointgroup.number == 0) {
+  auto const ptg = detail::point_group_of_rotations<F>(rotations, layer_axis);
+  if (!ptg || ptg->type.number == 0) {
     return std::nullopt;
   }
 
   Matrix3d const &prim_lat = primitive.cell.lattice().matrix();
   Matrix3i tmat_int = ptg->transformation;
-  Laue const laue = ptg->pointgroup.laue;
+  Laue const laue = ptg->type.laue;
 
   // For LAUE1 / LAUE2M, make the smallest lattice (tricli: Niggli; monocli: 2D
   // Delaunay) and update the integer transformation.
@@ -950,16 +949,15 @@ search_hall_number(std::optional<HallNumber> forced_hall,
       forced_index = forced_hall->index();
       return std::span<int const>(&forced_index, 1);
     }
-    return data::default_halls_with_pointgroup<F>(ptg->pointgroup.number);
+    return data::default_halls_with_pointgroup<F>(ptg->type.number);
   }();
 
   Matrix3d const &orig_lattice = primitive.orig_lattice;
   for (int const index : candidates) {
     HallNumber const hall = *HallNumber::of(F, index);
     auto const match = match_hall_symbol_db<F>(
-        conv_lattice, &orig_lattice, hall, ptg->pointgroup.number,
-        ptg->pointgroup.holohedry, centering->centering, conv_symmetry,
-        symprec);
+        conv_lattice, &orig_lattice, hall, ptg->type.number,
+        ptg->type.holohedry, centering->centering, conv_symmetry, symprec);
     if (match) {
       return SearchResult{hall, match->conv_lattice, match->origin_shift};
     }
@@ -1103,17 +1101,17 @@ spacegroup_type_from_symmetry(Operations const &operations,
 // public header never names the matcher.
 namespace seitz::detail {
 
-Result<SpacegroupMatch>
-spacegroup_of_operations(std::span<SymmetryOperation const> operations,
-                         Matrix3d const &lattice, LatticeSetting setting,
-                         Tolerance const &tol) {
-  Operations const ops{
-      std::vector<SymmetryOperation>(operations.begin(), operations.end())};
+Result<SpacegroupMatch> spacegroup_of_operations(Operations const &operations,
+                                                 Lattice const &lattice,
+                                                 LatticeSetting setting,
+                                                 Tolerance const &tol) {
   return setting == LatticeSetting::primitive
              ? spacegroup::spacegroup_type_from_symmetry<
-                   LatticeSetting::primitive>(ops, lattice, tol.symprec)
+                   LatticeSetting::primitive>(operations, lattice.matrix(),
+                                              tol.symprec)
              : spacegroup::spacegroup_type_from_symmetry<
-                   LatticeSetting::conventional>(ops, lattice, tol.symprec);
+                   LatticeSetting::conventional>(operations, lattice.matrix(),
+                                                 tol.symprec);
 }
 
 } // namespace seitz::detail

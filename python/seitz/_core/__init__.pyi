@@ -11,7 +11,7 @@ import numpy.typing
 import typing
 from . import elements
 from . import subgroups
-__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'CIF_SYMPREC', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CifBlock', 'CifMissingTagError', 'CifStructure', 'CifSyntaxError', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'InvalidXyzError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'NiggliFailedError', 'OccupancyCollapse', 'Operations', 'PointGroupType', 'PointgroupNotFoundError', 'SeitzError', 'Setting', 'Site', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupEdge', 'SubgroupKind', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TimeReversal', 'Tolerance', 'UniNumber', 'UnknownElementError', 'UnknownSpacegroupSymbolError', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'minimal_image', 'none_periodic', 'operations_from_database', 'parse_cif', 'periodic_along', 'pointgroup_by_number', 'read_cif', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'version_string', 'warmup', 'wrap', 'write_cif_analyzer', 'write_cif_cell']
+__all__: list[str] = ['AtomsTooCloseError', 'AxisKind', 'BrillouinZone', 'CIF_SYMPREC', 'Cell', 'CellSetting', 'CellStandardizationFailedError', 'Centering', 'CifBlock', 'CifMissingTagError', 'CifStructure', 'CifSyntaxError', 'CrystalClass', 'Dataset', 'DelaunayFailedError', 'EmptyCellError', 'GroupFamily', 'HallNumber', 'Holohedry', 'InvalidLatticeError', 'InvalidXyzError', 'K_DEFAULT_SYMPREC', 'K_LAYER_HALL_SETTINGS', 'K_NUM_LAYER_GROUPS', 'K_NUM_POINTGROUPS', 'K_NUM_SPACEGROUPS', 'K_NUM_UNI_NUMBERS', 'K_REFERENCE_SPGLIB_VERSION', 'K_SPACE_HALL_SETTINGS', 'K_UNI_NUMBERS', 'K_VERSION', 'K_ZERO_PREC', 'Lattice', 'LatticeSetting', 'Laue', 'MagneticCell', 'MagneticDataset', 'MagneticMatch', 'MagneticOperations', 'MagneticSpacegroupType', 'MagneticSymmetryAnalyzer', 'MagneticSymmetryOperation', 'MagneticSymmetrySearchFailedError', 'MagneticTolerance', 'MagneticType', 'Mesh', 'NiggliFailedError', 'OccupancyCollapse', 'Operations', 'PointGroupMatch', 'PointGroupType', 'PointgroupNotFoundError', 'ReciprocalMesh', 'SeitzError', 'Setting', 'Site', 'SiteTensor', 'SpaceGroup', 'SpacegroupMatch', 'SpacegroupSearchFailedError', 'SpacegroupType', 'SubgroupEdge', 'SubgroupKind', 'SymmetryAnalyzer', 'SymmetryOperation', 'SymmetryOperationSearchFailedError', 'TensorKind', 'TimeReversal', 'Tolerance', 'UniNumber', 'UnknownElementError', 'UnknownSpacegroupSymbolError', 'Version', 'Warm', 'Wyckoff', 'all_periodic', 'aperiodic_along', 'aperiodic_axis', 'conjugated_by', 'default_hall', 'default_halls_with_pointgroup', 'elements', 'family_of', 'halls_with_number', 'magnetic_operations_from_database', 'magnetic_spacegroup_type', 'magnetic_std_transformations', 'minimal_image', 'none_periodic', 'operations_from_database', 'parse_cif', 'periodic_along', 'pointgroup_by_number', 'read_cif', 'same_operation', 'spacegroup_type', 'subgroups', 'to_positions', 'uni_candidates', 'version_string', 'warmup', 'wrap', 'write_cif_analyzer', 'write_cif_cell']
 class AtomsTooCloseError(SeitzError):
     """
     Two atoms closer than the distance tolerance allows. Carries .distance.
@@ -28,6 +28,23 @@ class AxisKind(enum.IntEnum):
     def __format__(self, format_spec):
         """
         Convert to a string according to format_spec.
+        """
+class BrillouinZone:
+    """
+    A grid in the first Brillouin zone: each point at its image nearest the origin, boundary points duplicated. The map is on the doubled mesh.
+    """
+    def __repr__(self) -> str:
+        ...
+    def images_of(self, address: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"]) -> list[int | None]:
+        ...
+    def map(self, doubled_index: typing.SupportsInt | typing.SupportsIndex) -> int | None:
+        """
+        Doubled-mesh index -> index into addresses, or None.
+        """
+    @property
+    def addresses(self) -> numpy.typing.NDArray[numpy.int32]:
+        """
+        The in-BZ points as an (M, 3) int32 array: the first len(mesh) at their original index, then the duplicates.
         """
 class Cell:
     """
@@ -447,6 +464,194 @@ class Laue(enum.IntEnum):
         """
         Convert to a string according to format_spec.
         """
+class MagneticCell:
+    """
+    A Cell plus per-site magnetic moments: (N,) scalars for a collinear structure, (N, 3) vectors for a non-collinear one.
+    """
+    def __init__(self, cell: Cell, moments: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], kind: TensorKind = TensorKind.polar) -> None:
+        ...
+    def __len__(self) -> int:
+        ...
+    def __repr__(self) -> str:
+        ...
+    @property
+    def cell(self) -> Cell:
+        ...
+    @property
+    def kind(self) -> TensorKind:
+        ...
+    @property
+    def moments(self) -> typing.Any:
+        """
+        The moments as given: (N,) or (N, 3).
+        """
+    @property
+    def rank(self) -> SiteTensor:
+        ...
+class MagneticDataset(MagneticMatch):
+    """
+    The result of a magnetic space-group determination: the match plus the cell-level products.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def equivalent_atoms(self) -> list[int]:
+        ...
+    @property
+    def operations(self) -> MagneticOperations:
+        ...
+    @property
+    def primitive(self) -> Lattice:
+        ...
+    @property
+    def standardized(self) -> MagneticCell:
+        ...
+class MagneticMatch:
+    """
+    The matched magnetic space group of a magnetic operation set.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def hall(self) -> HallNumber:
+        """
+        Family (types I-III) or maximal (type IV) space group.
+        """
+    @property
+    def setting(self) -> Setting:
+        ...
+    @property
+    def type(self) -> MagneticType:
+        ...
+    @property
+    def uni(self) -> UniNumber:
+        ...
+class MagneticOperations:
+    """
+    An immutable set of magnetic space-group operations.
+    """
+    def __getitem__(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> MagneticSymmetryOperation:
+        ...
+    def __init__(self, operations: collections.abc.Sequence[MagneticSymmetryOperation]) -> None:
+        ...
+    def __iter__(self) -> collections.abc.Iterator[MagneticSymmetryOperation]:
+        ...
+    def __len__(self) -> int:
+        ...
+    def __repr__(self) -> str:
+        ...
+    def conjugated_by(self, t: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 3]"], t_inv: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 3]"]) -> MagneticOperations:
+        ...
+    def point_group(self, family: GroupFamily = GroupFamily.space, layer_axis: typing.SupportsInt | typing.SupportsIndex | None = None) -> PointGroupMatch:
+        """
+        The point group of the rotation parts, with the change of basis to its conventional axes. Raises PointgroupNotFoundError.
+        """
+    def spacegroup(self, lattice: Lattice, tolerance: Tolerance = ...) -> MagneticMatch:
+        """
+        The magnetic space group these operations imply in `lattice`. Raises MagneticSymmetrySearchFailedError.
+        """
+    @property
+    def empty(self) -> bool:
+        ...
+    @property
+    def pure_translations(self) -> list[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]]:
+        """
+        The identity-rotation translations, including zero; anti-translations excluded.
+        """
+    @property
+    def rotations(self) -> list[typing.Annotated[numpy.typing.NDArray[numpy.int32], "[3, 3]"]]:
+        """
+        The rotation parts, in order.
+        """
+    @property
+    def spatial(self) -> Operations:
+        """
+        The underlying space-group operations, dropping the time-reversal flags.
+        """
+class MagneticSpacegroupType:
+    """
+    One UNI number's metadata: the BNS and OG symbols, the family space-group number and the construction type.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def bns_number(self) -> str:
+        ...
+    @property
+    def litvin_number(self) -> int:
+        ...
+    @property
+    def number(self) -> int:
+        """
+        Family space-group international number, 1..230.
+        """
+    @property
+    def og_number(self) -> str:
+        ...
+    @property
+    def type(self) -> int:
+        """
+        Construction type 1..4.
+        """
+    @property
+    def uni_number(self) -> int:
+        ...
+class MagneticSymmetryAnalyzer:
+    """
+    The magnetic counterpart of SymmetryAnalyzer: the same memoized, thread-safe view, over a MagneticCell.
+    """
+    @staticmethod
+    def from_cell(cell: MagneticCell, tolerance: MagneticTolerance = ...) -> MagneticSymmetryAnalyzer:
+        ...
+    def __copy__(self) -> typing.Any:
+        ...
+    def __deepcopy__(self, memo: dict) -> typing.Any:
+        ...
+    def __repr__(self) -> str:
+        ...
+    @property
+    def cell(self) -> MagneticCell:
+        ...
+    @property
+    def dataset(self) -> MagneticDataset:
+        """
+        The full determination.
+        """
+    @property
+    def equivalent_atoms(self) -> list[int]:
+        ...
+    @property
+    def hall(self) -> HallNumber:
+        ...
+    @property
+    def operations(self) -> MagneticOperations:
+        ...
+    @property
+    def spacegroup_type(self) -> MagneticSpacegroupType:
+        ...
+    @property
+    def standardized_cell(self) -> MagneticCell:
+        ...
+    @property
+    def tolerance(self) -> MagneticTolerance:
+        ...
+    @property
+    def uni(self) -> UniNumber:
+        ...
+class MagneticSymmetryOperation:
+    """
+    A space-group operation with a time-reversal flag.
+    """
+    def __init__(self, spatial: SymmetryOperation, time_reversal: bool = False) -> None:
+        ...
+    def __repr__(self) -> str:
+        ...
+    @property
+    def spatial(self) -> SymmetryOperation:
+        ...
+    @property
+    def time_reversal(self) -> bool:
+        ...
 class MagneticSymmetrySearchFailedError(SeitzError):
     """
     The magnetic symmetry search failed.
@@ -465,6 +670,70 @@ class MagneticTolerance(Tolerance):
         ...
     @property
     def moment_or_symprec(self) -> float:
+        ...
+class MagneticType(enum.IntEnum):
+    """
+    Construction type of a magnetic space group (BNS types I-IV).
+    """
+    type_i: typing.ClassVar[MagneticType]  # value = <MagneticType.type_i: 1>
+    type_ii: typing.ClassVar[MagneticType]  # value = <MagneticType.type_ii: 2>
+    type_iii: typing.ClassVar[MagneticType]  # value = <MagneticType.type_iii: 3>
+    type_iv: typing.ClassVar[MagneticType]  # value = <MagneticType.type_iv: 4>
+    @classmethod
+    def __new__(cls, value):
+        ...
+    def __format__(self, format_spec):
+        """
+        Convert to a string according to format_spec.
+        """
+class Mesh:
+    """
+    Reciprocal-space grid geometry: the map between integer addresses and linear grid-point indices. Double-mesh convention: q = (2 * address + shift) / (2 * divisions).
+    """
+    __hash__: typing.ClassVar[None] = None
+    @staticmethod
+    def of(divisions: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"], shift: typing.Annotated[collections.abc.Sequence[bool], "FixedSize(3)"] = [False, False, False]) -> seitz._core.Mesh | None:
+        """
+        The mesh, or None when a division is not positive.
+        """
+    def __eq__(self, arg0: Mesh) -> bool:
+        ...
+    def __init__(self, divisions: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"], shift: typing.Annotated[collections.abc.Sequence[bool], "FixedSize(3)"] = [False, False, False]) -> None:
+        """
+        Raises ValueError unless every division is positive.
+        """
+    def __len__(self) -> int:
+        ...
+    def __ne__(self, arg0: Mesh) -> bool:
+        ...
+    def __repr__(self) -> str:
+        ...
+    def address_of(self, index: typing.SupportsInt | typing.SupportsIndex) -> typing.Annotated[list[int], "FixedSize(3)"]:
+        """
+        The address at a linear index, folded onto the parallelepiped.
+        """
+    def doubled(self) -> Mesh:
+        """
+        The mesh at twice the resolution.
+        """
+    def doubled_address(self, address: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"]) -> typing.Annotated[list[int], "FixedSize(3)"]:
+        ...
+    def index_of(self, address: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"]) -> int:
+        """
+        Linear index of an address, folded into the grid first.
+        """
+    def index_of_doubled(self, doubled: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"]) -> int:
+        ...
+    @property
+    def addresses(self) -> numpy.typing.NDArray[numpy.int32]:
+        """
+        Every address as an (N, 3) int32 array, in index order.
+        """
+    @property
+    def divisions(self) -> typing.Annotated[list[int], "FixedSize(3)"]:
+        ...
+    @property
+    def shift(self) -> typing.Annotated[list[bool], "FixedSize(3)"]:
         ...
 class NiggliFailedError(SeitzError):
     """
@@ -507,19 +776,43 @@ class Operations:
         ...
     def conjugated_by(self, t: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 3]"], t_inv: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 3]"]) -> Operations:
         ...
+    def point_group(self, family: GroupFamily = GroupFamily.space, layer_axis: typing.SupportsInt | typing.SupportsIndex | None = None) -> PointGroupMatch:
+        """
+        The point group of the rotation parts, with the change of basis to its conventional axes. Raises PointgroupNotFoundError.
+        """
+    def spacegroup(self, lattice: Lattice, tolerance: Tolerance = ..., setting: LatticeSetting = LatticeSetting.conventional) -> SpacegroupMatch:
+        """
+        The space group these operations imply in `lattice`, with no atomic positions. Raises SpacegroupSearchFailedError.
+        """
+    def to_primitive(self, tolerance: Tolerance = ...) -> tuple[Operations, typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 3]"]] | None:
+        """
+        The primitive operations these (conventional) ones imply and the primitive -> conventional transformation, or None when the set is inconsistent.
+        """
     @property
     def empty(self) -> bool:
         ...
     @property
     def pure_translations(self) -> list[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]]:
         """
-        The identity-rotation translations, including zero.
+        The identity-rotation translations, including zero; anti-translations excluded.
         """
     @property
     def rotations(self) -> list[typing.Annotated[numpy.typing.NDArray[numpy.int32], "[3, 3]"]]:
         """
         The rotation parts, in order.
         """
+class PointGroupMatch:
+    """
+    The matched point group of a rotation set.
+    """
+    def __repr__(self) -> str:
+        ...
+    @property
+    def transformation(self) -> typing.Annotated[numpy.typing.NDArray[numpy.int32], "[3, 3]"]:
+        ...
+    @property
+    def type(self) -> PointGroupType:
+        ...
 class PointGroupType:
     """
     Metadata for one of the 32 crystallographic point groups. Not the 0D group object.
@@ -548,6 +841,45 @@ class PointgroupNotFoundError(SeitzError):
     """
     The operations match no crystallographic point group.
     """
+class ReciprocalMesh:
+    """
+    The symmetry reduction of a mesh: the reciprocal point group and, per grid point, the index of its irreducible representative.
+    """
+    @staticmethod
+    def from_rotations(mesh: Mesh, rotations: collections.abc.Sequence[typing.Annotated[numpy.typing.ArrayLike, numpy.int32, "[3, 3]"]], time_reversal: TimeReversal = TimeReversal.on) -> ReciprocalMesh:
+        """
+        Reduce `mesh` by real-space rotations (transposed to reciprocal space, plus the inversion partner under time reversal).
+        """
+    def __repr__(self) -> str:
+        ...
+    def brillouin_zone(self, reciprocal: Lattice) -> ...:
+        """
+        Relocate the grid into the first Brillouin zone of `reciprocal` (columns = reciprocal basis vectors).
+        """
+    def images_of(self, address: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(3)"]) -> list[int]:
+        """
+        The grid-point index one address maps to under each rotation.
+        """
+    def stabilized(self, qpoints: collections.abc.Sequence[typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"]]) -> ReciprocalMesh:
+        """
+        Reduced only by the rotations that map the q-point set onto itself.
+        """
+    @property
+    def mapping(self) -> numpy.typing.NDArray[numpy.uint64]:
+        """
+        mapping[i] == i exactly when i is an irreducible representative; an (N,) uint64 array.
+        """
+    @property
+    def mesh(self) -> Mesh:
+        ...
+    @property
+    def num_irreducible(self) -> int:
+        ...
+    @property
+    def rotations(self) -> list[typing.Annotated[numpy.typing.NDArray[numpy.int32], "[3, 3]"]]:
+        """
+        The reciprocal point group.
+        """
 class SeitzError(Exception):
     """
     Base of every error this library reports. The C++ side returns Result<T> and never throws; this is what that becomes.
@@ -591,6 +923,20 @@ class Site:
     def wyckoff(self) -> int:
         """
         Wyckoff letter index, 0 = 'a'.
+        """
+class SiteTensor(enum.IntEnum):
+    """
+    Rank of the per-site tensors.
+    """
+    collinear: typing.ClassVar[SiteTensor]  # value = <SiteTensor.collinear: 0>
+    noncollinear: typing.ClassVar[SiteTensor]  # value = <SiteTensor.noncollinear: 1>
+    none: typing.ClassVar[SiteTensor]  # value = <SiteTensor.none: -1>
+    @classmethod
+    def __new__(cls, value):
+        ...
+    def __format__(self, format_spec):
+        """
+        Convert to a string according to format_spec.
         """
 class SpaceGroup:
     """
@@ -656,7 +1002,7 @@ class SpacegroupMatch:
     def origin_shift(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
         ...
     @property
-    def type(self) -> SpacegroupType:
+    def type(self) -> ...:
         ...
 class SpacegroupSearchFailedError(SeitzError):
     """
@@ -761,6 +1107,10 @@ class SymmetryAnalyzer:
         ...
     def __repr__(self) -> str:
         ...
+    def reciprocal_mesh(self, mesh: Mesh, time_reversal: TimeReversal = TimeReversal.on) -> ReciprocalMesh:
+        """
+        The irreducible reciprocal mesh: the determination's rotations made reciprocal, reducing `mesh`.
+        """
     def site_arrays(self) -> dict:
         """
         The per-atom answers as parallel arrays, with no per-site object built. Prefer this to .sites for large cells.
@@ -859,6 +1209,19 @@ class SymmetryOperationSearchFailedError(SeitzError):
     """
     The search for the cell's symmetry operations failed.
     """
+class TensorKind(enum.IntEnum):
+    """
+    How a rank-1 site tensor transforms under an improper operation.
+    """
+    axial: typing.ClassVar[TensorKind]  # value = <TensorKind.axial: 1>
+    polar: typing.ClassVar[TensorKind]  # value = <TensorKind.polar: 0>
+    @classmethod
+    def __new__(cls, value):
+        ...
+    def __format__(self, format_spec):
+        """
+        Convert to a string according to format_spec.
+        """
 class TimeReversal(enum.IntEnum):
     """
     Whether an operation set includes its time-reversal partners.
@@ -1049,6 +1412,18 @@ def halls_with_number(family: GroupFamily, number: typing.SupportsInt | typing.S
     """
     Every Hall setting index of an international number, ascending; empty if out of range.
     """
+def magnetic_operations_from_database(uni: UniNumber, hall: seitz._core.HallNumber | None = None) -> MagneticOperations:
+    """
+    The operations of a UNI number in a Hall setting (None = its first); empty when the pairing is invalid.
+    """
+def magnetic_spacegroup_type(uni: UniNumber) -> MagneticSpacegroupType:
+    """
+    The metadata of a UNI number.
+    """
+def magnetic_std_transformations(uni: UniNumber, hall: seitz._core.HallNumber | None = None) -> Operations:
+    """
+    The alternative standardized-setting transformations of a UNI number, identity first.
+    """
 def minimal_image(diff: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"], periodicity: typing.Annotated[collections.abc.Sequence[AxisKind], "FixedSize(3)"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[3, 1]"]:
     """
     `diff` folded to its nearest-image residue along every periodic axis.
@@ -1089,6 +1464,10 @@ def to_positions(rows: collections.abc.Sequence[typing.Annotated[numpy.typing.Ar
     """
     Pack a sequence of 3-vectors into an (N, 3) block.
     """
+def uni_candidates(hall: HallNumber) -> tuple[UniNumber, UniNumber]:
+    """
+    The (first, last) UNI numbers a 3D Hall setting can carry.
+    """
 def version_string() -> str:
     """
     "major.minor.patch" of this port.
@@ -1115,6 +1494,7 @@ K_LAYER_HALL_SETTINGS: int = 116
 K_NUM_LAYER_GROUPS: int = 80
 K_NUM_POINTGROUPS: int = 32
 K_NUM_SPACEGROUPS: int = 230
+K_NUM_UNI_NUMBERS: int = 1651
 K_REFERENCE_SPGLIB_VERSION: Version  # value = Version(2, 7, 0)
 K_SPACE_HALL_SETTINGS: int = 530
 K_UNI_NUMBERS: int = 1651

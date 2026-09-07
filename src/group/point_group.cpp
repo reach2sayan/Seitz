@@ -4,7 +4,6 @@
 #include "core/matrix_order.hpp"
 #include "group/locus_arrangement.hpp"
 #include "math/subspace.hpp"
-#include "symmetry/pointgroup.hpp"
 #include <seitz/data/spg_database.hpp>
 
 #include <Eigen/Dense>

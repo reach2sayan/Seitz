@@ -74,7 +74,7 @@ void check_conventional(Cell const &cell, double symprec) {
   auto const ops = reference_symmetry(cell, symprec);
   REQUIRE(!ops.empty());
 
-  auto const got = ops.spacegroup(cell.lattice().matrix(), {symprec});
+  auto const got = ops.spacegroup(cell.lattice(), {symprec});
   REQUIRE(got);
 
   std::vector<int> rot;
@@ -150,7 +150,7 @@ TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
       static_cast<int>(ops.size()), s);
 
   auto const got = ops.spacegroup<seitz::LatticeSetting::primitive>(
-      Matrix3d::Identity(), {s});
+      *Lattice::from_basis(Matrix3d::Identity()), {s});
 
   REQUIRE((ref_hall == 0) == (!got.has_value()));
   if (got) {
