@@ -1118,6 +1118,6 @@ K_NUM_SPACEGROUPS: int = 230
 K_REFERENCE_SPGLIB_VERSION: Version  # value = Version(2, 7, 0)
 K_SPACE_HALL_SETTINGS: int = 530
 K_UNI_NUMBERS: int = 1651
-K_VERSION: Version  # value = Version(0, 1, 0)
+K_VERSION: Version
 K_ZERO_PREC: float = 1e-10
-__version__: str = '0.1.0'
+__version__: str
