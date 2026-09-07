@@ -17,6 +17,8 @@ void bind_core_symmetry(py::module_ &m);
 void bind_analysis(py::module_ &m);
 void bind_group(py::module_ &m);
 void bind_data(py::module_ &m);
+void bind_magnetic(py::module_ &m);
+void bind_kpoint(py::module_ &m);
 void bind_io(py::module_ &m);
 
 } // namespace seitz::python
@@ -37,6 +39,9 @@ PYBIND11_MODULE(_core, m) {
   sp::bind_core(m);
   sp::bind_core_symmetry(m);
   sp::bind_data(m);
+  // MagneticCell and Mesh before the analyzers that take them.
+  sp::bind_magnetic(m);
+  sp::bind_kpoint(m);
   sp::bind_group(m);
   sp::bind_analysis(m);
 

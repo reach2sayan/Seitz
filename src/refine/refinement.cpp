@@ -3,7 +3,6 @@
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
 #include "math/lattice_parameters.hpp"
-#include "symmetry/pointgroup.hpp"
 #include <seitz/core/lattice.hpp>
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/point_group.hpp>

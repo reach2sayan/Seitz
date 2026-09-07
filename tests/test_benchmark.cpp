@@ -1,5 +1,6 @@
-// End-to-end timing for the three user-visible workloads: symmetry
-// determination, reciprocal-mesh reduction, and structure generation. All of it
+// End-to-end timing for the user-visible workloads: symmetry determination,
+// determination from a bare operation set, magnetic determination,
+// reciprocal-mesh reduction, and structure generation. All of it
 // is tagged [!benchmark], so it is skipped by a plain `ctest` run and only
 // executes under an explicit tag filter:
 //
@@ -10,8 +11,11 @@
 // defines, and a benchmark that cannot run in the default build is a benchmark
 // nobody runs.
 
+#include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
 #include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/core/keys.hpp>
+#include <seitz/core/magnetic_cell.hpp>
+#include <seitz/core/operation_set.hpp>
 #include <seitz/generate/generator.hpp>
 #include <seitz/group/space_group.hpp>
 #include <seitz/kpoint/mesh.hpp>
@@ -81,6 +85,41 @@ TEST_CASE("determine() on a low-symmetry cell", "[!benchmark]") {
   Cell const triclinic = triclinic_cell(48, rng);
 
   BENCHMARK("triclinic, 48 atoms") { return determine(triclinic); };
+}
+
+// The two questions asked of a bare operation set, with no atomic positions:
+// which point group, and which space group. Both are the whole pipeline from
+// operations alone, so the set is built once, outside the timed region.
+TEST_CASE("determination from an operation set", "[!benchmark]") {
+  std::mt19937 rng(19);
+  Cell const cell = test::rocksalt_supercell(2, 0.0, rng);
+  auto const analyzer = analysis::SymmetryAnalyzer::from_cell(cell);
+  Operations const &operations = test::must(analyzer.operations());
+
+  BENCHMARK("point group of 384 operations") {
+    return operations.point_group()->type.number;
+  };
+  BENCHMARK("space group of 384 operations") {
+    return operations.spacegroup(cell.lattice(), {})->hall.index();
+  };
+}
+
+// A collinear antiferromagnet: alternating moments, so the search does real
+// work rather than falling through to a grey group.
+TEST_CASE("magnetic determination", "[!benchmark]") {
+  std::mt19937 rng(23);
+  Cell const cell = test::rocksalt_supercell(2, 0.0, rng);
+  CollinearTensors moments(static_cast<std::size_t>(cell.size()));
+  for (Index i = 0; i < cell.size(); ++i) {
+    moments[static_cast<std::size_t>(i)] = (i % 2 == 0) ? 1.0 : -1.0;
+  }
+  MagneticCell const mcell(cell, SiteTensors{moments}, TensorKind::axial);
+
+  BENCHMARK("16-atom antiferromagnet") {
+    auto const magnetic =
+        analysis::MagneticSymmetryAnalyzer::from_cell(mcell, {});
+    return magnetic.dataset().has_value();
+  };
 }
 
 TEST_CASE("reciprocal-mesh reduction", "[!benchmark]") {

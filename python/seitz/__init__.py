@@ -32,33 +32,49 @@ from pathlib import Path
 
 from . import _core, errors, records
 from ._core import (
-    CIF_SYMPREC,
-    K_DEFAULT_SYMPREC,
-    K_ZERO_PREC,
     AxisKind,
+    BrillouinZone,
     Cell,
+    CellSetting,
+    Centering,
+    CIF_SYMPREC,
     CifBlock,
     CifStructure,
-    Centering,
-    CellSetting,
     CrystalClass,
     Dataset,
     GroupFamily,
     HallNumber,
     Holohedry,
+    K_DEFAULT_SYMPREC,
+    K_ZERO_PREC,
     Lattice,
     LatticeSetting,
     Laue,
+    MagneticCell,
+    MagneticDataset,
+    MagneticMatch,
+    MagneticOperations,
+    MagneticSpacegroupType,
+    MagneticSymmetryAnalyzer,
+    MagneticSymmetryOperation,
+    MagneticType,
+    Mesh,
     OccupancyCollapse,
     Operations,
+    PointGroupMatch,
     PointGroupType,
+    ReciprocalMesh,
     Setting,
     Site,
+    SiteTensor,
     SpaceGroup,
     SpacegroupMatch,
     SpacegroupType,
+    SubgroupEdge,
+    SubgroupKind,
     SymmetryAnalyzer,
     SymmetryOperation,
+    TensorKind,
     TimeReversal,
     UniNumber,
     Warm,
@@ -72,60 +88,79 @@ from ._core import (
     elements,
     family_of,
     halls_with_number,
+    magnetic_operations_from_database,
+    magnetic_spacegroup_type,
+    magnetic_std_transformations,
     minimal_image,
     none_periodic,
-    parse_cif,
     operations_from_database,
+    parse_cif,
     periodic_along,
     pointgroup_by_number,
     same_operation,
     spacegroup_type,
-    SubgroupEdge,
-    SubgroupKind,
     subgroups,
     to_positions,
+    uni_candidates,
     version_string,
     warmup,
     wrap,
 )
 from .errors import SeitzError
 from .options import MagneticTolerance, Tolerance
-from .records import CellRecord, DatasetRecord
+from .records import CellRecord, DatasetRecord, MagneticDatasetRecord
 
 __version__ = _core.__version__
 
 __all__ = [
-    "CIF_SYMPREC",
-    "K_DEFAULT_SYMPREC",
-    "K_ZERO_PREC",
     "AxisKind",
+    "BrillouinZone",
     "Cell",
     "CellRecord",
-    "CifBlock",
-    "CifStructure",
     "CellSetting",
     "Centering",
-    "SeitzError",
+    "CIF_SYMPREC",
+    "CifBlock",
+    "CifStructure",
     "CrystalClass",
     "Dataset",
     "DatasetRecord",
     "GroupFamily",
     "HallNumber",
     "Holohedry",
+    "K_DEFAULT_SYMPREC",
+    "K_ZERO_PREC",
     "Lattice",
     "LatticeSetting",
     "Laue",
+    "MagneticCell",
+    "MagneticDataset",
+    "MagneticDatasetRecord",
+    "MagneticMatch",
+    "MagneticOperations",
+    "MagneticSpacegroupType",
+    "MagneticSymmetryAnalyzer",
+    "MagneticSymmetryOperation",
     "MagneticTolerance",
+    "MagneticType",
+    "Mesh",
     "OccupancyCollapse",
     "Operations",
+    "PointGroupMatch",
     "PointGroupType",
+    "ReciprocalMesh",
+    "SeitzError",
     "Setting",
     "Site",
+    "SiteTensor",
     "SpaceGroup",
     "SpacegroupMatch",
     "SpacegroupType",
+    "SubgroupEdge",
+    "SubgroupKind",
     "SymmetryAnalyzer",
     "SymmetryOperation",
+    "TensorKind",
     "TimeReversal",
     "Tolerance",
     "UniNumber",
@@ -133,6 +168,7 @@ __all__ = [
     "Wyckoff",
     "all_periodic",
     "analyze",
+    "analyze_magnetic",
     "aperiodic_along",
     "aperiodic_axis",
     "conjugated_by",
@@ -142,21 +178,23 @@ __all__ = [
     "errors",
     "family_of",
     "halls_with_number",
+    "magnetic_operations_from_database",
+    "magnetic_spacegroup_type",
+    "magnetic_std_transformations",
     "minimal_image",
     "none_periodic",
-    "parse_cif",
-    "read_cif",
     "operations_from_database",
+    "parse_cif",
     "periodic_along",
     "pointgroup_by_number",
+    "read_cif",
     "records",
     "results",
     "same_operation",
     "spacegroup_type",
-    "SubgroupEdge",
-    "SubgroupKind",
     "subgroups",
     "to_positions",
+    "uni_candidates",
     "version_string",
     "warmup",
     "wrap",
@@ -175,6 +213,25 @@ def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = 
     Nothing is computed here: the analyzer computes on first query and caches.
     """
     return SymmetryAnalyzer.from_cell(cell, _tolerance(tolerance).to_core(), setting)
+
+
+def analyze_magnetic(cell: MagneticCell,
+                     tolerance: MagneticTolerance | dict[str, float | None] | None = None) \
+        -> MagneticSymmetryAnalyzer:
+    """Determine the magnetic symmetry of ``cell``.
+
+    The magnetic counterpart of :func:`analyze`, and the same bargain: nothing
+    is computed until a query, and every query is memoized and thread-safe.  A
+    :class:`MagneticCell` carries the moments, so the rank -- collinear or
+    non-collinear -- is the shape of the array handed to it, never a flag.
+    """
+    return MagneticSymmetryAnalyzer.from_cell(cell, _magnetic_tolerance(tolerance).to_core())
+
+
+def _magnetic_tolerance(tolerance: MagneticTolerance | dict[str, float | None] | None) -> MagneticTolerance:
+    if tolerance is None: return MagneticTolerance()
+    if isinstance(tolerance, MagneticTolerance): return tolerance
+    return MagneticTolerance.model_validate(tolerance)
 
 
 def _tolerance(tolerance: Tolerance | dict[str, float | None] | None) -> Tolerance:

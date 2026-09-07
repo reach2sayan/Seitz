@@ -8,6 +8,8 @@ pybind11_add_module(_core
         src/analysis.cpp
         src/group.cpp
         src/data.cpp
+        src/magnetic.cpp
+        src/kpoint.cpp
         src/io.cpp)
 
 # Linking the target, not naming its include directory, is what keeps the

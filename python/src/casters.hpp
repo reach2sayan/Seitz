@@ -5,7 +5,10 @@
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -57,6 +60,23 @@ template <class T>
   for (Index i = 0; i < count; ++i) {
     view(i) = types[static_cast<std::size_t>(i)];
   }
+  return out;
+}
+
+// A contiguous span of scalars as a 1-D array of the same dtype: one copy,
+// because the span borrows from an immutable object.
+template <class T>
+[[nodiscard]] py::array_t<T> array_1d(std::span<T const> values) {
+  py::array_t<T> out(static_cast<py::ssize_t>(values.size()));
+  std::ranges::copy(values, out.mutable_data());
+  return out;
+}
+
+// Rows of 3 as a C-contiguous (N, 3) array.
+template <class T>
+[[nodiscard]] py::array_t<T> array_n3(std::span<std::array<T, 3> const> rows) {
+  py::array_t<T> out({static_cast<py::ssize_t>(rows.size()), py::ssize_t{3}});
+  std::ranges::copy(rows | std::views::join, out.mutable_data());
   return out;
 }
 

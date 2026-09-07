@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from backends import BACKENDS, Backend
+from backends import BACKENDS, MESH, Backend
 from structures import CASES, cif_corpus
 
 WORKLOADS = ("dataset", "standardize", "primitive")
 CIF_BACKENDS = [n for n, b in BACKENDS.items() if b.read_cif]
+MESH_BACKENDS = [n for n, b in BACKENDS.items() if b.reciprocal_mesh]
+MAGNETIC_BACKENDS = [n for n, b in BACKENDS.items() if b.magnetic_dataset]
+# One small and one large cell each: the mesh reduction scales with the grid
+# and the point group, the magnetic search with the atom count.
+MESH_CASES = ("rocksalt-16", "rocksalt-128")
+MAGNETIC_CASES = ("rocksalt-16", "rocksalt-128")
 
 
 @pytest.fixture(scope="session")
@@ -69,3 +75,29 @@ def test_read_cif(benchmark, backend, cif_files) -> None:
     benchmark.extra_info["files"] = len(cif_files)
     benchmark(lambda: [read(p) for p in cif_files])
     _done(benchmark)
+
+
+@pytest.mark.parametrize("backend", MESH_BACKENDS)
+@pytest.mark.parametrize("case", MESH_CASES)
+def test_reciprocal_mesh(benchmark, case, backend) -> None:
+    """Irreducible-wedge reduction of a {0}^3 grid, the determination prebuilt."""
+    b: Backend = BACKENDS[backend]
+    grid = "x".join(str(d) for d in MESH)
+    _say(f"{'mesh':11s} {case:14s} {backend:9s} {grid:>11s} ... ", end="")
+    benchmark.group = f"mesh:{case}"
+    benchmark.extra_info["backend"] = backend
+    benchmark.extra_info["mesh"] = grid
+    result = benchmark(b.reciprocal_mesh, b.prepare_mesh(CASES[case]))
+    _done(benchmark, f"   {b.num_irreducible(result)} irreducible")
+
+
+@pytest.mark.parametrize("backend", MAGNETIC_BACKENDS)
+@pytest.mark.parametrize("case", MAGNETIC_CASES)
+def test_magnetic_dataset(benchmark, case, backend) -> None:
+    """Magnetic determination of a collinear antiferromagnet."""
+    b: Backend = BACKENDS[backend]
+    _say(f"{'magnetic':11s} {case:14s} {backend:9s} {len(CASES[case]):5d} atoms ... ", end="")
+    benchmark.group = f"magnetic:{case}"
+    benchmark.extra_info["backend"] = backend
+    result = benchmark(b.magnetic_dataset, b.prepare_magnetic(CASES[case]))
+    _done(benchmark, f"   UNI {b.uni_number(result)}")

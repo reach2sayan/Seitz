@@ -1,9 +1,9 @@
 #include <seitz/io/cif.hpp>
 
+#include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/core/fractional.hpp>
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/symmetry_operation.hpp>
-#include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/data/element_data.hpp>
 #include <seitz/data/spacegroup_symbols.hpp>
 #include <seitz/data/spg_database.hpp>
@@ -32,11 +32,11 @@ void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <locale>
 #include <cmath>
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <locale>
 #include <numbers>
 #include <optional>
 #include <ranges>
@@ -166,9 +166,9 @@ template <class Token> struct TokenParser {
     Iter const begin = it;
     // The end is a property of the position (a closing quote is one only
     // when whitespace follows), so the search runs over iterators.
-    Iter const end = *std::ranges::find_if(
-        std::views::iota(begin, Iter(last)),
-        [&](Iter at) { return Token::at_end(at, last); });
+    Iter const end =
+        *std::ranges::find_if(std::views::iota(begin, Iter(last)),
+                              [&](Iter at) { return Token::at_end(at, last); });
     it = end;
     if (!Token::accept(begin, end) || !Token::close(it, last)) {
       success = false;
@@ -181,8 +181,8 @@ template <class Token> struct TokenParser {
         auto const at = static_cast<std::ptrdiff_t>(out.size());
         out.insert(out.end(), begin, end);
         if constexpr (Token::lowercase) {
-          std::ranges::transform(out | std::views::drop(at),
-                                 out.begin() + at, ascii_lower);
+          std::ranges::transform(out | std::views::drop(at), out.begin() + at,
+                                 ascii_lower);
         }
       }
     }
@@ -334,8 +334,8 @@ auto const loop_def = bp::separate[bp::transform([](auto const &r) {
                                    +cif_tag >> +value];
 
 bp::rule<struct block_tag, Block> const data_block = "data block";
-auto const data_block_def =
-    bp::lexeme[bp::no_case[bp::lit("data_")] >> bare] >> *(loop | item);
+auto const data_block_def = bp::lexeme[bp::no_case[bp::lit("data_")] >> bare] >>
+                            *(loop | item);
 
 // The trailing `*skipper` is what lets the caller check `first == last`:
 // blocks alone stop at the last value, leaving the file's final newline.
@@ -355,9 +355,8 @@ BOOST_PARSER_DEFINE_RULES(item, loop, data_block, document);
 
 [[nodiscard]] leaf::error_id syntax_error(Iterator begin, Iterator at) {
   auto const position = bp::find_line_position(begin, at);
-  return leaf::new_error(
-      e_cif_syntax{.line = position.line_number + 1,
-                   .column = position.column_number + 1});
+  return leaf::new_error(e_cif_syntax{.line = position.line_number + 1,
+                                      .column = position.column_number + 1});
 }
 
 } // namespace
@@ -391,8 +390,7 @@ namespace {
 [[nodiscard]] std::optional<double> number_of(std::string_view text) {
   double out = 0.0;
   auto const number =
-      bp::lexeme[bp::double_ >>
-                 -bp::omit['(' >> *bp::digit >> -bp::lit(')')]];
+      bp::lexeme[bp::double_ >> -bp::omit['(' >> *bp::digit >> -bp::lit(')')]];
   if (!bp::parse(text, number, bp::ws, out)) {
     return std::nullopt;
   }
@@ -402,21 +400,19 @@ namespace {
 // The element a label or type symbol names: leading letters, two first so
 // `Cl1` is chlorine not carbon, then one for `O1W`, `Fe3+`, `Na+`.
 [[nodiscard]] std::optional<int> species_of(std::string_view symbol) {
-  std::string letters{
-      std::from_range,
-      symbol | std::views::take_while([](unsigned char c) {
-        return std::isalpha(c) != 0;
-      })};
+  std::string letters{std::from_range,
+                      symbol | std::views::take_while([](unsigned char c) {
+                        return std::isalpha(c) != 0;
+                      })};
   // The hydrogen isotopes neutron structures name are no element of their own.
   if (letters == "D" || letters == "T") {
     return data::atomic_number("H");
   }
   auto const titled = [&](std::size_t n) {
-    std::string s =
-        boost::algorithm::to_lower_copy(letters.substr(0, n),
-                                        std::locale::classic());
-    s.front() = static_cast<char>(
-        std::toupper(static_cast<unsigned char>(s.front())));
+    std::string s = boost::algorithm::to_lower_copy(letters.substr(0, n),
+                                                    std::locale::classic());
+    s.front() =
+        static_cast<char>(std::toupper(static_cast<unsigned char>(s.front())));
     return s;
   };
   for (std::size_t n : {std::size_t{2}, std::size_t{1}}) {
@@ -459,8 +455,7 @@ struct CifSite {
 
 // An optional column, padded to `rows` so every site column zips.
 [[nodiscard]] std::vector<std::string>
-column_or_blank(CifBlock const &block, std::string_view tag,
-                std::size_t rows) {
+column_or_blank(CifBlock const &block, std::string_view tag, std::size_t rows) {
   auto const column = block.column(tag);
   if (!column || column->size() != rows) {
     return std::vector<std::string>(rows);
@@ -500,28 +495,27 @@ column_or_blank(CifBlock const &block, std::string_view tag,
     return missing("_atom_site_fract_z");
   }
   if (y->size() != x->size() || z->size() != x->size()) {
-    return leaf::new_error(e_cif_missing{"_atom_site_fract_y"},
-                           e_message{"the coordinate columns differ in length"});
+    return leaf::new_error(
+        e_cif_missing{"_atom_site_fract_y"},
+        e_message{"the coordinate columns differ in length"});
   }
 
   auto const rows = x->size();
   auto const labels = column_or_blank(block, "_atom_site_label", rows);
   auto const symbols = column_or_blank(block, "_atom_site_type_symbol", rows);
-  auto const occupancies =
-      column_or_blank(block, "_atom_site_occupancy", rows);
+  auto const occupancies = column_or_blank(block, "_atom_site_occupancy", rows);
 
   std::vector<CifSite> sites;
   sites.reserve(rows);
   for (auto const [row, columns] : std::views::enumerate(
            std::views::zip(*x, *y, *z, labels, symbols, occupancies))) {
     auto const &[sx, sy, sz, label, symbol, occupancy] = columns;
-    auto const coordinate = std::array{number_of(sx), number_of(sy),
-                                       number_of(sz)};
+    auto const coordinate =
+        std::array{number_of(sx), number_of(sy), number_of(sz)};
     if (!std::ranges::all_of(coordinate, &std::optional<double>::has_value)) {
-      return leaf::new_error(
-          e_cif_missing{"_atom_site_fract_x"},
-          e_message{"a coordinate is not a number: " + sx + ' ' + sy + ' ' +
-                    sz});
+      return leaf::new_error(e_cif_missing{"_atom_site_fract_x"},
+                             e_message{"a coordinate is not a number: " + sx +
+                                       ' ' + sy + ' ' + sz});
     }
 
     CifSite site;
@@ -531,8 +525,7 @@ column_or_blank(CifBlock const &block, std::string_view tag,
     site.occupancy = number_of(occupancy).value_or(1.0);
 
     // '?' or '.' says the file has none, not that the element is called "?".
-    bool const stated =
-        !symbol.empty() && symbol != "?" && symbol != ".";
+    bool const stated = !symbol.empty() && symbol != "?" && symbol != ".";
     std::string_view const named = stated ? symbol : site.label;
     auto const type = species_of(named);
     if (!type) {
@@ -565,9 +558,8 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
         first == std::ranges::end(matches) ? static_cast<int>(row) : *first;
   }
 
-  std::vector<int> order{
-      std::from_range,
-      std::views::iota(0, static_cast<int>(sites.size()))};
+  std::vector<int> order{std::from_range,
+                         std::views::iota(0, static_cast<int>(sites.size()))};
   std::ranges::stable_sort(order, {}, [&](int i) {
     return sites[static_cast<std::size_t>(i)].representative;
   });
@@ -580,10 +572,11 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
   auto const label_of = [&](int i) {
     return sites[static_cast<std::size_t>(i)].label;
   };
-  for (auto chunk : order | std::views::chunk_by([&](int a, int b) {
-                      return sites[static_cast<std::size_t>(a)].representative ==
-                             sites[static_cast<std::size_t>(b)].representative;
-                    })) {
+  for (auto chunk :
+       order | std::views::chunk_by([&](int a, int b) {
+         return sites[static_cast<std::size_t>(a)].representative ==
+                sites[static_cast<std::size_t>(b)].representative;
+       })) {
     int const winner = std::ranges::max(chunk, {}, occupancy_of);
     kept.push_back(winner);
     if (std::ranges::distance(chunk) > 1 || occupancy_of(winner) < 1.0) {
@@ -591,9 +584,9 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
       // an initializer's braces or parentheses, and loses the enclosing scope
       // after it.
       auto const not_winner = [&](int i) { return i != winner; };
-      std::vector<std::string> dropped(
-          std::from_range, chunk | std::views::filter(not_winner) |
-                               std::views::transform(label_of));
+      std::vector<std::string> dropped(std::from_range,
+                                       chunk | std::views::filter(not_winner) |
+                                           std::views::transform(label_of));
       collapsed.push_back(OccupancyCollapse{.kept = label_of(winner),
                                             .occupancy = occupancy_of(winner),
                                             .dropped = std::move(dropped)});
@@ -605,14 +598,14 @@ collapse_shared_sites(std::vector<CifSite> &sites, Lattice const &lattice,
 
 // ---- the symmetry the block states ------------------------------------------
 
-constexpr auto kSymopTags = std::array{
-    "_space_group_symop_operation_xyz"sv, "_symmetry_equiv_pos_as_xyz"sv};
-constexpr auto kHallTags = std::array{
-    "_space_group_name_hall"sv, "_symmetry_space_group_name_hall"sv};
-constexpr auto kHmTags = std::array{
-    "_space_group_name_h-m_alt"sv, "_symmetry_space_group_name_h-m"sv};
-constexpr auto kNumberTags = std::array{
-    "_space_group_it_number"sv, "_symmetry_int_tables_number"sv};
+constexpr auto kSymopTags = std::array{"_space_group_symop_operation_xyz"sv,
+                                       "_symmetry_equiv_pos_as_xyz"sv};
+constexpr auto kHallTags =
+    std::array{"_space_group_name_hall"sv, "_symmetry_space_group_name_hall"sv};
+constexpr auto kHmTags = std::array{"_space_group_name_h-m_alt"sv,
+                                    "_symmetry_space_group_name_h-m"sv};
+constexpr auto kNumberTags =
+    std::array{"_space_group_it_number"sv, "_symmetry_int_tables_number"sv};
 
 [[nodiscard]] std::optional<std::string_view>
 first_stated(CifBlock const &block, std::span<std::string_view const> tags) {
@@ -624,8 +617,7 @@ first_stated(CifBlock const &block, std::span<std::string_view const> tags) {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<HallNumber>
-hall_of_number(std::string_view text) {
+[[nodiscard]] std::optional<HallNumber> hall_of_number(std::string_view text) {
   auto const number = number_of(text);
   return number ? data::default_hall<GroupFamily::space>(
                       static_cast<int>(std::lround(*number)))
@@ -699,8 +691,8 @@ named_setting(CifBlock const &block) {
 // A setting the block also names is taken when the loop lists exactly its
 // operations, which is what a well-formed file does; otherwise the setting is
 // searched for from the operations alone.
-[[nodiscard]] Result<std::pair<std::vector<SymmetryOperation>,
-                               std::optional<HallNumber>>>
+[[nodiscard]] Result<
+    std::pair<std::vector<SymmetryOperation>, std::optional<HallNumber>>>
 symmetry_of(CifBlock const &block, Lattice const &lattice,
             Tolerance const &tol) {
   for (std::string_view const tag : kSymopTags) {
@@ -720,8 +712,7 @@ symmetry_of(CifBlock const &block, Lattice const &lattice,
             ? named
             : std::nullopt;
     if (!hall) {
-      if (auto const match =
-              Operations{operations}.spacegroup(lattice.matrix(), tol)) {
+      if (auto const match = Operations{operations}.spacegroup(lattice, tol)) {
         hall = match->hall;
       }
     }
@@ -734,8 +725,7 @@ symmetry_of(CifBlock const &block, Lattice const &lattice,
                      std::optional<HallNumber>{}};
   }
   Operations const &database = data::operations_from_database(*hall);
-  return std::pair{
-      std::vector{std::from_range, database}, hall};
+  return std::pair{std::vector{std::from_range, database}, hall};
 }
 
 } // namespace
@@ -756,9 +746,8 @@ Result<std::vector<CifBlock>> parse_cif(std::string_view text) {
     out.name = std::move(parsed.name);
     for (Entry &entry : parsed.entries) {
       if (Item *scalar = std::get_if<Item>(&entry); scalar != nullptr) {
-        out.columns.insert_or_assign(
-            std::move(scalar->tag),
-            std::vector{std::move(scalar->value)});
+        out.columns.insert_or_assign(std::move(scalar->tag),
+                                     std::vector{std::move(scalar->value)});
         continue;
       }
       Loop &table = std::get<Loop>(entry);
@@ -780,7 +769,6 @@ Result<std::vector<CifBlock>> parse_cif(std::string_view text) {
   }
   return blocks;
 }
-
 
 Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   BOOST_LEAF_AUTO(lattice, lattice_of(block));
@@ -822,9 +810,10 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
   Types types;
   std::vector<std::string> labels;
   for (auto const [i, site_index] : std::views::enumerate(site_of)) {
-    auto const earlier = index.first_match(
-        images.row(i).transpose(), 0, scratch,
-        [&](int j) { return j < i && placed[static_cast<std::size_t>(j)]; });
+    auto const earlier =
+        index.first_match(images.row(i).transpose(), 0, scratch, [&](int j) {
+          return j < i && placed[static_cast<std::size_t>(j)];
+        });
     if (earlier) {
       continue;
     }
@@ -838,12 +827,12 @@ Result<CifStructure> structure_of(CifBlock const &block, Tolerance tol) {
     return leaf::new_error(e_empty_cell{});
   }
 
-  return CifStructure{.name = block.name,
-                      .cell = Cell{lattice, to_positions(positions),
-                                   std::move(types)},
-                      .hall = hall,
-                      .labels = std::move(labels),
-                      .collapsed = std::move(collapsed)};
+  return CifStructure{
+      .name = block.name,
+      .cell = Cell{lattice, to_positions(positions), std::move(types)},
+      .hall = hall,
+      .labels = std::move(labels),
+      .collapsed = std::move(collapsed)};
 }
 
 Result<std::vector<CifStructure>> read_cif(std::string_view text,
@@ -859,7 +848,6 @@ Result<std::vector<CifStructure>> read_cif(std::string_view text,
   }
   return structures;
 }
-
 
 namespace {
 
@@ -880,8 +868,7 @@ struct Row {
 }
 
 // `Fe1`, `Fe2`, ... : one counter per species, in the order the rows come.
-[[nodiscard]] std::vector<Row>
-labelled(std::vector<Row> rows) {
+[[nodiscard]] std::vector<Row> labelled(std::vector<Row> rows) {
   boost::container::flat_map<std::string_view, int> counter;
   for (Row &row : rows) {
     row.label = std::format("{}{}", row.symbol, ++counter[row.symbol]);
@@ -965,8 +952,8 @@ std::string write_cif(Cell const &cell, std::string_view name) {
                    .position = position};
       })});
   constexpr auto kP1 = *HallNumber::of(GroupFamily::space, 1);
-  return render(name, cell.lattice(), kP1,
-                std::array{SymmetryOperation{}}, rows);
+  return render(name, cell.lattice(), kP1, std::array{SymmetryOperation{}},
+                rows);
 }
 
 Result<std::string> write_cif(analysis::SymmetryAnalyzer const &analyzer,
@@ -992,10 +979,11 @@ Result<std::string> write_cif(analysis::SymmetryAnalyzer const &analyzer,
             auto const &[index, site] = indexed;
             return Row{
                 .label = {},
-                .symbol = symbol_of(standardized.type(static_cast<Index>(index))),
-                .multiplicity = static_cast<int>(std::ranges::count(
-                    sites, static_cast<int>(index),
-                    &analysis::Site::equivalent_atom)),
+                .symbol =
+                    symbol_of(standardized.type(static_cast<Index>(index))),
+                .multiplicity = static_cast<int>(
+                    std::ranges::count(sites, static_cast<int>(index),
+                                       &analysis::Site::equivalent_atom)),
                 .wyckoff = static_cast<char>('a' + site.wyckoff),
                 .position = standardized.position(static_cast<Index>(index))};
           })});

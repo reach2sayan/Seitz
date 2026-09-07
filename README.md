@@ -94,12 +94,19 @@ group itself. It is the object the determination hands back, and it can be
 interrogated on its own:
 
 ```cpp
-ops.rotations();                   // the point group, as integer matrices
+ops.rotations();                   // the rotation parts, as integer matrices
 ops.pure_translations();           // the centring vectors of the coset {I | t}
 ops.conjugated_by(P, P_inv);       // the group in another basis
-BOOST_LEAF_AUTO(m, ops.spacegroup(lattice, LatticeSetting::conventional));
-// m.hall, m.bravais, m.origin_shift, m.type()
+BOOST_LEAF_AUTO(m, ops.spacegroup<LatticeSetting::conventional>(lattice, tol));
+// m.hall, m.bravais_lattice, m.origin_shift, m.type()
+BOOST_LEAF_AUTO(p, ops.point_group());  // p.type (one of the 32), p.transformation
+BOOST_LEAF_AUTO(q, mag_ops.spacegroup(lattice, tol)); // q.uni, q.type, q.hall, q.setting
 ```
+
+The same three questions, asked of a bare set of operations with no atomic
+positions at all: which space group, which point group, which magnetic space
+group. `MagneticOperations` is the same class template over
+`MagneticSymmetryOperation`, so it answers the ones that still make sense.
 
 ---
 
@@ -295,7 +302,7 @@ auto const ma = analysis::MagneticSymmetryAnalyzer::from_cell(mcell, MagneticTol
 BOOST_LEAF_AUTO(uni,  ma.uni());               // UNI number (1651 types)
 BOOST_LEAF_AUTO(ops,  ma.operations());        // MagneticOperations
 BOOST_LEAF_AUTO(std,  ma.standardized_cell()); // tensors rotated into the standard basis
-ma.magnetic_spacegroup_type();                 // BNS/OG symbols, type I–IV
+ma.spacegroup_type();                          // BNS/OG symbols, type I-IV
 ```
 
 Collinear and non-collinear moments are both handled; the moment tolerance is
@@ -523,6 +530,19 @@ for e in sz.subgroups.maximal_subgroups(225, sz.SubgroupKind.translationengleich
     print(e.sub, e.index)
 
 print(sz.DatasetRecord.from_analyzer(analyzer).model_dump_json(indent=2))
+```
+
+Magnetic structures and reciprocal-space sampling are bound the same way. A
+`MagneticCell` takes the moments as an array, and its rank is that array's
+shape rather than a flag:
+
+```python
+magnetic = sz.MagneticCell(cell, np.array([1.0, -1.0]), sz.TensorKind.axial)
+print(sz.analyze_magnetic(magnetic).spacegroup_type.bns_number)
+
+reciprocal = analyzer.reciprocal_mesh(sz.Mesh([16, 16, 16]))
+print(reciprocal.num_irreducible)                      # the irreducible wedge
+zone = reciprocal.brillouin_zone(sz.Lattice(np.linalg.inv(cell.lattice.matrix).T))
 ```
 
 The analyzer memoizes, so it is the object you keep rather than a call you

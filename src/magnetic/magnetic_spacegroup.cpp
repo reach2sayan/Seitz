@@ -155,13 +155,11 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
 
   if (*spatial_index == 1) {
     if (num_sym_msg == num_sym_fsg) {
-      return std::pair{MagneticType::type_i,
-                       MagOps{identity_operation(false)}};
+      return std::pair{MagneticType::type_i, MagOps{identity_operation(false)}};
     }
     if (num_sym_msg == 2 * num_sym_fsg) {
-      return std::pair{
-          MagneticType::type_ii,
-          MagOps{identity_operation(false), identity_operation(true)}};
+      return std::pair{MagneticType::type_ii, MagOps{identity_operation(false),
+                                                     identity_operation(true)}};
     }
     return std::nullopt;
   }
@@ -243,8 +241,14 @@ changed_pure_translations(Matrix3d const &tmat,
       Vector3d const shifted = t + Vector3d(n0, n1, n2);
       Vector3d const transformed =
           math::wrap_to_unit_cell(Vector3d(tmat * shifted));
+      // Compared MODULO 1, not componentwise: `transformed` has been wrapped
+      // into [0, 1), so two images of the same translation straddling the cell
+      // edge (0.99999 and 0.00001, which is where a jittered input lands after
+      // tmat scales its noise up) are the same point and must not both be
+      // kept. The count check below turns a miss into a failed determination.
       push_unique(out, transformed, [&](Vector3d const &a, Vector3d const &b) {
-        return approx_equal(a, b, symprec);
+        return approx_equal(math::nearest_offset(Vector3d(a - b)),
+                            Vector3d::Zero(), symprec);
       });
     }
   }
@@ -388,7 +392,7 @@ get_reference_space_group(Matrix3d const &lattice,
 
 } // namespace
 
-Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
+Result<MagneticMatch> MagneticIdentification::identify() const {
   Matrix3d const &lattice = lattice_.matrix();
   MagneticOperations const &magnetic_symmetry = operations_;
   double const symprec = tol_.symprec;
@@ -463,20 +467,20 @@ Result<MagneticTypeIdentification> MagneticIdentification::identify() const {
   ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
   Matrix3d const rigid_rot = rigid_rotation(lattice, tmat, ref_sg);
 
-  return MagneticTypeIdentification{correction->uni,
-                                    static_cast<MagneticType>(msgtype.type),
-                                    hall,
-                                    tmat,
-                                    shift,
-                                    rigid_rot};
+  return MagneticMatch{.uni = correction->uni,
+                       .type = static_cast<MagneticType>(msgtype.type),
+                       .hall = hall,
+                       .setting = {.transformation = tmat,
+                                   .origin_shift = shift,
+                                   .rigid_rotation = rigid_rot}};
 }
 
-Result<MagneticCell> MagneticIdentification::transform(
-    MagneticCell const &mcell,
-    MagneticTypeIdentification const &identification) const {
-  Matrix3d const &transformation_matrix = identification.transformation_matrix;
-  Vector3d const &origin_shift = identification.origin_shift;
-  Matrix3d const &rigid_rotation = identification.std_rotation_matrix;
+Result<MagneticCell>
+MagneticIdentification::transform(MagneticCell const &mcell,
+                                  MagneticMatch const &match) const {
+  Matrix3d const &transformation_matrix = match.setting.transformation;
+  Vector3d const &origin_shift = match.setting.origin_shift;
+  Matrix3d const &rigid_rotation = match.setting.rigid_rotation;
   MagneticOperations const &magnetic_symmetry = operations_;
   double const symprec = tol_.symprec;
   Cell const &cell = mcell.cell();
@@ -554,3 +558,16 @@ Result<MagneticCell> MagneticIdentification::transform(
 }
 
 } // namespace seitz::magnetic
+
+// The body behind MagneticOperations::spacegroup, out of line here so the
+// public header never names the identifier.
+namespace seitz::detail {
+
+Result<MagneticMatch>
+magnetic_spacegroup_of_operations(MagneticOperations const &operations,
+                                  Lattice const &lattice,
+                                  Tolerance const &tol) {
+  return magnetic::MagneticIdentification{lattice, operations, tol}.identify();
+}
+
+} // namespace seitz::detail

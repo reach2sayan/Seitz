@@ -1,5 +1,8 @@
-#include "symmetry/pointgroup.hpp"
+#include <seitz/core/error.hpp>
+#include <seitz/core/keys.hpp>
 #include <seitz/core/operation_set.hpp>
+#include <seitz/core/point_group.hpp>
+#include <seitz/spacegroup_match.hpp>
 
 #include "core/matrix_order.hpp"
 
@@ -495,10 +498,20 @@ get_axes(Laue laue, PointSymmetry const &ps,
 
 } // namespace
 
+} // namespace seitz::symmetry
+
+// The body behind OperationSet::point_group. A function template takes its
+// visibility from its definition, not from the header's pragma, so the
+// definition and its two instantiations are exported from here.
+namespace seitz::detail {
+
+using namespace seitz::symmetry;
+
+#pragma GCC visibility push(default)
 template <GroupFamily F>
-Result<PointgroupTransform>
-identify_point_group(std::span<Matrix3i const> rotations,
-                     std::optional<int> layer_axis) {
+Result<PointGroupMatch>
+point_group_of_rotations(std::span<Matrix3i const> rotations,
+                         std::optional<int> layer_axis) {
   PointSymmetry const ps = unique_rotations(rotations);
   int const pg_num = pointgroup_number(ps);
   if (pg_num == 0) {
@@ -514,9 +527,8 @@ identify_point_group(std::span<Matrix3i const> rotations,
   }
   std::optional<int> const aperiodic_axis = layer_axis;
 
-  PointgroupTransform result;
-  result.pointgroup = pointgroup_by_number(pg_num);
-  auto const axes = get_axes(result.pointgroup.laue, ps, aperiodic_axis);
+  PointGroupMatch result{.type = pointgroup_by_number(pg_num)};
+  auto const axes = get_axes(result.type.laue, ps, aperiodic_axis);
   if (!axes) {
     return leaf::new_error(e_pointgroup_not_found{});
   }
@@ -524,11 +536,12 @@ identify_point_group(std::span<Matrix3i const> rotations,
   return result;
 }
 
-template Result<PointgroupTransform>
-    identify_point_group<GroupFamily::space>(std::span<Matrix3i const>,
-                                             std::optional<int>);
-template Result<PointgroupTransform>
-    identify_point_group<GroupFamily::layer>(std::span<Matrix3i const>,
-                                             std::optional<int>);
+template Result<PointGroupMatch>
+    point_group_of_rotations<GroupFamily::space>(std::span<Matrix3i const>,
+                                                 std::optional<int>);
+template Result<PointGroupMatch>
+    point_group_of_rotations<GroupFamily::layer>(std::span<Matrix3i const>,
+                                                 std::optional<int>);
+#pragma GCC visibility pop
 
-} // namespace seitz::symmetry
+} // namespace seitz::detail
