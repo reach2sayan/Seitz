@@ -501,6 +501,21 @@ Its `.targets` sets the include paths, `/std:c++latest` and the raised constexpr
 budget the subgroup tables need in the consumer's own translation units, so a
 referencing `.vcxproj` needs no settings of its own.
 
+vcpkg consumers get an overlay port, kept in the repository and re-pinned to each
+tag automatically:
+
+```bash
+git clone https://github.com/reach2sayan/Seitz
+vcpkg install seitz --overlay-ports=Seitz/contrib/vcpkg/ports
+```
+
+It takes Eigen and Boost from vcpkg rather than fetching its own
+(`SEITZ_EXTERNAL_EIGEN_AND_BOOST`), and pins spglib's sources at the same v2.7.0
+the tables are transcribed from. Two things to know: the port builds a throwaway
+Python venv for those transcribers, so it needs the network at build time; and
+the GCC 15 floor applies as it does everywhere else, so a Linux triplet on an
+older default compiler fails at configure with the diagnostic that says so.
+
 Only `include/` ships, so a consumer reaches exactly what the umbrella header
 reaches. `seitz` is a shared library, `0.1.0` with `SONAME 0.1`; while the API is
 pre-1.0 every minor version may break ABI. On Windows, and inside the Python

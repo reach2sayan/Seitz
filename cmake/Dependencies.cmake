@@ -7,6 +7,32 @@ include(FetchContent)
 set(EIGEN_BUILD_CMAKE_PACKAGE ON CACHE BOOL "" FORCE)
 set(BOOST_SKIP_INSTALL_RULES OFF CACHE BOOL "" FORCE)
 
+# The one exception to "everything is fetched", and it is opt-in and OFF by
+# default, so a plain build is unchanged: nothing is looked for on the system
+# and nothing found there can be picked up by accident.
+#
+# It exists for the vcpkg port under contrib/vcpkg, where fetching is the wrong
+# behaviour twice over -- vcpkg has already built Eigen and Boost into the
+# installed tree the consumer will link against, and a port that downloaded its
+# own copies would ship a second, differently-configured Boost inside seitz's
+# own prefix. FIND_PACKAGE_ARGS is the documented hook: with the default
+# FETCHCONTENT_TRY_FIND_PACKAGE_MODE of OPT_IN, only a Declare that carries it
+# tries find_package() first, and falls back to the fetch when that fails.
+#
+# The versions are floors, not pins. Eigen 5 is the release in which fixed-size
+# matrices became literal types, and vcpkg is on 5.0.1; Boost 1.88 is what the
+# URL below fetches. The components are every Boost library the target links,
+# PUBLIC and PRIVATE alike, because a static seitz records the private ones as
+# $<LINK_ONLY:...> and the consumer's link line still needs the targets --
+# the same list cmake/SeitzConfig.cmake.in re-derives for a consumer.
+option(SEITZ_EXTERNAL_EIGEN_AND_BOOST
+        "Take Eigen and Boost from CMAKE_PREFIX_PATH when they are there, instead of fetching them" OFF)
+if (SEITZ_EXTERNAL_EIGEN_AND_BOOST)
+    set(SEITZ_EIGEN_FIND FIND_PACKAGE_ARGS 5.0)
+    set(SEITZ_BOOST_FIND FIND_PACKAGE_ARGS 1.88 COMPONENTS container graph leaf
+            flyweight parser algorithm range)
+endif ()
+
 # Eigen 5.0.0 — the first release in which fixed-size Matrix/Array are literal
 # types, so they can be constructed and accessed in constexpr context (we
 # compile as C++23). As a subproject Eigen's tests/blas/lapack/docs/demos all
@@ -15,7 +41,8 @@ FetchContent_Declare(Eigen3
         GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
         GIT_TAG 5.0.0
         GIT_SHALLOW TRUE
-        SYSTEM)
+        SYSTEM
+        ${SEITZ_EIGEN_FIND})
 
 # Boost 1.88.0, from the CMake-ready release archive.
 #   container  — static_vector/small_vector/flat_map/flat_set
@@ -31,7 +58,8 @@ set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight graph leaf parser
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON
-        SYSTEM)
+        SYSTEM
+        ${SEITZ_BOOST_FIND})
 
 FetchContent_MakeAvailable(Eigen3 Boost)
 
