@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Seitz VERSION 0.1.2 LANGUAGES CXX
+project(Seitz VERSION 0.1.3 LANGUAGES CXX
         DESCRIPTION "Modern C++23 crystallography and symmetry-analysis library")
 
 set(CMAKE_CXX_STANDARD 23)
