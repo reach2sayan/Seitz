@@ -60,17 +60,29 @@ def headers(prefix, out):
             shutil.move(str(child), out / child.name)
         d.rmdir()
 
-    # `nuget pack` excludes dotfiles by default and then dies -- "String cannot
-    # be empty. Parameter name: entryName" -- on the directory it just emptied.
-    # Boost ships a boost/headers/.gitkeep that lands exactly there. Drop what
-    # NuGet would drop, then the directories that leaves behind, so the crash
-    # has nothing to happen to.
-    for path in sorted(out.rglob(".*"), key=lambda p: -len(p.parts)):
+    # `nuget pack` excludes dotfiles by default and can then die -- "String
+    # cannot be empty. Parameter name: entryName" -- on the directory it just
+    # emptied. Boost ships a boost/headers/.gitkeep that lands exactly there.
+    # Drop what NuGet would drop, so it has nothing left to empty. (The pack
+    # step also passes -NoDefaultExcludes, so this is what is actually removed,
+    # rather than two rules disagreeing about it.)
+    for path in out.rglob(".*"):
         if path.is_file():
             path.unlink()
-    for path in sorted(out.rglob("*"), key=lambda p: -len(p.parts)):
+    return True
+
+
+def prune(stage):
+    """Empty directories, deepest first. NuGet packs a directory as a zero-length
+    entry name and dies on it, so none may reach `nuget pack` -- and one can
+    appear at any depth once the dotfiles above are gone."""
+    for path in sorted(stage.rglob("*"), key=lambda p: -len(p.parts)):
         if path.is_dir() and not any(path.iterdir()):
             path.rmdir()
+    left = [p for p in stage.rglob("*") if p.is_dir() and not any(p.iterdir())]
+    if left:
+        print(f"empty directories survived pruning: {left}", file=sys.stderr)
+        return False
     return True
 
 
@@ -87,12 +99,18 @@ def main() -> int:
 
     shutil.copy2(ROOT / "contrib" / "nuget" / "Seitz.targets", native)
     shutil.copy2(ROOT / "README.md", args.stage)
-    shutil.copy2(ROOT / "LICENSE", args.stage)
+    # LICENSE.txt, not LICENSE: NuGet decides whether a <file> target names a
+    # file or a folder by looking for an extension, and an extensionless entry
+    # at the package root is one of the shapes that reaches the entryName crash.
+    # The nuspec's license is an SPDX expression either way; this copy is for
+    # someone reading the package.
+    shutil.copy2(ROOT / "LICENSE", args.stage / "LICENSE.txt")
     # Headers only: lib/cmake and share/ describe a find_package() consumer,
     # which is not who this package is for.
     ok = all([headers(args.release, native / "include"),
               *(merge(prefix, native / "lib" / "x64" / config / "seitz.lib")
                 for config, prefix in (("Release", args.release), ("Debug", args.debug)))])
+    ok = prune(args.stage) and ok
     if not ok:
         return 1
     print(f"staged {args.stage}")

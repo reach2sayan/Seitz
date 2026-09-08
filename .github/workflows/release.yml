@@ -550,7 +550,14 @@ jobs:
       - name: Pack
         run: |
           python tools/pack_nuget.py --release prefix-release --debug prefix-debug --stage stage
-          nuget pack contrib/nuget/Seitz.nuspec -Version ${{ needs.version.outputs.version }} -BasePath stage -OutputDirectory nupkg -NonInteractive
+          # -NoDefaultExcludes: NuGet's default excludes silently drop dotfiles
+          # and can leave a folder empty, which it then packs as a zero-length
+          # entry name and dies on ("String cannot be empty. Parameter name:
+          # entryName"). pack_nuget.py has already removed both, so there is
+          # nothing left for the excludes to do but reintroduce that failure.
+          # -Verbosity detailed lists each file as it is added, so if the crash
+          # ever comes back the last line before it names the culprit.
+          nuget pack contrib/nuget/Seitz.nuspec -Version ${{ needs.version.outputs.version }} -BasePath stage -OutputDirectory nupkg -NonInteractive -NoDefaultExcludes -Verbosity detailed
 
       # nuget.org rejects a package over 250 MB, and the Debug archive carries
       # its own debug info. Fail here, where the number is visible, rather than
