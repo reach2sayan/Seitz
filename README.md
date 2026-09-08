@@ -488,6 +488,19 @@ and Boost packages into the same prefix, so an installed tree is self-contained
 and `find_package(Seitz REQUIRED)` needs only `CMAKE_PREFIX_PATH`. Prebuilt
 prefixes for Linux and Windows are attached to each GitHub release.
 
+MSBuild consumers, who have no CMake to carry the flags, get the same library as
+a NuGet package instead — `Seitz` on [nuget.org](https://www.nuget.org/packages/Seitz),
+x64, headers plus one static `seitz.lib` per CRT flavour with the Eigen and Boost
+headers the public interface reaches bundled in:
+
+```
+nuget install Seitz          # or: Install-Package Seitz
+```
+
+Its `.targets` sets the include paths, `/std:c++latest` and the raised constexpr
+budget the subgroup tables need in the consumer's own translation units, so a
+referencing `.vcxproj` needs no settings of its own.
+
 Only `include/` ships, so a consumer reaches exactly what the umbrella header
 reaches. `seitz` is a shared library, `0.1.0` with `SONAME 0.1`; while the API is
 pre-1.0 every minor version may break ABI. On Windows, and inside the Python

@@ -1,5 +1,5 @@
-# Wheels, an sdist and a bare-library archive per platform, attached to a GitHub
-# Release. A tag `vX.Y.Z` builds and publishes -- pushed by hand, or cut on
+# Wheels, an sdist, a bare-library archive per platform and a native NuGet
+# package, attached to a GitHub Release. A tag `vX.Y.Z` builds and publishes -- pushed by hand, or cut on
 # Mondays by weekly-release.yml; a `workflow_dispatch` run on a branch builds the
 # same artifacts, leaves them on the run page and publishes nothing, which is how
 # a change to this pipeline gets tried before a version rides on it. Both publish
@@ -14,7 +14,10 @@
 # written to libstdc++'s C++23, and libc++ has no <generator>.
 #
 # Nothing is published to PyPI. The wheels ride the GitHub Release and are
-# installed by URL; the README shows the incantation.
+# installed by URL; the README shows the incantation. The .nupkg is the one
+# exception to release-by-attachment: it also goes to nuget.org by trusted
+# publishing, when the NUGET_USER repository variable names the account whose
+# policy this workflow is registered under.
 name: Release
 
 on:
@@ -453,16 +456,181 @@ jobs:
           name: native-${{ matrix.os }}
           path: dist/*
 
+  # The native package for MSVC consumers who build with MSBuild rather than
+  # CMake: headers plus one static seitz.lib per CRT flavour, x64. Both flavours
+  # because the library is an archive on Windows (Boost.LEAF, see the `native`
+  # job), so a /MDd consumer cannot link the /MD one -- there is no DLL boundary
+  # to absorb the mismatch, and cl reports it as a link error.
+  #
+  # One configure, two configs: the `nuget` preset is Ninja Multi-Config, which
+  # is what keeps this inside the job limit. The Visual Studio generator would
+  # drive MSBuild with no /MP and compile all 49 TUs serially, twice -- the same
+  # trap pyproject.toml sidesteps for the wheels.
+  nuget:
+    name: nuget package
+    needs: version
+    runs-on: windows-2022
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # The third copy of this block in the file; see the `wheels` job for why
+      # it is written out rather than using ilammy/msvc-dev-cmd. lib.exe, which
+      # tools/pack_nuget.py shells out to, comes from the same environment.
+      - name: Set up MSVC (x64)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $root = & $vswhere -latest -products '*' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (-not $root) { throw "no Visual Studio with the C++ toolset found" }
+          $vcvars = Join-Path $root 'VC\Auxiliary\Build\vcvars64.bat'
+          $env_after = & "$env:COMSPEC" /s /c "`"$vcvars`" && set"
+          if ($LASTEXITCODE -ne 0) { throw "vcvars64.bat failed ($LASTEXITCODE)" }
+          foreach ($line in $env_after) {
+            if ($line -notmatch '^([^=\s]+)=(.*)$') { continue }
+            $name, $value = $Matches[1], $Matches[2]
+            if ([Environment]::GetEnvironmentVariable($name) -eq $value) { continue }
+            [Environment]::SetEnvironmentVariable($name, $value)
+            "$name=$value" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          foreach ($tool in 'cl.exe', 'lib.exe') {
+            if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
+              throw "$tool is not on PATH after vcvars64.bat"
+            }
+          }
+
+      - name: Set up sccache
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          variant: sccache
+          key: nuget-msvc
+          max-size: 2G
+
+      - name: Cache fetched dependencies
+        uses: actions/cache@v6
+        with:
+          path: C:/d
+          key: nuget-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          restore-keys: |
+            nuget-deps-
+
+      # The preset carries what the package is; the -D flags are only about
+      # running on a shared runner. CMAKE_MSVC_DEBUG_INFORMATION_FORMAT is the
+      # preset's business here, unlike in `native`: the Debug archive has to
+      # carry its debug info inside itself (/Z7), because a compiler .pdb sits
+      # outside the install prefix and every consumer would link with LNK4099.
+      - name: Configure
+        run: >
+          cmake --preset nuget -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
+          -DFETCHCONTENT_BASE_DIR=C:/d
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build and install both configurations
+        run: |
+          cmake --build --preset nuget --config Release --parallel
+          cmake --build --preset nuget --config Debug --parallel
+          cmake --install build/nuget --config Release --prefix prefix-release
+          cmake --install build/nuget --config Debug --prefix prefix-debug
+
+      - run: sccache --show-stats
+        if: always()
+
+      - name: Pack
+        run: |
+          python tools/pack_nuget.py --release prefix-release --debug prefix-debug --stage stage
+          nuget pack contrib/nuget/Seitz.nuspec -Version ${{ needs.version.outputs.version }} -BasePath stage -OutputDirectory nupkg -NonInteractive
+
+      # nuget.org rejects a package over 250 MB, and the Debug archive carries
+      # its own debug info. Fail here, where the number is visible, rather than
+      # at the push step at the end of a four-hour pipeline.
+      - name: The package is inside nuget.org's size limit
+        shell: bash
+        run: |
+          for pkg in nupkg/*.nupkg; do
+            size=$(stat -c %s "$pkg")
+            echo "$pkg: $((size / 1000000)) MB"
+            if (( size > 250000000 )); then
+              echo "::error::$pkg exceeds nuget.org's 250 MB limit"
+              exit 1
+            fi
+          done
+
+      # What a consumer actually does with it: restore the package into a
+      # vcxproj and compile a TU against the installed headers. It asserts the
+      # two things the staging cannot -- that Seitz.targets is auto-imported
+      # under the name NuGet expects, and that the merged archive plus the
+      # bundled Eigen and Boost headers are enough on their own.
+      - name: A consumer can build against it
+        shell: pwsh
+        run: |
+          $version = "${{ needs.version.outputs.version }}"
+          New-Item -ItemType Directory -Force consumer-check | Out-Null
+          Set-Content consumer-check/packages.config @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <packages>
+            <package id="Seitz" version="$version" targetFramework="native" />
+          </packages>
+          "@
+          Set-Content consumer-check/main.cpp @'
+          #include <seitz/seitz.hpp>
+          #include <cstdio>
+          int main() {
+            std::printf("%s\n", seitz::version_string());
+          }
+          '@
+          Set-Content consumer-check/consumer.vcxproj @"
+          <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            <ItemGroup Label="ProjectConfigurations">
+              <ProjectConfiguration Include="Release|x64">
+                <Configuration>Release</Configuration><Platform>x64</Platform>
+              </ProjectConfiguration>
+            </ItemGroup>
+            <PropertyGroup Label="Globals">
+              <ProjectGuid>{4C3E6A1B-9D2F-4A77-8B3C-5E1D0F2A6B94}</ProjectGuid>
+              <ConfigurationType>Application</ConfigurationType>
+              <PlatformToolset>v143</PlatformToolset>
+            </PropertyGroup>
+            <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+            <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.props" />
+            <ItemGroup><ClCompile Include="main.cpp" /></ItemGroup>
+            <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
+            <Import Project="packages\Seitz.$version\build\native\Seitz.targets"
+                    Condition="Exists('packages\Seitz.$version\build\native\Seitz.targets')" />
+          </Project>
+          "@
+          Push-Location consumer-check
+          nuget install packages.config -Source "$env:GITHUB_WORKSPACE\nupkg" -OutputDirectory packages -NonInteractive
+          msbuild consumer.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+          & ".\x64\Release\consumer.exe"
+          Pop-Location
+          Remove-Item -Recurse -Force consumer-check
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: nuget
+          path: nupkg/*.nupkg
+
   # Only on a tag. A workflow_dispatch run reaches here and stops, which is what
   # makes a dispatch a rehearsal: everything above ran and its output is on the
   # run page, and nothing was published.
   release:
     name: publish
     if: github.ref_type == 'tag'
-    needs: [version, wheels, sdist, native]
+    needs: [version, wheels, sdist, native, nuget]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      # For NuGet's trusted publishing: the OIDC token below is minted from it.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
@@ -473,3 +641,20 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+
+      # Trusted publishing: the job's OIDC token buys a one-hour single-use API
+      # key against the policy registered on nuget.org (owner reach2sayan, repo
+      # Seitz, workflow release.yml). A repository *variable* rather than a
+      # secret, so the two steps can be skipped where it is unset -- a fork, or
+      # an account with no policy for this package yet -- and the .nupkg rides
+      # the GitHub Release alone, which is where every other artifact lives.
+      - name: NuGet login
+        if: vars.NUGET_USER != ''
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish to nuget.org
+        if: vars.NUGET_USER != ''
+        run: dotnet nuget push dist/*.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json

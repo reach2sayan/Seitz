@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Imported into every vcxproj that references the Seitz package.  There is
+     one library per CRT flavour and nothing else to choose: every configuration
+     that is not Debug links Release, which is what a RelWithDebInfo-style config
+     wants and what a mismatched /MDd build would fail loudly on anyway.
+
+     The .lib is one archive, not seitz.lib plus the Boost archives it was built
+     against: tools/pack_nuget.py merges them with lib.exe, so the list of
+     libraries a consumer links cannot drift when Boost's installed set changes.
+     The alternative — a wildcard over lib\x64\$(Cfg) — cannot be written here,
+     because MSBuild evaluates properties before items and @() in an
+     ItemDefinitionGroup is empty at that point.
+
+     The compile options below are not preferences.  They are the PUBLIC ones
+     CMakeLists.txt attaches to the seitz target, restated for consumers who
+     reach the headers through MSBuild instead: the subgroup tables and the
+     magnetic-operation decode are evaluated in the consumer's own translation
+     units, so the raised constexpr budget has to travel with them, and 45
+     public headers open a `#pragma GCC visibility` window that C4068 reports at
+     the default /W3.  Keep the two lists in step. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <SeitzCfg>Release</SeitzCfg>
+    <SeitzCfg Condition="'$(Configuration)' == 'Debug'">Debug</SeitzCfg>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;$(MSBuildThisFileDirectory)include\eigen3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard Condition="'%(LanguageStandard)' == '' or '%(LanguageStandard)' == 'Default'">stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/bigobj /utf-8 /Zc:__cplusplus /wd4068 /constexpr:steps100000000 /constexpr:depth2048 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(MSBuildThisFileDirectory)lib\x64\$(SeitzCfg)\seitz.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Target Name="SeitzCheckToolchain" BeforeTargets="ClCompile">
+    <Error Condition="'$(Platform)' != 'x64'"
+           Text="the Seitz package carries x64 binaries only; the active platform is '$(Platform)'" />
+    <!-- The same floor CMakeLists.txt states, and for the same reason: below
+         19.43 there is no &lt;generator&gt;, and the failure without this is a
+         wall of template errors inside generate/assignments.hpp. -->
+    <Error Condition="'$(VCToolsVersion)' != '' and $([System.Version]::Parse('$(VCToolsVersion)').CompareTo($([System.Version]::Parse('14.43')))) &lt; 0"
+           Text="Seitz needs MSVC 19.43 / Visual Studio 17.13+ for &lt;generator&gt; (this project builds with VC tools $(VCToolsVersion))" />
+  </Target>
+</Project>

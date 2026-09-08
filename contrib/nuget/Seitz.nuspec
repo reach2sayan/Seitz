@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Seitz</id>
+    <version>$version$</version>
+    <authors>Sayan Samanta</authors>
+    <license type="expression">BSD-3-Clause</license>
+    <projectUrl>https://github.com/reach2sayan/Seitz</projectUrl>
+    <repository type="git" url="https://github.com/reach2sayan/Seitz.git" />
+    <readme>README.md</readme>
+    <description>Crystallography and symmetry analysis for C++23: space-group
+determination, standardization and lattice reduction, Wyckoff refinement,
+magnetic space groups, k-point reduction, structure generation and alloy
+configurations. Native x64 package: the public headers plus one static
+seitz.lib per CRT flavour, Release and Debug, with the vendored Eigen 5 and
+Boost 1.88 headers the public interface reaches bundled in. Consumers compile
+with /std:c++latest and need MSVC 19.43 (Visual Studio 17.13) or newer for
+&lt;generator&gt;. There is no DLL: Boost.LEAF keeps error payloads in
+thread_local statics that do not survive a module boundary off GCC, so the
+Windows build is static by construction.</description>
+    <tags>native crystallography symmetry space-group spglib wyckoff diffraction materials-science cpp cpp23</tags>
+  </metadata>
+  <files>
+    <file src="build\native\**" target="build\native" />
+    <file src="README.md" target="" />
+    <file src="LICENSE" target="" />
+  </files>
+</package>
