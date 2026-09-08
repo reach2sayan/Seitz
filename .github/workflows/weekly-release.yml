@@ -36,6 +36,19 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
+      # Releases are cut from main and only from main. The scheduled run is
+      # already there -- `schedule` runs on the default branch -- but "Run
+      # workflow" offers a branch picker, and the push at the end is `HEAD:main`
+      # whatever was checked out, so a dispatch on develop would land develop's
+      # HEAD on main under a release tag. The green check below would most
+      # likely stop it first, since it looks for a CI run on main for this SHA,
+      # but that is a side effect of how it is written rather than a rule.
+      - name: main only
+        if: github.ref_name != 'main'
+        run: |
+          echo "::error::releases are cut from main; this run is on ${{ github.ref_name }}"
+          exit 1
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
