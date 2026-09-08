@@ -619,6 +619,36 @@ jobs:
           name: nuget
           path: nupkg/*.nupkg
 
+  # The one part of the pipeline a dispatch could not otherwise rehearse. The
+  # publish job below is tag-only, and by the time it runs, `gh release create`
+  # has already succeeded -- so a trusted-publishing policy that does not match
+  # (wrong owner, wrong repo, renamed workflow file, no policy at all) surfaces
+  # as a red job standing next to a GitHub Release that already exists, and the
+  # rerun fails on the tag it just published.
+  #
+  # This mints the key and does not use it: it asserts the exchange works. The
+  # key is single-use and expires in an hour, so leaving it unspent costs
+  # nothing. Seconds on a Linux runner, and it never runs on a tag -- there the
+  # real push is the check.
+  nuget-login-check:
+    name: nuget.org trusted publishing
+    if: github.event_name == 'workflow_dispatch' && vars.NUGET_USER != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: A key came back
+        env:
+          KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          [[ -n "$KEY" ]] || { echo "::error::the OIDC exchange returned no key"; exit 1; }
+          echo "nuget.org minted a key for ${{ vars.NUGET_USER }}; not spending it"
+
   # Only on a tag. A workflow_dispatch run reaches here and stops, which is what
   # makes a dispatch a rehearsal: everything above ran and its output is on the
   # run page, and nothing was published.
