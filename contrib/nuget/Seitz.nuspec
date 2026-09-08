@@ -23,6 +23,6 @@ Windows build is static by construction.</description>
   <files>
     <file src="build\native\**" target="build\native" />
     <file src="README.md" target="" />
-    <file src="LICENSE" target="" />
+    <file src="LICENSE.txt" target="" />
   </files>
 </package>
