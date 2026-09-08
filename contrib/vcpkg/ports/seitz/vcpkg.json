@@ -1,6 +1,6 @@
 {
   "name": "seitz",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "Modern C++23 crystallography and symmetry analysis: space-group determination, standardization, Wyckoff refinement, magnetic space groups and structure generation",
   "homepage": "https://github.com/reach2sayan/Seitz",
   "license": "BSD-3-Clause",
