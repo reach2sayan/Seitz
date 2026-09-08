@@ -44,6 +44,36 @@ def merge(prefix, out):
     return True
 
 
+def headers(prefix, out):
+    """The prefix's include/ as one flat tree, packable by `nuget pack`."""
+    shutil.copytree(prefix / "include", out)
+
+    # Boost's CMake install is versioned: include/boost-1_88/boost/... . One
+    # include directory in Seitz.targets is worth more than a path that has to
+    # be rewritten at every Boost bump, so the version dir is unwrapped here.
+    versioned = [d for d in out.glob("boost-*") if d.is_dir()]
+    if len(versioned) > 1:
+        print(f"more than one versioned Boost include dir: {versioned}", file=sys.stderr)
+        return False
+    for d in versioned:
+        for child in d.iterdir():
+            shutil.move(str(child), out / child.name)
+        d.rmdir()
+
+    # `nuget pack` excludes dotfiles by default and then dies -- "String cannot
+    # be empty. Parameter name: entryName" -- on the directory it just emptied.
+    # Boost ships a boost/headers/.gitkeep that lands exactly there. Drop what
+    # NuGet would drop, then the directories that leaves behind, so the crash
+    # has nothing to happen to.
+    for path in sorted(out.rglob(".*"), key=lambda p: -len(p.parts)):
+        if path.is_file():
+            path.unlink()
+    for path in sorted(out.rglob("*"), key=lambda p: -len(p.parts)):
+        if path.is_dir() and not any(path.iterdir()):
+            path.rmdir()
+    return True
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--release", type=Path, required=True, help="Release install prefix")
@@ -60,10 +90,9 @@ def main() -> int:
     shutil.copy2(ROOT / "LICENSE", args.stage)
     # Headers only: lib/cmake and share/ describe a find_package() consumer,
     # which is not who this package is for.
-    shutil.copytree(args.release / "include", native / "include")
-
-    ok = all([merge(prefix, native / "lib" / "x64" / config / "seitz.lib")
-              for config, prefix in (("Release", args.release), ("Debug", args.debug))])
+    ok = all([headers(args.release, native / "include"),
+              *(merge(prefix, native / "lib" / "x64" / config / "seitz.lib")
+                for config, prefix in (("Release", args.release), ("Debug", args.debug)))])
     if not ok:
         return 1
     print(f"staged {args.stage}")

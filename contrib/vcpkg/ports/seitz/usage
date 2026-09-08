@@ -1,0 +1,4 @@
+seitz provides CMake targets:
+
+    find_package(Seitz CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE seitz::seitz)

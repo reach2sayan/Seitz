@@ -1,8 +1,9 @@
 # Wheels, an sdist, a bare-library archive per platform and a native NuGet
-# package, attached to a GitHub Release. A tag `vX.Y.Z` builds and publishes -- pushed by hand, or cut on
-# Mondays by weekly-release.yml; a `workflow_dispatch` run on a branch builds the
-# same artifacts, leaves them on the run page and publishes nothing, which is how
-# a change to this pipeline gets tried before a version rides on it. Both publish
+# package, attached to a GitHub Release. A tag `vX.Y.Z` builds and publishes --
+# pushed by hand, or cut on Mondays by weekly-release.yml; a `workflow_dispatch`
+# run on a branch builds the same artifacts, leaves them on the run page and
+# publishes nothing, which is how a change to this pipeline gets tried before a
+# version rides on it. Both publish
 # jobs are gated on `github.ref_type == 'tag'` and that gate is the whole of the
 # distinction -- there is no separate "trial" workflow to keep in step.
 #
@@ -525,9 +526,11 @@ jobs:
 
       # The preset carries what the package is; the -D flags are only about
       # running on a shared runner. CMAKE_MSVC_DEBUG_INFORMATION_FORMAT is the
-      # preset's business here, unlike in `native`: the Debug archive has to
-      # carry its debug info inside itself (/Z7), because a compiler .pdb sits
-      # outside the install prefix and every consumer would link with LNK4099.
+      # preset's business here, unlike in `native`, and it is empty: the Debug
+      # flavour exists so a /MDd consumer has a CRT-compatible archive to link,
+      # not so anyone can step into the library. Debug info made it 678 MB, and
+      # nuget.org's limit is 250 MB. Nothing references a .pdb either way, so
+      # there is no LNK4099 to answer for.
       - name: Configure
         run: >
           cmake --preset nuget -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
@@ -618,6 +621,39 @@ jobs:
         with:
           name: nuget
           path: nupkg/*.nupkg
+
+  # The overlay port under contrib/vcpkg pins a tag and its archive hash, so
+  # each release has to rewrite both. Pushed straight to main with the same
+  # deploy key the weekly bump uses -- main requires a PR, and deploy keys are
+  # on that ruleset's bypass list.
+  vcpkg-port:
+    name: vcpkg port
+    if: github.ref_type == 'tag'
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+      - run: |
+          version="${{ needs.version.outputs.version }}"
+          sha=$(curl -sfL "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/v$version.tar.gz" | sha512sum | cut -d' ' -f1)
+          port=contrib/vcpkg/ports/seitz
+          sed -i -E "s/\"version\": \"[0-9.]+\"/\"version\": \"$version\"/" "$port/vcpkg.json"
+          # Address only the hash inside the reach2sayan/Seitz block: the
+          # portfile carries a second SHA512, for the pinned spglib sources the
+          # tables are transcribed from, and a bare s/SHA512 .../ would rewrite
+          # that one too and break every build of this port.
+          sed -i -E "/REPO reach2sayan\/Seitz/,/^\)/ s/SHA512 [0-9a-f]+/SHA512 $sha/" "$port/portfile.cmake"
+          grep -q "SHA512 $sha" "$port/portfile.cmake" || { echo "::error::the port hash did not update"; exit 1; }
+          grep -q "38b5e5c50bdda2c530f0b3f24d0f89e12965d0c2d1067e6d8501e677926c49de" "$port/portfile.cmake" \
+            || { echo "::error::the spglib hash was overwritten"; exit 1; }
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "vcpkg port v$version"
+          git push origin HEAD:main
 
   # The one part of the pipeline a dispatch could not otherwise rehearse. The
   # publish job below is tag-only, and by the time it runs, `gh release create`

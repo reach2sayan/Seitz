@@ -71,7 +71,7 @@
       "generator": "Ninja Multi-Config",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Release;Debug",
-        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "$<$<CONFIG:Debug>:Embedded>"
+        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": ""
       }
     }
   ],

@@ -87,7 +87,13 @@ include(Dependencies)
 # exception: scikit-build-core (SKBUILD) passes the interpreter it builds for.
 # Spelled `Python` rather than `Python3` so it resolves the same cache variable
 # pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
-if (NOT SKBUILD)
+#
+# `NOT Python_EXECUTABLE` as well as `NOT SKBUILD`: the set() below is FORCEd,
+# so without that clause a caller who named an interpreter on the command line
+# would silently get uv's instead. The vcpkg port does exactly that -- it builds
+# a throwaway venv with numpy and pandas in it, because a vcpkg build
+# environment has neither -- and a stray `uv` on PATH would undo it.
+if (NOT SKBUILD AND NOT Python_EXECUTABLE)
     find_program(UV_EXECUTABLE uv)
     if (UV_EXECUTABLE)
         execute_process(COMMAND "${UV_EXECUTABLE}" sync --quiet
