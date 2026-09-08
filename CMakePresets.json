@@ -63,6 +63,16 @@
         "SEITZ_BUILD_DEMO": "OFF",
         "SEITZ_BUILD_ORACLE_TESTS": "OFF"
       }
+    },
+    {
+      "name": "nuget",
+      "displayName": "Release + Debug, library only -- what the NuGet package ships",
+      "inherits": "dist",
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Release;Debug",
+        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "$<$<CONFIG:Debug>:Embedded>"
+      }
     }
   ],
   "buildPresets": [
@@ -85,6 +95,10 @@
     {
       "name": "dist",
       "configurePreset": "dist"
+    },
+    {
+      "name": "nuget",
+      "configurePreset": "nuget"
     }
   ],
   "testPresets": [
