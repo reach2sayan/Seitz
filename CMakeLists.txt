@@ -48,6 +48,7 @@ option(SEITZ_BUILD_TESTS "Build the test suite" ON)
 option(SEITZ_BUILD_DEMO "Build the demo executable" ON)
 option(SEITZ_BUILD_ORACLE_TESTS "Build oracle tests against the reference spglib" OFF)
 option(SEITZ_BUILD_PYTHON "Build the pybind11 extension module" OFF)
+option(SEITZ_STATIC_LIBRARY "Build seitz as a static archive, for a consumer that absorbs it into one module (its own Python extension, say)" OFF)
 option(SEITZ_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 
@@ -245,7 +246,7 @@ endif ()
 #   Linking one module is the only fix that does not fork Boost. It also makes
 #   the `#pragma GCC visibility` windows in the public headers and
 #   SEITZ_TESTABLE genuinely inert rather than something to work around.
-if (SEITZ_BUILD_PYTHON OR WIN32)
+if (SEITZ_BUILD_PYTHON OR WIN32 OR SEITZ_STATIC_LIBRARY)
     set(SEITZ_LIBRARY_TYPE STATIC)
 else ()
     set(SEITZ_LIBRARY_TYPE SHARED)
