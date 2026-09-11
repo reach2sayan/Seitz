@@ -1,7 +1,7 @@
 """The exception -> Result inverse.
 
 ``test_errors.py`` pins that a failure arrives as the right exception class with
-its payload attached.  This module pins that ``seitz.results`` hands that same
+its payload attached.  This module pins that ``pyseitz.results`` hands that same
 object back as a value instead, and -- the half that is easy to get wrong -- that
 it converts SeitzError and nothing else.
 """
@@ -13,8 +13,8 @@ import pydantic
 import pytest
 from result import Err, Ok
 
-import seitz as sz
-from seitz import errors, results
+import pyseitz as sz
+from pyseitz import errors, results
 
 # The same malformed documents test_errors.py uses, so the two suites cannot
 # drift about what "a CIF syntax error" is.

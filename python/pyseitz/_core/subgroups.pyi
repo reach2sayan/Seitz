@@ -4,10 +4,10 @@
 The maximal-subgroup graph of the 230 space groups, translationengleiche and klassengleiche.
 """
 from __future__ import annotations
-import seitz._core
+import pyseitz._core
 import typing
 __all__: list[str] = ['K_NUM_SPACE_GROUPS', 'edge', 'is_subgroup', 'maximal_subgroups', 'minimal_supergroups', 'path']
-def edge(id: typing.SupportsInt | typing.SupportsIndex) -> seitz._core.SubgroupEdge:
+def edge(id: typing.SupportsInt | typing.SupportsIndex) -> pyseitz._core.SubgroupEdge:
     """
     The relation with that id.
     """
@@ -15,15 +15,15 @@ def is_subgroup(sub: typing.SupportsInt | typing.SupportsIndex, super: typing.Su
     """
     Whether `sub` is reachable from `super` by a chain of maximal-subgroup steps of any kind. True when they are equal.
     """
-def maximal_subgroups(number: typing.SupportsInt | typing.SupportsIndex, kind: seitz._core.SubgroupKind | None = None) -> list[seitz._core.SubgroupEdge]:
+def maximal_subgroups(number: typing.SupportsInt | typing.SupportsIndex, kind: pyseitz._core.SubgroupKind | None = None) -> list[pyseitz._core.SubgroupEdge]:
     """
     The maximal subgroups of `number`, of one kind or both. Empty out of range.
     """
-def minimal_supergroups(number: typing.SupportsInt | typing.SupportsIndex, kind: seitz._core.SubgroupKind | None = None) -> list[seitz._core.SubgroupEdge]:
+def minimal_supergroups(number: typing.SupportsInt | typing.SupportsIndex, kind: pyseitz._core.SubgroupKind | None = None) -> list[pyseitz._core.SubgroupEdge]:
     """
     The groups of which `number` is a maximal subgroup.
     """
-def path(super: typing.SupportsInt | typing.SupportsIndex, sub: typing.SupportsInt | typing.SupportsIndex, kind: seitz._core.SubgroupKind | None = None) -> typing.Any:
+def path(super: typing.SupportsInt | typing.SupportsIndex, sub: typing.SupportsInt | typing.SupportsIndex, kind: pyseitz._core.SubgroupKind | None = None) -> typing.Any:
     """
     A shortest chain of relations from `super` down to `sub` along steps of the given kind (both when None); empty when they are equal, None when there is none.
     """

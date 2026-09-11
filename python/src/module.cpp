@@ -7,7 +7,7 @@
 // The extension module. Nothing is bound here: each subsystem's TU binds its
 // own headers, mirroring include/seitz/, and this file only fixes their order.
 //
-// _core is private; the public surface is the pure-Python seitz package, which
+// _core is private; the public surface is the pure-Python pyseitz package, which
 // re-exports from it and adds what a C++ binding expresses poorly (keyword-only
 // arguments, overloads, a stable __all__, JSON round-trips).
 namespace seitz::python {
@@ -26,7 +26,7 @@ void bind_io(py::module_ &m);
 PYBIND11_MODULE(_core, m) {
   namespace sp = seitz::python;
 
-  m.doc() = "Raw bindings for Seitz. Import seitz instead.";
+  m.doc() = "Raw bindings for Seitz. Import pyseitz instead.";
   m.attr("__version__") = seitz::version_string();
 
   // Errors first: every other binding's unwrap() reaches for these types, so

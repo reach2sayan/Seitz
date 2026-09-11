@@ -35,7 +35,7 @@ class Backend:
 
 
 def _seitz() -> Backend:
-    import seitz as sz
+    import pyseitz as sz
     tol = sz.Tolerance(symprec=SYMPREC)
     sz.warmup()
     return Backend(

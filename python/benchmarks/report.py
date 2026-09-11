@@ -75,7 +75,7 @@ def verdicts(t: pd.DataFrame) -> str:
 
 def version(pkg: str) -> str:
     """seitz comes from the build tree, not a distribution, so ask the module."""
-    try: return metadata.version(pkg) if pkg != "seitz" else __import__("seitz").__version__
+    try: return metadata.version(pkg) if pkg != "seitz" else __import__("pyseitz").__version__
     except (metadata.PackageNotFoundError, ImportError): return "-"
 
 

@@ -11,7 +11,7 @@ import gc
 
 import numpy as np
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_a_wyckoff_outlives_the_name_that_reached_it() -> None:

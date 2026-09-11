@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_a_mesh_needs_positive_divisions() -> None:

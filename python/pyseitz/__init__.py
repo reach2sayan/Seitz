@@ -3,7 +3,7 @@
 A structure in, its symmetry out::
 
     import numpy as np
-    import seitz as cc
+    import pyseitz as cc
 
     cell = cc.Cell(
         cc.Lattice(3.0 * np.eye(3)),
@@ -15,8 +15,8 @@ A structure in, its symmetry out::
 
 The analyzer memoizes, so it is the object you keep rather than a call you
 repeat, and every query on it is thread-safe.  Errors are never sentinels: a
-fallible call raises a :class:`~seitz.errors.SeitzError` subclass, and
-"absent" is always ``None``.  :mod:`seitz.results` is the same surface with the
+fallible call raises a :class:`~pyseitz.errors.SeitzError` subclass, and
+"absent" is always ``None``.  :mod:`pyseitz.results` is the same surface with the
 failure returned as an ``Ok``/``Err`` value instead, for callers who want the
 C++ layer's ``Result<T>`` discipline.
 
@@ -206,7 +206,7 @@ def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = 
         -> SymmetryAnalyzer:
     """Determine the symmetry of ``cell``.
 
-    Takes a :class:`~seitz.options.Tolerance`, a dict, or nothing.  An unset
+    Takes a :class:`~pyseitz.options.Tolerance`, a dict, or nothing.  An unset
     ``setting`` searches every Hall setting of the cell's family; a set one
     fixes it.
 
@@ -264,7 +264,7 @@ def write_cif(obj: Cell | SymmetryAnalyzer, *, name: str = "seitz",
     symmetrized: standardized cell, its setting's database operations, and one
     atom per orbit with Wyckoff letter and multiplicity.
 
-    The text is returned either way, so ``print(seitz.write_cif(cell))`` is the
+    The text is returned either way, so ``print(pyseitz.write_cif(cell))`` is the
     printable form.
     """
     if isinstance(obj, Cell): text = _core.write_cif_cell(obj, name)
@@ -274,7 +274,7 @@ def write_cif(obj: Cell | SymmetryAnalyzer, *, name: str = "seitz",
     return text
 
 
-# Imported last, not with the others at the top: seitz.results wraps read_cif
+# Imported last, not with the others at the top: pyseitz.results wraps read_cif
 # and write_cif, which are defined above, so a top-of-file import would reach
 # for names this module has not bound yet.
 from . import results  # noqa: E402

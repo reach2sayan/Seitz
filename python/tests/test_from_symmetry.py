@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_the_operations_of_a_cell_find_its_own_space_group(bcc_fe: sz.Cell) -> None:

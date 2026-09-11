@@ -32,26 +32,26 @@ target_link_libraries(_core PRIVATE seitz::seitz)
 # wants -- its own types are hidden so two extensions never share internals, and
 # PYBIND11_MODULE marks the init symbol default-visible by hand.
 set_target_properties(_core PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/seitz")
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/pyseitz")
 
 # The pure-Python half, mirrored next to the freshly built _core so that
 # PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} is an importable package with no wheel
 # and no install step -- which is what the CTest registration below relies on.
 file(GLOB SEITZ_PY CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/seitz/*.py"
-        "${CMAKE_CURRENT_SOURCE_DIR}/seitz/*.pyi"
-        "${CMAKE_CURRENT_SOURCE_DIR}/seitz/py.typed")
+        "${CMAKE_CURRENT_SOURCE_DIR}/pyseitz/*.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/pyseitz/*.pyi"
+        "${CMAKE_CURRENT_SOURCE_DIR}/pyseitz/py.typed")
 add_custom_command(TARGET _core POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
-                "${CMAKE_CURRENT_BINARY_DIR}/seitz"
+                "${CMAKE_CURRENT_BINARY_DIR}/pyseitz"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SEITZ_PY}
-                "${CMAKE_CURRENT_BINARY_DIR}/seitz"
+                "${CMAKE_CURRENT_BINARY_DIR}/pyseitz"
         # The _core stubs are a directory, not one file: the module has
         # submodules, so pybind11-stubgen writes a package. copy_directory_if_
         # different tolerates it being absent before the first stub generation.
         COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
-                "${CMAKE_CURRENT_SOURCE_DIR}/seitz/_core"
-                "${CMAKE_CURRENT_BINARY_DIR}/seitz/_core"
+                "${CMAKE_CURRENT_SOURCE_DIR}/pyseitz/_core"
+                "${CMAKE_CURRENT_BINARY_DIR}/pyseitz/_core"
         COMMENT "Mirroring the pure-Python package next to _core")
 
 # Only _core: it already contains the library. COMPONENT python so that the
@@ -59,8 +59,8 @@ add_custom_command(TARGET _core POST_BUILD
 # package config into site-packages.
 install(TARGETS _core
         COMPONENT python
-        LIBRARY DESTINATION seitz
-        RUNTIME DESTINATION seitz)
+        LIBRARY DESTINATION pyseitz
+        RUNTIME DESTINATION pyseitz)
 
 # The pytest suite, registered so `ctest` stays the single verb for "run the
 # tests". Skipped rather than failed when pytest is absent: a plain
@@ -82,7 +82,7 @@ else ()
     #
     # 1. libstdc++. We compile with GCC 15, but a conda or system interpreter
     #    may ship an older libstdc++ of its own and load it first (numpy pulls
-    #    it in before seitz gets a look in), and then _core cannot resolve
+    #    it in before pyseitz gets a look in), and then _core cannot resolve
     #    the GLIBCXX_3.4.3x symbols it was built against. Preloading the
     #    compiler's own copy settles the order; it is a no-op when the
     #    interpreter's is already new enough.

@@ -283,7 +283,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/build/python/python
         run: |
           uv run python tools/fix_core_stubs.py
-          git diff --exit-code python/seitz/_core
+          git diff --exit-code python/pyseitz/_core
 
   #
   # MSVC, required. Everything portable: library, unit tests, the reference

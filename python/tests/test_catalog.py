@@ -6,7 +6,7 @@ from collections import Counter
 
 import pytest
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_every_space_hall_setting_has_a_symbol() -> None:

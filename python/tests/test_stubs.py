@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.machinery
 import pathlib
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_the_stub_package_does_not_shadow_the_extension() -> None:
@@ -14,7 +14,7 @@ def test_the_stub_package_does_not_shadow_the_extension() -> None:
     Python resolves a real module in a directory ahead of a same-named
     subdirectory with no ``__init__.py``, so the extension wins -- but that is
     a rule worth pinning rather than trusting, because if it ever went the other
-    way ``import seitz`` would start returning an empty namespace package
+    way ``import pyseitz`` would start returning an empty namespace package
     and every symbol would vanish at once.
 
     The suffix is asked of the interpreter rather than spelled out: it is

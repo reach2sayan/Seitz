@@ -1,7 +1,7 @@
 """Shared by python/tests and python/benchmarks: the build-tree guard.
 
 At the repo root, not under python/: pytest puts a conftest's directory on
-sys.path, and python/ holds the *source* seitz package, whose _core is stubs only.
+sys.path, and python/ holds the *source* pyseitz package, whose _core is stubs only.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import pathlib
 
 import pytest
 
-import seitz as sz
+import pyseitz as sz
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -30,9 +30,9 @@ def pytest_configure(config: pytest.Config) -> None:
     loaded = pathlib.Path(sz._core.__file__).resolve()
     if not loaded.is_relative_to(pathlib.Path(expected).resolve()):
         raise pytest.UsageError(
-            f"seitz._core was imported from {loaded}, but PYTHONPATH points "
+            f"pyseitz._core was imported from {loaded}, but PYTHONPATH points "
             f"at {expected}. Something is shadowing the build tree -- most "
-            f"likely an editable install of seitz in this interpreter. "
-            f"Remove it (`uv pip uninstall seitz`); this project is reached "
+            f"likely an editable install of pyseitz in this interpreter. "
+            f"Remove it (`uv pip uninstall pyseitz`); this project is reached "
             f"through the CMake build tree, not an editable install."
         )

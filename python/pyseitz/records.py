@@ -2,8 +2,8 @@
 
 The plain-data half of a determination, as frozen pydantic models: what a caller
 wants to compare, print, store, or hand to something else as JSON.  The
-heavyweight handles -- :class:`~seitz.SymmetryAnalyzer`,
-:class:`~seitz.SpaceGroup`, :class:`~seitz.Cell` -- stay extension
+heavyweight handles -- :class:`~pyseitz.SymmetryAnalyzer`,
+:class:`~pyseitz.SpaceGroup`, :class:`~pyseitz.Cell` -- stay extension
 types, because their lifetime rules live on the C++ object and a model that
 merely held one would not inherit them.
 
@@ -99,7 +99,7 @@ class SpacegroupType(_Frozen):
 
 class CellRecord(_Frozen):
     """A cell as data, for storage and provenance.
-    The explicit adapter rather than making :class:`~seitz.Cell` itself a
+    The explicit adapter rather than making :class:`~pyseitz.Cell` itself a
     model: a Cell is on the hot path in both directions -- out of a
     determination and straight back into another one -- and a validation layer
     in the middle of that would be paid on every round trip for nothing.

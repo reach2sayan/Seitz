@@ -527,19 +527,22 @@ extension, it is a static archive instead.
 
 The same API, NumPy-first: the C++ library does the work, and the Python layer
 adds validated inputs, serializable records via **pydantic**, and an exception
-hierarchy over `Result<T>` — with `seitz.results` giving the `Result<T>`
+hierarchy over `Result<T>` — with `pyseitz.results` giving the `Result<T>`
 discipline back, unchanged, to callers who want it.
 
-Wheels for CPython 3.11-3.14 (Linux x86-64, Windows x64) are attached to each
-GitHub release, and need no compiler or GCC 15 on the target machine:
+Wheels for CPython 3.11-3.14 (Linux x86-64, Windows x64) are on PyPI, and
+need no compiler or GCC 15 on the target machine:
 
 ```bash
-uv pip install https://github.com/reach2sayan/Seitz/releases/latest/download/seitz-<version>-cp313-cp313-manylinux_2_28_x86_64.whl
+pip install pyseitz
 ```
+
+The distribution and the import are both `pyseitz`; PyPI refuses `seitz` as
+too close to the unrelated `seltz`.
 
 ```python
 import numpy as np
-import seitz as sz
+import pyseitz as sz
 
 cell = sz.Cell(
     sz.Lattice(3.0 * np.eye(3)),          # columns are the basis vectors
@@ -575,19 +578,19 @@ zone = reciprocal.brillouin_zone(sz.Lattice(np.linalg.inv(cell.lattice.matrix).T
 
 The analyzer memoizes, so it is the object you keep rather than a call you
 repeat, and every query on it is thread-safe. "Absent" is `None`; failures raise
-a `seitz.errors.SeitzError` subclass carrying its context —
+a `pyseitz.errors.SeitzError` subclass carrying its context —
 `InvalidLatticeError.determinant`, `AtomsTooCloseError.distance`. Layer groups
 are not a separate entry point: a cell built with
 `periodicity=sz.aperiodic_along(2)` goes through the same analyzer.
 
 Raising is the default because it is what Python callers expect, but it is not
-the only door. `seitz.results` mirrors the fallible surface as `Ok`/`Err`
+the only door. `pyseitz.results` mirrors the fallible surface as `Ok`/`Err`
 values, so [the error model above](#error-model-and-invariants) survives the
 crossing rather than being traded away at it:
 
 ```python
 from result import Ok, Err
-from seitz import errors, results
+from pyseitz import errors, results
 
 match results.read_cif(path):
     case Ok(structures):
