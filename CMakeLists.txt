@@ -51,6 +51,9 @@ option(SEITZ_BUILD_PYTHON "Build the pybind11 extension module" OFF)
 option(SEITZ_STATIC_LIBRARY "Build seitz as a static archive, for a consumer that absorbs it into one module (its own Python extension, say)" OFF)
 option(SEITZ_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
+# Defaults to off for an embedded build; see the install section at the end for
+# why a FetchContent consumer must not generate these rules.
+option(SEITZ_INSTALL "Generate install and export rules" ${PROJECT_IS_TOP_LEVEL})
 
 # The interpreter comes from uv: `uv sync` materialises .venv from pyproject's
 # dev group (numpy and pandas for the transcribers in tools/, pytest, stubgen)
@@ -70,7 +73,14 @@ option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 # would silently get uv's instead. The vcpkg port does exactly that -- it builds
 # a throwaway venv with numpy and pandas in it, because a vcpkg build
 # environment has neither -- and a stray `uv` on PATH would undo it.
-if (NOT SKBUILD AND NOT Python_EXECUTABLE)
+#
+# PROJECT_IS_TOP_LEVEL, because `uv sync` writes .venv into CMAKE_CURRENT_SOURCE_DIR
+# and reaches the network to do it. That is a convenience for someone building
+# this project; for a FetchContent consumer it is a surprise -- their configure
+# step would materialise a virtualenv inside _deps/seitz-src. Embedded builds
+# fall through to the diagnostic below, which tells the consumer to pass
+# -DPython_EXECUTABLE (as RMC and the vcpkg port already do).
+if (PROJECT_IS_TOP_LEVEL AND NOT SKBUILD AND NOT Python_EXECUTABLE)
     find_program(UV_EXECUTABLE uv)
     if (UV_EXECUTABLE)
         execute_process(COMMAND "${UV_EXECUTABLE}" sync --quiet
@@ -531,36 +541,48 @@ endif ()
 # PRIVATE include path and are deliberately not part of the exported interface,
 # so an installed consumer can reach exactly what <seitz/seitz.hpp>
 # reaches and no more.
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
+#
+# All of it behind SEITZ_INSTALL, off by default when this project is embedded.
+# A FetchContent consumer installs its own artefacts, not this library's -- and
+# install(EXPORT) cannot even be generated there unless every target the export
+# depends on is itself in an export set. Boost's are only when its install rules
+# were not skipped, and cmake/Dependencies.cmake's BOOST_SKIP_INSTALL_RULES only
+# decides that when this project is the one declaring Boost: FetchContent is
+# first-declaration-wins, so a parent that declares Boost itself has settled the
+# question before that file is read. The failure then names boost_container
+# rather than anything here, which is a poor way to learn this.
+if (SEITZ_INSTALL)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
 
-# GNUInstallDirs supplies every destination; naming them again would only
-# restate the defaults.
-install(TARGETS seitz EXPORT SeitzTargets)
-install(DIRECTORY include/seitz
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.hpp")
-# The three public tables are generated, so they are not under include/ to be
-# picked up by the rule above; they land in the same place from the build tree.
-# Their $<BUILD_INTERFACE:> and the authored headers' $<INSTALL_INTERFACE:include>
-# converge on one directory, which is why the installed layout is unchanged.
-install(DIRECTORY "${SEITZ_GENERATED_INCLUDE_DIR}/seitz"
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.hpp")
-install(EXPORT SeitzTargets
-        FILE SeitzTargets.cmake
-        NAMESPACE seitz::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
+    # GNUInstallDirs supplies every destination; naming them again would only
+    # restate the defaults.
+    install(TARGETS seitz EXPORT SeitzTargets)
+    install(DIRECTORY include/seitz
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.hpp")
+    # The three public tables are generated, so they are not under include/ to be
+    # picked up by the rule above; they land in the same place from the build tree.
+    # Their $<BUILD_INTERFACE:> and the authored headers' $<INSTALL_INTERFACE:include>
+    # converge on one directory, which is why the installed layout is unchanged.
+    install(DIRECTORY "${SEITZ_GENERATED_INCLUDE_DIR}/seitz"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.hpp")
+    install(EXPORT SeitzTargets
+            FILE SeitzTargets.cmake
+            NAMESPACE seitz::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
 
-write_basic_package_version_file(
-        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
-        VERSION ${PROJECT_VERSION}
-        COMPATIBILITY SameMajorVersion)
-configure_package_config_file(
-        cmake/SeitzConfig.cmake.in
-        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
-        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
-install(FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
+    write_basic_package_version_file(
+            "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
+            VERSION ${PROJECT_VERSION}
+            COMPATIBILITY SameMajorVersion)
+    configure_package_config_file(
+            cmake/SeitzConfig.cmake.in
+            "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
+            INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
+    install(FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/SeitzConfigVersion.cmake"
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Seitz)
+endif ()

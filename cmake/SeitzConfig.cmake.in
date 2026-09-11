@@ -1,7 +1,12 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(Eigen3)
+# Version floors, interpolated from cmake/Dependencies.cmake so they cannot drift
+# from what the library was built against. Without them a consumer with, say,
+# Eigen 3.4 or Boost 1.83 installed configures cleanly and then fails deep inside
+# a header -- relocating downstream exactly the breakage the compiler-version
+# gate in CMakeLists.txt exists to catch early.
+find_dependency(Eigen3 @SEITZ_EIGEN_MIN@)
 # Which Boost components a consumer needs depends on how the library was built.
 # Eigen and Boost.Container appear in the installed headers, Boost.Graph in the
 # subgroup-graph interface and Boost.LEAF in the Result<T> return type; all
@@ -13,10 +18,10 @@ find_dependency(Eigen3)
 # the consumer's link line does need the targets to exist. Boost::algorithm
 # and ::range are there too: no installed header names them.
 if ("@SEITZ_LIBRARY_TYPE@" STREQUAL "SHARED")
-    find_dependency(Boost COMPONENTS container graph leaf)
+    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS container graph leaf)
 else ()
-    find_dependency(Boost COMPONENTS container graph leaf flyweight parser
-            algorithm range)
+    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS container graph leaf
+            flyweight parser algorithm range)
 endif ()
 find_dependency(Threads)
 

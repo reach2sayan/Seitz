@@ -27,9 +27,14 @@ set(BOOST_SKIP_INSTALL_RULES OFF CACHE BOOL "" FORCE)
 # the same list cmake/SeitzConfig.cmake.in re-derives for a consumer.
 option(SEITZ_EXTERNAL_EIGEN_AND_BOOST
         "Take Eigen and Boost from CMAKE_PREFIX_PATH when they are there, instead of fetching them" OFF)
+# The floors, named once. cmake/SeitzConfig.cmake.in interpolates these same two
+# variables into its find_dependency() calls, so an installed seitz cannot accept
+# a version of Eigen or Boost that this build would have refused.
+set(SEITZ_EIGEN_MIN 5.0)
+set(SEITZ_BOOST_MIN 1.88)
 if (SEITZ_EXTERNAL_EIGEN_AND_BOOST)
-    set(SEITZ_EIGEN_FIND FIND_PACKAGE_ARGS 5.0)
-    set(SEITZ_BOOST_FIND FIND_PACKAGE_ARGS 1.88 COMPONENTS container graph leaf
+    set(SEITZ_EIGEN_FIND FIND_PACKAGE_ARGS ${SEITZ_EIGEN_MIN})
+    set(SEITZ_BOOST_FIND FIND_PACKAGE_ARGS ${SEITZ_BOOST_MIN} COMPONENTS container graph leaf
             flyweight parser algorithm range)
 endif ()
 
