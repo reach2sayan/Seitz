@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import seitz as sz
+import pyseitz as sz
 
 
 @pytest.fixture

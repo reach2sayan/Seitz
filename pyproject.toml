@@ -3,13 +3,15 @@ requires = ["scikit-build-core>=0.10", "numpy>=1.24", "pandas>=2.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "seitz"
+# Not `seitz`: PyPI refuses it as confusable with the unrelated `seltz` (i and l
+# fold together). The import is `pyseitz` too, so the two names never differ.
+name = "pyseitz"
 dynamic = ["version"]
 description = "Modern C++23 crystallography and symmetry analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
-# result: the Ok/Err type seitz.results returns. Pure Python, no
+# result: the Ok/Err type pyseitz.results returns. Pure Python, no
 # dependencies of its own; a hard requirement rather than an extra because
 # an optional one would buy an import guard, a skip marker and a second
 # supported configuration for less than it costs.
@@ -42,12 +44,12 @@ cmake.define.SEITZ_BUILD_PYTHON = "ON"
 cmake.define.SEITZ_BUILD_TESTS = "OFF"
 cmake.define.SEITZ_BUILD_DEMO = "OFF"
 install.components = ["python"]
-wheel.packages = ["python/seitz"]
+wheel.packages = ["python/pyseitz"]
 build-dir = "build/{wheel_tag}"
 sdist.exclude = ["cmake-build-*", ".deps", "build"]
 
 # No [tool.scikit-build.editable] section, deliberately. scikit-build-core's
-# editable install works through a meta-path finder that maps seitz._core to
+# editable install works through a meta-path finder that maps pyseitz._core to
 # whichever artifact it installed -- and a meta-path finder wins over PYTHONPATH
 # unconditionally, so an editable install silently shadows the build tree that
 # `ctest` compiles and points at. For a project whose source of truth is the
@@ -120,7 +122,7 @@ test-requires = "pytest"
 # numpy and pydantic arrive as install dependencies of the wheel under test.
 # This is the only gate that catches an extension that links but does not
 # import, and the only place the *installed* layout is exercised -- in the build
-# tree the stub package seitz/_core/ sits beside the extension seitz/_core.so,
+# tree the stub package pyseitz/_core/ sits beside the extension pyseitz/_core.so,
 # and test_stubs.py asserts the extension is what wins.
 test-command = "pytest -q {package}/python/tests"
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_positions_are_c_contiguous_float64(bcc_fe: sz.Cell) -> None:

@@ -17,7 +17,7 @@ namespace {
 // and a static py::object would decref one after the GIL is gone.
 [[nodiscard]] py::handle make(py::module_ &m, char const *name, char const *doc,
                               py::handle base) {
-  std::string const qualified = std::string("seitz._core.") + name;
+  std::string const qualified = std::string("pyseitz._core.") + name;
   py::handle const type =
       PyErr_NewExceptionWithDoc(qualified.c_str(), doc, base.ptr(), nullptr);
   if (!type) {

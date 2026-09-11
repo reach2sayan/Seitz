@@ -22,8 +22,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import seitz as sz
-from seitz import errors
+import pyseitz as sz
+from pyseitz import errors
 
 
 def test_a_singular_basis_raises_and_carries_its_determinant() -> None:

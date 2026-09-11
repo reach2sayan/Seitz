@@ -14,11 +14,10 @@
 # importable on a machine that has never seen GCC 15. No macOS wheel: the tree is
 # written to libstdc++'s C++23, and libc++ has no <generator>.
 #
-# Nothing is published to PyPI. The wheels ride the GitHub Release and are
-# installed by URL; the README shows the incantation. The .nupkg is the one
-# exception to release-by-attachment: it also goes to nuget.org by trusted
-# publishing, when the NUGET_USER repository variable names the account whose
-# policy this workflow is registered under.
+# Two artifacts also leave GitHub. The wheels go to PyPI as `pyseitz` by trusted
+# publishing, once the GitHub Release exists (the `pypi` job). The .nupkg goes
+# to nuget.org by trusted publishing, when the NUGET_USER repository variable
+# names the account whose policy this workflow is registered under.
 name: Release
 
 on:
@@ -238,17 +237,17 @@ jobs:
           for w in sorted(glob.glob("wheelhouse/*.whl")):
               names = set(zipfile.ZipFile(w).namelist())
               print(f"=== {w}")
-              for want in ("seitz/__init__.py", "seitz/py.typed", "seitz/_core/__init__.pyi"):
+              for want in ("pyseitz/__init__.py", "pyseitz/py.typed", "pyseitz/_core/__init__.pyi"):
                   if want not in names:
                       print(f"::error::{w}: missing {want}"); bad = True
-              ext = [n for n in names if re.fullmatch(r"seitz/_core\.[^/]+\.(so|pyd)", n)]
+              ext = [n for n in names if re.fullmatch(r"pyseitz/_core\.[^/]+\.(so|pyd)", n)]
               if len(ext) != 1:
                   print(f"::error::{w}: expected exactly one extension, got {ext}"); bad = True
               # The whole C++ library is absorbed into _core; nothing should have
               # been vendored beside it. On Windows that means MSVCP140 stays a
               # redistributable dependency, which is the convention for C++
               # extension wheels -- assert it rather than discover a change.
-              vendored = [n for n in names if n.startswith("seitz.libs/")]
+              vendored = [n for n in names if n.startswith("pyseitz.libs/")]
               if vendored:
                   print(f"::error::{w}: unexpected vendored libraries {vendored}"); bad = True
           sys.exit(1 if bad else 0)
@@ -262,7 +261,7 @@ jobs:
             echo "=== $w"
             python3 -m auditwheel show "$w"
             rm -rf /tmp/unpack && python3 -m zipfile -e "$w" /tmp/unpack
-            nm -D --undefined-only /tmp/unpack/seitz/_core*.so \
+            nm -D --undefined-only /tmp/unpack/pyseitz/_core*.so \
               | grep -oE 'GLIBCXX_[0-9.]+|CXXABI_[0-9.]+|GLIBC_[0-9.]+' \
               | sort -uV | tee /tmp/vers
             if grep -qE 'GLIBCXX_3\.4\.(2[5-9]|[3-9][0-9])' /tmp/vers; then
@@ -731,3 +730,28 @@ jobs:
       - name: Publish to nuget.org
         if: vars.NUGET_USER != ''
         run: dotnet nuget push dist/*.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+
+  # PyPI as pyseitz, by trusted publishing against the publisher registered on
+  # pypi.org (owner reach2sayan, repo Seitz, workflow release.yml, environment
+  # pypi) -- `seitz` itself is refused as confusable with the unrelated `seltz`.
+  # After the GitHub Release, since a version once on PyPI can never be
+  # uploaded again. Wheels only: the sdist needs GCC 15, so on a platform with
+  # no wheel -- macOS, musl -- pip would fail in CMake's compiler gate instead
+  # of reporting that there is no matching distribution.
+  pypi:
+    name: PyPI
+    if: github.ref_type == 'tag'
+    needs: [version, release]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/seitz/${{ needs.version.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-import seitz as sz
+import pyseitz as sz
 
 
 def test_a_cell_is_a_sequence_of_atoms(bcc_fe: sz.Cell) -> None:
