@@ -51,6 +51,38 @@ option(SEITZ_BUILD_PYTHON "Build the pybind11 extension module" OFF)
 option(SEITZ_ENABLE_SANITIZERS "Enable Address/UB sanitizers" OFF)
 option(SEITZ_NATIVE_ARCH "Build for this machine's ISA (-march=native)" OFF)
 
+# The interpreter comes from uv: `uv sync` materialises .venv from pyproject's
+# dev group (numpy and pandas for the transcribers in tools/, pytest, stubgen)
+# and `uv run python` is that interpreter -- overriding a stale cache entry, so
+# an old build tree cannot keep a bare system python. The wheel build is the
+# exception: scikit-build-core (SKBUILD) passes the interpreter it builds for.
+# Spelled `Python` rather than `Python3` so it resolves the same cache variable
+# pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
+#
+# Before include(Dependencies), not after: with SEITZ_BUILD_PYTHON on, pybind11's
+# FetchContent_MakeAvailable runs its own find_package(Python), which caches the
+# first interpreter on PATH -- conda's 3.10, on a machine that has one -- and
+# then `NOT Python_EXECUTABLE` below is false and uv is never asked.
+#
+# `NOT Python_EXECUTABLE` as well as `NOT SKBUILD`: the set() below is FORCEd,
+# so without that clause a caller who named an interpreter on the command line
+# would silently get uv's instead. The vcpkg port does exactly that -- it builds
+# a throwaway venv with numpy and pandas in it, because a vcpkg build
+# environment has neither -- and a stray `uv` on PATH would undo it.
+if (NOT SKBUILD AND NOT Python_EXECUTABLE)
+    find_program(UV_EXECUTABLE uv)
+    if (UV_EXECUTABLE)
+        execute_process(COMMAND "${UV_EXECUTABLE}" sync --quiet
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_sync)
+        execute_process(COMMAND "${UV_EXECUTABLE}" run --no-sync python -c "import sys; print(sys.executable)"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_run
+                OUTPUT_VARIABLE seitz_uv_python OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        if (seitz_uv_sync EQUAL 0 AND seitz_uv_run EQUAL 0)
+            set(Python_EXECUTABLE "${seitz_uv_python}" CACHE FILEPATH "uv's interpreter" FORCE)
+        endif ()
+    endif ()
+endif ()
+
 include(Dependencies)
 
 # ---- generated data tables ----
@@ -76,36 +108,10 @@ include(Dependencies)
 # the tracked input, and the build transcribes that CSV like any other. So no
 # generated header is tracked, and no build needs PyXtal or spglib's Python.
 #
-# Still not generated here: python/seitz/_core/*.pyi describe the built
+# Still not generated here: python/pyseitz/_core/*.pyi describe the built
 # extension module, so they are downstream of the build, not upstream of it. CI
-# already fails on a stale one.
-#
-# The interpreter comes from uv: `uv sync` materialises .venv from pyproject's
-# dev group (numpy and pandas for the transcribers in tools/, pytest, stubgen)
-# and `uv run python` is that interpreter -- overriding a stale cache entry, so
-# an old build tree cannot keep a bare system python. The wheel build is the
-# exception: scikit-build-core (SKBUILD) passes the interpreter it builds for.
-# Spelled `Python` rather than `Python3` so it resolves the same cache variable
-# pybind11 and scikit-build-core populate (see PYBIND11_FINDPYTHON).
-#
-# `NOT Python_EXECUTABLE` as well as `NOT SKBUILD`: the set() below is FORCEd,
-# so without that clause a caller who named an interpreter on the command line
-# would silently get uv's instead. The vcpkg port does exactly that -- it builds
-# a throwaway venv with numpy and pandas in it, because a vcpkg build
-# environment has neither -- and a stray `uv` on PATH would undo it.
-if (NOT SKBUILD AND NOT Python_EXECUTABLE)
-    find_program(UV_EXECUTABLE uv)
-    if (UV_EXECUTABLE)
-        execute_process(COMMAND "${UV_EXECUTABLE}" sync --quiet
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_sync)
-        execute_process(COMMAND "${UV_EXECUTABLE}" run --no-sync python -c "import sys; print(sys.executable)"
-                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE seitz_uv_run
-                OUTPUT_VARIABLE seitz_uv_python OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-        if (seitz_uv_sync EQUAL 0 AND seitz_uv_run EQUAL 0)
-            set(Python_EXECUTABLE "${seitz_uv_python}" CACHE FILEPATH "uv's interpreter" FORCE)
-        endif ()
-    endif ()
-endif ()
+# already fails on a stale one. The interpreter the transcribers run under is
+# chosen above include(Dependencies); see there.
 find_package(Python 3.9 REQUIRED COMPONENTS Interpreter)
 execute_process(COMMAND "${Python_EXECUTABLE}" -c "import numpy, pandas"
         RESULT_VARIABLE seitz_python_modules OUTPUT_QUIET ERROR_QUIET)
