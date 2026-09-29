@@ -97,12 +97,15 @@ interrogated on its own:
 ops.rotations();                   // the rotation parts, as integer matrices
 ops.pure_translations();           // the centring vectors of the coset {I | t}
 ops.conjugated_by(P, P_inv);       // the group in another basis
-if (auto const m = ops.spacegroup<LatticeSetting::conventional>(lattice, tol))
+if (auto const m = ops.spacegroup<LatticeSetting::conventional>(lattice, tol)) {
   m->hall;                         // m->bravais_lattice, m->origin_shift, m->type()
-if (auto const p = ops.point_group())
+}
+if (auto const p = ops.point_group()) {
   p->type;                         // one of the 32; p->transformation
-if (auto const q = mag_ops.spacegroup(lattice, tol))
+}
+if (auto const q = mag_ops.spacegroup(lattice, tol)) {
   q->uni;                          // q->type, q->hall, q->setting
+}
 ```
 
 The same three questions, asked of a bare set of operations with no atomic
@@ -142,16 +145,14 @@ safe to share across threads from the moment it exists.
 auto const sa = analysis::SymmetryAnalyzer::from_cell(cell, Tolerance{},
                                                      /*setting=*/std::nullopt);
 
-auto const hall = sa.hall();            // runs the pipeline
-if (!hall) {
+if (auto const hall = sa.hall()) {                    // runs the pipeline
+  auto const &type = data::spacegroup_type(*hall);
+  if (auto const ops = sa.operations()) {             // reuses it
+    std::println("{} ({}), |G| = {}", type.international_short, type.number, ops->size());
+  }
+} else {
   std::println("no group at this tolerance");
-  return;
 }
-auto const ops  = sa.operations();      // reuses it
-auto const prim = sa.primitive_cell();
-auto const &type = data::spacegroup_type(*hall);
-std::println("{} ({}), |G| = {}, Z' cell of {} atoms",
-             type.international_short, type.number, ops->size(), prim->size());
 ```
 
 | Query | Yields |
@@ -191,9 +192,9 @@ Two classical reductions of a lattice basis, both returning a new `Lattice`:
   holohedry search runs on, since it exposes the lattice's full point symmetry.
 
 ```cpp
-auto const n = lat.niggli(eps);                                 // Result<Lattice>
-auto const d = lat.delaunay(symprec);
-auto const p = lat.delaunay_in_plane(unique_axis, symprec);    // layer case
+if (auto const n = lat.niggli(eps)) { *n; }                      // Result<Lattice>
+if (auto const d = lat.delaunay(symprec)) { *d; }
+if (auto const p = lat.delaunay_in_plane(unique_axis, symprec)) { *p; }  // layer case
 lat.rigid_rotation_to(ideal);   // R with ideal = R · lat
 ```
 
@@ -212,11 +213,11 @@ The catalogs are objects, not parallel arrays. `SpaceGroup`, `PointGroup` and
 without a runtime hierarchy.
 
 ```cpp
-auto const r = group::SpaceGroup::from_number(GroupFamily::space, 225);
-if (!r) return;                                             // number out of range
-group::SpaceGroup const &g = **r;
+if (auto const r = group::SpaceGroup::from_number(GroupFamily::space, 225)) {
+  group::SpaceGroup const &g = **r;
+  g.order();  g.symbol();  g.centering();  g.operations();
+}
 group::SpaceGroup const &h = group::SpaceGroup::of(hall);   // by Hall setting
-g.order();  g.symbol();  g.centering();  g.operations();
 ```
 
 A **Wyckoff position** is an orbit type: the set of points whose stabilizer
@@ -235,8 +236,9 @@ for (group::Wyckoff const &w : g.wyckoffs()) {
   w.canonical(xyz);               // idempotent projection onto the locus
   w.orbit(xyz, periodicity);      // the full orbit, one row per image
 }
-if (auto const wa = g.wyckoff('a'))
+if (auto const wa = g.wyckoff('a')) {
   (*wa)->multiplicity();
+}
 ```
 
 `canonical` is the projector onto the locus, so an approximate coordinate still
@@ -303,9 +305,9 @@ Bärnighausen/BNS construction types:
 
 ```cpp
 auto const ma = analysis::MagneticSymmetryAnalyzer::from_cell(mcell, MagneticTolerance{});
-auto const uni  = ma.uni();                    // UNI number (1651 types)
-auto const ops  = ma.operations();             // MagneticOperations
-auto const cell = ma.standardized_cell();      // tensors rotated into the standard basis
+if (auto const uni = ma.uni()) { *uni; }                     // UNI number (1651 types)
+if (auto const ops = ma.operations()) { *ops; }              // MagneticOperations
+if (auto const cell = ma.standardized_cell()) { *cell; }     // tensors rotated into the standard basis
 ma.spacegroup_type();                          // BNS/OG symbols, type I-IV
 ```
 
@@ -333,11 +335,12 @@ Each grid point is mapped to the smallest index in its orbit, so
 
 ```cpp
 auto const mesh = *kpoint::Mesh::of({8, 8, 8});     // nullopt on a non-positive mesh
-auto const rm = sa.reciprocal_mesh(mesh, TimeReversal::on);
-rm->num_irreducible();                // |IBZ|
-rm->mapping();                        // grid point → representative
-rm->images_of(address);               // the orbit of one address
-auto const bz = rm->brillouin_zone(reciprocal_lattice);
+if (auto const rm = sa.reciprocal_mesh(mesh, TimeReversal::on)) {
+  rm->num_irreducible();              // |IBZ|
+  rm->mapping();                      // grid point → representative
+  rm->images_of(address);             // the orbit of one address
+  auto const bz = rm->brillouin_zone(reciprocal_lattice);
+}
 ```
 
 `BrillouinZone` relocates every point to the reciprocal-lattice image nearest
@@ -367,8 +370,9 @@ generate::Generator const gen{g, {.seed = 42, .attempts_per_combination = 50}};
 
 gen.compatible(comp);                 // is any assignment possible at all?
 gen.assignments(comp);                // enumerate them
-if (auto const x = gen(comp))         // x->cell, x->assignment (with generating coordinates)
-  x->cell;
+if (auto const x = gen(comp)) {
+  x->cell;  x->assignment;            // the assignment carries the generating coordinates
+}
 ```
 
 `GenerateOptions` fixes the search: `seed` (fully deterministic), `scale` on the
@@ -405,12 +409,14 @@ $\rho_c = V_c\xi$, and the Kikuchi–Barker coefficients $k_c$ of the entropy
 $$S = -k_B \sum_c k_c \sum_j m_{jc}\, \rho_{jc} \ln \rho_{jc} .$$
 
 ```cpp
-auto const pool = alloy::ClustersPool::generate(parent, {.radii = {{2, 6.0}, {3, 4.5}}});
-for (alloy::Orbit const &o : *pool) { o.multiplicity(); }
+if (auto const pool = alloy::ClustersPool::generate(parent, {.radii = {{2, 6.0}, {3, 4.5}}})) {
+  for (alloy::Orbit const &o : *pool) { o.multiplicity(); }
+}
 
-auto const cvm = alloy::Cvm::create(parent, maximal_clusters, basis);
-cvm->clusters();   // per subcluster: configurations, V-matrix, Kikuchi–Barker coefficient
-cvm->functions();  // the basis functions indexing ξ
+if (auto const cvm = alloy::Cvm::create(parent, maximal_clusters, basis)) {
+  cvm->clusters();   // per subcluster: configurations, V-matrix, Kikuchi–Barker coefficient
+  cvm->functions();  // the basis functions indexing ξ
+}
 ```
 
 This layer generates the ingredients; fitting the $J_\alpha$ and minimizing the
