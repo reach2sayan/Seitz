@@ -53,7 +53,11 @@ struct WyckoffFactory {
       // tabulated site-symmetry symbol.
       Matrix3d const projector =
           math::projector(Eigen::MatrixXd(d.locus_basis.leftCols(d.dof)));
-      out.push_back(Wyckoff{d.multiplicity(),
+      // Read before the braced list below moves orbit_ops out: MSVC builds
+      // by-value constructor parameters right to left even in a braced
+      // initializer, so an inline d.multiplicity() would see an empty vector.
+      int const multiplicity = d.multiplicity();
+      out.push_back(Wyckoff{multiplicity,
                             d.dof,
                             letter++,
                             {},
