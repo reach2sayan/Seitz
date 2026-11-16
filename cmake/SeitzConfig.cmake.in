@@ -15,13 +15,13 @@ find_dependency(Eigen3 @SEITZ_EIGEN_MIN@)
 # only required where the library is a static archive: a shared object has
 # already resolved them and keeps them out of its exported interface, while a
 # static one records them as $<LINK_ONLY:...> in INTERFACE_LINK_LIBRARIES and
-# the consumer's link line does need the targets to exist. Boost::algorithm
-# and ::range are there too: no installed header names them.
+# the consumer's link line does need the targets to exist. Both lists come
+# from cmake/Dependencies.cmake.
 if ("@SEITZ_LIBRARY_TYPE@" STREQUAL "SHARED")
-    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS container graph leaf)
+    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS @SEITZ_BOOST_PUBLIC@)
 else ()
-    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS container graph leaf
-            flyweight parser algorithm range)
+    find_dependency(Boost @SEITZ_BOOST_MIN@ COMPONENTS @SEITZ_BOOST_PUBLIC@
+            @SEITZ_BOOST_PRIVATE@)
 endif ()
 find_dependency(Threads)
 

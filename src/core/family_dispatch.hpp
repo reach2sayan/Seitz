@@ -8,6 +8,17 @@
 
 namespace seitz {
 
+// In the conventional/standardized setting a layer group always has its
+// aperiodic axis as c (axis 2); a 3D group is periodic on all three.
+template <GroupFamily F>
+[[nodiscard]] constexpr CellPeriodicity conventional_periodicity() noexcept {
+  if constexpr (F == GroupFamily::layer) {
+    return aperiodic_along(2);
+  } else {
+    return all_periodic();
+  }
+}
+
 template <class Fn, GroupFamily F>
 using family_call_result_t =
     decltype(std::declval<Fn>().template operator()<F>());

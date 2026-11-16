@@ -51,6 +51,8 @@ static_assert(rod_symbol(76).empty()); // out of range (above)
 static_assert(rod_symbol(1) == "p1");
 static_assert(rod_symbol(75) == "p6/mmc");
 
+// The operations of rod group `rod_number`. Precondition:
+// rod_number_in_range(rod_number); the caller range-checks.
 [[nodiscard]] Operations rod_operations_from_database(int rod_number);
 
 } // namespace seitz::data

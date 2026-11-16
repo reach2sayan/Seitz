@@ -48,8 +48,7 @@ TEST_CASE("Cell with_* builders replace one facet and keep the atoms",
   CHECK(relatticed.positions().isApprox(c.positions()));
   CHECK(relatticed.types() == c.types());
 
-  CellPeriodicity const layer{AxisKind::periodic, AxisKind::periodic,
-                              AxisKind::aperiodic};
+  CellPeriodicity const layer = aperiodic_along(2);
   Cell const layered = c.with_periodicity(layer);
   CHECK(layered.periodicity() == layer);
   CHECK(aperiodic_axis(layered.periodicity()) == 2);

@@ -105,6 +105,21 @@ rotation_type(Matrix3i const &rot) noexcept {
   return rotation_type(rot.determinant(), rot.trace());
 }
 
+// The proper rotation type of order 2, 3 or 4; nullopt for any other order.
+[[nodiscard]] constexpr std::optional<RotationType>
+proper_type(int order) noexcept {
+  switch (order) {
+  case 2:
+    return RotationType::rotation_2;
+  case 3:
+    return RotationType::rotation_3;
+  case 4:
+    return RotationType::rotation_4;
+  default:
+    return std::nullopt;
+  }
+}
+
 // The ten crystallographic types are exactly the reachable (det, trace) cells.
 static_assert(rotation_type(1, 3) == RotationType::identity);
 static_assert(rotation_type(-1, -3) == RotationType::inversion);
@@ -265,7 +280,7 @@ template <std::ranges::forward_range R>
 }
 
 // The distinguished axis of a Laue class: the first proper rotation of
-// rot_order (2, 3 or 4, identified by its trace) paired with its rotation-axis
+// rot_order (2, 3 or 4, identified by its rotation type) paired with its rotation-axis
 // index. nullopt if no such operation (or no axis for it) exists.
 struct Principal {
   Matrix3i prop_rot;
@@ -273,11 +288,10 @@ struct Principal {
 };
 [[nodiscard]] std::optional<Principal> principal_axis(PointSymmetry const &ps,
                                                       int rot_order) {
+  auto const wanted = proper_type(rot_order);
   for (Matrix3i const &r : ps) {
     Matrix3i const prop_rot = proper_rotation(r);
-    if ((rot_order == 4 && prop_rot.trace() == 1) ||
-        (rot_order == 3 && prop_rot.trace() == 0) ||
-        (rot_order == 2 && prop_rot.trace() == -1)) {
+    if (wanted && rotation_type(prop_rot) == wanted) {
       return axis_index(prop_rot).transform(
           [&](int axis) { return Principal{prop_rot, axis}; });
     }
@@ -444,10 +458,10 @@ lauennn(PointSymmetry const &ps, int rot_order,
   // The distinct axes of the rotations of `rot_order`, in encounter order;
   // mmm / m-3 / m-3m each have exactly three.
   boost::container::static_vector<int, 3> idx;
+  auto const wanted = proper_type(rot_order);
   for (Matrix3i const &r : ps) {
     Matrix3i const prop_rot = proper_rotation(r);
-    if ((prop_rot.trace() == -1 && rot_order == 2) ||
-        (prop_rot.trace() == 1 && rot_order == 4)) {
+    if (wanted && rotation_type(prop_rot) == wanted) {
       auto const axis = axis_index(prop_rot);
       if (axis && idx.size() < idx.capacity() &&
           !std::ranges::contains(idx, *axis)) {

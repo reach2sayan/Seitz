@@ -1,31 +1,12 @@
 #include "symmetry/search.hpp"
+#include "structures.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 using namespace seitz;
 
-namespace {
-Cell primitive_cubic(double a) {
-  Positions pos(1, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0});
-}
-
-Cell rock_salt(double a) {
-  // Conventional NaCl cell: 4 Na + 4 Cl (Fm-3m). Non-primitive -> many ops.
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(8, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  pos.row(4) << 0.5, 0.5, 0.5;
-  pos.row(5) << 0.0, 0.0, 0.5;
-  pos.row(6) << 0.0, 0.5, 0.0;
-  pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
-}
-} // namespace
+using seitz::test::primitive_cubic;
+using seitz::test::rock_salt;
 
 TEST_CASE("primitive cubic has the full 48-operation point group",
           "[symmetry]") {

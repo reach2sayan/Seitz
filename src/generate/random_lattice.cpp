@@ -5,27 +5,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numbers>
 #include <random>
 
 namespace seitz::generate {
 
-namespace {
-
-constexpr double kDeg = std::numbers::pi / 180.0;
-
-// Cell parameters -> basis matrix, angles in degrees here rather than the
-// radians math::lattice_from_parameters takes.
-[[nodiscard]] Matrix3d from_parameters(double a, double b, double c,
-                                       double alpha, double beta,
-                                       double gamma) {
-  return math::lattice_from_parameters(a, b, c, alpha * kDeg, beta * kDeg,
-                                       gamma * kDeg);
-}
-
-} // namespace
-
-Matrix3d random_lattice(CrystalSystem system, double target_volume,
+Matrix3d random_lattice(Holohedry system, double target_volume,
                         std::uint64_t seed) {
   std::mt19937_64 rng(seed);
   std::uniform_real_distribution<double> len(1.0, 2.0);    // relative lengths
@@ -39,31 +23,33 @@ Matrix3d random_lattice(CrystalSystem system, double target_volume,
   double gamma = 90.0;
 
   switch (system) {
-  case CrystalSystem::triclinic:
+  case Holohedry::none: // not a crystal system; drawn as the generic metric
+  case Holohedry::triclinic:
     alpha = ang(rng);
     beta = ang(rng);
     gamma = ang(rng);
     break;
-  case CrystalSystem::monoclinic:
+  case Holohedry::monoclinic:
     beta = ang(rng); // unique axis b
     break;
-  case CrystalSystem::orthorhombic:
+  case Holohedry::orthorhombic:
     break;
-  case CrystalSystem::tetragonal:
+  case Holohedry::tetragonal:
     b = a;
     break;
-  case CrystalSystem::trigonal:
-  case CrystalSystem::hexagonal:
+  case Holohedry::trigonal:
+  case Holohedry::hexagonal:
     b = a;
     gamma = 120.0;
     break;
-  case CrystalSystem::cubic:
+  case Holohedry::cubic:
     b = a;
     c = a;
     break;
   }
 
-  Matrix3d const raw = from_parameters(a, b, c, alpha, beta, gamma);
+  Matrix3d const raw =
+      math::lattice_from_parameters_deg(a, b, c, alpha, beta, gamma);
   double const vol = std::abs(raw.determinant());
   double const scale = std::cbrt(target_volume / vol);
   return raw * scale;
@@ -98,7 +84,7 @@ Matrix3d random_layer_lattice(std::span<SymmetryOperation const> operations,
   // in-plane point group (whatever crystal system that implies).
   double const a0 = len(rng);
   double const b0 = len(rng);
-  double const g0 = ang(rng) * kDeg;
+  double const g0 = ang(rng) * math::kRadiansPerDegree;
   Eigen::Matrix2d g0m;
   g0m << a0 * a0, a0 * b0 * std::cos(g0), a0 * b0 * std::cos(g0), b0 * b0;
 

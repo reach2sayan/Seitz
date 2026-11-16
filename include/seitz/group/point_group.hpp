@@ -27,17 +27,9 @@ public:
     return schoenflies_;
   }
 
-  // A space group whose point group is this one (a symmorphic P group); its
-  // crystal system fixes the metric used when realising a cluster in Cartesian
-  // space (generate::random_cluster).
-  [[nodiscard]] int representative_spacegroup() const noexcept {
-    return representative_spacegroup_;
-  }
-
 private:
   PointGroup() = default;
   std::string_view schoenflies_;
-  int representative_spacegroup_ = 0;
 };
 
 } // namespace seitz::group

@@ -1,6 +1,7 @@
 #include "core/overlap.hpp"
 
 #include "helpers.hpp"
+#include "structures.hpp"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -13,16 +14,7 @@
 using namespace seitz;
 
 namespace {
-// Body-centered cubic: atoms at (0,0,0) and (1/2,1/2,1/2).
-Cell bcc(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{lattice}, pos, {0, 0});
-}
-
-Matrix3i inversion() { return -Matrix3i::Identity(); }
+using seitz::test::bcc;
 
 // The greedy matching the checker replaced, kept verbatim as the reference:
 // originals in order, each taking the lowest-index untaken image of its type
@@ -81,7 +73,7 @@ TEST_CASE("identity is always a symmetry", "[overlap]") {
 
 TEST_CASE("inversion is a symmetry of bcc", "[overlap]") {
   OverlapChecker checker(bcc(3.0), 1e-5);
-  CHECK(checker.check_total_overlap(Vector3d::Zero(), inversion()));
+  CHECK(checker.check_total_overlap(Vector3d::Zero(), -Matrix3i::Identity()));
 }
 
 TEST_CASE("a bogus translation is rejected", "[overlap]") {
@@ -98,11 +90,7 @@ TEST_CASE("the bcc centering translation is a symmetry", "[overlap]") {
 }
 
 TEST_CASE("symmetry breaks when the two atoms differ in type", "[overlap]") {
-  Matrix3d lattice = Matrix3d::Identity() * 3.0;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  OverlapChecker checker(Cell(Lattice{lattice}, pos, {0, 1}),
+  OverlapChecker checker(test::rocksalt_motif(3.0),
                          1e-5); // CsCl-like, distinct types
   // The centering translation now swaps unlike atoms -> not a symmetry.
   CHECK_FALSE(checker.check_total_overlap(Vector3d(0.5, 0.5, 0.5),

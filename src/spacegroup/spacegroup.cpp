@@ -287,14 +287,17 @@ template <GroupFamily F>
 
 // ---- is_equivalent_lattice -------------------------------------------------
 
+// How far two lattices may differ and still count as the same setting.
+enum class Equivalence {
+  identical,  // tmat == identity
+  axis_flips, // |tmat| == identity
+};
+
 // Isometric transform tmat such that orig = lattice * tmat, if the two lattices
 // are equivalent under `mode`; nullopt otherwise.
-//   mode 0: tmat == identity
-//   mode 1: |tmat| == identity (axis flips allowed)
-//   mode 2: tmat integer & unimodular & metric tensors agree
 [[nodiscard]] std::optional<Matrix3d>
-is_equivalent_lattice(int mode, Matrix3d const &lattice, Matrix3d const &orig,
-                      double symprec) {
+is_equivalent_lattice(Equivalence mode, Matrix3d const &lattice,
+                      Matrix3d const &orig, double symprec) {
   if (std::abs(lattice.determinant() - orig.determinant()) > symprec) {
     return std::nullopt;
   }
@@ -303,36 +306,30 @@ is_equivalent_lattice(int mode, Matrix3d const &lattice, Matrix3d const &orig,
     return std::nullopt;
   }
   Matrix3d const tmat = *inv * orig;
-
-  switch (mode) {
-  case 0:
-    if (matrices_close(Matrix3d::Identity(), tmat, symprec)) {
-      return tmat;
-    }
-    break;
-  case 1:
-    if (matrices_close(Matrix3d::Identity(), tmat.cwiseAbs(), symprec)) {
-      return tmat;
-    }
-    break;
-  case 2: {
-    Matrix3i const tmat_int = math::round_to_int(tmat);
-    if (!matrices_close(tmat_int.cast<double>(), tmat, symprec)) {
-      break;
-    }
-    if (tmat_int.determinant() != 1) {
-      break;
-    }
-    if (matrices_close(Lattice{orig}.metric(), Lattice{lattice}.metric(),
-                       symprec)) {
-      return tmat;
-    }
-    break;
-  }
-  default:
-    break;
+  Matrix3d const compared =
+      mode == Equivalence::identical ? tmat : Matrix3d(tmat.cwiseAbs());
+  if (matrices_close(Matrix3d::Identity(), compared, symprec)) {
+    return tmat;
   }
   return std::nullopt;
+}
+
+// The lattice and change of basis after applying `cob` to `conv_lattice`, then
+// re-aligned to the input lattice `orig` (when given) by axis flips; nullopt
+// if no flip matches it.
+[[nodiscard]] std::optional<std::pair<Matrix3d, Matrix3d>>
+align_to_input(Matrix3d const &conv_lattice, Matrix3d const &cob,
+               Matrix3d const *orig, double symprec) {
+  Matrix3d const lattice = conv_lattice * cob;
+  if (!orig) {
+    return std::pair{lattice, cob};
+  }
+  auto const tmat =
+      is_equivalent_lattice(Equivalence::axis_flips, lattice, *orig, symprec);
+  if (!tmat) {
+    return std::nullopt;
+  }
+  return std::pair{Matrix3d(lattice * *tmat), Matrix3d(cob * *tmat)};
 }
 
 // ---- centering -------------------------------------------------------------
@@ -541,8 +538,9 @@ template <GroupFamily F>
                      [&](Matrix3d const &cob,
                          Matrix3d const *orig) -> std::optional<MatchResult> {
                        Matrix3d const changed_lattice = conv_lattice * cob;
-                       if (orig && !is_equivalent_lattice(0, changed_lattice,
-                                                          *orig, symprec)) {
+                       if (orig && !is_equivalent_lattice(
+                                       Equivalence::identical, changed_lattice,
+                                       *orig, symprec)) {
                          return std::nullopt;
                        }
                        Operations const changed_symmetry =
@@ -594,18 +592,12 @@ match_db_cubic_in_loop(Matrix3d const &conv_lattice,
                        Matrix3d const *orig_lattice, Matrix3d const &change,
                        HallNumber hall, Centering centering,
                        Operations const &conv_symmetry, double symprec) {
-  Matrix3d change_of_basis = change;
-  Matrix3d changed_lattice = conv_lattice * change_of_basis;
-
-  if (orig_lattice) {
-    auto const tmat =
-        is_equivalent_lattice(1, changed_lattice, *orig_lattice, symprec);
-    if (!tmat) {
-      return std::nullopt;
-    }
-    changed_lattice = changed_lattice * *tmat;
-    change_of_basis = change_of_basis * *tmat;
+  auto const aligned =
+      align_to_input(conv_lattice, change, orig_lattice, symprec);
+  if (!aligned) {
+    return std::nullopt;
   }
+  auto const &[changed_lattice, change_of_basis] = *aligned;
 
   Operations const changed_symmetry = get_conventional_symmetry(
       change_of_basis, Centering::primitive, conv_symmetry);
@@ -656,18 +648,12 @@ template <GroupFamily F>
   Centering const changed_centering =
       (centering == Centering::c_face) ? choice.centering : centering;
 
-  Matrix3d change_of_basis = choice.basis;
-  Matrix3d changed_lattice = conv_lattice * change_of_basis;
-
-  if (orig_lattice) {
-    auto const tmat =
-        is_equivalent_lattice(1, changed_lattice, *orig_lattice, symprec);
-    if (!tmat) {
-      return std::nullopt;
-    }
-    changed_lattice = changed_lattice * *tmat;
-    change_of_basis = change_of_basis * *tmat;
+  auto const aligned =
+      align_to_input(conv_lattice, choice.basis, orig_lattice, symprec);
+  if (!aligned) {
+    return std::nullopt;
   }
+  auto const &[changed_lattice, change_of_basis] = *aligned;
 
   if (!ortho_axis_norms_ok(changed_lattice, choice.unique_axis,
                            num_free_axes)) {
@@ -747,7 +733,8 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
     // mode-1 equivalence effectively checks the C2 rotation about the unique
     // axis; only accept flips that keep the unique axis fixed.
     if (auto const tmat =
-            is_equivalent_lattice(1, conv_lattice, *orig_lattice, symprec)) {
+            is_equivalent_lattice(Equivalence::axis_flips, conv_lattice,
+                                  *orig_lattice, symprec)) {
       int const u1 = (unique_axis + 1) % 3;
       int const u2 = (unique_axis + 2) % 3;
       if ((*tmat)(u1, u1) * (*tmat)(u2, u2) > kZeroPrec) {
@@ -1066,35 +1053,6 @@ search_spacegroup_with_symmetry(Operations const &operations,
       {.symprec = symprec, .angle_tolerance = std::nullopt});
 }
 
-// The body behind OperationSet::spacegroup; nothing else calls it.
-template <LatticeSetting Setting>
-[[nodiscard]] static Result<SpacegroupMatch>
-spacegroup_type_from_symmetry(Operations const &operations,
-                              Matrix3d const &lattice, double symprec) {
-  auto const prim = operations.to_primitive({symprec, std::nullopt});
-  if (!prim) {
-    return leaf::new_error(e_spacegroup_search_failed{});
-  }
-  Operations const &prim_sym = prim->first;
-  Matrix3d const &t_mat = prim->second;
-
-  Matrix3d prim_lat;
-  if constexpr (Setting == LatticeSetting::conventional) {
-    prim_lat = lattice * t_mat.inverse();
-  } else {
-    prim_lat = lattice;
-  }
-
-  // Niggli-reduce (the matcher requires it), then carry the operations into
-  // that basis -- the rotations are distinct already, so it is just a change.
-  BOOST_LEAF_AUTO(red, Lattice{prim_lat}.niggli(symprec));
-  Matrix3d const &red_lat = red.matrix();
-  Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
-  Matrix3d const inv2 = t_mat2.inverse();
-  return search_spacegroup_with_symmetry(prim_sym.conjugated_by(t_mat2, inv2),
-                                         red_lat, symprec);
-}
-
 } // namespace seitz::spacegroup
 
 // The implementation behind OperationSet::spacegroup, out of line here so the
@@ -1105,13 +1063,24 @@ Result<SpacegroupMatch> spacegroup_of_operations(Operations const &operations,
                                                  Lattice const &lattice,
                                                  LatticeSetting setting,
                                                  Tolerance const &tol) {
-  return setting == LatticeSetting::primitive
-             ? spacegroup::spacegroup_type_from_symmetry<
-                   LatticeSetting::primitive>(operations, lattice.matrix(),
-                                              tol.symprec)
-             : spacegroup::spacegroup_type_from_symmetry<
-                   LatticeSetting::conventional>(operations, lattice.matrix(),
-                                                 tol.symprec);
+  double const symprec = tol.symprec;
+  auto const prim = operations.to_primitive({symprec, std::nullopt});
+  if (!prim) {
+    return leaf::new_error(e_spacegroup_search_failed{});
+  }
+  auto const &[prim_sym, t_mat] = *prim;
+  Matrix3d const prim_lat = setting == LatticeSetting::conventional
+                                ? Matrix3d(lattice.matrix() * t_mat.inverse())
+                                : lattice.matrix();
+
+  // Niggli-reduce (the matcher requires it), then carry the operations into
+  // that basis -- the rotations are distinct already, so it is just a change.
+  BOOST_LEAF_AUTO(red, Lattice{prim_lat}.niggli(symprec));
+  Matrix3d const &red_lat = red.matrix();
+  Matrix3d const t_mat2 = red_lat.inverse() * prim_lat;
+  Matrix3d const inv2 = t_mat2.inverse();
+  return spacegroup::search_spacegroup_with_symmetry(
+      prim_sym.conjugated_by(t_mat2, inv2), red_lat, symprec);
 }
 
 } // namespace seitz::detail

@@ -90,7 +90,11 @@ static_assert(inverses_are_exact());
 
 } // namespace detail
 
-[[nodiscard]] Matrix3i const &centering_matrix(data::Centering c);
+// A view straight onto the constexpr table: integer, so nothing to compute.
+[[nodiscard]] inline Eigen::Map<math::RowMajor3i const>
+centering_matrix(data::Centering c) noexcept {
+  return math::as_matrix(detail::kCenteringMatrix[static_cast<std::size_t>(c)]);
+}
 [[nodiscard]] Matrix3d const &centering_matrix_inv(data::Centering c);
 [[nodiscard]] std::span<Vector3d const> centering_shifts(data::Centering c);
 

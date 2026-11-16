@@ -5,13 +5,16 @@ import re
 
 import numpy as np
 
-def c_initializer(text, name, symbols=None):
-    """The value of `... name[...] = {...};` in C source, as nested lists.
+def c_initializers(text, symbols=None):
+    """A reader of `... name[...] = {...};` in C source, each value as nested lists.
     Brace initializers are Python list literals once braces become brackets;
-    identifiers (enumerators) resolve through `symbols`."""
+    identifiers (enumerators) resolve through `symbols`. Comments are stripped
+    once here, not per table: msg_database.c is 7 MB."""
     text = re.sub(r"/\*.*?\*/|//[^\n]*", "", text, flags=re.S)
-    body = re.search(rf"\b{re.escape(name)}\s*(?:\[[^\]]*\])*\s*=\s*(\{{.*?\}})\s*;", text, re.S)
-    return eval(body.group(1).replace("{", "[").replace("}", "]"), {"__builtins__": {}}, symbols or {})
+    def read(name):
+        body = re.search(rf"\b{re.escape(name)}\s*(?:\[[^\]]*\])*\s*=\s*(\{{.*?\}})\s*;", text, re.S)
+        return eval(body.group(1).replace("{", "[").replace("}", "]"), {"__builtins__": {}}, symbols or {})
+    return read
 
 class code(str):
     """A string emitted verbatim (an enumerator, an expression), not as a literal."""
@@ -53,10 +56,10 @@ def lines(items, per_line, indent="    "):
     items = list(items)
     return "".join(indent + ", ".join(items[i:i + per_line]) + ",\n" for i in range(0, len(items), per_line))
 
-def array(name, ctype, items, per_line=1, comment="", size=None, indent="    "):
-    """`inline constexpr std::array<ctype, N> name = {{...}};`, items already rendered."""
+def array(name, ctype, items, per_line=1, comment="", size=None, indent="    ", specifier="constexpr"):
+    """`inline <specifier> std::array<ctype, N> name = {{...}};`, items already rendered."""
     items = list(items)
-    head = f"inline constexpr std::array<{ctype}, {size or len(items)}> {name} = {{{{\n"
+    head = f"inline {specifier} std::array<{ctype}, {size or len(items)}> {name} = {{{{\n"
     return (f"// {comment}\n" if comment else "") + head + lines(items, per_line, indent) + "}};\n\n"
 
 def preamble(banner, includes=("array",), public=False):

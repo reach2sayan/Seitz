@@ -397,10 +397,10 @@ Result<PointSymmetry> SymmetrySearch<F>::lattice_symmetry() const {
       return transform_pointsymmetry(*found, cell.lattice().matrix(),
                                      min_lattice->matrix());
     }
-    if (angle) {
-      *angle *= kAngleReduceRate; // too many: tighten and retry
+    if (!angle) {
+      break; // std::nullopt (auto): a retry would see identical inputs
     }
-    // std::nullopt (auto): identical retry, will exhaust attempts and fail.
+    *angle *= kAngleReduceRate; // too many: tighten and retry
   }
   return leaf::new_error(e_symmetry_operation_search_failed{});
 }
@@ -412,20 +412,24 @@ Result<Operations> SymmetrySearch<F>::operations() const {
     return valid.error();
   }
   BOOST_LEAF_AUTO(lat_sym, lattice_symmetry());
-  if (lat_sym.empty())
+  if (lat_sym.empty()) {
     return leaf::new_error(e_symmetry_operation_search_failed{});
+  }
 
   std::optional<int> const min_index = index_with_least_atoms(cell);
-  if (!min_index)
+  if (!min_index) {
     return leaf::new_error(e_empty_cell{});
+  }
 
   OverlapChecker const checker(cell, tol_.symprec);
   std::vector<SymmetryOperation> ops;
-  for (Matrix3i const &rot : lat_sym)
+  for (Matrix3i const &rot : lat_sym) {
     for (Vector3d const &t :
          translations_for_rotation(cell, checker, rot, *min_index,
-                                   tol_.symprec))
+                                   tol_.symprec)) {
       ops.push_back({rot, t});
+    }
+  }
 
   return Operations{std::move(ops)};
 }
@@ -451,8 +455,9 @@ template <GroupFamily F>
 std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
   Cell const &cell = cell_;
   std::optional<int> const min_index = index_with_least_atoms(cell);
-  if (!min_index)
+  if (!min_index) {
     return {};
+  }
   OverlapChecker const checker(cell, tol_.symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
                                    *min_index, tol_.symprec);

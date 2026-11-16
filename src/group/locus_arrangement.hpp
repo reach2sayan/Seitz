@@ -22,9 +22,13 @@
 // A geometry policy supplies everything dimension-specific.
 namespace seitz::group::detail {
 
-// One derived Wyckoff position before letter assignment.
+// One derived Wyckoff position before letter assignment. Its multiplicity is
+// the number of coset representatives, orbit_ops.size().
 struct DerivedLocus {
-  int multiplicity = 0;
+  [[nodiscard]] int multiplicity() const noexcept {
+    return static_cast<int>(orbit_ops.size());
+  }
+
   int dof = 0;
   Vector3d origin{Vector3d::Zero()};
   Matrix3d locus_basis{Matrix3d::Zero()};
@@ -38,7 +42,7 @@ struct WyckoffFactory {
   [[nodiscard]] static std::vector<Wyckoff>
   to_wyckoffs(std::vector<DerivedLocus> derived) {
     std::ranges::sort(derived, {}, [](DerivedLocus const &d) {
-      return std::pair{d.multiplicity, d.dof};
+      return std::pair{d.multiplicity(), d.dof};
     });
     std::vector<Wyckoff> out;
     out.reserve(derived.size());
@@ -49,7 +53,7 @@ struct WyckoffFactory {
       // tabulated site-symmetry symbol.
       Matrix3d const projector =
           math::projector(Eigen::MatrixXd(d.locus_basis.leftCols(d.dof)));
-      out.push_back(Wyckoff{d.multiplicity,
+      out.push_back(Wyckoff{d.multiplicity(),
                             d.dof,
                             letter++,
                             {},
@@ -69,9 +73,8 @@ struct WyckoffFactory {
 // `fold` normalises an image into the fundamental domain (wrap_to_unit_cell,
 // a single-axis fold, or identity); `same_point` is the geometry's equality.
 struct OrbitPartition {
-  Operations orbit_ops;         // coset representatives, one per point
-  Operations site_symmetry;     // stabilizer of p0
-  std::vector<Vector3d> points; // the distinct (folded) orbit points
+  Operations orbit_ops;     // coset representatives, one per orbit point
+  Operations site_symmetry; // stabilizer of p0
 };
 
 template <class Fold, class SamePoint>
@@ -96,8 +99,7 @@ partition_orbit(std::span<SymmetryOperation const> ops, Vector3d const &p0,
     }
   }
   return {.orbit_ops = Operations{std::move(orbit_ops)},
-          .site_symmetry = Operations{std::move(site_symmetry)},
-          .points = std::move(points)};
+          .site_symmetry = Operations{std::move(site_symmetry)}};
 }
 
 // The geometry's stabiliser-locus representation.
@@ -152,16 +154,16 @@ derive_wyckoff_positions(std::span<SymmetryOperation const> ops,
   //    the representative, then mark every image of its locus as assigned.
   std::vector<DerivedLocus> derived;
   std::vector<bool> assigned(loci.size(), false);
-  for (std::size_t i = 0; i < loci.size(); ++i) {
-    if (assigned[i]) {
+  for (auto &&[locus, done] : std::views::zip(loci, assigned)) {
+    if (done) {
       continue;
     }
-    derived.push_back(geom.derive(loci[i]));
+    derived.push_back(geom.derive(locus));
     for (auto const &op : ops) {
-      Locus const mapped = geom.image(op, loci[i]);
-      for (std::size_t k = 0; k < loci.size(); ++k) {
-        if (!assigned[k] && geom.same_locus(loci[k], mapped)) {
-          assigned[k] = true;
+      Locus const mapped = geom.image(op, locus);
+      for (auto &&[other, other_done] : std::views::zip(loci, assigned)) {
+        if (!other_done && geom.same_locus(other, mapped)) {
+          other_done = true;
         }
       }
     }

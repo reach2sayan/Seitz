@@ -4,6 +4,7 @@
 // spg_get_dense_BZ_grid_points_by_rotations.
 
 #include "oracle.hpp"
+#include "structures.hpp"
 
 #include <seitz/kpoint/mesh.hpp>
 
@@ -14,6 +15,8 @@
 
 namespace {
 
+using seitz::test::columns;
+
 using seitz::Cell;
 using seitz::Lattice;
 using seitz::Matrix3d;
@@ -21,14 +24,6 @@ using seitz::Matrix3i;
 using seitz::Positions;
 using seitz::Vector3d;
 using seitz::Vector3i;
-
-Matrix3d columns(Vector3d const &a, Vector3d const &b, Vector3d const &c) {
-  Matrix3d l;
-  l.col(0) = a;
-  l.col(1) = b;
-  l.col(2) = c;
-  return l;
-}
 
 // The identity rotation is enough: BZ relocation itself does not use the
 // reciprocal group, only its geometry.
@@ -63,19 +58,22 @@ void check_relocate(Matrix3d const &real_lattice, Vector3i const &divisions,
 
   CHECK(got.addresses().size() == ref.num_bzgp);
   REQUIRE(got.addresses().size() == ref.bz_grid_address.size());
-  for (std::size_t i = 0; i < ref.bz_grid_address.size(); ++i) {
-    INFO("bz grid point " << i);
-    auto const a = got.addresses()[i];
-    CHECK(Vector3i(a[0], a[1], a[2]) == ref.bz_grid_address[i]);
+  for (auto const [i, point] :
+       std::views::zip(got.addresses(), ref.bz_grid_address) |
+           std::views::enumerate) {
+    auto const &[a, ref_address] = point;
+    INFO("bz grid point " << static_cast<std::size_t>(i));
+    CHECK(Vector3i(a[0], a[1], a[2]) == ref_address);
   }
 
-  for (std::size_t i = 0; i < ref.bz_map.size(); ++i) {
-    INFO("bz_map index " << i);
-    if (ref.bz_map[i] == ref.num_bzmesh) {
-      CHECK_FALSE(got.map(i).has_value());
+  for (auto const [i, ref_mapped] : ref.bz_map | std::views::enumerate) {
+    auto const index = static_cast<std::size_t>(i);
+    INFO("bz_map index " << index);
+    if (ref_mapped == ref.num_bzmesh) {
+      CHECK_FALSE(got.map(index).has_value());
     } else {
-      REQUIRE(got.map(i).has_value());
-      CHECK(*got.map(i) == ref.bz_map[i]);
+      REQUIRE(got.map(index).has_value());
+      CHECK(*got.map(index) == ref_mapped);
     }
   }
 }
@@ -102,12 +100,8 @@ TEST_CASE("BZ relocation matches reference", "[oracle][kpoint]") {
     check_relocate(bcc, Vector3i(4, 4, 4), Vector3i(0, 0, 0));
   }
   SECTION("hexagonal") {
-    double const a = 3.0;
-    double const c = 5.0;
-    Matrix3d const hex =
-        columns(Vector3d(a, 0, 0), Vector3d(-a / 2, a * std::sqrt(3.0) / 2, 0),
-                Vector3d(0, 0, c));
-    check_relocate(hex, Vector3i(4, 4, 4), Vector3i(0, 0, 0));
+    check_relocate(seitz::test::hexagonal(3.0, 5.0), Vector3i(4, 4, 4),
+                   Vector3i(0, 0, 0));
   }
 }
 
@@ -138,12 +132,12 @@ TEST_CASE("BZ grid points by rotations match reference", "[oracle][kpoint]") {
         address, rot_reciprocal, mesh, shift, ref_bz.bz_map);
 
     REQUIRE(got.size() == ref.size());
-    for (std::size_t i = 0; i < ref.size(); ++i) {
-      if (ref[i] == ref_bz.num_bzmesh) {
-        CHECK_FALSE(got[i].has_value());
+    for (auto const &[image, ref_image] : std::views::zip(got, ref)) {
+      if (ref_image == ref_bz.num_bzmesh) {
+        CHECK_FALSE(image.has_value());
       } else {
-        REQUIRE(got[i].has_value());
-        CHECK(*got[i] == ref[i]);
+        REQUIRE(image.has_value());
+        CHECK(*image == ref_image);
       }
     }
   }

@@ -5,6 +5,7 @@
 // setting.
 
 #include "oracle.hpp"
+#include "structures.hpp"
 
 #include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
 #include <seitz/core/magnetic_cell.hpp>
@@ -21,6 +22,8 @@
 
 namespace {
 
+using seitz::test::make_cell;
+
 using seitz::Cell;
 using seitz::CollinearTensors;
 using seitz::Lattice;
@@ -35,43 +38,9 @@ using seitz::SiteTensors;
 using seitz::TensorKind;
 using seitz::Vector3d;
 
-Cell make_cell(double a, std::vector<std::array<double, 3>> const &pos,
-               std::vector<int> const &types) {
-  Positions p(static_cast<Eigen::Index>(pos.size()), 3);
-  for (std::size_t i = 0; i < pos.size(); ++i) {
-    p.row(static_cast<Eigen::Index>(i)) =
-        Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
-  }
-  return Cell(Lattice{a * Matrix3d::Identity()}, p, types);
-}
-
-// Flat tensor array (spglib layout) from a MagneticCell.
-std::vector<double> flat_tensors(MagneticCell const &mcell) {
-  std::vector<double> out;
-  Eigen::Index const n = mcell.size();
-  if (mcell.rank() == SiteTensor::collinear) {
-    for (Eigen::Index i = 0; i < n; ++i)
-      out.push_back(mcell.scalar(i));
-  } else {
-    for (Eigen::Index i = 0; i < n; ++i)
-      for (int s = 0; s < 3; ++s)
-        out.push_back(mcell.vector(i)[s]);
-  }
-  return out;
-}
-
-bool fractional_overlap(Vector3d const &a, Vector3d const &b, double symprec) {
-  Vector3d d = a - b;
-  d = d.unaryExpr([](double x) { return x - std::round(x); });
-  return d.cwiseAbs().maxCoeff() <= symprec;
-}
-
-bool same_lattice(Matrix3d const &a, Matrix3d const &b) {
-  Matrix3d const rel = a.inverse() * b;
-  Matrix3i const rounded = seitz::math::round_to_int(rel);
-  return (rel - rounded.cast<double>()).cwiseAbs().maxCoeff() < 1e-6 &&
-         std::abs(rounded.determinant()) == 1;
-}
+using seitz::oracle::flat_tensors;
+using seitz::test::coincide_mod1;
+using seitz::test::same_lattice;
 
 void check(MagneticCell const &input, TensorKind kind, double symprec) {
   bool const is_axial = kind == TensorKind::axial;
@@ -82,7 +51,7 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   // Reference dataset.
   seitz::oracle::CCell c(mcell.cell());
   std::vector<double> const tensors = flat_tensors(mcell);
-  int const rank = mcell.rank() == SiteTensor::collinear ? 0 : 1;
+  int const rank = seitz::oracle::tensor_rank(mcell);
   SpglibMagneticDataset *ref = spg_get_magnetic_dataset(
       c.lattice, c.pos(), c.types.data(), tensors.data(), rank, c.num_atom(),
       is_axial ? 1 : 0, symprec);
@@ -116,9 +85,9 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
 
   // Equivalent atoms (per input atom).
   REQUIRE(static_cast<int>(got->equivalent_atoms.size()) == ref->n_atoms);
-  for (int i = 0; i < ref->n_atoms; ++i)
-    CHECK(got->equivalent_atoms[static_cast<std::size_t>(i)] ==
-          ref->equivalent_atoms[i]);
+  CHECK(std::ranges::equal(got->equivalent_atoms,
+                           std::span(ref->equivalent_atoms,
+                                     static_cast<std::size_t>(ref->n_atoms))));
 
   // Standardized cell atoms, matched as a set (type + position + tensor).
   int const n_std = ref->n_std_atoms;
@@ -131,7 +100,7 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
       auto const ug = static_cast<std::size_t>(g);
       if (got->standardized.cell().types()[ug] != ref->std_types[r])
         continue;
-      if (!fractional_overlap(
+      if (!coincide_mod1(
               got->standardized.cell().positions().row(g).transpose(), ref_pos,
               symprec))
         continue;
@@ -156,23 +125,14 @@ void check(MagneticCell const &input, TensorKind kind, double symprec) {
   // Magnetic operations, matched as a set.
   REQUIRE(static_cast<int>(got->operations.size()) == ref->n_operations);
   for (int s = 0; s < ref->n_operations; ++s) {
-    Matrix3i r;
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        r(i, j) = ref->rotations[s][i][j];
-    Vector3d const t(ref->translations[s][0], ref->translations[s][1],
-                     ref->translations[s][2]);
+    auto const spatial = seitz::oracle::from_c(&ref->rotations[s][0][0],
+                                               ref->translations[s]);
     bool const tr = ref->time_reversals[s] != 0;
-    bool found = false;
-    for (auto const &op : got->operations) {
-      if (op.spatial.rotation == r && op.time_reversal == tr &&
-          fractional_overlap(op.spatial.translation, t, symprec)) {
-        found = true;
-        break;
-      }
-    }
     INFO("operation " << s << " not matched");
-    CHECK(found);
+    CHECK(std::ranges::any_of(got->operations, [&](auto const &op) {
+      return op.time_reversal == tr &&
+             seitz::same_operation(op.spatial, spatial, symprec);
+    }));
   }
 
   Matrix3d ref_prim;

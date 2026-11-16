@@ -22,21 +22,22 @@ namespace {
 
 constexpr double kTol = 1e-6;
 
-[[nodiscard]] Vector3d unit_axis(int axis) {
-  Vector3d e = Vector3d::Zero();
-  e[axis] = 1.0;
-  return e;
-}
-
 // The geometry policy of a rod group: loci are affine subspaces (a point plus
 // a direction span), periodic along one axis — that component is folded into
 // [0, 1) and compared modulo the rod lattice, the aperiodic components are
 // exact. Orbit counts come from the distinct images of a generic point.
 struct RodGeometry {
-  // An affine locus: point + span(dir columns).
+  // An affine locus: point + span(dir columns). The orthogonal projector onto
+  // the direction span is cached, as in PointGeometry: same_locus is the
+  // O(n^2) / O(n^2 |G|) equality of the arrangement driver.
   struct Locus {
-    Vector3d point{Vector3d::Zero()};
-    Eigen::MatrixXd dir{Eigen::MatrixXd(3, 0)};
+    Locus(Vector3d p, Eigen::MatrixXd d)
+        : point{std::move(p)}, dir{std::move(d)},
+          projector{math::projector(dir)} {}
+
+    Vector3d point;
+    Eigen::MatrixXd dir;
+    Matrix3d projector;
     [[nodiscard]] int dim() const { return static_cast<int>(dir.cols()); }
   };
 
@@ -58,7 +59,7 @@ struct RodGeometry {
   }
 
   [[nodiscard]] Locus whole_space() const {
-    return Locus{.point = Vector3d::Zero(), .dir = Matrix3d::Identity()};
+    return Locus{Vector3d::Zero(), Matrix3d::Identity()};
   }
 
   // The fixed loci of one operation h(p) = R p + t within one period: the
@@ -74,10 +75,10 @@ struct RodGeometry {
     std::vector<Locus> loci;
     for (int n = -1; n <= 2; ++n) {
       Vector3d const rhs =
-          -op.translation + static_cast<double>(n) * unit_axis(axis);
+          -op.translation + static_cast<double>(n) * Vector3d::Unit(axis);
       Vector3d const particular = lu.solve(rhs);
       if (approx_equal(m * particular, rhs, kTol)) {
-        loci.push_back(Locus{.point = reduce(particular), .dir = ker});
+        loci.emplace_back(reduce(particular), ker);
       }
     }
     return loci;
@@ -92,7 +93,7 @@ struct RodGeometry {
     int const kb = b.dim();
     for (int shift = -1; shift <= 1; ++shift) {
       Vector3d const p2 =
-          b.point + static_cast<double>(shift) * unit_axis(axis);
+          b.point + static_cast<double>(shift) * Vector3d::Unit(axis);
       Vector3d const rhs = p2 - a.point;
       if (ka + kb == 0) {
         if (approx_zero(rhs, kTol)) {
@@ -113,9 +114,8 @@ struct RodGeometry {
         if (ka > 0) {
           common += a.dir * w.head(ka);
         }
-        results.push_back(
-            Locus{.point = reduce(common),
-                  .dir = math::intersect_column_spaces(a.dir, b.dir, kTol)});
+        results.emplace_back(
+            reduce(common), math::intersect_column_spaces(a.dir, b.dir, kTol));
       }
     }
     return results;
@@ -125,14 +125,13 @@ struct RodGeometry {
     if (a.dim() != b.dim()) {
       return false;
     }
-    Matrix3d const pa = math::projector(a.dir);
-    if (!approx_equal(pa, math::projector(b.dir), kTol)) {
+    if (!approx_equal(a.projector, b.projector, kTol)) {
       return false;
     }
     for (int n = -1; n <= 1; ++n) {
       Vector3d const delta =
-          a.point - b.point - static_cast<double>(n) * unit_axis(axis);
-      Vector3d const perp = delta - pa * delta;
+          a.point - b.point - static_cast<double>(n) * Vector3d::Unit(axis);
+      Vector3d const perp = delta - a.projector * delta;
       if (approx_zero(perp, kTol)) {
         return true;
       }
@@ -167,7 +166,7 @@ struct RodGeometry {
   // along the periodic axis, a centred band across the section.
   [[nodiscard]] Eigen::MatrixXd
   canonicalize_dir(Eigen::MatrixXd const &dir) const {
-    Vector3d const e = unit_axis(axis);
+    Vector3d const e = Vector3d::Unit(axis);
     bool const has_periodic =
         dir.cols() > 0 && approx_equal(dir * (dir.transpose() * e), e, kTol);
 
@@ -203,7 +202,6 @@ struct RodGeometry {
       locus_basis.leftCols(cdir.cols()) = cdir;
     }
     return detail::DerivedLocus{
-        .multiplicity = static_cast<int>(partition.points.size()),
         .dof = locus.dim(),
         .origin = reduce(locus.point),
         .locus_basis = locus_basis,
@@ -221,18 +219,11 @@ Result<RodGroup> RodGroup::from_number(int number) {
                   "(expected 1..75)"});
   }
 
-  Operations ops = data::rod_operations_from_database(number);
-  if (ops.empty()) {
-    return leaf::new_error(e_message{
-        "RodGroup::from_number: no operations for this rod group (is the "
-        "generated rod table present? run tools/transcribe_rod_groups.py)"});
-  }
-
   RodGroup rg;
   rg.number_ = number;
   rg.symbol_ = data::rod_symbol(number);
   rg.periodic_axis_ = data::rod_periodic_axis();
-  rg.operations_ = std::move(ops);
+  rg.operations_ = data::rod_operations_from_database(number);
 
   rg.positions_ = detail::derive_wyckoff_positions(
       rg.operations_, RodGeometry{rg.operations_, rg.periodic_axis_});

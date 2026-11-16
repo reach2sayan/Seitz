@@ -37,10 +37,6 @@ Matrix3d lattice_from_rows(double a0, double a1, double a2, double b0,
 }
 
 std::vector<Scenario> scenarios() {
-  constexpr CellPeriodicity layer{AxisKind::periodic, AxisKind::periodic,
-                                  AxisKind::aperiodic};
-  constexpr CellPeriodicity cluster{AxisKind::aperiodic, AxisKind::aperiodic,
-                                    AxisKind::aperiodic};
   return {
       {"cubic", Matrix3d::Identity() * 5.0, all_periodic()},
       {"triclinic",
@@ -50,8 +46,8 @@ std::vector<Scenario> scenarios() {
        lattice_from_rows(1.0, 0.0, 0.0, 0.97, 0.05, 0.0, 0.9, 0.9, 0.02),
        all_periodic()},
       {"layer", lattice_from_rows(3.0, 0.0, 0.0, 1.5, 2.6, 0.0, 0.0, 0.0, 20.0),
-       layer},
-      {"cluster", Matrix3d::Identity(), cluster},
+       aperiodic_along(2)},
+      {"cluster", Matrix3d::Identity(), none_periodic()},
   };
 }
 
@@ -82,10 +78,7 @@ Positions random_points(std::mt19937 &rng, Index n, CellPeriodicity const &p,
 }
 
 std::vector<int> sorted(auto &&range) {
-  std::vector<int> out;
-  for (int x : range) {
-    out.push_back(x);
-  }
+  std::vector<int> out{std::from_range, range};
   std::ranges::sort(out);
   return out;
 }
@@ -139,8 +132,9 @@ TEST_CASE("PositionIndex agrees with the brute-force scan",
           std::optional<int> const first =
               typed.begin() == typed.end() ? std::nullopt
                                            : std::optional(*typed.begin());
-          CHECK(index.first_match(q, type) == first);
-          CHECK(sorted(index.matches(q, type)) == sorted(typed));
+          PositionIndex::Scratch scratch;
+          CHECK(index.first_match(q, type, scratch) == first);
+          CHECK(sorted(index.matches(q, type, scratch)) == sorted(typed));
         }
       }
     }
@@ -157,8 +151,10 @@ TEST_CASE("first_match honours the accept predicate in index order",
   Types const types{7, 7, 7};
   PositionIndex const index(pos, types, lattice, 1e-5, all_periodic());
   Vector3d const q(0.25, 0.25, 1.25); // one lattice vector away
-  CHECK(index.first_match(q, 7) == 0);
-  CHECK(index.first_match(q, 7, [](int j) { return j > 0; }) == 1);
-  CHECK(index.first_match(q, 7, [](int j) { return j > 5; }) == std::nullopt);
-  CHECK(index.first_match(q, 8) == std::nullopt);
+  PositionIndex::Scratch scratch;
+  CHECK(index.first_match(q, 7, scratch) == 0);
+  CHECK(index.first_match(q, 7, scratch, [](int j) { return j > 0; }) == 1);
+  CHECK(index.first_match(q, 7, scratch, [](int j) { return j > 5; }) ==
+        std::nullopt);
+  CHECK(index.first_match(q, 8, scratch) == std::nullopt);
 }

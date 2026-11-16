@@ -32,6 +32,14 @@ constexpr Index kMeshGrain = 4096;
   return {v[0], v[1], v[2]};
 }
 
+// 2 * address + shift, WITHOUT folding into the mesh (Mesh::doubled_address
+// folds, and folding is not rotation-equivariant on a non-cubic mesh).
+[[nodiscard]] Vector3i unfolded_doubled(Address address,
+                                        std::array<bool, 3> const &shift) noexcept {
+  return to_eigen(address) * 2 +
+         Vector3i(int{shift[0]}, int{shift[1]}, int{shift[2]});
+}
+
 // True -> fast "normal" reduction;
 // false -> "distortion" path (3/6-fold rotations or non-conventional cells)
 [[nodiscard]] bool has_conventional_symmetry(Mesh const &mesh,
@@ -223,10 +231,7 @@ ReciprocalMesh::stabilized(std::span<Vector3d const> qpoints) const {
 }
 
 std::vector<std::size_t> ReciprocalMesh::images_of(Address address) const {
-  Vector3i const doubled =
-      to_eigen(address) * 2 +
-      to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
-                mesh_.shift()[2] ? 1 : 0});
+  Vector3i const doubled = unfolded_doubled(address, mesh_.shift());
   return {std::from_range,
           rotations_ | std::views::transform([&](Matrix3i const &rot) {
             return mesh_.index_of_doubled(from_eigen(rot * doubled));
@@ -302,11 +307,8 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
         gp = addresses.size();
         addresses.push_back(bz);
       }
-      Address doubled{};
-      for (std::size_t k = 0; k < 3; ++k) {
-        doubled[k] = bz[k] * 2 + (shift[k] ? 1 : 0);
-      }
-      map[bzmesh.index_of_doubled(doubled)] = gp;
+      map[bzmesh.index_of_doubled(from_eigen(unfolded_doubled(bz, shift)))] =
+          gp;
     }
   }
 
@@ -317,10 +319,7 @@ BrillouinZone ReciprocalMesh::brillouin_zone(Lattice const &reciprocal) const {
 std::vector<std::optional<std::size_t>>
 BrillouinZone::images_of(Address address) const {
   // mesh_ is already the doubled mesh.
-  Vector3i const doubled =
-      to_eigen(address) * 2 +
-      to_eigen({mesh_.shift()[0] ? 1 : 0, mesh_.shift()[1] ? 1 : 0,
-                mesh_.shift()[2] ? 1 : 0});
+  Vector3i const doubled = unfolded_doubled(address, mesh_.shift());
   return {std::from_range,
           rotations_ | std::views::transform([&](Matrix3i const &rot) {
             return map(mesh_.index_of_doubled(from_eigen(rot * doubled)));

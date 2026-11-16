@@ -171,4 +171,10 @@ inline std::vector<CorpusEntry> load_corpus() {
   return out;
 }
 
+// The corpus, parsed once per test process.
+inline std::vector<CorpusEntry> const &corpus() {
+  static std::vector<CorpusEntry> const entries = load_corpus();
+  return entries;
+}
+
 } // namespace seitz::oracle

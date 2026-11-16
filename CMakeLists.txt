@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Seitz VERSION 0.1.13 LANGUAGES CXX
+project(Seitz VERSION 1.0.0 LANGUAGES CXX
         DESCRIPTION "Modern C++23 crystallography and symmetry-analysis library")
 
 set(CMAKE_CXX_STANDARD 23)
@@ -226,8 +226,31 @@ seitz_transcribe(transcribe_subgroup_relations.py
 # Windows CI job passes sccache explicitly instead.
 find_program(CCACHE_PROGRAM ccache)
 if (CCACHE_PROGRAM AND NOT MSVC)
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    # The sloppiness is what lets ccache cache a TU that uses the precompiled
+    # header below at all; without it every such TU is a silent miss.
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CMAKE_COMMAND} -E env
+            CCACHE_SLOPPINESS=pch_defines,time_macros,include_file_mtime,include_file_ctime
+            ${CCACHE_PROGRAM})
 endif ()
+
+# Precompiled third-party headers, shared by the library and the test targets.
+# Only external headers that nearly every TU already reaches (Eigen through
+# core/types.hpp): never a seitz/ header, so a PCH can't mask a missing include
+# or carry the generated tables' visibility pragmas, and never Boost.Parser,
+# whose configuration macros must precede its include. Off under an MSVC
+# launcher: sccache cannot cache /Yu compiles, and a cache hit beats a PCH.
+if (MSVC AND CMAKE_CXX_COMPILER_LAUNCHER)
+    set(SEITZ_PCH_DEFAULT OFF)
+else ()
+    set(SEITZ_PCH_DEFAULT ON)
+endif ()
+option(SEITZ_PCH "Precompile the heavy third-party headers" ${SEITZ_PCH_DEFAULT})
+set(SEITZ_PCH_HEADERS
+        <Eigen/Dense>
+        <boost/leaf.hpp>
+        <boost/container/flat_map.hpp>
+        <boost/container/small_vector.hpp>
+        <algorithm> <array> <format> <optional> <ranges> <span> <vector>)
 
 # ---- library ----
 # The type is decided here, not via BUILD_SHARED_LIBS: it is part of the
@@ -268,10 +291,9 @@ add_library(seitz::seitz ALIAS seitz)
 set_target_properties(seitz PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if (SEITZ_LIBRARY_TYPE STREQUAL "SHARED")
     set_target_properties(seitz PROPERTIES
-            # 0.x: SOVERSION tracks the minor, since every minor may break ABI
-            # before 1.0. From 1.0 on this becomes ${PROJECT_VERSION_MAJOR}.
+            # Semver from 1.0: only a major bump may break ABI.
             VERSION ${PROJECT_VERSION}
-            SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+            SOVERSION ${PROJECT_VERSION_MAJOR})
 endif ()
 target_sources(seitz PRIVATE
         src/version.cpp
@@ -355,13 +377,16 @@ target_include_directories(seitz PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
-target_link_libraries(seitz PUBLIC Eigen3::Eigen Boost::container
-        Boost::graph Boost::leaf Threads::Threads)
-target_link_libraries(seitz PRIVATE Boost::flyweight
-        Boost::parser Boost::algorithm Boost::range)
+list(TRANSFORM SEITZ_BOOST_PUBLIC PREPEND Boost:: OUTPUT_VARIABLE _seitz_boost_public)
+list(TRANSFORM SEITZ_BOOST_PRIVATE PREPEND Boost:: OUTPUT_VARIABLE _seitz_boost_private)
+target_link_libraries(seitz PUBLIC Eigen3::Eigen ${_seitz_boost_public} Threads::Threads)
+target_link_libraries(seitz PRIVATE ${_seitz_boost_private})
 # Boost.Parser's MSVC debug stream includes <Windows.h>, whose min/max macros
 # would otherwise rewrite std::ranges::max(...) in the two grammar TUs.
 target_compile_definitions(seitz PRIVATE $<$<PLATFORM_ID:Windows>:NOMINMAX>)
+if (SEITZ_PCH)
+    target_precompile_headers(seitz PRIVATE ${SEITZ_PCH_HEADERS})
+endif ()
 
 # The conversion warnings are applied to the library only — the oracle tests
 # bridge to the reference C API (reinterpret_cast, size_t<->int), which would

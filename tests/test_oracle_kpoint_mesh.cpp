@@ -5,6 +5,7 @@
 // rotations.
 
 #include "oracle.hpp"
+#include "structures.hpp"
 
 #include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/kpoint/mesh.hpp>
@@ -17,6 +18,10 @@
 
 namespace {
 
+using seitz::test::make_cell;
+using seitz::test::cubic;
+using seitz::test::hexagonal;
+
 using seitz::Cell;
 using seitz::Lattice;
 using seitz::Matrix3d;
@@ -24,26 +29,6 @@ using seitz::Matrix3i;
 using seitz::Positions;
 using seitz::Vector3d;
 using seitz::Vector3i;
-
-Cell make_cell(Matrix3d const &lattice,
-               std::vector<std::array<double, 3>> const &pos,
-               std::vector<int> const &types) {
-  Positions p(static_cast<Eigen::Index>(pos.size()), 3);
-  for (std::size_t i = 0; i < pos.size(); ++i)
-    p.row(static_cast<Eigen::Index>(i)) =
-        Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
-  return Cell(Lattice{lattice}, p, types);
-}
-
-Matrix3d cubic(double a) { return a * Matrix3d::Identity(); }
-
-Matrix3d hexagonal(double a, double c) {
-  Matrix3d l;
-  l.col(0) = Vector3d(a, 0.0, 0.0);
-  l.col(1) = Vector3d(-a / 2.0, a * std::sqrt(3.0) / 2.0, 0.0);
-  l.col(2) = Vector3d(0.0, 0.0, c);
-  return l;
-}
 
 seitz::kpoint::Mesh sampling(Vector3i const &divisions,
                                   Vector3i const &is_shift) {
@@ -69,12 +54,14 @@ void check_ir(Cell const &cell, Vector3i const &divisions,
   CHECK(got->num_irreducible() == ref.num_ir);
   REQUIRE(got->mesh().size() == ref.grid_address.size());
   REQUIRE(got->mapping().size() == ref.ir_mapping_table.size());
-  std::size_t i = 0;
-  for (auto const address : got->mesh().addresses()) {
-    INFO("grid point " << i);
-    CHECK(Vector3i(address[0], address[1], address[2]) == ref.grid_address[i]);
-    CHECK(got->mapping()[i] == ref.ir_mapping_table[i]);
-    ++i;
+  for (auto const [i, point] :
+       std::views::zip(got->mesh().addresses(), got->mapping(),
+                       ref.grid_address, ref.ir_mapping_table) |
+           std::views::enumerate) {
+    auto const &[address, mapped, ref_address, ref_mapped] = point;
+    INFO("grid point " << static_cast<std::size_t>(i));
+    CHECK(Vector3i(address[0], address[1], address[2]) == ref_address);
+    CHECK(mapped == ref_mapped);
   }
 }
 
@@ -136,8 +123,7 @@ TEST_CASE("stabilized reciprocal mesh matches reference", "[oracle][kpoint]") {
         mesh, shift, tr, rotations, qpoints);
     CHECK(got.num_irreducible() == ref.num_ir);
     REQUIRE(got.mapping().size() == ref.ir_mapping_table.size());
-    for (std::size_t i = 0; i < ref.ir_mapping_table.size(); ++i)
-      CHECK(got.mapping()[i] == ref.ir_mapping_table[i]);
+    CHECK(std::ranges::equal(got.mapping(), ref.ir_mapping_table));
   };
 
   SECTION("gamma only (full symmetry)") {

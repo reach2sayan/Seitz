@@ -22,9 +22,7 @@ SubgroupEdge SubgroupEdge::of(int id) noexcept {
           .hall = *HallNumber::of(GroupFamily::space, r.hall),
           .kind = r.kind,
           .index = r.index,
-          .basis = Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor> const>(
-                       r.basis.data())
-                       .cast<double>() /
+          .basis = math::as_matrix(r.basis).cast<double>() /
                    data::kTableDenominator,
           .origin = Eigen::Map<Vector3i const>(r.shift.data()).cast<double>() /
                     data::kTableDenominator};

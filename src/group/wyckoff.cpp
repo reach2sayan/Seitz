@@ -21,10 +21,10 @@ Positions Wyckoff::orbit(Vector3d const &xyz,
   for (auto const &op : orbit_ops_) {
     Vector3d const point = wrap(op.apply(seed), periodicity);
     auto const coincides = [&](Index k) {
-      return minimal_image(Vector3d(points.row(k).transpose() - point),
-                           periodicity)
-                 .cwiseAbs()
-                 .maxCoeff() < kDefaultSymprec;
+      return approx_zero(
+          minimal_image(Vector3d(points.row(k).transpose() - point),
+                        periodicity),
+          kDefaultSymprec);
     };
     if (!std::ranges::any_of(std::views::iota(Index{0}, kept), coincides)) {
       points.row(kept++) = point.transpose();

@@ -68,17 +68,8 @@ void add_orbit(Cluster candidate, std::vector<Orbit> &orbits,
 void add_decorations(Cluster const &geometry, std::vector<Orbit> &orbits,
                      Operations const &ops, Lattice const &lattice,
                      double tol) {
-  std::vector<int> const radix = detail::radix_of(
-      geometry, [](ClusterPoint const &p) { return p.species - 1; });
-  for (std::span<int const> functions : detail::mixed_radix(radix)) {
-    auto const decorated =
-        std::views::zip(geometry, functions) |
-        std::views::transform([](auto const &pair) {
-          auto const &[point, function] = pair;
-          return ClusterPoint{point.position, point.species, function};
-        });
-    add_orbit(Cluster{Cluster::Points(decorated.begin(), decorated.end())},
-              orbits, ops, lattice, tol);
+  for (Cluster decorated : detail::decorations(geometry)) {
+    add_orbit(std::move(decorated), orbits, ops, lattice, tol);
   }
 }
 

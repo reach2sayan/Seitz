@@ -11,8 +11,6 @@
 #include "core/position_index.hpp"
 #include "math/lattice_parameters.hpp"
 
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/join.hpp>
 // Declared ahead of the parser headers: Boost.Parser's tracing prints every
 // sub-parser through a qualified call, so a user parser's overload has to be
 // visible where those templates are defined, not merely where they are used.
@@ -27,7 +25,6 @@ void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
 }
 
 #include <boost/parser/parser.hpp>
-#include <boost/range/join.hpp>
 
 #include <algorithm>
 #include <array>
@@ -36,7 +33,6 @@ void print_parser(Context const &, seitz::io::TokenParser<Token> const &,
 #include <cstdint>
 #include <format>
 #include <iterator>
-#include <locale>
 #include <numbers>
 #include <optional>
 #include <ranges>
@@ -370,16 +366,21 @@ CifBlock::column(std::string_view tag) const {
   return std::span{it->second};
 }
 
+namespace {
+
+// CIF's "unknown" and "inapplicable": no value, not a value spelled `?`.
+[[nodiscard]] constexpr bool is_cif_null(std::string_view v) noexcept {
+  return v == "?" || v == ".";
+}
+
+} // namespace
+
 std::optional<std::string_view> CifBlock::value(std::string_view tag) const {
   auto const rows = column(tag);
-  if (!rows || rows->empty()) {
+  if (!rows || rows->empty() || is_cif_null(rows->front())) {
     return std::nullopt;
   }
-  std::string_view const first = rows->front();
-  if (first == "?" || first == ".") {
-    return std::nullopt;
-  }
-  return first;
+  return rows->front();
 }
 
 namespace {
@@ -409,8 +410,8 @@ namespace {
     return data::atomic_number("H");
   }
   auto const titled = [&](std::size_t n) {
-    std::string s = boost::algorithm::to_lower_copy(letters.substr(0, n),
-                                                    std::locale::classic());
+    std::string s = letters.substr(0, n);
+    std::ranges::transform(s, s.begin(), ascii_lower);
     s.front() =
         static_cast<char>(std::toupper(static_cast<unsigned char>(s.front())));
     return s;
@@ -453,18 +454,18 @@ struct CifSite {
   return *number;
 }
 
-// An optional column, padded to `rows` so every site column zips.
-[[nodiscard]] std::vector<std::string>
+// An optional column, padded to `rows` so every site column zips. Views into
+// the block, which outlives the sites read from it.
+[[nodiscard]] std::vector<std::string_view>
 column_or_blank(CifBlock const &block, std::string_view tag, std::size_t rows) {
   auto const column = block.column(tag);
   if (!column || column->size() != rows) {
-    return std::vector<std::string>(rows);
+    return std::vector<std::string_view>(rows);
   }
-  return {column->begin(), column->end()};
+  return {std::from_range, *column};
 }
 
 [[nodiscard]] Result<Lattice> lattice_of(CifBlock const &block) {
-  constexpr double kDegree = std::numbers::pi / 180.0;
   BOOST_LEAF_AUTO(a, scalar_of(block, "_cell_length_a"));
   BOOST_LEAF_AUTO(b, scalar_of(block, "_cell_length_b"));
   BOOST_LEAF_AUTO(c, scalar_of(block, "_cell_length_c"));
@@ -472,8 +473,8 @@ column_or_blank(CifBlock const &block, std::string_view tag, std::size_t rows) {
   BOOST_LEAF_AUTO(beta, scalar_of(block, "_cell_angle_beta"));
   BOOST_LEAF_AUTO(gamma, scalar_of(block, "_cell_angle_gamma"));
 
-  Matrix3d const basis = math::lattice_from_parameters(
-      a, b, c, alpha * kDegree, beta * kDegree, gamma * kDegree);
+  Matrix3d const basis =
+      math::lattice_from_parameters_deg(a, b, c, alpha, beta, gamma);
   auto lattice = Lattice::from_basis(basis);
   if (!lattice) {
     return leaf::new_error(e_invalid_lattice{basis.determinant()});
@@ -519,14 +520,14 @@ column_or_blank(CifBlock const &block, std::string_view tag, std::size_t rows) {
     }
 
     CifSite site;
-    site.label = label.empty() ? std::format("site{}", row) : label;
+    site.label = label.empty() ? std::format("site{}", row) : std::string{label};
     site.position = Vector3d{*coordinate[0], *coordinate[1], *coordinate[2]};
     // "Not stated" is a full site when reading permissively.
     site.occupancy = number_of(occupancy).value_or(1.0);
 
     // '?' or '.' says the file has none, not that the element is called "?".
-    bool const stated = !symbol.empty() && symbol != "?" && symbol != ".";
-    std::string_view const named = stated ? symbol : site.label;
+    bool const stated = !symbol.empty() && !is_cif_null(symbol);
+    std::string_view const named = stated ? symbol : std::string_view{site.label};
     auto const type = species_of(named);
     if (!type) {
       return leaf::new_error(e_unknown_element{std::string{named}});
@@ -634,14 +635,24 @@ constexpr auto kNamedSources = std::array{
     NamedSource{kHmTags, &data::hall_from_hm_symbol<GroupFamily::space>},
     NamedSource{kNumberTags, &hall_of_number}};
 
+// The sources the block states, in that order, each with its stated text.
+[[nodiscard]] auto stated_sources(CifBlock const &block) {
+  return kNamedSources | std::views::transform([&block](NamedSource const &s) {
+           return std::pair{first_stated(block, s.tags), s.resolve};
+         }) |
+         std::views::filter([](auto const &p) { return p.first.has_value(); }) |
+         std::views::transform([](auto const &p) {
+           return std::pair{*p.first, p.second};
+         });
+}
+
 // The setting the block names and the tables know; nullopt otherwise. For
 // the loop path, where the name only confirms the listed operations, so an
 // unknown symbol (`Aba2`, a non-standard setting) is no error.
 [[nodiscard]] std::optional<HallNumber>
 resolved_setting(CifBlock const &block) {
-  for (auto const &[tags, resolve] : kNamedSources) {
-    auto const stated = first_stated(block, tags);
-    if (auto const hall = stated ? resolve(*stated) : std::nullopt) {
+  for (auto const &[text, resolve] : stated_sources(block)) {
+    if (auto const hall = resolve(text)) {
       return hall;
     }
   }
@@ -652,18 +663,16 @@ resolved_setting(CifBlock const &block) {
 // when it names one the tables cannot resolve.
 [[nodiscard]] Result<std::optional<HallNumber>>
 named_setting(CifBlock const &block) {
-  for (auto const &[tags, resolve] : kNamedSources) {
-    auto const stated = first_stated(block, tags);
-    if (!stated) {
-      continue;
-    }
-    auto const hall = resolve(*stated);
-    if (!hall) {
-      return leaf::new_error(e_unknown_spacegroup_symbol{std::string{*stated}});
-    }
-    return hall;
+  auto stated = stated_sources(block);
+  if (stated.empty()) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  auto const &[text, resolve] = stated.front();
+  auto const hall = resolve(text);
+  if (!hall) {
+    return leaf::new_error(e_unknown_spacegroup_symbol{std::string{text}});
+  }
+  return hall;
 }
 
 // Whether `listed` is exactly the operation set of `hall`: the same count,
@@ -912,12 +921,10 @@ struct Row {
   auto const angle = [&](int i) {
     return math::metric_angle(metric, (i + 1) % 3, (i + 2) % 3) * kDegree;
   };
-  std::array const lengths{math::metric_length(metric, 0),
-                           math::metric_length(metric, 1),
-                           math::metric_length(metric, 2)};
-  std::array const angles{angle(0), angle(1), angle(2)};
-  for (auto const [tag, parameter] :
-       std::views::zip(kCellTags, boost::range::join(lengths, angles))) {
+  std::array const parameters{
+      math::metric_length(metric, 0), math::metric_length(metric, 1),
+      math::metric_length(metric, 2), angle(0), angle(1), angle(2)};
+  for (auto const [tag, parameter] : std::views::zip(kCellTags, parameters)) {
     out += std::format("{:<30} {:.6f}\n", tag, parameter);
   }
 
@@ -945,11 +952,7 @@ std::string write_cif(Cell const &cell, std::string_view name) {
       std::from_range,
       cell.atoms() | std::views::transform([](auto const &atom) {
         auto const &[position, type] = atom;
-        return Row{.label = {},
-                   .symbol = symbol_of(type),
-                   .multiplicity = 1,
-                   .wyckoff = 'a',
-                   .position = position};
+        return Row{.symbol = symbol_of(type), .position = position};
       })});
   constexpr auto kP1 = *HallNumber::of(GroupFamily::space, 1);
   return render(name, cell.lattice(), kP1, std::array{SymmetryOperation{}},
@@ -968,6 +971,10 @@ Result<std::string> write_cif(analysis::SymmetryAnalyzer const &analyzer,
   BOOST_LEAF_AUTO(sites, restated.sites());
   BOOST_LEAF_AUTO(operations, restated.operations());
 
+  boost::container::flat_map<int, int> multiplicity;
+  for (analysis::Site const &site : sites) {
+    ++multiplicity[site.equivalent_atom];
+  }
   auto const rows = labelled(std::vector<Row>{
       std::from_range,
       std::views::enumerate(sites) |
@@ -981,9 +988,7 @@ Result<std::string> write_cif(analysis::SymmetryAnalyzer const &analyzer,
                 .label = {},
                 .symbol =
                     symbol_of(standardized.type(static_cast<Index>(index))),
-                .multiplicity = static_cast<int>(
-                    std::ranges::count(sites, static_cast<int>(index),
-                                       &analysis::Site::equivalent_atom)),
+                .multiplicity = multiplicity[static_cast<int>(index)],
                 .wyckoff = static_cast<char>('a' + site.wyckoff),
                 .position = standardized.position(static_cast<Index>(index))};
           })});

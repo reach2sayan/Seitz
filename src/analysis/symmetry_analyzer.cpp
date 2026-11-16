@@ -59,21 +59,6 @@ attempt(Cell const &cell, Tolerance const &tol,
   Lattice const bravais{sg.bravais_lattice};
   Lattice const std_lattice = standardized->bravais.lattice();
 
-  // Zipped, not indexed: these five per-atom tables are parallel, and a shared
-  // subscript is the one way assembling a Site can silently go wrong.
-  std::vector<Site> sites;
-  sites.reserve(standardized->wyckoffs.size());
-  std::ranges::transform(
-      std::views::zip(
-          standardized->wyckoffs, standardized->site_symmetry_symbols,
-          standardized->equivalent_atoms, standardized->crystallographic_orbits,
-          primitive->mapping_table),
-      std::back_inserter(sites), [](auto const &fields) {
-        auto const &[wyckoff, symbol, equivalent, orbit, primitive_atom] =
-            fields;
-        return Site{wyckoff, symbol, equivalent, orbit, primitive_atom};
-      });
-
   return Dataset{
       .hall = sg.hall,
       .bravais = bravais,
@@ -82,7 +67,7 @@ attempt(Cell const &cell, Tolerance const &tol,
                   .origin_shift = sg.origin_shift,
                   .rigid_rotation = bravais.rigid_rotation_to(std_lattice)},
       .operations = std::move(*operations),
-      .sites = std::move(sites),
+      .sites = std::move(standardized->sites),
       .standardized = std::move(standardized->bravais),
       .std_mapping_to_primitive =
           std::move(standardized->std_mapping_to_primitive),

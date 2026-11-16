@@ -7,11 +7,13 @@
 
 #include <algorithm>
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 // The conversions that are not pybind11's job out of the box: borrowing a span
 // into an object's own storage, and the small NumPy shapes the library speaks.
@@ -72,11 +74,15 @@ template <class T>
   return out;
 }
 
-// Rows of 3 as a C-contiguous (N, 3) array.
-template <class T>
-[[nodiscard]] py::array_t<T> array_n3(std::span<std::array<T, 3> const> rows) {
-  py::array_t<T> out({static_cast<py::ssize_t>(rows.size()), py::ssize_t{3}});
-  std::ranges::copy(rows | std::views::join, out.mutable_data());
+// Rows of 3 as a C-contiguous (N, 3) array: one copy, straight from any sized
+// range of rows -- a span, or a lazy view such as Mesh::addresses().
+template <class T, std::ranges::sized_range R>
+  requires std::same_as<std::ranges::range_value_t<R>, std::array<T, 3>>
+[[nodiscard]] py::array_t<T> array_n3(R &&rows) {
+  py::array_t<T> out(
+      {static_cast<py::ssize_t>(std::ranges::size(rows)), py::ssize_t{3}});
+  std::ranges::copy(std::views::all(std::forward<R>(rows)) | std::views::join,
+                    out.mutable_data());
   return out;
 }
 

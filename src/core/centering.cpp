@@ -11,20 +11,8 @@ namespace seitz {
 
 using data::Centering;
 
-// The tables are the source of truth; these are the typed views the pipeline
-// works with, materialised into Eigen once on first use.
-
-Matrix3i const &centering_matrix(Centering c) {
-  static auto const table = [] {
-    std::array<Matrix3i, kCenteringCount> t;
-    std::ranges::transform(detail::kCenteringMatrix, t.begin(),
-                           [](math::Mat3Rows const &rows) {
-                             return Matrix3i(math::as_matrix(rows));
-                           });
-    return t;
-  }();
-  return table[static_cast<std::size_t>(c)];
-}
+// The tables are the source of truth; the inverse is materialised into Eigen
+// once on first use (centering_matrix itself is a view, in the header).
 
 Matrix3d const &centering_matrix_inv(Centering c) {
   static auto const table = [] {

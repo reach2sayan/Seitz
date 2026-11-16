@@ -7,7 +7,6 @@
 #include "core/position_index.hpp"
 #include "math/fractional.hpp"
 #include "math/integer_matrix.hpp"
-#include "symmetry/search.hpp"
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/periodicity.hpp>
 
@@ -109,21 +108,35 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
                   double symprec) {
   int const multi = static_cast<int>(pure_trans.size());
   double const init_volume = cell.lattice().volume();
+  // Layer: the aperiodic lattice vector keeps its column so the 2D reduction
+  // leaves it alone; the periodic ones come from the candidates below.
+  std::optional<int> const ap = [&]() -> std::optional<int> {
+    if constexpr (F == GroupFamily::layer) {
+      return aperiodic_axis(cell.periodicity()).value_or(2);
+    } else {
+      return std::nullopt;
+    }
+  }();
+  // Candidate basis vectors: the pure translations (the zero translation, the
+  // reference atom's own, first) and the periodic unit vectors.
+  std::vector<Vector3d> cand(pure_trans.begin(), pure_trans.end());
+  for (int a = 0; a < 3; ++a) {
+    if (a != ap) {
+      cand.push_back(Vector3d::Unit(a));
+    }
+  }
+  auto const right_volume = [&](Matrix3d const &relative) {
+    double const volume =
+        std::abs((cell.lattice().matrix() * relative).determinant());
+    return volume > symprec && math::nint(init_volume / volume) == multi;
+  };
+  auto const finish = [&](Matrix3d const &relative) {
+    return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
+                                       cell.periodicity(), symprec);
+  };
 
   if constexpr (F == GroupFamily::layer) {
-    auto const layer_axis = aperiodic_axis(cell.periodicity());
-    // Layer: the third basis vector is the aperiodic lattice vector; the two
-    // periodic ones come from the in-plane translations and unit vectors. The
-    // aperiodic axis keeps its column so the 2D reduction leaves it alone.
-    int const ap = layer_axis.value_or(2);
-    std::vector<Vector3d> cand(pure_trans.begin(),
-                               pure_trans.end()); // in-plane, includes zero
-    for (int a = 0; a < 3; ++a) {
-      if (a != ap) {
-        cand.push_back(Vector3d::Unit(a));
-      }
-    }
-    std::array<int, 2> const periodic{ap == 0 ? 1 : 0, ap == 2 ? 1 : 2};
+    std::array<int, 2> const periodic{*ap == 0 ? 1 : 0, *ap == 2 ? 1 : 2};
     auto const ids = std::views::iota(std::size_t{0}, cand.size());
     // The first pair (in lexicographic order) spanning a cell of the right
     // volume.
@@ -132,31 +145,18 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
                                    return std::get<0>(ij) < std::get<1>(ij);
                                  })) {
       Matrix3d relative;
-      relative.col(ap) = Vector3d::Unit(ap);
+      relative.col(*ap) = Vector3d::Unit(*ap);
       relative.col(periodic[0]) = cand[i];
       relative.col(periodic[1]) = cand[j];
-      double const volume =
-          std::abs((cell.lattice().matrix() * relative).determinant());
-      if (volume <= symprec || math::nint(init_volume / volume) != multi) {
-        continue;
+      if (right_volume(relative)) {
+        return finish(relative);
       }
-      return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
-                                         cell.periodicity(), symprec);
     }
-    return std::nullopt;
   } else {
-
-    std::vector<Vector3d> cand(
-        pure_trans.begin(),
-        pure_trans.end()); // includes the zero translation
-    cand.push_back(Vector3d::UnitX());
-    cand.push_back(Vector3d::UnitY());
-    cand.push_back(Vector3d::UnitZ());
     // The first triple (in lexicographic order) of non-zero candidates
-    // spanning a cell of the right volume. The zero candidate (the reference
-    // atom's own translation, always first) gives an exactly zero determinant,
-    // so it is filtered out before the product rather than visited in the
-    // O(n^2) triples that hold it.
+    // spanning a cell of the right volume. The zero candidate gives an exactly
+    // zero determinant, so it is filtered out before the product rather than
+    // visited in the O(n^2) triples that hold it.
     std::vector<std::size_t> const nonzero{
         std::from_range, std::views::iota(std::size_t{0}, cand.size()) |
                              std::views::filter([&](std::size_t i) {
@@ -169,19 +169,13 @@ primitive_lattice(Cell const &cell, std::span<Vector3d const> pure_trans,
                return i < j && j < k;
              })) {
       Matrix3d relative;
-      relative.col(0) = cand[i];
-      relative.col(1) = cand[j];
-      relative.col(2) = cand[k];
-      double const volume =
-          std::abs((cell.lattice().matrix() * relative).determinant());
-      if (volume <= symprec || math::nint(init_volume / volume) != multi) {
-        continue;
+      relative << cand[i], cand[j], cand[k];
+      if (right_volume(relative)) {
+        return finish(relative);
       }
-      return finish_primitive_lattice<F>(relative, cell.lattice(), multi,
-                                         cell.periodicity(), symprec);
     }
-    return std::nullopt;
   }
+  return std::nullopt;
 }
 
 // Fold atoms into the trimmed lattice, de-dup translationally-equivalent ones,
@@ -256,8 +250,9 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
       tol *= bad->second < ratio ? kTrimIncreaseRate : kTrimReduceRate;
     }
   }
-  if (!ok)
+  if (!ok) {
     return std::nullopt;
+  }
 
   // Build the mapping (input atom -> trimmed atom) and the trimmed types:
   // each representative becomes the next trimmed atom, every other atom maps
@@ -279,9 +274,8 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   // a component more than half a cell from its representative is shifted one
   // cell toward it before summing.
   Positions tpos = Positions::Zero(tn, 3);
-  for (int i = 0; i < n; ++i) {
-    int const j = mapping[static_cast<std::size_t>(i)];
-    int const k = overlap[static_cast<std::size_t>(i)];
+  for (auto const [i, j, k] :
+       std::views::zip(std::views::iota(0, n), mapping, overlap)) {
     tpos.row(j) += pos.row(i).binaryExpr(pos.row(k), [](double pi, double pk) {
       if (std::abs(pk - pi) > 0.5) {
         return pi < pk ? pi + 1.0 : pi - 1.0;
@@ -298,15 +292,6 @@ trim_cell(Lattice const &trimmed_lattice, Cell const &cell, double symprec) {
   return std::pair{Cell(trimmed_lattice, std::move(tpos),
                         std::move(trimmed_types), periodicity),
                    std::move(mapping)};
-}
-
-// The translations of a symmetry-operation set whose rotation is the identity.
-[[nodiscard]] std::vector<Vector3d>
-operation_pure_translations(std::span<SymmetryOperation const> operations) {
-  return {std::from_range,
-          operations | std::views::filter([](auto const &op) {
-            return op.rotation == Matrix3i::Identity();
-          }) | std::views::transform(&SymmetryOperation::translation)};
 }
 
 // The primitive lattice in "translation space": reduce a cell whose atoms sit
@@ -350,43 +335,46 @@ PrimitiveFinder<F>::trim_to(Lattice const &trimmed_lattice) const {
   return trim_cell(trimmed_lattice, cell_, tol_.symprec);
 }
 
+// The primitive cell implied by `pure_trans` at one tolerance: a single pure
+// translation means the cell is already primitive and only needs reducing.
+template <GroupFamily F>
+[[nodiscard]] std::optional<Primitive>
+primitive_from(Cell const &cell, std::span<Vector3d const> pure_trans,
+               Tolerance const &tol) {
+  if (pure_trans.size() == 1) {
+    auto smallest = smallest_lattice_cell<F>(cell, tol.symprec);
+    if (!smallest) {
+      return std::nullopt;
+    }
+    std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
+    std::ranges::iota(mapping, 0);
+    return Primitive{std::move(*smallest), std::move(mapping),
+                     cell.lattice().matrix(), tol};
+  }
+  auto const prim_lat = primitive_lattice<F>(cell, pure_trans, tol.symprec);
+  if (!prim_lat) {
+    return std::nullopt;
+  }
+  auto trimmed = trim_cell(*prim_lat, cell, tol.symprec);
+  if (!trimmed) {
+    return std::nullopt;
+  }
+  return Primitive{std::move(trimmed->first), std::move(trimmed->second),
+                   cell.lattice().matrix(), tol};
+}
+
 template <GroupFamily F> Result<Primitive> PrimitiveFinder<F>::find() const {
-  Cell const &cell = cell_;
-  Tolerance const &tol = tol_;
-  double tolerance = tol.symprec;
+  double tolerance = tol_.symprec;
   for (int attempt = 0; attempt < kNumAttempt;
        ++attempt, tolerance *= kReduceRate) {
-    auto const pure = SymmetrySearch<F>{cell, {tolerance, tol_.angle_tolerance}}
-                          .pure_translations();
+    Tolerance const tol{tolerance, tol_.angle_tolerance};
+    auto const pure = SymmetrySearch<F>{cell_, tol}.pure_translations();
     if (pure.empty()) {
       continue;
     }
-
-    if (pure.size() == 1) {
-      auto smallest = smallest_lattice_cell<F>(cell, tolerance);
-      if (!smallest) {
-        continue;
-      }
-      std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
-      std::ranges::iota(mapping, 0);
-      return Primitive{std::move(*smallest),
-                       std::move(mapping),
-                       cell.lattice().matrix(),
-                       {tolerance, tol.angle_tolerance}};
+    if (auto prim = primitive_from<F>(cell_, pure, tol)) {
+      return std::move(*prim);
     }
-
-    auto const prim_lat = primitive_lattice<F>(cell, pure, tolerance);
-    if (!prim_lat) {
-      continue;
-    }
-    auto trimmed = trim_cell(*prim_lat, cell, tolerance);
-    if (!trimmed) {
-      continue;
-    }
-    return Primitive{std::move(trimmed->first),
-                     std::move(trimmed->second),
-                     cell.lattice().matrix(),
-                     {tolerance, tol.angle_tolerance}};
   }
   return leaf::new_error(e_cell_standardization_failed{});
 }
@@ -400,32 +388,11 @@ std::optional<Lattice> PrimitiveFinder<F>::lattice_from_pure_translations(
 template <GroupFamily F>
 Result<Primitive> PrimitiveFinder<F>::from_pure_translations(
     std::span<Vector3d const> pure_trans) const {
-  Cell const &cell = cell_;
-  double const symprec = tol_.symprec;
-  if (pure_trans.size() == 1) {
-    auto smallest = smallest_lattice_cell<F>(cell, symprec);
-    if (!smallest) {
-      return leaf::new_error(e_cell_standardization_failed{});
-    }
-    std::vector<int> mapping(static_cast<std::size_t>(cell.size()));
-    std::iota(mapping.begin(), mapping.end(), 0);
-    return Primitive{std::move(*smallest),
-                     std::move(mapping),
-                     cell.lattice().matrix(),
-                     {symprec, std::nullopt}};
+  if (auto prim = primitive_from<F>(cell_, pure_trans,
+                                    {tol_.symprec, std::nullopt})) {
+    return std::move(*prim);
   }
-  auto const prim_lat = primitive_lattice<F>(cell, pure_trans, symprec);
-  if (!prim_lat) {
-    return leaf::new_error(e_cell_standardization_failed{});
-  }
-  auto trimmed = trim_cell(*prim_lat, cell, symprec);
-  if (!trimmed) {
-    return leaf::new_error(e_cell_standardization_failed{});
-  }
-  return Primitive{std::move(trimmed->first),
-                   std::move(trimmed->second),
-                   cell.lattice().matrix(),
-                   {symprec, std::nullopt}};
+  return leaf::new_error(e_cell_standardization_failed{});
 }
 
 template class PrimitiveFinder<GroupFamily::space>;
@@ -437,10 +404,9 @@ template class PrimitiveFinder<GroupFamily::layer>;
 // the public header never names the primitive-cell machinery.
 namespace seitz::detail {
 
-std::optional<std::pair<std::vector<SymmetryOperation>, Matrix3d>>
-primitive_operations(std::span<SymmetryOperation const> operations,
-                     Tolerance const &tol) {
-  auto const pure_trans = symmetry::operation_pure_translations(operations);
+std::optional<std::pair<Operations, Matrix3d>>
+primitive_operations(Operations const &operations, Tolerance const &tol) {
+  auto const pure_trans = operations.pure_translations();
   if (pure_trans.empty()) {
     return std::nullopt;
   }
@@ -456,14 +422,13 @@ primitive_operations(std::span<SymmetryOperation const> operations,
   Matrix3d const t_mat = t_mat_inv->inverse();
 
   auto const prim =
-      symmetry::collect_primitive_operations(operations, primsym_size);
+      symmetry::collect_primitive_operations(operations.span(), primsym_size);
   if (!prim) {
     return std::nullopt;
   }
 
   // (T, 0) (R, t) (T, 0)^-1 = (T R T^-1, T t).
-  Operations const conjugated = prim->conjugated_by(t_mat, *t_mat_inv);
-  return std::pair{std::vector(conjugated.begin(), conjugated.end()), t_mat};
+  return std::pair{prim->conjugated_by(t_mat, *t_mat_inv), t_mat};
 }
 
 } // namespace seitz::detail

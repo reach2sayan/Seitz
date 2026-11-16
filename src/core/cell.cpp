@@ -47,7 +47,7 @@ Result<Cell> Cell::transformed(Matrix3i const &basis,
 }
 
 Cell Cell::translated(Vector3d const &shift) const {
-  std::vector<Vector3d> const rows{
+  std::vector const rows{
       std::from_range, atoms() | std::views::transform([&](auto const &atom) {
         return wrap(Vector3d(atom.first + shift), periodicity_);
       })};

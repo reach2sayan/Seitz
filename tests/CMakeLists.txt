@@ -35,6 +35,14 @@ target_include_directories(seitz_tests PRIVATE
         ${SEITZ_GENERATED_SRC_DIR}
         ${CMAKE_SOURCE_DIR}/src)
 
+# The library's PCH list plus Catch2's macros header, which 47 of the test files
+# include. The oracle target below builds its own copy rather than REUSE_FROM
+# this one: its extra compile definitions would make a shared PCH unusable.
+if (SEITZ_PCH)
+    target_precompile_headers(seitz_tests PRIVATE
+            ${SEITZ_PCH_HEADERS} <catch2/catch_test_macros.hpp>)
+endif ()
+
 include(Catch)
 catch_discover_tests(seitz_tests)
 
@@ -75,5 +83,9 @@ if (SEITZ_BUILD_ORACLE_TESTS)
             SPGLIB_REF_DATA_DIR="${spglib_reference_SOURCE_DIR}/test/functional/python/data"
             # PyXtal's two CIF corpora; tests/cif_corpus.hpp reads both.
             SEITZ_PYXTAL_CIF_DIR="${pyxtal_reference_SOURCE_DIR}/pyxtal")
+    if (SEITZ_PCH)
+        target_precompile_headers(seitz_oracle_tests PRIVATE
+                ${SEITZ_PCH_HEADERS} <catch2/catch_test_macros.hpp>)
+    endif ()
     catch_discover_tests(seitz_oracle_tests)
 endif ()

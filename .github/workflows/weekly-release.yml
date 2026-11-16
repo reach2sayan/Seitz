@@ -1,7 +1,8 @@
 # Every Monday, main becomes a release: the patch number in project() goes up by
 # one, the bump is committed and tagged, and Release builds and publishes the
 # artifacts for that tag. A week in which main did not move produces nothing --
-# the test is whether HEAD is already the commit the latest tag names -- and a
+# the test is whether anything outside the vcpkg port differs from the latest
+# tag (release.yml always lands one port commit after it) -- and a
 # red main is never released. "Run workflow" is the same thing on demand.
 #
 # The green check reads one workflow because there is one: CI covers GCC, Clang,
@@ -60,10 +61,13 @@ jobs:
           # No tags at all is the first-release case, not an error -- and
           # `git describe` exits non-zero there, which would end the step.
           last=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          # Compare trees, not commits: release.yml lands a "vcpkg port" commit
+          # after every tag, so HEAD is never the tagged commit. Only that
+          # port's own files are excluded -- anything else is a real change.
           if [[ -z "$last" ]]; then
             echo "no v* tag yet; this will be the first release"
-          elif [[ $(git rev-parse "$last^{commit}") == $(git rev-parse HEAD) ]]; then
-            echo "main is still $last; nothing to release"
+          elif git diff --quiet "$last" HEAD -- . ':(exclude)contrib/vcpkg/ports/seitz'; then
+            echo "nothing but the vcpkg port has changed since $last; nothing to release"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "$(git rev-list --count "$last"..HEAD) commits since $last"

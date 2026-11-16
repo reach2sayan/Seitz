@@ -6,6 +6,7 @@
 #include <seitz/data/spg_database.hpp>
 
 #include "helpers.hpp"
+#include "structures.hpp"
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -22,15 +23,9 @@ using seitz::test::layer_hall;
 using seitz::test::must;
 using seitz::test::space_hall;
 
-// A hexagonal in-plane lattice (a=b, gamma=120) with a large vacuum gap along
-// c, the aperiodic axis. Columns are basis vectors.
-Matrix3d hexagonal_layer(double a, double c) {
-  Matrix3d m;
-  m.col(0) = Vector3d(a, 0, 0);
-  m.col(1) = Vector3d(-a / 2, a * std::numbers::sqrt3 / 2, 0);
-  m.col(2) = Vector3d(0, 0, c);
-  return m;
-}
+// A hexagonal in-plane lattice with a large vacuum gap along c, the aperiodic
+// axis.
+using seitz::test::hexagonal;
 } // namespace
 
 TEST_CASE("layer database: negative-hall metadata + ops", "[layer][database]") {
@@ -50,7 +45,7 @@ TEST_CASE("layer database: negative-hall metadata + ops", "[layer][database]") {
 }
 
 TEST_CASE("graphene is layer group p6/mmm (LG 80)", "[layer]") {
-  Matrix3d const lat = hexagonal_layer(2.46, 15.0);
+  Matrix3d const lat = hexagonal(2.46, 15.0);
   Positions pos(2, 3);
   pos.row(0) << 1.0 / 3, 2.0 / 3, 0.0; // honeycomb sites in the z=0 plane
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;
@@ -74,7 +69,7 @@ TEST_CASE("graphene offset along the aperiodic axis still resolves",
   // The layer sits at an arbitrary z (not the database's z=0 plane). The
   // origin-shift aperiodic (c) component must re-center it; the result is
   // independent of the offset.
-  Matrix3d const lat = hexagonal_layer(2.46, 15.0);
+  Matrix3d const lat = hexagonal(2.46, 15.0);
   for (double z : {0.5, 0.27}) {
     Positions pos(2, 3);
     pos.row(0) << 1.0 / 3, 2.0 / 3, z;
@@ -106,7 +101,7 @@ TEST_CASE("square lattice single atom is p4/mmm (LG 61)", "[layer]") {
 }
 
 TEST_CASE("SymmetryAnalyzer auto-routes layer cells", "[layer][analysis]") {
-  Matrix3d const lat = hexagonal_layer(2.46, 15.0);
+  Matrix3d const lat = hexagonal(2.46, 15.0);
   Positions pos(2, 3);
   pos.row(0) << 1.0 / 3, 2.0 / 3, 0.0;
   pos.row(1) << 2.0 / 3, 1.0 / 3, 0.0;

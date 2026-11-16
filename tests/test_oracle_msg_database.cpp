@@ -28,38 +28,32 @@ using seitz::test::uni_number;
 // spg_get_magnetic_symmetry_from_database (max 384 operations).
 MagneticOperations reference_magnetic_operations(int uni_number,
                                                  int hall_number) {
-  std::array<int, 384 * 9> rot{};
-  std::array<double, 384 * 3> trans{};
+  seitz::oracle::COperations buffer(384);
   std::array<int, 384> timerev{};
   int const n = spg_get_magnetic_symmetry_from_database(
-      reinterpret_cast<int(*)[3][3]>(rot.data()),
-      reinterpret_cast<double(*)[3]>(trans.data()), timerev.data(), uni_number,
+      buffer.rotations(), buffer.translations(), timerev.data(), uni_number,
       hall_number);
-  std::vector<seitz::MagneticSymmetryOperation> ops;
-  ops.reserve(static_cast<std::size_t>(n));
-  for (int s = 0; s < n; ++s) {
-    Matrix3i r;
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        r(i, j) = rot[static_cast<std::size_t>(9 * s + 3 * i + j)];
-    Vector3d t(trans[static_cast<std::size_t>(3 * s + 0)],
-               trans[static_cast<std::size_t>(3 * s + 1)],
-               trans[static_cast<std::size_t>(3 * s + 2)]);
-    ops.push_back({{r, t}, timerev[static_cast<std::size_t>(s)] != 0});
-  }
-  return MagneticOperations{std::move(ops)};
+  auto const spatial = buffer.operations(n);
+  return MagneticOperations{
+      std::from_range,
+      std::views::zip(spatial, timerev) |
+          std::views::transform([](auto const &entry) {
+            auto const &[op, tr] = entry;
+            return seitz::MagneticSymmetryOperation{op, tr != 0};
+          })};
 }
 
 void require_same_operations(MagneticOperations const &got,
                              MagneticOperations const &ref) {
   REQUIRE(got.size() == ref.size());
-  for (std::size_t i = 0; i < ref.size(); ++i) {
-    INFO("operation index " << i);
-    REQUIRE(got[i].spatial.rotation == ref[i].spatial.rotation);
-    REQUIRE((got[i].spatial.translation - ref[i].spatial.translation)
+  for (auto const [i, pair] : std::views::zip(got, ref) | std::views::enumerate) {
+    auto const &[g, r] = pair;
+    INFO("operation index " << static_cast<std::size_t>(i));
+    REQUIRE(g.spatial.rotation == r.spatial.rotation);
+    REQUIRE((g.spatial.translation - r.spatial.translation)
                 .cwiseAbs()
                 .maxCoeff() < 1e-12);
-    REQUIRE(got[i].time_reversal == ref[i].time_reversal);
+    REQUIRE(g.time_reversal == r.time_reversal);
   }
 }
 

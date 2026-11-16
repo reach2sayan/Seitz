@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 // The cell-parameter <-> basis-matrix conversion, in the standard
 // crystallographic orientation: a along x, b in the xy-plane, c completing a
@@ -53,6 +54,18 @@ namespace seitz::math {
   m.col(1) = Vector3d{b * cg, b * sg, 0.0};
   m.col(2) = Vector3d{c * cb, c * (ca - cb * cg) / sg, cz};
   return m;
+}
+
+inline constexpr double kRadiansPerDegree = std::numbers::pi / 180.0;
+
+// lattice_from_parameters with the angles in DEGREES, as cell parameters are
+// usually stated.
+[[nodiscard]] inline Matrix3d
+lattice_from_parameters_deg(double a, double b, double c, double alpha,
+                            double beta, double gamma) {
+  return lattice_from_parameters(a, b, c, alpha * kRadiansPerDegree,
+                                 beta * kRadiansPerDegree,
+                                 gamma * kRadiansPerDegree);
 }
 
 } // namespace seitz::math

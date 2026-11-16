@@ -60,12 +60,10 @@ space_group_of_magnetic_symmetry(MagneticOperations const &magnetic_symmetry,
   // operations are removed from the maximal subgroup, and for a type-II group
   // every g appears as both g and g', so the primed copy is removed.
   auto keep_in_subgroup = [&ignore_time_reversal, &is_type2](const auto &op) {
-    bool const drop = (!ignore_time_reversal && op.time_reversal) ||
-                      (is_type2 && op.time_reversal);
-    return !drop;
+    return !(op.time_reversal && (!ignore_time_reversal || is_type2));
   };
 
-  Operations const sym{
+  Operations sym{
       std::from_range,
       magnetic_symmetry | std::views::filter(keep_in_subgroup) |
           std::views::transform([](auto const &op) { return op.spatial; })};
@@ -186,14 +184,11 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
   changed.reserve(sym_msg.size());
   std::ranges::transform(
       sym_msg, std::back_inserter(changed), [&](auto const &op) {
-        Matrix3i const rot = math::round_to_int(
-            tmat * op.spatial.rotation.template cast<double>() * tmat_inv);
-        Vector3d const trans = math::wrap_to_unit_cell(
-            Vector3d(shift - rot.cast<double>() * shift +
-                     tmat * op.spatial.translation));
-        return MagneticSymmetryOperation{
-            .spatial = {.rotation = rot, .translation = trans},
-            .time_reversal = op.time_reversal};
+        SymmetryOperation c = conjugated_by(op.spatial, tmat, tmat_inv);
+        c.translation = math::wrap_to_unit_cell(
+            Vector3d(shift - c.rotation.cast<double>() * shift + c.translation));
+        return MagneticSymmetryOperation{.spatial = c,
+                                         .time_reversal = op.time_reversal};
       });
   return changed;
 }
@@ -247,8 +242,7 @@ changed_pure_translations(Matrix3d const &tmat,
       // tmat scales its noise up) are the same point and must not both be
       // kept. The count check below turns a miss into a failed determination.
       push_unique(out, transformed, [&](Vector3d const &a, Vector3d const &b) {
-        return approx_equal(math::nearest_offset(Vector3d(a - b)),
-                            Vector3d::Zero(), symprec);
+        return math::same_point(a, b, symprec);
       });
     }
   }
@@ -319,9 +313,8 @@ changed_pure_translations(Matrix3d const &tmat,
     return std::ranges::any_of(lo, hi, [&](auto const &entry) {
       auto const &ob = b[static_cast<std::size_t>(entry.second)];
       // NB: strictly below symprec, unlike same_operation's <=; kept as is.
-      return approx_equal(math::nearest_offset(Vector3d(
-                              oa.spatial.translation - ob.spatial.translation)),
-                          Vector3d::Zero(), symprec);
+      return math::same_point(oa.spatial.translation, ob.spatial.translation,
+                              symprec);
     });
   });
 }
@@ -331,10 +324,7 @@ changed_pure_translations(Matrix3d const &tmat,
 // term cancels and the result is the identity up to numerical noise; reproduced
 // verbatim so the (later) std_rotation oracle matches spglib v2.7.0 exactly.
 [[nodiscard]] Matrix3d rigid_rotation(Matrix3d const &lattice,
-                                      Matrix3d const &tmat,
-                                      SpacegroupMatch const &ref_sg) {
-  Lattice const ideal_latt = refine::conventional_lattice(ref_sg);
-  static_cast<void>(ideal_latt); // unused in the product (see note above)
+                                      Matrix3d const &tmat) {
   return lattice * tmat.inverse() * tmat * lattice.inverse();
 }
 
@@ -463,9 +453,7 @@ Result<MagneticMatch> MagneticIdentification::identify() const {
   Vector3d const shift =
       correction->tmat * reference->shift + correction->shift;
 
-  SpacegroupMatch ref_sg = reference->ref_sg;
-  ref_sg.bravais_lattice = lattice * ref_sg.bravais_lattice;
-  Matrix3d const rigid_rot = rigid_rotation(lattice, tmat, ref_sg);
+  Matrix3d const rigid_rot = rigid_rotation(lattice, tmat);
 
   return MagneticMatch{.uni = correction->uni,
                        .type = static_cast<MagneticType>(msgtype.type),

@@ -54,12 +54,6 @@ Cell singular_cell() {
   return Cell(Lattice{lattice}, p, Types{0});
 }
 
-Cell valid_cell() {
-  Positions p(1, 3);
-  p.row(0) = Eigen::RowVector3d(0, 0, 0);
-  return Cell(Lattice{4.0 * Matrix3d::Identity()}, p, Types{0});
-}
-
 } // namespace
 
 TEST_CASE("empty cell is rejected with e_empty_cell", "[error]") {

@@ -25,8 +25,8 @@ constexpr int kMaxAttempts = 1000;
 // dot product, fold and flip and report "not yet reduced". Returns true when no
 // positive dot product remains.
 [[nodiscard]] bool reduce_step(std::array<Vector3d, 4> &b, double symprec) {
-  for (std::size_t i = 0; i < 3; ++i)
-    for (std::size_t j = i + 1; j < 4; ++j)
+  for (std::size_t i = 0; i < 3; ++i) {
+    for (std::size_t j = i + 1; j < 4; ++j) {
       if (b[i].dot(b[j]) > symprec) {
         for (std::size_t k = 0; k < 4; ++k) {
           if (k != i && k != j) {
@@ -36,18 +36,9 @@ constexpr int kMaxAttempts = 1000;
         b[i] = -b[i];
         return false;
       }
-  return true;
-}
-
-// Fold the extended basis until no pair has a positive dot product; nullopt if
-// it has not converged within kMaxAttempts steps.
-[[nodiscard]] std::optional<std::array<Vector3d, 4>>
-reduce_basis(std::array<Vector3d, 4> b, double symprec) {
-  for (std::size_t attempt = 0; attempt < kMaxAttempts; ++attempt)
-    if (reduce_step(b, symprec)) {
-      return b;
     }
-  return std::nullopt;
+  }
+  return true;
 }
 
 // From the candidate set {b1, b2, b1+b2, b3, b4, b2+b3, b3+b1}, pick the three
@@ -117,26 +108,34 @@ if_unimodular(Matrix3d const &red, Matrix3d const &lattice, double symprec) {
 // third vector by +2*b[i], flip b[i], and report "not yet reduced". The rank-2
 // / rank-3 overloads are distinguished by the basis array size.
 [[nodiscard]] bool reduce_step(std::array<Vector3d, 3> &b, double symprec) {
-  for (std::size_t i = 0; i < 2; ++i)
-    for (std::size_t j = i + 1; j < 3; ++j)
+  for (std::size_t i = 0; i < 2; ++i) {
+    for (std::size_t j = i + 1; j < 3; ++j) {
       if (b[i].dot(b[j]) > symprec) {
-        for (std::size_t k = 0; k < 3; ++k)
+        for (std::size_t k = 0; k < 3; ++k) {
           if (k != i && k != j) {
             b[k] += 2 * b[i];
             break;
           }
+        }
         b[i] = -b[i];
         return false;
       }
+    }
+  }
   return true;
 }
 
-[[nodiscard]] std::optional<std::array<Vector3d, 3>>
-reduce_basis(std::array<Vector3d, 3> b, double symprec) {
-  for (std::size_t attempt = 0; attempt < kMaxAttempts; ++attempt)
+// Fold the extended basis (rank 3: N = 4, rank 2: N = 3; the reduce_step
+// overload is picked by N) until no pair has a positive dot product; nullopt
+// if it has not converged within kMaxAttempts steps.
+template <std::size_t N>
+[[nodiscard]] std::optional<std::array<Vector3d, N>>
+reduce_basis(std::array<Vector3d, N> b, double symprec) {
+  for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
     if (reduce_step(b, symprec)) {
       return b;
     }
+  }
   return std::nullopt;
 }
 

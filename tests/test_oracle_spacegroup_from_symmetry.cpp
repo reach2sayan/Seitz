@@ -5,6 +5,7 @@
 // fed to both sides, so this tests the pipeline, not the symmetry search.
 
 #include "oracle.hpp"
+#include "structures.hpp"
 #include <seitz/core/operation_set.hpp>
 
 #include "spacegroup/spacegroup.hpp"
@@ -17,56 +18,17 @@
 
 namespace {
 
+using seitz::test::make_cell;
+using seitz::test::cubic;
+using seitz::test::hexagonal;
+using seitz::test::tetragonal;
+
 using seitz::Cell;
 using seitz::Lattice;
 using seitz::Matrix3d;
 using seitz::Operations;
 using seitz::Positions;
 using seitz::oracle::reference_symmetry;
-
-Cell make_cell(Matrix3d const &lattice,
-               std::vector<std::array<double, 3>> const &pos,
-               std::vector<int> const &types) {
-  Positions p(static_cast<Eigen::Index>(pos.size()), 3);
-  for (std::size_t i = 0; i < pos.size(); ++i) {
-    p.row(static_cast<Eigen::Index>(i)) =
-        Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
-  }
-  return Cell(Lattice{lattice}, p, types);
-}
-
-Matrix3d cubic(double a) { return a * Matrix3d::Identity(); }
-
-Matrix3d hexagonal(double a, double c) {
-  Matrix3d l;
-  l.col(0) = Eigen::Vector3d(a, 0.0, 0.0);
-  l.col(1) = Eigen::Vector3d(-a / 2.0, a * std::sqrt(3.0) / 2.0, 0.0);
-  l.col(2) = Eigen::Vector3d(0.0, 0.0, c);
-  return l;
-}
-
-Matrix3d tetragonal(double a, double c) {
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = a;
-  l(1, 1) = a;
-  l(2, 2) = c;
-  return l;
-}
-
-void to_c_operations(std::vector<int> &rot, std::vector<double> &trans,
-                     Operations const &ops) {
-  rot.resize(9 * ops.size());
-  trans.resize(3 * ops.size());
-  for (std::size_t s = 0; s < ops.size(); ++s) {
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        rot[9 * s + 3 * static_cast<std::size_t>(i) +
-            static_cast<std::size_t>(j)] = ops[s].rotation(i, j);
-      }
-      trans[3 * s + static_cast<std::size_t>(i)] = ops[s].translation[i];
-    }
-  }
-}
 
 // Compare port OperationSet::spacegroup<conventional> against the reference
 // spg_get_spacegroup_type_from_symmetry, both fed the same operation set.
@@ -77,15 +39,11 @@ void check_conventional(Cell const &cell, double symprec) {
   auto const got = ops.spacegroup(cell.lattice(), {symprec});
   REQUIRE(got);
 
-  std::vector<int> rot;
-  std::vector<double> trans;
-  to_c_operations(rot, trans, ops);
+  seitz::oracle::COperations c_ops(ops);
   double lat[3][3];
   seitz::oracle::to_c_lattice(lat, cell.lattice().matrix());
   SpglibSpacegroupType const ref = spg_get_spacegroup_type_from_symmetry(
-      reinterpret_cast<int(*)[3][3]>(rot.data()),
-      reinterpret_cast<double(*)[3]>(trans.data()),
-      static_cast<int>(ops.size()), lat, symprec);
+      c_ops.rotations(), c_ops.translations(), c_ops.size(), lat, symprec);
 
   REQUIRE(ref.number != 0);
   REQUIRE(got->type().number == ref.number);
@@ -141,13 +99,9 @@ TEST_CASE("OperationSet::spacegroup matches reference (primitive)",
   auto const ops = reference_symmetry(cell, s);
   REQUIRE(!ops.empty());
 
-  std::vector<int> rot;
-  std::vector<double> trans;
-  to_c_operations(rot, trans, ops);
+  seitz::oracle::COperations c_ops(ops);
   int const ref_hall = spg_get_hall_number_from_symmetry(
-      reinterpret_cast<int(*)[3][3]>(rot.data()),
-      reinterpret_cast<double(*)[3]>(trans.data()),
-      static_cast<int>(ops.size()), s);
+      c_ops.rotations(), c_ops.translations(), c_ops.size(), s);
 
   auto const got = ops.spacegroup<seitz::LatticeSetting::primitive>(
       *Lattice::from_basis(Matrix3d::Identity()), {s});

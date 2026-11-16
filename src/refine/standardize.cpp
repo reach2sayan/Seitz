@@ -1,10 +1,10 @@
 #include "refine/refinement.hpp"
 #include <seitz/core/operation_set.hpp>
 
+#include "core/family_dispatch.hpp"
 #include "core/overlap.hpp"
 #include "core/position_index.hpp"
 #include "math/fractional.hpp"
-#include "refine/refinement.hpp"
 #include "refine/site_symmetry.hpp"
 #include <seitz/data/spg_database.hpp>
 
@@ -23,17 +23,6 @@ namespace seitz::refine {
 using data::operations_from_database;
 
 namespace {
-
-// In the conventional/standardized setting a layer group always has its
-// aperiodic axis as c (axis 2); a 3D group is periodic on all three.
-template <GroupFamily F>
-[[nodiscard]] constexpr CellPeriodicity conventional_periodicity() noexcept {
-  if constexpr (F == GroupFamily::layer) {
-    return aperiodic_along(2);
-  } else {
-    return all_periodic();
-  }
-}
 
 // Number of pure (identity-rotation) translations among the conventional ops.
 [[nodiscard]] int num_pure_translations(Operations const &conv_sym) {
@@ -201,34 +190,35 @@ Refinement<F>::standardize(Operations const &cell_operations,
   Bravais bravais = expand_in_bravais(conv_prim, std_lattice, conv_sym, *exact,
                                       conv_periodicity);
 
-  // Per input-cell atom Wyckoff letter + site-symmetry symbol (the first
-  // bravais block is in primitive-atom order).
-  Standardized out;
-  out.bravais = std::move(bravais.cell);
-  out.std_mapping_to_primitive = std::move(bravais.std_mapping_to_primitive);
-  out.wyckoffs.reserve(mapping_table.size());
-  out.site_symmetry_symbols.reserve(mapping_table.size());
-  for (int const prim : mapping_table) {
-    auto const &atom = (*exact)[static_cast<std::size_t>(prim)];
-    out.wyckoffs.push_back(atom.wyckoff);
-    out.site_symmetry_symbols.push_back(atom.site_symmetry_symbol);
-  }
-
-  out.crystallographic_orbits = crystallographic_orbits(*exact, mapping_table);
+  std::vector<int> const orbits = crystallographic_orbits(*exact, mapping_table);
 
   // Equivalent atoms: the crystallographic orbits unless the input cell breaks
   // the ideal site multiplicity (supercell), in which case use the found ops.
   int const num_prim_sym = static_cast<int>(conv_sym.size()) / multi;
-  if (static_cast<int>(cell.size()) * num_prim_sym !=
-      static_cast<int>(cell_operations.size()) *
-          static_cast<int>(primitive.size())) {
-    out.equivalent_atoms =
-        equivalent_atoms_broken(cell, cell_operations, mapping_table, symprec);
-  } else {
-    out.equivalent_atoms = out.crystallographic_orbits;
-  }
+  bool const broken = static_cast<int>(cell.size()) * num_prim_sym !=
+                      static_cast<int>(cell_operations.size()) *
+                          static_cast<int>(primitive.size());
+  std::vector<int> const equivalents =
+      broken ? equivalent_atoms_broken(cell, cell_operations, mapping_table,
+                                       symprec)
+             : orbits;
 
-  return out;
+  // One Site per input-cell atom; its Wyckoff letter and site-symmetry symbol
+  // come from its primitive atom (the first bravais block is in primitive-atom
+  // order).
+  return Standardized{
+      .bravais = std::move(bravais.cell),
+      .sites = {std::from_range,
+                std::views::zip(mapping_table, equivalents, orbits) |
+                    std::views::transform([&](auto const &fields) {
+                      auto const &[prim, equivalent, orbit] = fields;
+                      auto const &atom =
+                          (*exact)[static_cast<std::size_t>(prim)];
+                      return analysis::Site{atom.wyckoff, atom.site_symmetry_symbol,
+                                  equivalent, orbit, prim};
+                    })},
+      .std_mapping_to_primitive = std::move(bravais.std_mapping_to_primitive),
+  };
 }
 
 template std::optional<Standardized>

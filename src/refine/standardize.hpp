@@ -1,11 +1,11 @@
 #pragma once
 
+#include <seitz/analysis/dataset.hpp>
 #include <seitz/core/cell.hpp>
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/symmetry_operation.hpp>
 #include <seitz/core/types.hpp>
 
-#include <string_view>
 #include <vector>
 
 namespace seitz::refine {
@@ -13,12 +13,8 @@ namespace seitz::refine {
 // The standardized conventional ("bravais") cell together with the per-atom
 // Wyckoff / equivalence data of the *input* cell.
 struct Standardized {
-  Cell bravais;              // idealized conventional cell
-  std::vector<int> wyckoffs; // per input-cell atom (0 = a, ...)
-  // Views into the static site-symmetry table, one per input-cell atom.
-  std::vector<std::string_view> site_symmetry_symbols;
-  std::vector<int> equivalent_atoms;         // per input-cell atom
-  std::vector<int> crystallographic_orbits;  // per input-cell atom
+  Cell bravais;                              // idealized conventional cell
+  std::vector<analysis::Site> sites;                 // per input-cell atom
   std::vector<int> std_mapping_to_primitive; // per bravais atom
 };
 

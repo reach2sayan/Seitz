@@ -63,10 +63,10 @@ TEST_CASE("new map access matches old array indexing for all 530 Hall numbers",
     // --- operations: offset-decoded vs lazily-built cache ---
     auto const old_ops = operations_by_offset(index);
     auto const &new_ops = data::operations_from_database(hall);
-    bool ops_ok = old_ops.size() == new_ops.size();
-    for (std::size_t s = 0; ops_ok && s < old_ops.size(); ++s)
-      ops_ok = old_ops[s].rotation == new_ops[s].rotation &&
-               old_ops[s].translation == new_ops[s].translation;
+    bool const ops_ok =
+        std::ranges::equal(old_ops, new_ops, [](auto const &a, auto const &b) {
+          return a.rotation == b.rotation && a.translation == b.translation;
+        });
     op_mismatches += ops_ok ? 0 : 1;
 
     // --- metadata: raw array entry vs constexpr catalog ---

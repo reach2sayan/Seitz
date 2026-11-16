@@ -10,12 +10,12 @@ Decoding lives in src/data/sitesym_database.cpp.
 """
 import sys
 
-from cxx_tables import array, c_initializer, epilogue, literal, preamble
+from cxx_tables import array, c_initializers, epilogue, literal, preamble
 
 def main():
     src, out = sys.argv[1], sys.argv[2]
     text = open(src).read()
-    read = lambda name: c_initializer(text, name)
+    read = c_initializers(text)
     position, layer = read("position_wyckoff"), read("position_layer_wyckoff")
     first, multiplicity = read("coordinates_first"), read("multiplicities")
     symbols = [s.rstrip(" ") for s in read("site_symmetry_symbols")]

@@ -9,7 +9,9 @@
 // the bridge is an element-wise copy `L[i][j] = M(i, j)`. Never
 // `Eigen::Map<Matrix3d>(&L[0][0])` -- that silently transposes.
 
+#include <seitz/analysis/dataset.hpp>
 #include <seitz/core/cell.hpp>
+#include <seitz/core/magnetic_cell.hpp>
 #include <seitz/core/operation_set.hpp>
 #include <seitz/core/symmetry_operation.hpp>
 
@@ -26,7 +28,12 @@ extern "C" {
 #pragma warning(disable : 4996)
 #endif
 
+#include <catch2/catch_test_macros.hpp>
+
 #include <array>
+#include <cstddef>
+#include <ranges>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -66,6 +73,69 @@ struct CCell {
   }
 };
 
+// One operation from spglib's C layout: the rotation as a row-major
+// int[3][3], the translation as double[3].
+[[nodiscard]] inline SymmetryOperation from_c(int const *rotation,
+                                              double const *translation) {
+  return {Matrix3i{Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor> const>(
+              rotation)},
+          Vector3d{Eigen::Map<Vector3d const>(translation)}};
+}
+
+// Owns operations in spglib's C layout (rotations [n][3][3] row-major,
+// translations [n][3]) so the pointers handed to spglib stay valid: filled
+// from our operations to feed the reference, or sized as an output buffer and
+// read back with operations().
+struct COperations {
+  std::vector<std::array<int, 9>> rotation;
+  std::vector<std::array<double, 3>> translation;
+
+  explicit COperations(std::size_t n) : rotation(n), translation(n) {}
+  // From any range of SymmetryOperation (project magnetic ones on .spatial).
+  explicit COperations(std::ranges::input_range auto &&ops) {
+    for (SymmetryOperation const &op : ops) {
+      Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor>>(
+          rotation.emplace_back().data()) = op.rotation;
+      Eigen::Map<Vector3d>(translation.emplace_back().data()) = op.translation;
+    }
+  }
+
+  [[nodiscard]] int size() const { return static_cast<int>(rotation.size()); }
+  [[nodiscard]] int (*rotations())[3][3] {
+    return reinterpret_cast<int(*)[3][3]>(rotation.data());
+  }
+  [[nodiscard]] double (*translations())[3] {
+    return reinterpret_cast<double(*)[3]>(translation.data());
+  }
+  // The first `n` operations, decoded.
+  [[nodiscard]] std::vector<SymmetryOperation> operations(int n) const {
+    return {std::from_range,
+            std::views::zip(rotation, translation) | std::views::take(n) |
+                std::views::transform([](auto const &rt) {
+                  auto const &[r, t] = rt;
+                  return from_c(r.data(), t.data());
+                })};
+  }
+};
+
+// A magnetic cell's site tensors in spglib's flat layout: one scalar per atom
+// (collinear, rank 0) or three components per atom (non-collinear, rank 1).
+[[nodiscard]] inline int tensor_rank(MagneticCell const &mcell) {
+  return mcell.rank() == SiteTensor::collinear ? 0 : 1;
+}
+[[nodiscard]] inline std::vector<double>
+flat_tensors(MagneticCell const &mcell) {
+  std::vector<double> out;
+  for (Index i = 0; i < mcell.size(); ++i) {
+    if (mcell.rank() == SiteTensor::collinear) {
+      out.push_back(mcell.scalar(i));
+    } else {
+      out.append_range(mcell.vector(i));
+    }
+  }
+  return out;
+}
+
 // Symmetry operations as found by the reference spg_get_symmetry, in the input
 // cell's basis (rotations integer, translations fractional).
 inline Operations reference_symmetry(Cell const &cell, double symprec) {
@@ -73,25 +143,11 @@ inline Operations reference_symmetry(Cell const &cell, double symprec) {
   int const n = c.num_atom();
   int const mult =
       spg_get_multiplicity(c.lattice, c.pos(), c.types.data(), n, symprec);
-  std::vector<int> rot(static_cast<std::size_t>(9 * mult));
-  std::vector<double> trans(static_cast<std::size_t>(3 * mult));
+  COperations buffer(static_cast<std::size_t>(mult));
   int const found =
-      spg_get_symmetry(reinterpret_cast<int(*)[3][3]>(rot.data()),
-                       reinterpret_cast<double(*)[3]>(trans.data()), mult,
+      spg_get_symmetry(buffer.rotations(), buffer.translations(), mult,
                        c.lattice, c.pos(), c.types.data(), n, symprec);
-  std::vector<SymmetryOperation> ops;
-  ops.reserve(static_cast<std::size_t>(found));
-  for (int s = 0; s < found; ++s) {
-    Matrix3i r;
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        r(i, j) = rot[static_cast<std::size_t>(9 * s + 3 * i + j)];
-    Vector3d t(trans[static_cast<std::size_t>(3 * s + 0)],
-               trans[static_cast<std::size_t>(3 * s + 1)],
-               trans[static_cast<std::size_t>(3 * s + 2)]);
-    ops.push_back({r, t});
-  }
-  return Operations{std::move(ops)};
+  return Operations{buffer.operations(found)};
 }
 
 // Reference international space-group number (0 on failure).
@@ -150,19 +206,10 @@ inline Cell reference_find_primitive(Cell const &cell, double symprec) {
 // Reference database operations for a Hall number
 // (spg_get_symmetry_from_database).
 inline Operations reference_database_operations(int hall_number) {
-  int rot[192][3][3];
-  double trans[192][3];
-  int const n = spg_get_symmetry_from_database(rot, trans, hall_number);
-  std::vector<SymmetryOperation> ops;
-  ops.reserve(static_cast<std::size_t>(n));
-  for (int s = 0; s < n; ++s) {
-    Matrix3i r;
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        r(i, j) = rot[s][i][j];
-    ops.push_back({r, Vector3d(trans[s][0], trans[s][1], trans[s][2])});
-  }
-  return Operations{std::move(ops)};
+  COperations buffer(192);
+  int const n = spg_get_symmetry_from_database(
+      buffer.rotations(), buffer.translations(), hall_number);
+  return Operations{buffer.operations(n)};
 }
 
 inline SpglibSpacegroupType reference_spacegroup_type(int hall_number) {
@@ -208,15 +255,12 @@ inline RefDataset convert_dataset(SpglibDataset *ds) {
   out.choice = ds->choice;
   out.pointgroup = ds->pointgroup_symbol;
   out.n_operations = ds->n_operations;
-  for (int s = 0; s < ds->n_operations; ++s) {
-    Matrix3i r;
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        r(i, j) = ds->rotations[s][i][j];
-    out.operations.push_back(
-        {r, Vector3d(ds->translations[s][0], ds->translations[s][1],
-                     ds->translations[s][2])});
-  }
+  out.operations = {std::from_range,
+                    std::views::iota(0, ds->n_operations) |
+                        std::views::transform([ds](int s) {
+                          return from_c(&ds->rotations[s][0][0],
+                                        ds->translations[s]);
+                        })};
   from_c_lattice(out.std_lattice, ds->std_lattice);
   from_c_lattice(out.std_rotation_matrix, ds->std_rotation_matrix);
   from_c_lattice(out.transformation_matrix, ds->transformation_matrix);
@@ -238,6 +282,23 @@ inline RefDataset convert_dataset(SpglibDataset *ds) {
   }
   spg_free_dataset(ds);
   return out;
+}
+
+// Per input atom: Wyckoff letter, site-symmetry symbol and equivalent atom
+// agree with the reference.
+inline void check_sites(std::span<analysis::Site const> sites,
+                        RefDataset const &ref) {
+  REQUIRE(sites.size() == ref.wyckoffs.size());
+  for (auto const [i, atom] :
+       std::views::zip(sites, ref.wyckoffs, ref.site_symmetry_symbols,
+                       ref.equivalent_atoms) |
+           std::views::enumerate) {
+    auto const &[site, wyckoff, symbol, equivalent] = atom;
+    INFO("atom " << static_cast<std::size_t>(i));
+    CHECK(site.wyckoff == wyckoff);
+    CHECK(site.site_symmetry == symbol);
+    CHECK(site.equivalent_atom == equivalent);
+  }
 }
 
 inline RefDataset reference_dataset(Cell const &cell, double symprec) {
@@ -289,6 +350,16 @@ inline Cell reference_standardize_cell(Cell const &cell, bool to_primitive,
   return Cell(Lattice{out_lattice}, pos, out_types);
 }
 
+// Integer rotations in the C [n][3][3] row-major layout.
+inline std::vector<std::array<int, 9>>
+to_c_rotations(std::vector<Matrix3i> const &rotations) {
+  std::vector<std::array<int, 9>> out(rotations.size());
+  for (auto const &[c, r] : std::views::zip(out, rotations)) {
+    Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor>>(c.data()) = r;
+  }
+  return out;
+}
+
 struct CPointgroup {
   int number;
   std::string symbol;
@@ -298,21 +369,15 @@ struct CPointgroup {
 // Reference point group of a set of rotations (spg_get_pointgroup).
 inline CPointgroup
 reference_pointgroup(std::vector<Matrix3i> const &rotations) {
-  std::vector<int> rot(rotations.size() * 9);
-  for (std::size_t s = 0; s < rotations.size(); ++s)
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        rot[s * 9 + static_cast<std::size_t>(3 * i + j)] = rotations[s](i, j);
+  auto rot = to_c_rotations(rotations);
   char symbol[6] = {};
   int tmat[3][3];
   int const num = spg_get_pointgroup(symbol, tmat,
                                      reinterpret_cast<int(*)[3][3]>(rot.data()),
                                      static_cast<int>(rotations.size()));
-  Matrix3i t;
-  for (int i = 0; i < 3; ++i)
-    for (int j = 0; j < 3; ++j)
-      t(i, j) = tmat[i][j];
-  return {num, std::string(symbol), t};
+  return {num, std::string(symbol),
+          Matrix3i{Eigen::Map<Eigen::Matrix<int, 3, 3, Eigen::RowMajor> const>(
+              &tmat[0][0])}};
 }
 
 // Reference grid-point index of a grid address (spg_get_dense_grid_point_from_
@@ -329,18 +394,6 @@ struct RefIrMesh {
   std::vector<std::size_t> ir_mapping_table;
   std::vector<Vector3i> grid_address;
 };
-
-// Convert a list of integer rotations to the C [][3][3] layout.
-inline std::vector<std::array<std::array<int, 3>, 3>>
-to_c_rotations(std::vector<Matrix3i> const &rotations) {
-  std::vector<std::array<std::array<int, 3>, 3>> out(rotations.size());
-  for (std::size_t s = 0; s < rotations.size(); ++s)
-    for (int i = 0; i < 3; ++i)
-      for (int j = 0; j < 3; ++j)
-        out[s][static_cast<std::size_t>(i)][static_cast<std::size_t>(j)] =
-            rotations[s](i, j);
-  return out;
-}
 
 inline RefIrMesh extract_ir_mesh(std::vector<std::array<int, 3>> const &ga,
                                  std::vector<std::size_t> const &mapping,

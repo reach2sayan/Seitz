@@ -1,4 +1,5 @@
 #include "symmetry/primitive.hpp"
+#include "structures.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -6,43 +7,13 @@
 using namespace seitz;
 using Catch::Approx;
 
-namespace {
-Cell bcc_conventional(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{lattice}, pos, {0, 0});
-}
-
-Cell fcc_conventional(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(4, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0});
-}
-
-Cell rock_salt(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(8, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  pos.row(4) << 0.5, 0.5, 0.5;
-  pos.row(5) << 0.0, 0.0, 0.5;
-  pos.row(6) << 0.0, 0.5, 0.0;
-  pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
-}
-} // namespace
+using seitz::test::bcc;
+using seitz::test::fcc;
+using seitz::test::rock_salt;
 
 TEST_CASE("bcc conventional cell reduces to a 1-atom primitive cell",
           "[primitive]") {
-  Cell const cell = bcc_conventional(3.0);
+  Cell const cell = bcc(3.0);
   auto p = symmetry::PrimitiveFinder<GroupFamily::space>{cell, {1e-5}}.find();
   REQUIRE(p);
   CHECK(p->cell.size() == 1);
@@ -52,7 +23,7 @@ TEST_CASE("bcc conventional cell reduces to a 1-atom primitive cell",
 
 TEST_CASE("fcc conventional cell reduces to a 1-atom primitive cell",
           "[primitive]") {
-  Cell const cell = fcc_conventional(4.0);
+  Cell const cell = fcc(4.0);
   auto p = symmetry::PrimitiveFinder<GroupFamily::space>{cell, {1e-5}}.find();
   REQUIRE(p);
   CHECK(p->cell.size() == 1);

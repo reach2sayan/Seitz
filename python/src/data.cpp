@@ -20,36 +20,6 @@ namespace {
 using data::Centering;
 using data::SpacegroupType;
 
-// halls_with_number, default_hall and default_halls_with_pointgroup are all
-// templates over GroupFamily. Python cannot pass a template argument, so the
-// runtime family is dispatched here -- once each, rather than exposing two
-// differently-named functions per query and making the caller pick.
-[[nodiscard]] std::vector<int> halls_with_number(GroupFamily family,
-                                                 int number) {
-  auto const halls = family == GroupFamily::layer
-                         ? data::halls_with_number<GroupFamily::layer>(number)
-                         : data::halls_with_number<GroupFamily::space>(number);
-  return {halls.begin(), halls.end()};
-}
-
-[[nodiscard]] std::optional<HallNumber> default_hall(GroupFamily family,
-                                                     int number) {
-  return family == GroupFamily::layer
-             ? data::default_hall<GroupFamily::layer>(number)
-             : data::default_hall<GroupFamily::space>(number);
-}
-
-[[nodiscard]] std::vector<int>
-default_halls_with_pointgroup(GroupFamily family, int pointgroup_number) {
-  auto const halls =
-      family == GroupFamily::layer
-          ? data::default_halls_with_pointgroup<GroupFamily::layer>(
-                pointgroup_number)
-          : data::default_halls_with_pointgroup<GroupFamily::space>(
-                pointgroup_number);
-  return {halls.begin(), halls.end()};
-}
-
 } // namespace
 
 void bind_data(py::module_ &m) {
@@ -114,15 +84,33 @@ void bind_data(py::module_ &m) {
       py::arg("hall"), py::return_value_policy::reference,
       py::doc("The metadata of a Hall setting."));
 
-  m.def("halls_with_number", &halls_with_number, py::arg("family"),
-        py::arg("number"),
+  // Lambdas, not &data::f: each name is an overload set (the family template
+  // and its runtime-family form). The spans become list[int].
+  m.def(
+      "halls_with_number",
+      [](GroupFamily family, int number) {
+        return std::vector<int>{std::from_range,
+                                data::halls_with_number(family, number)};
+      },
+      py::arg("family"), py::arg("number"),
         py::doc("Every Hall setting index of an international number, "
                 "ascending; empty if out of range."));
-  m.def("default_hall", &default_hall, py::arg("family"), py::arg("number"),
+  m.def(
+      "default_hall",
+      [](GroupFamily family, int number) {
+        return data::default_hall(family, number);
+      },
+      py::arg("family"), py::arg("number"),
         py::doc("The default (first) Hall setting of an international number, "
                 "or None."));
-  m.def("default_halls_with_pointgroup", &default_halls_with_pointgroup,
-        py::arg("family"), py::arg("pointgroup_number"),
+  m.def(
+      "default_halls_with_pointgroup",
+      [](GroupFamily family, int pointgroup_number) {
+        return std::vector<int>{std::from_range,
+                                data::default_halls_with_pointgroup(
+                                    family, pointgroup_number)};
+      },
+      py::arg("family"), py::arg("pointgroup_number"),
         py::doc("The default Hall setting index of every group with that point "
                 "group, ascending by group number."));
   m.def("operations_from_database", &data::operations_from_database,
@@ -144,19 +132,9 @@ void bind_data(py::module_ &m) {
                py::doc("Single-bond covalent radius in angstrom, or None."));
   elements.def("atomic_volume", &data::atomic_volume, py::arg("z"),
                py::doc("Sphere volume from the covalent radius, or None."));
-  elements.def(
-      "element_symbol",
-      [](int z) -> std::optional<std::string> {
-        if (auto const symbol = data::element_symbol(z)) {
-          return std::string(*symbol);
-        }
-        return std::nullopt;
-      },
-      py::arg("z"), py::doc("Chemical symbol, or None."));
-  elements.def(
-      "atomic_number",
-      [](std::string_view symbol) { return data::atomic_number(symbol); },
-      py::arg("symbol"),
+  elements.def("element_symbol", &data::element_symbol, py::arg("z"),
+               py::doc("Chemical symbol, or None."));
+  elements.def("atomic_number", &data::atomic_number, py::arg("symbol"),
       py::doc("Atomic number of a chemical symbol (case-sensitive), or None."));
   elements.attr("K_NUM_ELEMENTS") = data::kNumElements;
 }

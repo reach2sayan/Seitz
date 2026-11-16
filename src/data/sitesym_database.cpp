@@ -84,14 +84,15 @@ constexpr auto kLayerWyckoffRanges = build_ranges<kPositionLayerWyckoff>();
 WyckoffCoordinate wyckoff_coordinate(int index) {
   WyckoffLit const &d = kWyckoffDecoded[static_cast<std::size_t>(index)];
 
-  Matrix3i rot;
-  rot << d.rot[0], d.rot[1], d.rot[2], d.rot[3], d.rot[4], d.rot[5], d.rot[6],
-      d.rot[7], d.rot[8];
-
-  Vector3d const trans{d.trans_num[0] / 24.0, d.trans_num[1] / 24.0,
-                       d.trans_num[2] / 24.0};
-
-  return {rot, trans, d.multiplicity};
+  // Read through Maps over the constexpr table, as packed_decode.hpp's
+  // make_operation does; the result owns its matrices.
+  return {Eigen::Map<Eigen::Matrix<std::int8_t, 3, 3, Eigen::RowMajor> const>(
+              d.rot.data())
+              .cast<int>(),
+          Eigen::Map<Eigen::Matrix<std::int8_t, 3, 1> const>(d.trans_num.data())
+                  .cast<double>() /
+              24.0,
+          d.multiplicity};
 }
 
 WyckoffRange wyckoff_indices(HallNumber hall) {
@@ -103,20 +104,6 @@ WyckoffRange wyckoff_indices(HallNumber hall) {
 
 std::string_view site_symmetry_symbol(int index) {
   return kSiteSymmetrySymbols[static_cast<std::size_t>(index)];
-}
-
-std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall) {
-  WyckoffRange const range = wyckoff_indices(hall);
-  std::vector<WyckoffEntry> entries;
-  entries.reserve(static_cast<std::size_t>(range.count));
-  // The database lists positions general-first; the letter is the reverse
-  // offset (count - offset - 1), so 'a' is the most special position. Emit in
-  // ascending-letter order (a, b, c, ...) by walking the range backwards.
-  for (int offset = range.count - 1; offset >= 0; --offset) {
-    entries.push_back(
-        WyckoffEntry{range.start + offset, range.count - offset - 1});
-  }
-  return entries;
 }
 
 } // namespace seitz::data

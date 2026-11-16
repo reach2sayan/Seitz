@@ -48,17 +48,7 @@ void bind_io(py::module_ &m) {
             return std::vector<std::string>{rows->begin(), rows->end()};
           },
           py::arg("tag"), "The rows of `tag`, or None if the block lacks it.")
-      .def(
-          "value",
-          [](io::CifBlock const &self,
-             std::string_view tag) -> std::optional<std::string> {
-            auto const text = self.value(tag);
-            if (!text) {
-              return std::nullopt;
-            }
-            return std::string{*text};
-          },
-          py::arg("tag"),
+      .def("value", &io::CifBlock::value, py::arg("tag"),
           "The scalar reading of `tag`: its first row, with CIF's '?' and '.' "
           "reported as None like an absent tag.")
       .def("__repr__", [](io::CifBlock const &self) {

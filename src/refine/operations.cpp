@@ -29,11 +29,16 @@ namespace {
       })};
 }
 
-// Keep the first operation of each distinct rotation and transform it to the
-// primitive setting (R' = T R T^-1, t' = T t).
+// Keep the first operation of each distinct rotation, carry it to the shifted
+// origin, and transform it to the primitive setting (R' = T R T^-1, t' = T t).
+// De-duplicated before shifting: the shift never changes a rotation.
 [[nodiscard]] Operations primitive_db_symmetry(Matrix3d const &t_mat,
-                                               Operations const &conv_sym) {
-  return Operations{unique_by_rotation(conv_sym, &SymmetryOperation::rotation)}
+                                               Operations const &conv_sym,
+                                               Vector3d const &shift) {
+  return with_origin_shift(
+             Operations{unique_by_rotation(conv_sym,
+                                           &SymmetryOperation::rotation)},
+             shift)
       .conjugated_by(t_mat, t_mat.inverse());
 }
 
@@ -56,7 +61,6 @@ namespace {
       out.emplace_back(rot_i, Vector3d(inv_tmat * op.translation));
     }
   }
-  out.shrink_to_fit();
   return Operations{std::move(out)};
 }
 
@@ -106,8 +110,8 @@ std::optional<Operations> Refinement<F>::operations() const {
 
   // Conventional ops in the shifted origin, transformed to the primitive cell.
   Matrix3d const t_mat_pb = inv_prim * sg.bravais_lattice;
-  Operations const prim_sym = primitive_db_symmetry(
-      t_mat_pb, with_origin_shift(conv_sym, sg.origin_shift));
+  Operations const prim_sym =
+      primitive_db_symmetry(t_mat_pb, conv_sym, sg.origin_shift);
 
   // Recover them in the input cell.
   Matrix3i const t_mat_pc =

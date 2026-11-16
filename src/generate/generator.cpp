@@ -42,22 +42,26 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                  Matrix3d const &lattice,
                                  CellPeriodicity const &periodicity,
                                  SeedBox const &box, std::mt19937_64 &rng) {
-  std::vector<Vector3d> rows;
+  // Each orbit is copied once, straight into its block of the result.
+  std::vector<Positions> orbits;
+  orbits.reserve(assignment.size());
   Types types;
   for (auto &placed : assignment) {
     placed.coordinate = placed.position->canonical(
         placed.coordinate.value_or(box.sample(rng)));
-    Positions const orbit =
-        placed.position->orbit(*placed.coordinate, periodicity);
-    rows.append_range(std::views::iota(Index{0}, orbit.rows()) |
-                      std::views::transform([&](Index i) {
-                        return Vector3d(orbit.row(i).transpose());
-                      }));
+    Positions const &orbit = orbits.emplace_back(
+        placed.position->orbit(*placed.coordinate, periodicity));
     types.insert(types.end(), static_cast<std::size_t>(orbit.rows()),
                  placed.type);
   }
-  return Generated{Cell{Lattice{lattice}, to_positions(rows), std::move(types),
-                        periodicity},
+  Positions positions(static_cast<Index>(types.size()), 3);
+  Index row = 0;
+  for (Positions const &orbit : orbits) {
+    positions.middleRows(row, orbit.rows()) = orbit;
+    row += orbit.rows();
+  }
+  return Generated{Cell{Lattice{lattice}, std::move(positions),
+                        std::move(types), periodicity},
                    std::move(assignment)};
 }
 
@@ -133,7 +137,8 @@ Matrix3d GroupTraits<group::SpaceGroup>::lattice(group::SpaceGroup const &g,
     return random_layer_lattice(g.operations(), volume / kLayerThickness,
                                 kVacuum, rng());
   }
-  return random_lattice(crystal_system(g.number()), volume, rng());
+  return random_lattice(
+      pointgroup_by_number(g.type().pointgroup_number).holohedry, volume, rng());
 }
 
 std::string_view
@@ -163,7 +168,7 @@ Matrix3d GroupTraits<group::PointGroup>::lattice(group::PointGroup const &g,
   // grows on repeated failure, to spread the atoms apart.
   double const volume = options.scale * estimated_cell_volume(comp) *
                         (1.0 + 0.2 * static_cast<double>(attempt));
-  return random_lattice(crystal_system(g.representative_spacegroup()), volume,
+  return random_lattice(pointgroup_by_number(g.number()).holohedry, volume,
                         rng());
 }
 

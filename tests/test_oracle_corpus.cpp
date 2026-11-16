@@ -21,7 +21,7 @@ using seitz::test::space_hall;
 TEST_CASE("get_dataset matches spg_get_dataset across the reference corpus",
           "[oracle][corpus]") {
   double const symprec = 1e-5;
-  auto const corpus = seitz::oracle::load_corpus();
+  auto const &corpus = seitz::oracle::corpus();
   INFO("corpus size " << corpus.size());
   REQUIRE(corpus.size() >= 200); // ~230 cells; guards against a bad data path
 

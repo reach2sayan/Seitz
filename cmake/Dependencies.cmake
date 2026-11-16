@@ -32,10 +32,21 @@ option(SEITZ_EXTERNAL_EIGEN_AND_BOOST
 # a version of Eigen or Boost that this build would have refused.
 set(SEITZ_EIGEN_MIN 5.0)
 set(SEITZ_BOOST_MIN 1.88)
+# The Boost components, named once: CMakeLists.txt links them, the fetch/find
+# below and cmake/SeitzConfig.cmake.in derive their lists from these two.
+#   container  -- static_vector/small_vector/flat_map/flat_set      (PUBLIC)
+#   graph      -- the algorithms over the constexpr subgroup graph   (PUBLIC)
+#   leaf       -- the error model (Result<T>)                        (PUBLIC)
+#   flyweight  -- one shared immutable SpaceGroup per Hall setting
+#   parser     -- the CIF and xyz-triplet grammars; header-only, numerics via
+#                 <charconv> (no compiled lib)
+#   algorithm  -- join(), for the xyz triplet
+set(SEITZ_BOOST_PUBLIC container graph leaf)
+set(SEITZ_BOOST_PRIVATE flyweight parser algorithm)
 if (SEITZ_EXTERNAL_EIGEN_AND_BOOST)
     set(SEITZ_EIGEN_FIND FIND_PACKAGE_ARGS ${SEITZ_EIGEN_MIN})
-    set(SEITZ_BOOST_FIND FIND_PACKAGE_ARGS ${SEITZ_BOOST_MIN} COMPONENTS container graph leaf
-            flyweight parser algorithm range)
+    set(SEITZ_BOOST_FIND FIND_PACKAGE_ARGS ${SEITZ_BOOST_MIN} COMPONENTS
+            ${SEITZ_BOOST_PUBLIC} ${SEITZ_BOOST_PRIVATE})
 endif ()
 
 # Eigen 5.0.0 — the first release in which fixed-size Matrix/Array are literal
@@ -50,16 +61,7 @@ FetchContent_Declare(Eigen3
         ${SEITZ_EIGEN_FIND})
 
 # Boost 1.88.0, from the CMake-ready release archive.
-#   container  — static_vector/small_vector/flat_map/flat_set
-#   flyweight  — one shared immutable SpaceGroup per Hall setting
-#   graph      — the algorithms over the constexpr subgroup graph (BFS, views)
-#   leaf       — the error model (Result<T>)
-#   parser     — the CIF and xyz-triplet grammars; header-only, numerics via
-#                <charconv> (no compiled lib)
-#   algorithm  — to_lower_copy/join, so the CIF layer hand-rolls neither
-#   range      — join(), for concatenating two ranges
-set(BOOST_INCLUDE_LIBRARIES algorithm container flyweight graph leaf parser
-        range)
+set(BOOST_INCLUDE_LIBRARIES ${SEITZ_BOOST_PUBLIC} ${SEITZ_BOOST_PRIVATE})
 FetchContent_Declare(Boost
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP ON

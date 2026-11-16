@@ -68,18 +68,8 @@ build_functions(std::span<Cluster const> subclusters, Operations const &ops,
                 double tol) {
   std::vector<ClusterFunction> functions;
   for (Cluster const &sub : subclusters) {
-    std::vector<int> const radix =
-        radix_of(sub, [](ClusterPoint const &p) { return p.species - 1; });
-
     std::vector<Cluster> distinct;
-    for (std::span<int const> assignment : mixed_radix(radix)) {
-      auto const decorated =
-          std::views::zip(sub, assignment) |
-          std::views::transform([](auto const &pair) {
-            auto const &[point, function] = pair;
-            return ClusterPoint{point.position, point.species, function};
-          });
-      Cluster candidate{Cluster::Points(decorated.begin(), decorated.end())};
+    for (Cluster candidate : detail::decorations(sub)) {
       if (find_equivalent(distinct, candidate, ops, tol) == distinct.end()) {
         distinct.push_back(std::move(candidate));
       }
@@ -265,16 +255,14 @@ struct Overlap {
 
 // Every symmetry image of every non-empty subcluster that, re-anchored on
 // `site`, passes through it. The overlapping point is moved to index 0 and the
-// rest follow, carried by the same lattice shift.
+// rest follow, carried by the same lattice shift. `images[i]` holds the
+// symmetry images of subcluster i (none for the empty cluster).
 [[nodiscard]] std::vector<Overlap>
-overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
-                 Operations const &ops, double tol) {
+overlaps_at_site(Vector3d const &site,
+                 std::span<std::vector<Cluster> const> images, double tol) {
   std::vector<Overlap> overlaps;
-  for (auto const &[index, sub] : std::views::enumerate(subclusters)) {
-    if (sub.empty()) {
-      continue;
-    }
-    for (Cluster const &image : symmetry_images(sub, ops, tol)) {
+  for (auto const &[index, sub_images] : std::views::enumerate(images)) {
+    for (Cluster const &image : sub_images) {
       for (auto const &[centre, anchor] : std::views::enumerate(image)) {
         Vector3d const shift = site - anchor.position;
         // A plain integrality test on the fractional shift. The reference
@@ -312,6 +300,13 @@ overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
 [[nodiscard]] std::vector<double>
 build_kikuchi_barker(std::span<Cluster const> subclusters,
                      Operations const &ops, double tol) {
+  // Each subcluster's images, built once rather than once per overlap query.
+  std::vector<std::vector<Cluster>> const images{
+      std::from_range,
+      subclusters | std::views::transform([&](Cluster const &s) {
+        return s.empty() ? std::vector<Cluster>{}
+                         : symmetry_images(s, ops, tol);
+      })};
   std::vector<double> coefficients(subclusters.size(), 0.0);
   for (std::size_t const current :
        std::views::iota(std::size_t{1}, subclusters.size()) |
@@ -319,7 +314,7 @@ build_kikuchi_barker(std::span<Cluster const> subclusters,
     Cluster const &sub = subclusters[current];
 
     auto containing =
-        overlaps_at_site(sub[0].position, subclusters, ops, tol) |
+        overlaps_at_site(sub[0].position, images, tol) |
         std::views::filter([&](Overlap const &overlap) {
           return overlap.cluster.size() > sub.size() && // strictly larger
                  std::ranges::all_of(sub, [&](ClusterPoint const &point) {

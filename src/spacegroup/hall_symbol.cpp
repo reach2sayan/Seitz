@@ -1,6 +1,7 @@
 #include "spacegroup/spacegroup.hpp"
 
 #include "core/centering.hpp"
+#include "core/family_dispatch.hpp"
 #include "core/matrix_order.hpp"
 #include "core/position_index.hpp"
 #include "data/hall_classification.hpp"
@@ -64,11 +65,7 @@ template <GroupFamily F> struct MatchContext {
   // overlap test must not fold it, and a shift along it stays raw — that is
   // what re-centers a layer onto the database convention.
   [[nodiscard]] static constexpr CellPeriodicity periodicity() noexcept {
-    if constexpr (F == GroupFamily::layer) {
-      return aperiodic_along(2);
-    } else {
-      return all_periodic();
-    }
+    return conventional_periodicity<F>();
   }
   [[nodiscard]] Vector3d wrap(Vector3d const &v) const noexcept {
     return seitz::wrap(v, periodicity());
