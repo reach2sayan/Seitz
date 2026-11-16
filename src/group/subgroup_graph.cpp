@@ -22,8 +22,8 @@ SubgroupEdge SubgroupEdge::of(int id) noexcept {
           .hall = *HallNumber::of(GroupFamily::space, r.hall),
           .kind = r.kind,
           .index = r.index,
-          .basis = math::as_matrix(r.basis).cast<double>() /
-                   data::kTableDenominator,
+          .basis =
+              math::as_matrix(r.basis).cast<double>() / data::kTableDenominator,
           .origin = Eigen::Map<Vector3i const>(r.shift.data()).cast<double>() /
                     data::kTableDenominator};
 }
@@ -70,7 +70,7 @@ SubgroupGraph::path(int super, int sub, std::optional<SubgroupKind> kind) {
       color.data(), boost::identity_property_map{});
   auto const predecessor_map = boost::make_iterator_property_map(
       predecessor.data(), boost::identity_property_map{});
-  auto&& bfs_visitor = boost::visitor(boost::make_bfs_visitor(
+  auto &&bfs_visitor = boost::visitor(boost::make_bfs_visitor(
       boost::record_edge_predecessors(predecessor_map, boost::on_tree_edge{})));
   boost::breadth_first_search(view, super, bfs_visitor.color_map(color_map));
 

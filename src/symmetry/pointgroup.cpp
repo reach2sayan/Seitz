@@ -280,8 +280,8 @@ template <std::ranges::forward_range R>
 }
 
 // The distinguished axis of a Laue class: the first proper rotation of
-// rot_order (2, 3 or 4, identified by its rotation type) paired with its rotation-axis
-// index. nullopt if no such operation (or no axis for it) exists.
+// rot_order (2, 3 or 4, identified by its rotation type) paired with its
+// rotation-axis index. nullopt if no such operation (or no axis for it) exists.
 struct Principal {
   Matrix3i prop_rot;
   int axis;

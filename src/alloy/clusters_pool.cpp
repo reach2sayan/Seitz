@@ -115,8 +115,8 @@ Result<ClustersPool> ClustersPool::generate(ParentLattice const &parent,
       for (std::span<std::size_t const> combination :
            detail::combinations(nearby.size(), order - 1)) {
         auto const chosen =
-            combination | std::views::transform(
-                              [&](std::size_t i) { return nearby[i]; });
+            combination |
+            std::views::transform([&](std::size_t i) { return nearby[i]; });
         Cluster::Points geometry{seed};
         geometry.insert(geometry.end(), chosen.begin(), chosen.end());
 

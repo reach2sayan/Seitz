@@ -42,21 +42,23 @@ using RotationMultimap =
 // (a) std::identity for a range of rotations,
 // (b) &SymmetryOperation::rotation (or a lambda) for anything that carries one.
 template <class Proj, class R>
-concept RotationProjection = std::same_as<
-    std::remove_cvref_t<
-        std::invoke_result_t<Proj &, std::ranges::range_reference_t<R>>>,
-    Matrix3i>;
+concept RotationProjection =
+    std::same_as<std::remove_cvref_t<std::invoke_result_t<
+                     Proj &, std::ranges::range_reference_t<R>>>,
+                 Matrix3i>;
 
 // The distinct rotations of a range. `proj` : element <==> Matrix3i key
 // O(n log n).
-template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
+template <std::ranges::input_range R,
+          RotationProjection<R> Proj = std::identity>
 [[nodiscard]] RotationSet rotation_set(R &&range, Proj proj = {}) {
   auto v = range | std::views::transform(proj);
   return RotationSet(std::ranges::begin(v), std::ranges::end(v));
 }
 
 // Whether any rotation occurs twice; stops at the first repeat.
-template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
+template <std::ranges::input_range R,
+          RotationProjection<R> Proj = std::identity>
 [[nodiscard]] bool has_duplicate_rotation(R &&range, Proj proj = {}) {
   RotationSet seen;
   return std::ranges::any_of(range, [&](auto const &item) {
@@ -65,7 +67,8 @@ template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity
 }
 
 // Keep the first element per distinct rotation, preserving encounter order.
-template <std::ranges::input_range R, RotationProjection<R> Proj = std::identity>
+template <std::ranges::input_range R,
+          RotationProjection<R> Proj = std::identity>
 [[nodiscard]] auto unique_by_rotation(R &&range, Proj proj = {})
     -> std::vector<std::ranges::range_value_t<R>> {
   std::vector<std::ranges::range_value_t<R>> out;
@@ -87,7 +90,8 @@ template <class Key, std::strict_weak_order<Key const &, Key const &> Less>
 [[nodiscard]] auto ordered_multimap(std::vector<std::pair<Key, int>> pairs,
                                     Less less) {
   std::ranges::sort(pairs, [&](auto const &a, auto const &b) {
-    return less(a.first, b.first) || (!less(b.first, a.first) && a.second < b.second);
+    return less(a.first, b.first) ||
+           (!less(b.first, a.first) && a.second < b.second);
   });
   return boost::container::flat_multimap<Key, int, Less>(
       boost::container::ordered_range, pairs.begin(), pairs.end());

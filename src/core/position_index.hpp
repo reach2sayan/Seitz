@@ -23,9 +23,9 @@ namespace seitz {
 // for any periodicity.
 // Inline: it is the innermost test of every search, and out of line its 3x3
 // product and fold were half again the cost of the call itself.
-[[nodiscard]] inline bool coincident(Vector3d const &a, Vector3d const &b,
-                                     Matrix3d const &lattice, double symprec,
-                                     CellPeriodicity const &periodicity) noexcept {
+[[nodiscard]] inline bool
+coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
+           double symprec, CellPeriodicity const &periodicity) noexcept {
   return (lattice * minimal_image(a - b, periodicity)).norm() <= symprec;
 }
 

@@ -202,7 +202,8 @@ SpacegroupMatch find_similar_bravais_lattice(SpacegroupMatch sg,
   Matrix3d const inv = chosen.cast<double>().inverse();
   Vector3d const inv_shift = inv * sg.origin_shift;
   // The prebuilt rotation index walks a rotation's operations in index order.
-  auto const [lo, hi] = data::operations_by_rotation(sg.hall).equal_range(chosen);
+  auto const [lo, hi] =
+      data::operations_by_rotation(sg.hall).equal_range(chosen);
   for (int const i : std::ranges::subrange(lo, hi) | std::views::values) {
     auto const &op = conv_sym[static_cast<std::size_t>(i)];
     Vector3d p = inv_shift - inv * op.translation;

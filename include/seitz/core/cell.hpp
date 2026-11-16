@@ -48,9 +48,8 @@ public:
   // indexed in lockstep at a call site.
   [[nodiscard]] auto atoms() const {
     return std::views::iota(Index{0}, size()) |
-           std::views::transform([this](Index i) {
-             return std::pair{position(i), type(i)};
-           });
+           std::views::transform(
+               [this](Index i) { return std::pair{position(i), type(i)}; });
   }
 
   // Same atoms in a new basis, or the same geometry at a new periodicity.

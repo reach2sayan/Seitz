@@ -18,8 +18,8 @@ namespace seitz::generate {
 // (lengths around unity before scaling, angles within the usual
 // crystallographic bounds); the absolute scale is then fixed by
 // `target_volume`.
-[[nodiscard]] Matrix3d random_lattice(Holohedry system,
-                                      double target_volume, std::uint64_t seed);
+[[nodiscard]] Matrix3d random_lattice(Holohedry system, double target_volume,
+                                      std::uint64_t seed);
 
 // Element-aware estimate of the conventional-cell volume (A^3) of a
 // composition: each atom contributes (4/3) pi r_cov^3 (data::atomic_volume),

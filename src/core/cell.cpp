@@ -33,7 +33,8 @@ Result<Cell> Cell::transformed(Matrix3i const &basis,
   std::vector<Vector3d> const points = math::lattice_points_in_cell(basis);
   auto images = std::views::cartesian_product(atoms(), points);
   std::vector<Vector3d> const rows{
-      std::from_range, images | std::views::transform([&](auto const &image) {
+      std::from_range,
+      images | std::views::transform([&](auto const &image) {
         auto const &[atom, point] = image;
         return wrap(Vector3d(inverse * (atom.first - origin) + point),
                     periodicity_);
@@ -47,10 +48,11 @@ Result<Cell> Cell::transformed(Matrix3i const &basis,
 }
 
 Cell Cell::translated(Vector3d const &shift) const {
-  std::vector const rows{
-      std::from_range, atoms() | std::views::transform([&](auto const &atom) {
-        return wrap(Vector3d(atom.first + shift), periodicity_);
-      })};
+  std::vector const rows{std::from_range,
+                         atoms() | std::views::transform([&](auto const &atom) {
+                           return wrap(Vector3d(atom.first + shift),
+                                       periodicity_);
+                         })};
   return Cell{lattice_, to_positions(rows), types_, periodicity_};
 }
 

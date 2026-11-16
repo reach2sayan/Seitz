@@ -39,7 +39,7 @@ private:
   [[nodiscard]] bool possible_overlap(Matrix3d const &rot_transposed,
                                       Vector3d const &trans) const;
 
-  Cell sorted_; // the input cell with atoms sorted as described above
+  Cell sorted_;         // the input cell with atoms sorted as described above
   PositionIndex index_; // over sorted_; ties the checker to its address
 
   mutable Positions rotated_; // n x 3 images

@@ -29,8 +29,8 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                       GenerateOptions const &options) {
   return std::ranges::fold_left(comp, 0.0, [&](double sum, auto const &entry) {
     auto const &[type, count] = entry;
-    return sum + static_cast<double>(count) * 2.0 *
-                     options.distance.radius(type);
+    return sum +
+           static_cast<double>(count) * 2.0 * options.distance.radius(type);
   });
 }
 
@@ -47,8 +47,8 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
   orbits.reserve(assignment.size());
   Types types;
   for (auto &placed : assignment) {
-    placed.coordinate = placed.position->canonical(
-        placed.coordinate.value_or(box.sample(rng)));
+    placed.coordinate =
+        placed.position->canonical(placed.coordinate.value_or(box.sample(rng)));
     Positions const &orbit = orbits.emplace_back(
         placed.position->orbit(*placed.coordinate, periodicity));
     types.insert(types.end(), static_cast<std::size_t>(orbit.rows()),
@@ -138,7 +138,8 @@ Matrix3d GroupTraits<group::SpaceGroup>::lattice(group::SpaceGroup const &g,
                                 kVacuum, rng());
   }
   return random_lattice(
-      pointgroup_by_number(g.type().pointgroup_number).holohedry, volume, rng());
+      pointgroup_by_number(g.type().pointgroup_number).holohedry, volume,
+      rng());
 }
 
 std::string_view
@@ -258,9 +259,10 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   if (options_.placement == Placement::general_only) {
     group::Wyckoff const *general = &positions.back();
     std::erase_if(assignments, [&](Assignment<group::Wyckoff> const &a) {
-      return std::ranges::any_of(
-          a | std::views::drop(pinned),
-          [&](Placed<group::Wyckoff> const &p) { return p.position != general; });
+      return std::ranges::any_of(a | std::views::drop(pinned),
+                                 [&](Placed<group::Wyckoff> const &p) {
+                                   return p.position != general;
+                                 });
     });
     if (assignments.empty()) {
       return leaf::new_error(e_message{std::format(
@@ -293,7 +295,8 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
           options_.lattice
               ? options_.lattice->matrix()
               : Traits::lattice(*group_, comp, options_, attempt, rng);
-      Generated candidate = assemble(assignment, lattice, periodicity, box, rng);
+      Generated candidate =
+          assemble(assignment, lattice, periodicity, box, rng);
       if (distances_valid(candidate.cell, options_.distance)) {
         return candidate;
       }

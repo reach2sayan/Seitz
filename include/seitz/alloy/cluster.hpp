@@ -93,9 +93,8 @@ symmetry_images(Cluster const &c, Operations const &ops, double tol);
 // The permutation `op` induces on the points of `c`: entry i is the image of
 // point i. Meaningful only for op in site_symmetry(c, ...); the configuration
 // builder compares occupations through it.
-[[nodiscard]] std::vector<int> point_permutation(Cluster const &c,
-                                                 SymmetryOperation const &op,
-                                                 double tol);
+[[nodiscard]] std::vector<int>
+point_permutation(Cluster const &c, SymmetryOperation const &op, double tol);
 
 // First element of `reps` whose projected cluster is symmetry-equivalent to
 // `c`, else the end iterator. The |G| images of `c` are formed once, not once

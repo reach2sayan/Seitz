@@ -185,8 +185,8 @@ magnetic_space_group_type(MagneticOperations const &magnetic_symmetry,
   std::ranges::transform(
       sym_msg, std::back_inserter(changed), [&](auto const &op) {
         SymmetryOperation c = conjugated_by(op.spatial, tmat, tmat_inv);
-        c.translation = math::wrap_to_unit_cell(
-            Vector3d(shift - c.rotation.cast<double>() * shift + c.translation));
+        c.translation = math::wrap_to_unit_cell(Vector3d(
+            shift - c.rotation.cast<double>() * shift + c.translation));
         return MagneticSymmetryOperation{.spatial = c,
                                          .time_reversal = op.time_reversal};
       });

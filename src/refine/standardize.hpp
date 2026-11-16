@@ -14,7 +14,7 @@ namespace seitz::refine {
 // Wyckoff / equivalence data of the *input* cell.
 struct Standardized {
   Cell bravais;                              // idealized conventional cell
-  std::vector<analysis::Site> sites;                 // per input-cell atom
+  std::vector<analysis::Site> sites;         // per input-cell atom
   std::vector<int> std_mapping_to_primitive; // per bravais atom
 };
 

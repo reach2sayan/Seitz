@@ -85,15 +85,17 @@ template <> struct GroupTraits<group::RodGroup> {
 // A group the generator can place a composition on: it has Wyckoff positions
 // and a GroupTraits<G> specialization.
 template <class G>
-concept GeneratableGroup = requires(G const &g, Composition const &comp,
-                                    GenerateOptions const &options,
-                                    std::mt19937_64 &rng) {
-  { g.wyckoffs() } -> std::ranges::input_range;
-  { GroupTraits<G>::kind(g) } -> std::convertible_to<std::string_view>;
-  { GroupTraits<G>::periodicity(g) } -> std::same_as<CellPeriodicity>;
-  { GroupTraits<G>::seed_box(g) } -> std::same_as<SeedBox>;
-  { GroupTraits<G>::lattice(g, comp, options, 0, rng) } -> std::same_as<Matrix3d>;
-};
+concept GeneratableGroup =
+    requires(G const &g, Composition const &comp,
+             GenerateOptions const &options, std::mt19937_64 &rng) {
+      { g.wyckoffs() } -> std::ranges::input_range;
+      { GroupTraits<G>::kind(g) } -> std::convertible_to<std::string_view>;
+      { GroupTraits<G>::periodicity(g) } -> std::same_as<CellPeriodicity>;
+      { GroupTraits<G>::seed_box(g) } -> std::same_as<SeedBox>;
+      {
+        GroupTraits<G>::lattice(g, comp, options, 0, rng)
+      } -> std::same_as<Matrix3d>;
+    };
 
 // Assignments per search: ample for any real composition, a bound on
 // pathological ones.
@@ -112,8 +114,7 @@ public:
   // the fixed sites; fewer when there are fewer, exactly `max` when the
   // enumeration was cut short.
   [[nodiscard]] std::vector<Assignment<group::Wyckoff>>
-  assignments(Composition const &comp,
-              std::size_t max = kMaxAssignments) const;
+  assignments(Composition const &comp, std::size_t max = kMaxAssignments) const;
 
   // A random structure with this group's symmetry and `comp`'s composition,
   // deterministic in options.seed. The returned assignment carries every

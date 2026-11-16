@@ -190,7 +190,8 @@ Refinement<F>::standardize(Operations const &cell_operations,
   Bravais bravais = expand_in_bravais(conv_prim, std_lattice, conv_sym, *exact,
                                       conv_periodicity);
 
-  std::vector<int> const orbits = crystallographic_orbits(*exact, mapping_table);
+  std::vector<int> const orbits =
+      crystallographic_orbits(*exact, mapping_table);
 
   // Equivalent atoms: the crystallographic orbits unless the input cell breaks
   // the ideal site multiplicity (supercell), in which case use the found ops.
@@ -214,8 +215,9 @@ Refinement<F>::standardize(Operations const &cell_operations,
                       auto const &[prim, equivalent, orbit] = fields;
                       auto const &atom =
                           (*exact)[static_cast<std::size_t>(prim)];
-                      return analysis::Site{atom.wyckoff, atom.site_symmetry_symbol,
-                                  equivalent, orbit, prim};
+                      return analysis::Site{atom.wyckoff,
+                                            atom.site_symmetry_symbol,
+                                            equivalent, orbit, prim};
                     })},
       .std_mapping_to_primitive = std::move(bravais.std_mapping_to_primitive),
   };

@@ -195,7 +195,8 @@ enumerate_assignments(std::span<W const> positions, Composition comp,
   }
   detail::UsedSpecial used;
   for (auto const &placed : fixed) {
-    auto const index = static_cast<std::size_t>(placed.position - positions.data());
+    auto const index =
+        static_cast<std::size_t>(placed.position - positions.data());
     if (index >= positions.size()) {
       co_return; // not a position of this group
     }
@@ -219,8 +220,8 @@ enumerate_assignments(std::span<W const> positions, Composition comp,
     co_return;
   }
   Assignment<W> placements = std::move(fixed);
-  co_yield std::ranges::elements_of(detail::walk(
-      ctx, placements, used, 0, 0, ctx.elements.front().second));
+  co_yield std::ranges::elements_of(
+      detail::walk(ctx, placements, used, 0, 0, ctx.elements.front().second));
 }
 
 // Whether `comp` has at least one assignment on `positions`.

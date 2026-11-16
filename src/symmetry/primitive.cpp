@@ -98,8 +98,7 @@ finish_primitive_lattice(Matrix3d relative, Lattice const &cell_lattice,
   }
   auto const reduced = reduce_lattice<F>(cell_lattice.transformed(relative),
                                          periodicity, symprec);
-  return reduced.has_value() ? std::optional(reduced.value())
-                             : std::nullopt;
+  return reduced.has_value() ? std::optional(reduced.value()) : std::nullopt;
 }
 
 template <GroupFamily F>
@@ -388,8 +387,8 @@ std::optional<Lattice> PrimitiveFinder<F>::lattice_from_pure_translations(
 template <GroupFamily F>
 Result<Primitive> PrimitiveFinder<F>::from_pure_translations(
     std::span<Vector3d const> pure_trans) const {
-  if (auto prim = primitive_from<F>(cell_, pure_trans,
-                                    {tol_.symprec, std::nullopt})) {
+  if (auto prim =
+          primitive_from<F>(cell_, pure_trans, {tol_.symprec, std::nullopt})) {
     return std::move(*prim);
   }
   return leaf::new_error(e_cell_standardization_failed{});

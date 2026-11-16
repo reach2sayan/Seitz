@@ -136,7 +136,6 @@ template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::primitive
 template Result<Cell> SymmetryAnalyzer::standardized_cell<CellSetting::primitive, Idealize::no>() const;
 // clang-format on
 
-
 Result<Operations const &> SymmetryAnalyzer::cell_operations() const & {
   BOOST_LEAF_AUTO(ops, cell_operations_.get([&] {
     return dispatch_family(cell_.periodicity(), [&]<GroupFamily F>() {

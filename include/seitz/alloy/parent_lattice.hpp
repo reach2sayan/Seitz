@@ -78,7 +78,8 @@ public:
   // A maximal cluster given as CARTESIAN points, mapped into the fractional
   // frame with species counts filled in and every function zero -- the shape
   // Cvm::create expects. Fails naming the point that lies on no site.
-  [[nodiscard]] Result<Cluster> cluster_of(std::span<Vector3d const> points) const;
+  [[nodiscard]] Result<Cluster>
+  cluster_of(std::span<Vector3d const> points) const;
 
 private:
   ParentLattice(Cell cell, std::vector<Species> species, Operations operations)

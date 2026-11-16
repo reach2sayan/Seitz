@@ -15,11 +15,10 @@ using detail::coincident;
 using detail::integral;
 
 Cluster Cluster::transformed(SymmetryOperation const &op) const {
-  auto const moved =
-      points_ | std::views::transform([&op](ClusterPoint point) {
-        point.position = op.apply(point.position);
-        return point;
-      });
+  auto const moved = points_ | std::views::transform([&op](ClusterPoint point) {
+                       point.position = op.apply(point.position);
+                       return point;
+                     });
   return Cluster{Points(moved.begin(), moved.end())};
 }
 

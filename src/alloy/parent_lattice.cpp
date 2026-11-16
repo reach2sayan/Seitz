@@ -18,9 +18,8 @@ namespace seitz::alloy {
 
 using detail::integral;
 
-Result<ParentLattice> ParentLattice::create(Cell cell,
-                                            std::vector<Species> species,
-                                            Tolerance tol) {
+Result<ParentLattice>
+ParentLattice::create(Cell cell, std::vector<Species> species, Tolerance tol) {
   if (species.empty()) {
     return leaf::new_error(
         e_message{"alloy: the parent lattice declares no sublattices"});
@@ -34,8 +33,8 @@ Result<ParentLattice> ParentLattice::create(Cell cell,
       std::ranges::find_if(sublattices, [](auto const &entry) {
         Species const &allowed = std::get<1>(entry);
         return allowed.empty() ||
-               std::ranges::adjacent_find(allowed, std::ranges::greater_equal{}) !=
-                   allowed.end();
+               std::ranges::adjacent_find(
+                   allowed, std::ranges::greater_equal{}) != allowed.end();
       });
   if (malformed != sublattices.end()) {
     return leaf::new_error(e_message{std::format(
@@ -92,9 +91,9 @@ Result<ParentLattice> ParentLattice::from_sites(Lattice lattice,
     coordinates.push_back(position);
     types.push_back(entry->second);
   }
-  return create(Cell{std::move(lattice), to_positions(coordinates),
-                     std::move(types)},
-                std::move(species), tol);
+  return create(
+      Cell{std::move(lattice), to_positions(coordinates), std::move(types)},
+      std::move(species), tol);
 }
 
 int ParentLattice::species_at(Index site) const noexcept {
@@ -145,8 +144,8 @@ std::vector<ClusterPoint> ParentLattice::anchors(Anchors which) const {
   return representatives;
 }
 
-Result<Cluster> ParentLattice::cluster_of(
-    std::span<Vector3d const> points) const {
+Result<Cluster>
+ParentLattice::cluster_of(std::span<Vector3d const> points) const {
   Cluster::Points cluster;
   cluster.reserve(points.size());
   auto const atoms = cell_.atoms();

@@ -534,21 +534,20 @@ template <GroupFamily F>
                                                ? Centering::r_center
                                                : Centering::primitive;
 
-  return first_match(change_of_basis, orig_lattice, symprec,
-                     [&](Matrix3d const &cob,
-                         Matrix3d const *orig) -> std::optional<MatchResult> {
-                       Matrix3d const changed_lattice = conv_lattice * cob;
-                       if (orig && !is_equivalent_lattice(
-                                       Equivalence::identical, changed_lattice,
-                                       *orig, symprec)) {
-                         return std::nullopt;
-                       }
-                       Operations const changed_symmetry =
-                           get_conventional_symmetry(
-                               cob, centering_for_symmetry, conv_symmetry);
-                       return try_hall<F>(changed_lattice, hall, centering,
-                                          changed_symmetry, symprec);
-                     });
+  return first_match(
+      change_of_basis, orig_lattice, symprec,
+      [&](Matrix3d const &cob,
+          Matrix3d const *orig) -> std::optional<MatchResult> {
+        Matrix3d const changed_lattice = conv_lattice * cob;
+        if (orig && !is_equivalent_lattice(Equivalence::identical,
+                                           changed_lattice, *orig, symprec)) {
+          return std::nullopt;
+        }
+        Operations const changed_symmetry = get_conventional_symmetry(
+            cob, centering_for_symmetry, conv_symmetry);
+        return try_hall<F>(changed_lattice, hall, centering, changed_symmetry,
+                           symprec);
+      });
 }
 
 template <GroupFamily F>
@@ -732,9 +731,8 @@ match_db_monocli_in_loop(Matrix3d conv_lattice, AxisChoice const &choice,
   if (orig_lattice && orig_lattice->determinant() > symprec) {
     // mode-1 equivalence effectively checks the C2 rotation about the unique
     // axis; only accept flips that keep the unique axis fixed.
-    if (auto const tmat =
-            is_equivalent_lattice(Equivalence::axis_flips, conv_lattice,
-                                  *orig_lattice, symprec)) {
+    if (auto const tmat = is_equivalent_lattice(
+            Equivalence::axis_flips, conv_lattice, *orig_lattice, symprec)) {
       int const u1 = (unique_axis + 1) % 3;
       int const u2 = (unique_axis + 2) % 3;
       if ((*tmat)(u1, u1) * (*tmat)(u2, u2) > kZeroPrec) {

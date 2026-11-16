@@ -114,8 +114,8 @@ struct RodGeometry {
         if (ka > 0) {
           common += a.dir * w.head(ka);
         }
-        results.emplace_back(
-            reduce(common), math::intersect_column_spaces(a.dir, b.dir, kTol));
+        results.emplace_back(reduce(common),
+                             math::intersect_column_spaces(a.dir, b.dir, kTol));
       }
     }
     return results;
@@ -201,12 +201,12 @@ struct RodGeometry {
     if (cdir.cols() > 0) {
       locus_basis.leftCols(cdir.cols()) = cdir;
     }
-    return detail::DerivedLocus{
-        .dof = locus.dim(),
-        .origin = reduce(locus.point),
-        .locus_basis = locus_basis,
-        .orbit_ops = std::move(partition.orbit_ops),
-        .site_symmetry = std::move(partition.site_symmetry)};
+    return detail::DerivedLocus{.dof = locus.dim(),
+                                .origin = reduce(locus.point),
+                                .locus_basis = locus_basis,
+                                .orbit_ops = std::move(partition.orbit_ops),
+                                .site_symmetry =
+                                    std::move(partition.site_symmetry)};
   }
 };
 

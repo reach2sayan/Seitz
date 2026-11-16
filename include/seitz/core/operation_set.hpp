@@ -59,7 +59,8 @@ namespace detail {
 // The primitive operations and the primitive->conventional transformation a
 // conventional set implies. Defined in src/core, so to_primitive stays inline
 // without this header naming a pipeline type.
-[[nodiscard]] std::optional<std::pair<OperationSet<SymmetryOperation>, Matrix3d>>
+[[nodiscard]] std::optional<
+    std::pair<OperationSet<SymmetryOperation>, Matrix3d>>
 primitive_operations(OperationSet<SymmetryOperation> const &operations,
                      Tolerance const &tol);
 

@@ -59,8 +59,7 @@ template <class Bound>
                            std::ranges::range_reference_t<Cluster const &>>,
       int>
 [[nodiscard]] std::vector<int> radix_of(Cluster const &c, Bound bound) {
-  return std::vector<int>{std::from_range,
-                          c | std::views::transform(bound)};
+  return std::vector<int>{std::from_range, c | std::views::transform(bound)};
 }
 
 // Every point-function decoration of `c`: a site admitting k species carries

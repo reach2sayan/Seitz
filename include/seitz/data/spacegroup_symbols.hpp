@@ -70,7 +70,8 @@ struct NormalizedSymbol {
 // `symbol` split into canonical key and requested setting. `drop_lone_ones`
 // turns a monoclinic full symbol into the short one everybody writes.
 [[nodiscard]] constexpr NormalizedSymbol
-normalize_symbol(std::string_view symbol, bool drop_lone_ones = false) noexcept {
+normalize_symbol(std::string_view symbol,
+                 bool drop_lone_ones = false) noexcept {
   NormalizedSymbol out{};
   if (auto const colon = symbol.find(':'); colon != std::string_view::npos) {
     for (char const c : symbol.substr(colon + 1)) {
@@ -114,7 +115,8 @@ normalize_symbol(std::string_view symbol, bool drop_lone_ones = false) noexcept 
 
 // The pre-1983 cubic spelling modernised: `Pm3m` is `Pm-3m`. Empty when the
 // symbol carries no such `3`, so the retry is skipped.
-[[nodiscard]] constexpr SymbolKey modernized_cubic(SymbolKey const &key) noexcept {
+[[nodiscard]] constexpr SymbolKey
+modernized_cubic(SymbolKey const &key) noexcept {
   auto const text = key.view();
   SymbolKey out{};
   bool changed = false;
@@ -180,7 +182,8 @@ template <GroupFamily F>
 template <GroupFamily F>
 inline constexpr auto kHmSymbolIndex =
     bucket_index<static_cast<std::size_t>(hall_settings(F)) * kSymbolKinds,
-                 kSymbolBuckets>([](int id) { return bucket_of(hm_key_of<F>(id)); });
+                 kSymbolBuckets>(
+        [](int id) { return bucket_of(hm_key_of<F>(id)); });
 
 // A Hall symbol is one per setting, so this index is keyed by the row.
 template <GroupFamily F>
@@ -247,10 +250,9 @@ template <GroupFamily F>
 [[nodiscard]] constexpr std::optional<HallNumber>
 hall_from_hall_symbol(std::string_view symbol) noexcept {
   auto const query = detail::normalize_symbol(symbol);
-  return detail::find_setting<F>(detail::kHallSymbolIndex<F>,
-                                 detail::hall_key_of<F>,
-                                 [](int row) { return row; }, query.key,
-                                 query.setting);
+  return detail::find_setting<F>(
+      detail::kHallSymbolIndex<F>, detail::hall_key_of<F>,
+      [](int row) { return row; }, query.key, query.setting);
 }
 
 // ---- compile-time guards ---------------------------------------------------
@@ -269,9 +271,8 @@ constexpr bool monoclinic_spellings_agree() {
 
 static_assert(detail::monoclinic_spellings_agree());
 // The pre-1983 cubic spelling and the modern one are the same group.
-static_assert(
-    spacegroup_type(*hall_from_hm_symbol<GroupFamily::space>("Pm3m")).number ==
-    221);
+static_assert(spacegroup_type(*hall_from_hm_symbol<GroupFamily::space>("Pm3m"))
+                  .number == 221);
 static_assert(hall_from_hm_symbol<GroupFamily::space>("Pm3m") ==
               hall_from_hm_symbol<GroupFamily::space>("Pm-3m"));
 // The rhombohedral and hexagonal settings of R-3m are one group, two rows.
@@ -288,13 +289,13 @@ static_assert(
     spacegroup_type(*hall_from_hall_symbol<GroupFamily::space>("-F 4 2 3"))
         .number == 225);
 // An alternative orthorhombic setting keeps its choice.
-static_assert(
-    spacegroup_type(*hall_from_hm_symbol<GroupFamily::space>("Pbnm")).choice ==
-    "cab");
+static_assert(spacegroup_type(*hall_from_hm_symbol<GroupFamily::space>("Pbnm"))
+                  .choice == "cab");
 static_assert(hall_from_hm_symbol<GroupFamily::layer>("p 2/m 1 1").has_value());
 static_assert(!hall_from_hm_symbol<GroupFamily::space>("Xyz").has_value());
 static_assert(!hall_from_hm_symbol<GroupFamily::space>("").has_value());
-static_assert(!hall_from_hall_symbol<GroupFamily::space>("nonsense").has_value());
+static_assert(
+    !hall_from_hall_symbol<GroupFamily::space>("nonsense").has_value());
 
 } // namespace seitz::data
 

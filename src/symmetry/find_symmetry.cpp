@@ -306,7 +306,8 @@ void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
     };
   };
   std::vector<std::uint8_t> const seeds = found;
-  for (int const seed : std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
+  for (int const seed :
+       std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
     // The walk: seed, its image, that one's image, ... until it closes or
     // dead-ends; a cycle is at most n long.
     int atom = seed;

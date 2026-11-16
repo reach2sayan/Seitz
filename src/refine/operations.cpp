@@ -2,8 +2,8 @@
 #include <seitz/core/operation_set.hpp>
 
 #include "core/matrix_order.hpp"
-#include <seitz/core/fractional.hpp>
 #include "math/integer_matrix.hpp"
+#include <seitz/core/fractional.hpp>
 #include <seitz/data/spg_database.hpp>
 
 #include <ranges>
@@ -35,10 +35,9 @@ namespace {
 [[nodiscard]] Operations primitive_db_symmetry(Matrix3d const &t_mat,
                                                Operations const &conv_sym,
                                                Vector3d const &shift) {
-  return with_origin_shift(
-             Operations{unique_by_rotation(conv_sym,
-                                           &SymmetryOperation::rotation)},
-             shift)
+  return with_origin_shift(Operations{unique_by_rotation(
+                               conv_sym, &SymmetryOperation::rotation)},
+                           shift)
       .conjugated_by(t_mat, t_mat.inverse());
 }
 
