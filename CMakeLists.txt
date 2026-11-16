@@ -377,8 +377,24 @@ target_include_directories(seitz PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(seitz PUBLIC cxx_std_23)
 find_package(Threads REQUIRED)
-list(TRANSFORM SEITZ_BOOST_PUBLIC PREPEND Boost:: OUTPUT_VARIABLE _seitz_boost_public)
-list(TRANSFORM SEITZ_BOOST_PRIVATE PREPEND Boost:: OUTPUT_VARIABLE _seitz_boost_private)
+# Each component's own target where the Boost package declares one, and
+# Boost::headers where it does not. Boost's CMake build and vcpkg declare a
+# target per library; conan's Boost declares only its compiled libraries plus
+# Boost::headers, so leaf/parser/flyweight/algorithm have no target there.
+function(seitz_boost_targets out)
+    set(targets)
+    foreach (component IN LISTS ARGN)
+        if (TARGET Boost::${component})
+            list(APPEND targets Boost::${component})
+        else ()
+            list(APPEND targets Boost::headers)
+        endif ()
+    endforeach ()
+    list(REMOVE_DUPLICATES targets)
+    set(${out} ${targets} PARENT_SCOPE)
+endfunction()
+seitz_boost_targets(_seitz_boost_public ${SEITZ_BOOST_PUBLIC})
+seitz_boost_targets(_seitz_boost_private ${SEITZ_BOOST_PRIVATE})
 target_link_libraries(seitz PUBLIC Eigen3::Eigen ${_seitz_boost_public} Threads::Threads)
 target_link_libraries(seitz PRIVATE ${_seitz_boost_private})
 # Boost.Parser's MSVC debug stream includes <Windows.h>, whose min/max macros

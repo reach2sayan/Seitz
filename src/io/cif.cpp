@@ -864,7 +864,7 @@ namespace {
 
 // One `_atom_site` row: an orbit's representative, named and counted.
 struct Row {
-  std::string label;
+  std::string label{};
   std::string_view symbol;
   int multiplicity = 1;
   char wyckoff = 'a';

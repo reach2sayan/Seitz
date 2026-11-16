@@ -66,7 +66,9 @@ using analysis::SymmetryAnalyzer;
   // the whole call and the span never reaches Python.
   auto const sites = unwrap([&]() -> Result<std::span<Site const>> {
     py::gil_scoped_release const unlocked;
-    BOOST_LEAF_AUTO(all, self.sites());
+    // ASSIGN with a reference, not AUTO: AUTO declares `auto all`, a copy, and
+    // the span would outlive it.
+    BOOST_LEAF_ASSIGN(auto const &all, self.sites());
     return std::span<Site const>{all};
   });
   auto const count = static_cast<Index>(sites.size());

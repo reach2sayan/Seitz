@@ -66,18 +66,31 @@ constexpr Index kMeshGrain = 4096;
          (!eq_ca || (d[2] == d[0] && s[2] == s[0]));
 }
 
-// Smallest grid-point index in the orbit of `doubled` under the reciprocal
-// group. The group is closed, so iterating every rotation reaches the whole
-// orbit and the minimum is canonical.
-[[nodiscard]] std::size_t
-normal_representative(Address doubled, Mesh const &mesh, std::size_t self,
-                      std::span<Matrix3i const> rots) {
-  Vector3i const ad = to_eigen(doubled);
-  std::size_t best = self;
-  for (Matrix3i const &rot : rots) {
-    best = std::min(best, mesh.index_of_doubled(from_eigen(rot * ad)));
+// Every grid point mapped to the smallest index in its orbit under the
+// reciprocal group. The group is closed, so the orbits partition the mesh, and
+// an ascending sweep meets each orbit first at its minimum: that point labels
+// its whole orbit, and every rotation is applied once per orbit rather than once
+// per point.
+[[nodiscard]] std::vector<std::size_t>
+normal_mapping(Mesh const &mesh, std::span<Matrix3i const> rots) {
+  std::vector<std::size_t> mapping(mesh.size());
+  std::vector<std::uint8_t> labelled(mesh.size(), 0);
+  for (std::size_t i = 0; i < mesh.size(); ++i) {
+    if (labelled[i] != 0) {
+      continue;
+    }
+    labelled[i] = 1;
+    mapping[i] = i;
+    Vector3i const ad = to_eigen(mesh.doubled_address(mesh.address_of(i)));
+    for (Matrix3i const &rot : rots) {
+      std::size_t const j = mesh.index_of_doubled(from_eigen(rot * ad));
+      if (labelled[j] == 0) {
+        labelled[j] = 1;
+        mapping[j] = i;
+      }
+    }
   }
-  return best;
+  return mapping;
 }
 
 // As above, but for the distortion path: the rotation is applied in 64-bit
@@ -171,17 +184,20 @@ ReciprocalMesh::ReciprocalMesh(Mesh mesh, std::vector<Matrix3i> rotations)
       static_cast<std::int64_t>(d[0]) * d[1],
   };
 
-  // Indexed writes, not push_back: each mapping_[i] depends only on i and both
-  // representative functions are pure. The largest raw iteration count in the
-  // library (up to 10^6 points), and the only loop worth threading.
-  mapping_.resize(mesh_.size());
-  parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
-    auto const i = static_cast<std::size_t>(index);
-    Address const doubled = mesh_.doubled_address(mesh_.address_of(i));
-    mapping_[i] = normal ? normal_representative(doubled, mesh_, i, rotations_)
-                         : distortion_representative(doubled, mesh_, i, divisor,
-                                                     rotations_);
-  });
+  // A closed group sweeps its orbits once. The distortion path validates each
+  // rotated point on its own, so it stays per point: indexed writes, each
+  // mapping_[i] a pure function of i, threaded over up to 10^6 points.
+  if (normal) {
+    mapping_ = normal_mapping(mesh_, rotations_);
+  } else {
+    mapping_.resize(mesh_.size());
+    parallel_for(static_cast<Index>(mesh_.size()), kMeshGrain, [&](Index index) {
+      auto const i = static_cast<std::size_t>(index);
+      Address const doubled = mesh_.doubled_address(mesh_.address_of(i));
+      mapping_[i] = distortion_representative(doubled, mesh_, i, divisor,
+                                              rotations_);
+    });
+  }
   num_irreducible_ = static_cast<std::size_t>(std::ranges::count_if(
       mapping_ | std::views::enumerate, [](auto const &e) {
         const auto &[lindex, rindex] = e;
