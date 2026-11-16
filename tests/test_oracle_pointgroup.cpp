@@ -1,32 +1,16 @@
 #include "oracle.hpp"
 
 #include "symmetry/search.hpp"
+#include "structures.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 using namespace seitz;
 
 namespace {
-Cell primitive_cubic(double a) {
-  Positions pos(1, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0});
-}
+using seitz::test::primitive_cubic;
+using seitz::test::rutile;
 
-Cell rutile() {
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = 4.6;
-  l(1, 1) = 4.6;
-  l(2, 2) = 3.0;
-  Positions pos(6, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  pos.row(2) << 0.3, 0.3, 0.0;
-  pos.row(3) << 0.7, 0.7, 0.0;
-  pos.row(4) << 0.8, 0.2, 0.5;
-  pos.row(5) << 0.2, 0.8, 0.5;
-  return Cell(Lattice{l}, pos, {0, 0, 1, 1, 1, 1});
-}
 
 Cell hexagonal() {
   Matrix3d l;

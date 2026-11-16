@@ -60,10 +60,9 @@ combinations(std::size_t n, int choose) {
   std::vector<std::size_t> chosen;
   chosen.reserve(width);
   do {
-    auto selected = std::views::iota(std::size_t{0}, n) |
-                    std::views::filter([&mask](std::size_t i) {
-                      return mask[i] != 0;
-                    });
+    auto selected =
+        std::views::iota(std::size_t{0}, n) |
+        std::views::filter([&mask](std::size_t i) { return mask[i] != 0; });
     chosen.assign(selected.begin(), selected.end());
     co_yield std::span{chosen};
   } while (std::prev_permutation(mask.begin(), mask.end()));

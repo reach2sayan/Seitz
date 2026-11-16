@@ -18,9 +18,9 @@ template <class T> using Result = boost::leaf::result<T>;
 // instead of a finished Result, so a BOOST_LEAF_AUTO chain can be written
 // inline at the call site.
 template <class F>
-concept ResultProducer =
-    std::invocable<F &> &&
-    requires { typename std::invoke_result_t<F &>::value_type; };
+concept ResultProducer = std::invocable<F &> && requires {
+  typename std::invoke_result_t<F &>::value_type;
+};
 
 struct e_spacegroup_search_failed {};
 struct e_cell_standardization_failed {};

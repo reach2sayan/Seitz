@@ -33,11 +33,3 @@ def layer_cell() -> sz.Cell:
         [6],
         sz.aperiodic_along(2),
     )
-
-
-def space_hall(index: int) -> sz.HallNumber:
-    return sz.HallNumber(sz.GroupFamily.space, index)
-
-
-def layer_hall(index: int) -> sz.HallNumber:
-    return sz.HallNumber(sz.GroupFamily.layer, index)

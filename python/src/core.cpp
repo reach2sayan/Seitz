@@ -34,7 +34,7 @@ namespace {
     return *std::move(lattice);
   }
   detail::raise(error_types().invalid_lattice, "the lattice basis is singular",
-                "determinant", basis.determinant());
+                {{"determinant", py::float_(basis.determinant())}});
 }
 
 [[nodiscard]] std::string lattice_repr(Lattice const &self) {

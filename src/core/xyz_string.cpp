@@ -17,7 +17,8 @@
 #include <vector>
 
 // The Jones-faithful coordinate triplet, both directions. The grammar is
-// private to this TU: Boost::parser is PRIVATE and no installed header names it.
+// private to this TU: Boost::parser is PRIVATE and no installed header names
+// it.
 namespace seitz {
 
 namespace {
@@ -43,8 +44,8 @@ struct Triplet {
   Coordinate c;
 };
 
-bp::symbols<int> const axis_symbol{
-    {"x", 0}, {"y", 1}, {"z", 2}, {"X", 0}, {"Y", 1}, {"Z", 2}};
+bp::symbols<int> const axis_symbol{{"x", 0}, {"y", 1}, {"z", 2},
+                                   {"X", 0}, {"Y", 1}, {"Z", 2}};
 auto const sign = bp::char_("+-");
 
 // Fraction first, so "1/2" is one term; backtracks to a decimal on no '/'.
@@ -123,9 +124,8 @@ void append_translation(std::string &out, double t, bool signed_) {
   std::string out;
   for (auto const [axis, coefficient] :
        std::views::iota(Index{0}, Index{3}) |
-           std::views::transform([&](Index a) {
-             return std::pair{a, op.rotation(row, a)};
-           }) |
+           std::views::transform(
+               [&](Index a) { return std::pair{a, op.rotation(row, a)}; }) |
            std::views::filter([](auto const &t) { return t.second != 0; })) {
     if (coefficient < 0) {
       out += '-';
@@ -144,11 +144,11 @@ void append_translation(std::string &out, double t, bool signed_) {
 } // namespace
 
 std::string to_xyz(SymmetryOperation const &op) {
-  auto const coordinates =
-      std::views::iota(Index{0}, Index{3}) |
-      std::views::transform([&](Index row) { return coordinate_text(op, row); });
-  return boost::algorithm::join(
-      std::vector{std::from_range, coordinates}, ",");
+  auto const coordinates = std::views::iota(Index{0}, Index{3}) |
+                           std::views::transform([&](Index row) {
+                             return coordinate_text(op, row);
+                           });
+  return boost::algorithm::join(std::vector{std::from_range, coordinates}, ",");
 }
 
 Result<SymmetryOperation> from_xyz(std::string_view text) {

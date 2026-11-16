@@ -68,17 +68,8 @@ void add_orbit(Cluster candidate, std::vector<Orbit> &orbits,
 void add_decorations(Cluster const &geometry, std::vector<Orbit> &orbits,
                      Operations const &ops, Lattice const &lattice,
                      double tol) {
-  std::vector<int> const radix = detail::radix_of(
-      geometry, [](ClusterPoint const &p) { return p.species - 1; });
-  for (std::span<int const> functions : detail::mixed_radix(radix)) {
-    auto const decorated =
-        std::views::zip(geometry, functions) |
-        std::views::transform([](auto const &pair) {
-          auto const &[point, function] = pair;
-          return ClusterPoint{point.position, point.species, function};
-        });
-    add_orbit(Cluster{Cluster::Points(decorated.begin(), decorated.end())},
-              orbits, ops, lattice, tol);
+  for (Cluster decorated : detail::decorations(geometry)) {
+    add_orbit(std::move(decorated), orbits, ops, lattice, tol);
   }
 }
 
@@ -124,8 +115,8 @@ Result<ClustersPool> ClustersPool::generate(ParentLattice const &parent,
       for (std::span<std::size_t const> combination :
            detail::combinations(nearby.size(), order - 1)) {
         auto const chosen =
-            combination | std::views::transform(
-                              [&](std::size_t i) { return nearby[i]; });
+            combination |
+            std::views::transform([&](std::size_t i) { return nearby[i]; });
         Cluster::Points geometry{seed};
         geometry.insert(geometry.end(), chosen.begin(), chosen.end());
 

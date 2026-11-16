@@ -212,7 +212,7 @@ def analyze(cell: Cell, tolerance: Tolerance | dict[str, float | None] | None = 
 
     Nothing is computed here: the analyzer computes on first query and caches.
     """
-    return SymmetryAnalyzer.from_cell(cell, _tolerance(tolerance).to_core(), setting)
+    return SymmetryAnalyzer.from_cell(cell, _validated(Tolerance, tolerance).to_core(), setting)
 
 
 def analyze_magnetic(cell: MagneticCell,
@@ -225,20 +225,12 @@ def analyze_magnetic(cell: MagneticCell,
     :class:`MagneticCell` carries the moments, so the rank -- collinear or
     non-collinear -- is the shape of the array handed to it, never a flag.
     """
-    return MagneticSymmetryAnalyzer.from_cell(cell, _magnetic_tolerance(tolerance).to_core())
+    return MagneticSymmetryAnalyzer.from_cell(cell, _validated(MagneticTolerance, tolerance).to_core())
 
 
-def _magnetic_tolerance(tolerance: MagneticTolerance | dict[str, float | None] | None) -> MagneticTolerance:
-    if tolerance is None: return MagneticTolerance()
-    if isinstance(tolerance, MagneticTolerance): return tolerance
-    return MagneticTolerance.model_validate(tolerance)
-
-
-def _tolerance(tolerance: Tolerance | dict[str, float | None] | None) -> Tolerance:
-    """A tolerance argument as a validated model; shared by analyze/read_cif."""
-    if tolerance is None: return Tolerance()
-    if isinstance(tolerance, Tolerance): return tolerance
-    return Tolerance.model_validate(tolerance)
+def _validated(model, value):
+    """A tolerance argument as a validated ``model``: the default for None, a model as is, a dict validated."""
+    return model() if value is None else value if isinstance(value, model) else model.model_validate(value)
 
 
 def read_cif(source: str | os.PathLike[str],
@@ -252,7 +244,7 @@ def read_cif(source: str | os.PathLike[str],
     five-decimal coordinates put two images of a site ~1e-4 apart.
     """
     text = Path(source).read_text() if isinstance(source, os.PathLike) else source
-    validated = _tolerance(tolerance) if tolerance is not None else Tolerance(symprec=CIF_SYMPREC)
+    validated = _validated(Tolerance, tolerance) if tolerance is not None else Tolerance(symprec=CIF_SYMPREC)
     return _core.read_cif(text, validated.to_core())
 
 

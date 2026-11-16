@@ -4,8 +4,8 @@
 #include <seitz/core/keys.hpp>
 #include <seitz/core/types.hpp>
 
+#include <ranges>
 #include <string_view>
-#include <vector>
 
 // Decoder for the site-symmetry / Wyckoff database (generated tables in
 // src/data/sitesym_tables.hpp). The
@@ -22,8 +22,7 @@ struct WyckoffCoordinate {
   int multiplicity;
 };
 
-[[nodiscard]] SEITZ_TESTABLE WyckoffCoordinate
-wyckoff_coordinate(int index);
+[[nodiscard]] SEITZ_TESTABLE WyckoffCoordinate wyckoff_coordinate(int index);
 
 // The half-open range [start, start + count) of global Wyckoff-position indices
 // belonging to a Hall number.
@@ -36,8 +35,7 @@ struct WyckoffRange {
 
 // Site-symmetry symbol of a Wyckoff position. The trailing space padding is
 // removed at generation time, so the view points straight into static storage.
-[[nodiscard]] SEITZ_TESTABLE std::string_view
-site_symmetry_symbol(int index);
+[[nodiscard]] SEITZ_TESTABLE std::string_view site_symmetry_symbol(int index);
 
 // One Wyckoff position of a Hall setting: its global database index (the key
 // for wyckoff_coordinate / site_symmetry_symbol) paired with its Wyckoff
@@ -53,7 +51,14 @@ struct WyckoffEntry {
 // (a, b, c, ...). Bundles index + letter so callers iterate one list of objects
 // rather than re-deriving the letter offset from a WyckoffRange. The letter
 // convention (count - offset - 1) matches the one used when assigning
-// Dataset::wyckoffs in refine/site_symmetry.cpp.
-[[nodiscard]] std::vector<WyckoffEntry> wyckoff_entries(HallNumber hall);
+// Dataset::wyckoffs in refine/site_symmetry.cpp. A lazy view: the range is
+// captured by value, so nothing can dangle.
+[[nodiscard]] inline auto wyckoff_entries(HallNumber hall) {
+  WyckoffRange const range = wyckoff_indices(hall);
+  return std::views::iota(0, range.count) |
+         std::views::transform([range](int letter) {
+           return WyckoffEntry{range.start + range.count - letter - 1, letter};
+         });
+}
 
 } // namespace seitz::data

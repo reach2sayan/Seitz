@@ -127,9 +127,7 @@ struct PointGeometry {
     Matrix3d locus_basis = Matrix3d::Zero();
     locus_basis.leftCols(l.dim()) = l.basis;
 
-    return detail::DerivedLocus{.multiplicity =
-                                    static_cast<int>(orbit_ops.size()),
-                                .dof = l.dim(),
+    return detail::DerivedLocus{.dof = l.dim(),
                                 .origin = Vector3d::Zero(),
                                 .locus_basis = locus_basis,
                                 .orbit_ops = std::move(orbit_ops),
@@ -161,7 +159,6 @@ Result<PointGroup> PointGroup::from_number(int number) {
   pg.number_ = number;
   pg.symbol_ = meta.symbol;
   pg.schoenflies_ = meta.schoenflies;
-  pg.representative_spacegroup_ = rep;
 
   // The point group = the distinct rotation parts (zero translation).
   pg.operations_ = Operations{unique_by_rotation(

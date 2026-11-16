@@ -3,6 +3,7 @@
 #include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
+#include "structures.hpp"
 
 #include <boost/leaf.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -15,20 +16,6 @@ using namespace seitz;
 namespace {
 using seitz::test::must;
 
-Cell nacl_conventional() {
-  Matrix3d const L = 5.64 * Matrix3d::Identity();
-  Positions p(8, 3);
-  p.row(0) << 0, 0, 0;
-  p.row(1) << 0, 0.5, 0.5;
-  p.row(2) << 0.5, 0, 0.5;
-  p.row(3) << 0.5, 0.5, 0;
-  p.row(4) << 0.5, 0.5, 0.5;
-  p.row(5) << 0.5, 0, 0;
-  p.row(6) << 0, 0.5, 0;
-  p.row(7) << 0, 0, 0.5;
-  return Cell(Lattice{L}, p, Types{11, 11, 11, 11, 17, 17, 17, 17});
-}
-
 int spacegroup_of(Cell const &c) {
   auto const analyzer = analysis::SymmetryAnalyzer::from_cell(c);
   return data::spacegroup_type(must(analyzer.hall())).number;
@@ -37,7 +24,7 @@ int spacegroup_of(Cell const &c) {
 
 TEST_CASE("standardize_cell: conventional vs primitive atom counts",
           "[standardize]") {
-  Cell const nacl = nacl_conventional();
+  Cell const nacl = test::nacl();
   // F-centering: conventional has 4x the primitive atoms.
   CHECK(must(analysis::SymmetryAnalyzer::from_cell(nacl)
                  .standardized_cell<analysis::CellSetting::conventional,
@@ -68,7 +55,7 @@ TEST_CASE("standardize_cell: Idealize::no keeps an undistorted cell unchanged",
           "[standardize]") {
   // For an already-ideal cell, the idealized and non-idealized conventional
   // standardizations agree on the lattice metric.
-  Cell const nacl = nacl_conventional();
+  Cell const nacl = test::nacl();
   auto const ideal =
       must(analysis::SymmetryAnalyzer::from_cell(nacl)
                .standardized_cell<analysis::CellSetting::conventional,
@@ -77,11 +64,8 @@ TEST_CASE("standardize_cell: Idealize::no keeps an undistorted cell unchanged",
       must(analysis::SymmetryAnalyzer::from_cell(nacl)
                .standardized_cell<analysis::CellSetting::conventional,
                                   analysis::Idealize::no>());
-  Matrix3d const gi =
-      ideal.lattice().matrix().transpose() * ideal.lattice().matrix();
-  Matrix3d const gr =
-      raw.lattice().matrix().transpose() * raw.lattice().matrix();
-  CHECK((gi - gr).cwiseAbs().maxCoeff() < 1e-6);
+  CHECK(test::same_metric(ideal.lattice().matrix(), raw.lattice().matrix(),
+                          1e-6));
 }
 
 TEST_CASE("standardize_cell: no_idealize preserves a strained input lattice",
@@ -92,7 +76,7 @@ TEST_CASE("standardize_cell: no_idealize preserves a strained input lattice",
   Matrix3d L = 5.64 * Matrix3d::Identity();
   L(0, 0) *= 1.005;
   L(2, 2) *= 0.995;
-  Cell const strained = nacl_conventional().with_lattice(Lattice{L});
+  Cell const strained = test::nacl().with_lattice(Lattice{L});
 
   auto const raw =
       must(analysis::SymmetryAnalyzer::from_cell(strained, {1e-1})

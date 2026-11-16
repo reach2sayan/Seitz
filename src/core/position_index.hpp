@@ -23,9 +23,9 @@ namespace seitz {
 // for any periodicity.
 // Inline: it is the innermost test of every search, and out of line its 3x3
 // product and fold were half again the cost of the call itself.
-[[nodiscard]] inline bool coincident(Vector3d const &a, Vector3d const &b,
-                                     Matrix3d const &lattice, double symprec,
-                                     CellPeriodicity const &periodicity) noexcept {
+[[nodiscard]] inline bool
+coincident(Vector3d const &a, Vector3d const &b, Matrix3d const &lattice,
+           double symprec, CellPeriodicity const &periodicity) noexcept {
   return (lattice * minimal_image(a - b, periodicity)).norm() <= symprec;
 }
 
@@ -95,12 +95,6 @@ public:
              return type_of(atom) == type && coincides(point, atom);
            });
   }
-  [[nodiscard]] auto matches(Vector3d const &point, int type) const {
-    return candidates(point) |
-           std::views::filter([this, point, type](int atom) {
-             return type_of(atom) == type && coincides(point, atom);
-           });
-  }
 
   // The lowest-index atom of `type` coincident with `point` that `accept`s:
   // the first-hit-in-index-order primitive of the linear scans this replaces.
@@ -117,16 +111,6 @@ public:
   [[nodiscard]] std::optional<int> first_match(Vector3d const &point, int type,
                                                Scratch &out) const {
     return first_match(point, type, out, [](int) { return true; });
-  }
-  [[nodiscard]] std::optional<int>
-  first_match(Vector3d const &point, int type,
-              std::predicate<int> auto accept) const {
-    Scratch out;
-    return first_match(point, type, out, accept);
-  }
-  [[nodiscard]] std::optional<int> first_match(Vector3d const &point,
-                                               int type) const {
-    return first_match(point, type, [](int) { return true; });
   }
 
 private:

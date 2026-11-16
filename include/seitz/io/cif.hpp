@@ -36,7 +36,8 @@ struct CifBlock {
   column(std::string_view tag) const;
 
   // First row of `tag`; nullopt for absent and for CIF's nulls '?' and '.'.
-  [[nodiscard]] std::optional<std::string_view> value(std::string_view tag) const;
+  [[nodiscard]] std::optional<std::string_view>
+  value(std::string_view tag) const;
 };
 
 // The blocks of a CIF 1.1 document, in file order. Errors e_cif_syntax with
@@ -46,9 +47,9 @@ struct CifBlock {
 // A partially occupied or mixed site, collapsed to its majority species.
 // Reported rather than silently applied: the structure is not the one on disk.
 struct OccupancyCollapse {
-  std::string kept;                  // the label that survived
-  double occupancy = 1.0;            // its stated occupancy
-  std::vector<std::string> dropped;  // the labels that shared the site
+  std::string kept;                 // the label that survived
+  double occupancy = 1.0;           // its stated occupancy
+  std::vector<std::string> dropped; // the labels that shared the site
 };
 
 // One block read as crystallography.
@@ -63,9 +64,10 @@ struct CifStructure {
 };
 
 // Five-decimal coordinates put two images of a site ~1e-4 apart, which the
-// 1e-5 search default would call different atoms. Do not substitute Tolerance{}.
+// 1e-5 search default would call different atoms. Do not substitute
+// Tolerance{}.
 inline constexpr Tolerance kCifTolerance{.symprec = 1e-3,
-                                        .angle_tolerance = std::nullopt};
+                                         .angle_tolerance = std::nullopt};
 
 // One block as a structure, symmetry expanded over the asymmetric unit. Errors
 // e_cif_missing, e_unknown_element, e_unknown_spacegroup_symbol,
@@ -124,8 +126,9 @@ struct std::formatter<seitz::io::AsCif<seitz::Cell>>
 template <>
 struct std::formatter<seitz::io::AsCif<seitz::analysis::SymmetryAnalyzer>>
     : std::formatter<std::string_view> {
-  auto format(seitz::io::AsCif<seitz::analysis::SymmetryAnalyzer> const &document,
-              std::format_context &ctx) const {
+  auto
+  format(seitz::io::AsCif<seitz::analysis::SymmetryAnalyzer> const &document,
+         std::format_context &ctx) const {
     auto text = seitz::io::write_cif(document.subject, document.name);
     return std::formatter<std::string_view>::format(
         text ? *text : std::string{"# seitz: the determination failed\n"}, ctx);

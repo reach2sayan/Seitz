@@ -30,7 +30,7 @@ namespace {
 // operations.
 int pg_order(int number) {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, number));
+      test::space_group(number);
   return static_cast<int>(
       rotation_set(sg->operations(), &SymmetryOperation::rotation).size());
 }

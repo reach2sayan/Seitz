@@ -66,14 +66,11 @@ void bind_kpoint(py::module_ &m) {
       .def("address_of", &Mesh::address_of, py::arg("index"),
            py::doc("The address at a linear index, folded onto the "
                    "parallelepiped."))
-      // addresses() is a lazy view over `this`, so it is materialised: one
-      // (N, 3) int32 array, in grid-point-index order.
+      // addresses() is a lazy view over `this`, copied once into an (N, 3)
+      // int32 array, in grid-point-index order.
       .def_property_readonly(
           "addresses",
-          [](Mesh const &self) {
-            std::vector<Address> const rows(std::from_range, self.addresses());
-            return array_n3<int>(rows);
-          },
+          [](Mesh const &self) { return array_n3<int>(self.addresses()); },
           py::doc("Every address as an (N, 3) int32 array, in index order."))
       .def("doubled_address", &Mesh::doubled_address, py::arg("address"))
       .def("doubled", &Mesh::doubled,

@@ -9,7 +9,7 @@ index tables), decoded in src/data/spg_database.cpp.
 """
 import sys
 
-from cxx_tables import array, c_initializer, epilogue, preamble, struct
+from cxx_tables import aggregate, array, c_initializers, epilogue, preamble, struct
 
 CENTERING = {"CENTERING_ERROR": 0, "PRIMITIVE": 1, "BODY": 2, "FACE": 3,
              "A_FACE": 4, "B_FACE": 5, "C_FACE": 6, "BASE": 7, "R_CENTER": 8}
@@ -26,7 +26,7 @@ def types(rows):
 def main():
     src, meta_out, ops_out = sys.argv[1:4]
     text = open(src).read()
-    read = lambda name: c_initializer(text, name, CENTERING)
+    read = c_initializers(text, CENTERING)
     spacegroups, layers = list(types(read("spacegroup_types")[:531])), list(types(read("layer_group_types")[:117]))
     ops = read("symmetry_operations")
     index, layer_index = read("symmetry_operation_index")[:531], read("layer_symmetry_operation_index")[:117]
@@ -50,8 +50,8 @@ def main():
                                    "rotation base-3, translation base-12. Decoded in",
                                    "src/data/spg_database.cpp; must NOT be included by a public header."]))
         f.write(array("kSymmetryOperations", "int", map(str, ops), 12))
-        f.write(array("kSymmetryOperationIndex", "std::array<int, 2>", (f"{{{{{a}, {b}}}}}" for a, b in index)))
-        f.write(array("kLayerSymmetryOperationIndex", "std::array<int, 2>", (f"{{{{{a}, {b}}}}}" for a, b in layer_index),
+        f.write(array("kSymmetryOperationIndex", "std::array<int, 2>", map(aggregate, index)))
+        f.write(array("kLayerSymmetryOperationIndex", "std::array<int, 2>", map(aggregate, layer_index),
                       comment="Layer-group operation index ({count, offset} into kSymmetryOperations,\n"
                               "// the same shared array). Indexed by -(layer hall number); 117 entries."))
         f.write(epilogue())

@@ -45,8 +45,8 @@ public:
 
   // Orbits come out ordered: the empty cluster, then the points, then each body
   // order ascending and, within an order, by increasing diameter.
-  [[nodiscard]] static Result<ClustersPool> generate(ParentLattice const &parent,
-                                                     Options const &options);
+  [[nodiscard]] static Result<ClustersPool>
+  generate(ParentLattice const &parent, Options const &options);
 
   [[nodiscard]] auto begin() const noexcept { return orbits_.begin(); }
   [[nodiscard]] auto end() const noexcept { return orbits_.end(); }

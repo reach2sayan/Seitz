@@ -4,6 +4,7 @@
 // tensor, rotation-invariant), composition, and the atom set.
 
 #include "oracle.hpp"
+#include "structures.hpp"
 
 #include <seitz/analysis/symmetry_analyzer.hpp>
 
@@ -21,6 +22,8 @@
 
 namespace {
 
+using seitz::test::make_cell;
+
 using seitz::Cell;
 using seitz::Lattice;
 using seitz::Matrix3d;
@@ -29,34 +32,12 @@ using seitz::Result;
 using seitz::Types;
 using seitz::Vector3d;
 
-Cell make_cell(Matrix3d const &lattice,
-               std::vector<std::array<double, 3>> const &pos,
-               std::vector<int> const &types) {
-  Positions p(static_cast<Eigen::Index>(pos.size()), 3);
-  for (std::size_t i = 0; i < pos.size(); ++i) {
-    p.row(static_cast<Eigen::Index>(i)) =
-        Eigen::RowVector3d(pos[i][0], pos[i][1], pos[i][2]);
-  }
-  return Cell(Lattice{lattice}, p, types);
-}
-
-// Lattices match up to a rigid rotation iff their metric tensors agree.
-bool same_metric(Matrix3d const &a, Matrix3d const &b) {
-  return ((a.transpose() * a) - (b.transpose() * b)).cwiseAbs().maxCoeff() <
-         1e-3;
-}
-
 std::map<int, int> composition(Cell const &c) {
   std::map<int, int> m;
   for (int t : c.types()) {
     ++m[t];
   }
   return m;
-}
-
-bool overlap(Vector3d const &a, Vector3d const &b, double tol) {
-  Vector3d d = (a - b).unaryExpr([](double x) { return x - std::round(x); });
-  return d.cwiseAbs().maxCoeff() <= tol;
 }
 
 using seitz::test::must;
@@ -85,7 +66,8 @@ void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
   REQUIRE(ref.size() > 0); // reference succeeded
 
   CHECK(got.size() == ref.size());
-  CHECK(same_metric(got.lattice().matrix(), ref.lattice().matrix()));
+  CHECK(seitz::test::same_metric(got.lattice().matrix(), ref.lattice().matrix(),
+                                 1e-3));
   CHECK(composition(got) == composition(ref));
 
   // Every reference atom is matched (same type, coincident position mod 1) by a
@@ -99,7 +81,8 @@ void check_one(Cell const &cell, bool to_primitive, bool no_idealize,
       if (used[ug] || got.type(g) != ref.type(r)) {
         continue;
       }
-      if (overlap(got.position(g), ref.position(r), symprec)) {
+      if (seitz::test::coincide_mod1(got.position(g), ref.position(r),
+                                     symprec)) {
         used[ug] = 1;
         found = true;
       }
@@ -119,17 +102,7 @@ void check_all(Cell const &cell, double symprec = 1e-5) {
 } // namespace
 
 TEST_CASE("standardize: NaCl (Fm-3m, F-centered)", "[oracle][standardize]") {
-  Matrix3d const L = 5.64 * Matrix3d::Identity();
-  check_all(make_cell(L,
-                      {{0, 0, 0},
-                       {0, 0.5, 0.5},
-                       {0.5, 0, 0.5},
-                       {0.5, 0.5, 0},
-                       {0.5, 0.5, 0.5},
-                       {0.5, 0, 0},
-                       {0, 0.5, 0},
-                       {0, 0, 0.5}},
-                      {11, 11, 11, 11, 17, 17, 17, 17}));
+  check_all(seitz::test::nacl());
 }
 
 TEST_CASE("standardize: bcc Fe (Im-3m, I-centered)", "[oracle][standardize]") {
@@ -142,11 +115,8 @@ TEST_CASE("standardize: simple cubic (primitive)", "[oracle][standardize]") {
 }
 
 TEST_CASE("standardize: C-centered orthorhombic", "[oracle][standardize]") {
-  Matrix3d L = Matrix3d::Zero();
-  L(0, 0) = 4.0;
-  L(1, 1) = 6.0;
-  L(2, 2) = 8.0;
-  check_all(make_cell(L, {{0, 0, 0}, {0.5, 0.5, 0}}, {1, 1}));
+  check_all(make_cell(seitz::test::orthorhombic(4.0, 6.0, 8.0),
+                      {{0, 0, 0}, {0.5, 0.5, 0}}, {1, 1}));
 }
 
 TEST_CASE("standardize: a primitive input expands to its conventional cell",
@@ -168,57 +138,6 @@ TEST_CASE("standardize: strained cell, no_idealize preserves input geometry",
   Matrix3d L = 5.64 * Matrix3d::Identity();
   L(0, 0) *= 1.002;
   L(1, 1) *= 0.998;
-  Cell const cell = make_cell(L,
-                              {{0, 0, 0},
-                               {0, 0.5, 0.5},
-                               {0.5, 0, 0.5},
-                               {0.5, 0.5, 0},
-                               {0.5, 0.5, 0.5},
-                               {0.5, 0, 0},
-                               {0, 0.5, 0},
-                               {0, 0, 0.5}},
-                              {11, 11, 11, 11, 17, 17, 17, 17});
+  Cell const cell = seitz::test::nacl().with_lattice(Lattice{L});
   check_all(cell, 1e-2);
-}
-
-TEST_CASE("standardize: the to_primitive / idealized option pairs",
-          "[oracle][standardize]") {
-  // The two named wrappers must be bit-identical to the standardize_cell calls
-  // they delegate to. find_primitive == spg_find_primitive (to_primitive,
-  // idealized); the default == spg_refine_cell (conventional, idealized) — both
-  // already oracle-checked via check_all above, so equality with their delegate
-  // transitively proves the wrapper.
-  Cell const nacl = make_cell(5.64 * Matrix3d::Identity(),
-                              {{0, 0, 0},
-                               {0, 0.5, 0.5},
-                               {0.5, 0, 0.5},
-                               {0.5, 0.5, 0},
-                               {0.5, 0.5, 0.5},
-                               {0.5, 0, 0},
-                               {0, 0.5, 0},
-                               {0, 0, 0.5}},
-                              {11, 11, 11, 11, 17, 17, 17, 17});
-
-  auto const same_cell = [](Cell const &a, Cell const &b) {
-    return a.size() == b.size() &&
-           (a.lattice().matrix() - b.lattice().matrix()).cwiseAbs().maxCoeff() <
-               1e-12 &&
-           (a.positions() - b.positions()).cwiseAbs().maxCoeff() < 1e-12 &&
-           a.types() == b.types();
-  };
-
-  Cell const prim =
-      must(seitz::analysis::SymmetryAnalyzer::from_cell(nacl)
-               .standardized_cell<seitz::analysis::CellSetting::primitive,
-                                  seitz::analysis::Idealize::yes>());
-  Cell const prim_ref =
-      must(seitz::analysis::SymmetryAnalyzer::from_cell(nacl)
-               .standardized_cell<seitz::analysis::CellSetting::primitive,
-                                  seitz::analysis::Idealize::yes>());
-  CHECK(same_cell(prim, prim_ref));
-
-  auto const analyzer = seitz::analysis::SymmetryAnalyzer::from_cell(nacl);
-  Cell const refined = must(analyzer.standardized_cell());
-  Cell const refined_ref = must(analyzer.standardized_cell());
-  CHECK(same_cell(refined, refined_ref));
 }

@@ -3,14 +3,23 @@
 #include <seitz/analysis/magnetic_symmetry_analyzer.hpp>
 #include <seitz/analysis/symmetry_analyzer.hpp>
 #include <seitz/core/error.hpp>
+#include <seitz/core/fractional.hpp>
 #include <seitz/core/keys.hpp>
+#include <seitz/core/operation_set.hpp>
+#include <seitz/core/symmetry_operation.hpp>
+#include <seitz/group/space_group.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <random>
+#include <ranges>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 // Shared Result<T> plumbing for the test suites, so each file does not carry
 // its own copy of the same two try_handle_all wrappers.
@@ -76,13 +85,70 @@ template <ResultProducer F> [[nodiscard]] bool errored(F &&make) {
       [](leaf::error_info const &) { return true; });
 }
 
-// The two-atom rocksalt motif (types 0 and 1) in a cubic cell of edge `a`: the
-// seed the supercell-shaped tests and benchmarks grow from.
-[[nodiscard]] inline Cell rocksalt_motif(double a) {
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 1});
+// The space (layer) group of international number `n` in its default setting,
+// failing the test if the lookup errors. Flyweights: the pointer is stable.
+[[nodiscard]] inline group::SpaceGroup const *space_group(int n) {
+  return must(group::SpaceGroup::from_number(GroupFamily::space, n));
+}
+[[nodiscard]] inline group::SpaceGroup const *layer_group(int n) {
+  return must(group::SpaceGroup::from_number(GroupFamily::layer, n));
+}
+
+// A cell from literal fractional rows. The cubic-edge overload is the common
+// shape of the hand-built magnetic and spin structures.
+[[nodiscard]] inline Cell make_cell(Matrix3d const &lattice,
+                                    std::vector<std::array<double, 3>> const &pos,
+                                    Types types) {
+  Positions p(static_cast<Index>(pos.size()), 3);
+  for (auto const [i, row] : pos | std::views::enumerate) {
+    p.row(i) = Eigen::Map<Eigen::RowVector3d const>(row.data());
+  }
+  return Cell(Lattice{lattice}, p, std::move(types));
+}
+[[nodiscard]] inline Cell make_cell(double a,
+                                    std::vector<std::array<double, 3>> const &pos,
+                                    Types types) {
+  return make_cell(Matrix3d{a * Matrix3d::Identity()}, pos, std::move(types));
+}
+
+// The two-atom rocksalt motif (CsCl arrangement) in a cubic cell of edge `a`:
+// the seed the supercell-shaped tests and benchmarks grow from.
+[[nodiscard]] inline Cell rocksalt_motif(double a, Types types = {0, 1}) {
+  return make_cell(a, {{0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}}, std::move(types));
+}
+
+// Whether two fractional points coincide modulo 1 within `tol` (inclusive).
+[[nodiscard]] inline bool coincide_mod1(Vector3d const &a, Vector3d const &b,
+                                        double tol) {
+  return math::nearest_offset(Vector3d(a - b)).cwiseAbs().maxCoeff() <= tol;
+}
+
+// Equal as sets: rotations exact, translations modulo the lattice. Reference
+// implementations order their operations differently than we discover them.
+[[nodiscard]] inline bool same_operation_set(auto const &a, auto const &b,
+                                             double tol) {
+  return std::ranges::size(a) == std::ranges::size(b) &&
+         std::ranges::all_of(a, [&](SymmetryOperation const &x) {
+           return std::ranges::any_of(b, [&](SymmetryOperation const &y) {
+             return same_operation(x, y, tol);
+           });
+         });
+}
+
+// Two lattices agree up to a rigid rotation iff their metric tensors do.
+[[nodiscard]] inline bool same_metric(Matrix3d const &a, Matrix3d const &b,
+                                      double tol) {
+  return (Lattice{a}.metric() - Lattice{b}.metric()).cwiseAbs().maxCoeff() <
+         tol;
+}
+
+// Two bases span the same lattice iff a^-1 b is an integer unimodular matrix.
+[[nodiscard]] inline bool same_lattice(Matrix3d const &a, Matrix3d const &b,
+                                       double tol = 1e-6) {
+  Matrix3d const rel = a.inverse() * b;
+  Matrix3i const rounded = math::round_to_int(rel);
+  return (rel - rounded.cast<double>()).cwiseAbs().maxCoeff() <= tol &&
+         std::abs(rounded.determinant()) == 1;
 }
 
 // Every atom displaced by a random Cartesian vector of amplitude

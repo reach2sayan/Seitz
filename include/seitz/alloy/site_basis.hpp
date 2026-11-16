@@ -37,7 +37,8 @@ public:
   // sum_q theta_function(q)^2 over the occupations the site admits: the
   // per-point factor of the v-matrix normalization. Kept here because a row of
   // a column-major block is not contiguous, so no span can be handed out.
-  [[nodiscard]] double sum_of_squares(int species, int function) const noexcept {
+  [[nodiscard]] double sum_of_squares(int species,
+                                      int function) const noexcept {
     return block(species).row(function).squaredNorm();
   }
 

@@ -141,12 +141,27 @@ halls_with_number(int number) noexcept {
   return kHallsByNumber<F>[number];
 }
 
+// The family as a runtime value, for the callers (and Python) that hold one.
+[[nodiscard]] constexpr std::span<int const>
+halls_with_number(GroupFamily family, int number) noexcept {
+  return family == GroupFamily::layer
+             ? halls_with_number<GroupFamily::layer>(number)
+             : halls_with_number<GroupFamily::space>(number);
+}
+
 // The default (first) Hall setting of an international number.
 template <GroupFamily F>
 [[nodiscard]] constexpr std::optional<HallNumber>
 default_hall(int number) noexcept {
   auto const halls = halls_with_number<F>(number);
   return halls.empty() ? std::nullopt : HallNumber::of(F, halls.front());
+}
+
+[[nodiscard]] constexpr std::optional<HallNumber>
+default_hall(GroupFamily family, int number) noexcept {
+  return family == GroupFamily::layer
+             ? default_hall<GroupFamily::layer>(number)
+             : default_hall<GroupFamily::space>(number);
 }
 
 // point-group number -> the default Hall setting of every group with that
@@ -167,6 +182,16 @@ template <GroupFamily F>
 [[nodiscard]] constexpr std::span<int const>
 default_halls_with_pointgroup(int pointgroup_number) noexcept {
   return kDefaultHallsByPointgroup<F>[pointgroup_number];
+}
+
+[[nodiscard]] constexpr std::span<int const>
+default_halls_with_pointgroup(GroupFamily family,
+                              int pointgroup_number) noexcept {
+  return family == GroupFamily::layer
+             ? default_halls_with_pointgroup<GroupFamily::layer>(
+                   pointgroup_number)
+             : default_halls_with_pointgroup<GroupFamily::space>(
+                   pointgroup_number);
 }
 
 // ---- compile-time integrity guards -----------------------------------------

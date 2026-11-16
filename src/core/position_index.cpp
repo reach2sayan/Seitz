@@ -72,10 +72,10 @@ PositionIndex::PositionIndex(Positions const &positions, Types const &types,
   // Counting sort by bucket: a histogram, its prefix sums as bucket starts,
   // and a stable scatter that keeps each bucket in index order.
   std::vector<int> const bucket_of{
-      std::from_range, std::views::iota(0, n) | std::views::transform([&](int i) {
-                         return bucket(wrap(positions.row(i).transpose(),
-                                            periodicity));
-                       })};
+      std::from_range,
+      std::views::iota(0, n) | std::views::transform([&](int i) {
+        return bucket(wrap(positions.row(i).transpose(), periodicity));
+      })};
   starts_.assign(buckets + 1, 0);
   for (int const b : bucket_of) {
     ++starts_[static_cast<std::size_t>(b) + 1];
@@ -146,8 +146,8 @@ std::span<int const> PositionIndex::candidates(Vector3d const &point,
   };
   for (auto const [b0, b1, b2] :
        std::views::cartesian_product(run(0), run(1), run(2))) {
-    auto const b =
-        static_cast<std::size_t>((b0 * divisions_[1] + b1) * divisions_[2] + b2);
+    auto const b = static_cast<std::size_t>(
+        (b0 * divisions_[1] + b1) * divisions_[2] + b2);
     out.insert(out.end(), atoms_.begin() + starts_[b],
                atoms_.begin() + starts_[b + 1]);
   }

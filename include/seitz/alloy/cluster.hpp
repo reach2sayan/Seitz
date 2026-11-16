@@ -93,12 +93,12 @@ symmetry_images(Cluster const &c, Operations const &ops, double tol);
 // The permutation `op` induces on the points of `c`: entry i is the image of
 // point i. Meaningful only for op in site_symmetry(c, ...); the configuration
 // builder compares occupations through it.
-[[nodiscard]] std::vector<int> point_permutation(Cluster const &c,
-                                                 SymmetryOperation const &op,
-                                                 double tol);
+[[nodiscard]] std::vector<int>
+point_permutation(Cluster const &c, SymmetryOperation const &op, double tol);
 
 // First element of `reps` whose projected cluster is symmetry-equivalent to
-// `c`, else the end iterator.
+// `c`, else the end iterator. The |G| images of `c` are formed once, not once
+// per representative.
 template <std::ranges::forward_range R, class Proj = std::identity>
   requires std::convertible_to<
       std::invoke_result_t<Proj &, std::ranges::range_reference_t<R>>,
@@ -106,11 +106,18 @@ template <std::ranges::forward_range R, class Proj = std::identity>
 [[nodiscard]] auto find_equivalent(R &&reps, Cluster const &c,
                                    Operations const &ops, double tol,
                                    Proj proj = {}) {
+  if (std::ranges::empty(reps)) {
+    return std::ranges::begin(reps);
+  }
+  std::vector<Cluster> const moved{
+      std::from_range,
+      ops | std::views::transform([&c](SymmetryOperation const &op) {
+        return c.transformed(op);
+      })};
   return std::ranges::find_if(reps, [&](auto const &e) {
     Cluster const &rep = std::invoke(proj, e);
-    return std::ranges::any_of(ops, [&](SymmetryOperation const &op) {
-      return c.transformed(op).congruent(rep, tol);
-    });
+    return std::ranges::any_of(
+        moved, [&](Cluster const &m) { return m.congruent(rep, tol); });
   });
 }
 

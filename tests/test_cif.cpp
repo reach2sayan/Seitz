@@ -394,11 +394,8 @@ namespace {
 // Real atomic numbers as types. Not test::rocksalt_motif, whose 0 and 1 are
 // labels: the writer spells 0 as `X` and that does not read back.
 [[nodiscard]] Cell nacl_cell() {
-  Positions positions(2, 3);
-  positions.row(0) << 0.0, 0.0, 0.0;
-  positions.row(1) << 0.5, 0.5, 0.5;
-  return Cell{Lattice{Matrix3d::Identity() * 5.64}, positions,
-              Types{*data::atomic_number("Na"), *data::atomic_number("Cl")}};
+  return test::rocksalt_motif(
+      5.64, {*data::atomic_number("Na"), *data::atomic_number("Cl")});
 }
 
 } // namespace

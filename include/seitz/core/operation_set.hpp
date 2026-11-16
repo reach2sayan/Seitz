@@ -59,8 +59,9 @@ namespace detail {
 // The primitive operations and the primitive->conventional transformation a
 // conventional set implies. Defined in src/core, so to_primitive stays inline
 // without this header naming a pipeline type.
-[[nodiscard]] std::optional<std::pair<std::vector<SymmetryOperation>, Matrix3d>>
-primitive_operations(std::span<SymmetryOperation const> operations,
+[[nodiscard]] std::optional<
+    std::pair<OperationSet<SymmetryOperation>, Matrix3d>>
+primitive_operations(OperationSet<SymmetryOperation> const &operations,
                      Tolerance const &tol);
 
 // The space group these operations imply in `lattice`; the matcher is private
@@ -212,12 +213,7 @@ public:
   to_primitive(Tolerance const &tol) const
     requires(!Traits::has_time_reversal)
   {
-    auto primitive = detail::primitive_operations(span(), tol);
-    if (!primitive) {
-      return std::nullopt;
-    }
-    return std::pair{OperationSet{std::move(primitive->first)},
-                     primitive->second};
+    return detail::primitive_operations(*this, tol);
   }
 
 private:

@@ -5,8 +5,12 @@
 #include <seitz/core/tolerance.hpp>
 #include <seitz/core/types.hpp>
 
+#include "alloy/enumerate.hpp"
+
 #include <algorithm>
+#include <generator>
 #include <ranges>
+#include <span>
 
 // Private to src/alloy: the three geometric primitives the cluster, pool and
 // CVM builders share. All fractional, all on a caller-supplied tolerance --
@@ -55,8 +59,23 @@ template <class Bound>
                            std::ranges::range_reference_t<Cluster const &>>,
       int>
 [[nodiscard]] std::vector<int> radix_of(Cluster const &c, Bound bound) {
-  return std::vector<int>{std::from_range,
-                          c | std::views::transform(bound)};
+  return std::vector<int>{std::from_range, c | std::views::transform(bound)};
+}
+
+// Every point-function decoration of `c`: a site admitting k species carries
+// k - 1 non-constant point functions, walked in mixed_radix order.
+[[nodiscard]] inline std::generator<Cluster> decorations(Cluster const &c) {
+  std::vector<int> const radix =
+      radix_of(c, [](ClusterPoint const &p) { return p.species - 1; });
+  for (std::span<int const> functions : mixed_radix(radix)) {
+    auto const decorated =
+        std::views::zip(c, functions) |
+        std::views::transform([](auto const &pair) {
+          auto const &[point, function] = pair;
+          return ClusterPoint{point.position, point.species, function};
+        });
+    co_yield Cluster{Cluster::Points(decorated.begin(), decorated.end())};
+  }
 }
 
 } // namespace seitz::alloy::detail

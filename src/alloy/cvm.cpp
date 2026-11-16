@@ -36,9 +36,8 @@ void collect_subclusters(std::vector<Cluster> &subclusters,
 
   for (std::span<int const> selection : mixed_radix(radix)) {
     auto taken = std::views::zip(selection, maximal) |
-                 std::views::filter([](auto const &pair) {
-                   return std::get<0>(pair) == 1;
-                 }) |
+                 std::views::filter(
+                     [](auto const &pair) { return std::get<0>(pair) == 1; }) |
                  std::views::transform([](auto const &pair) {
                    ClusterPoint const &point = std::get<1>(pair);
                    return ClusterPoint{point.position, point.species, 0};
@@ -68,18 +67,8 @@ build_functions(std::span<Cluster const> subclusters, Operations const &ops,
                 double tol) {
   std::vector<ClusterFunction> functions;
   for (Cluster const &sub : subclusters) {
-    std::vector<int> const radix =
-        radix_of(sub, [](ClusterPoint const &p) { return p.species - 1; });
-
     std::vector<Cluster> distinct;
-    for (std::span<int const> assignment : mixed_radix(radix)) {
-      auto const decorated =
-          std::views::zip(sub, assignment) |
-          std::views::transform([](auto const &pair) {
-            auto const &[point, function] = pair;
-            return ClusterPoint{point.position, point.species, function};
-          });
-      Cluster candidate{Cluster::Points(decorated.begin(), decorated.end())};
+    for (Cluster candidate : detail::decorations(sub)) {
       if (find_equivalent(distinct, candidate, ops, tol) == distinct.end()) {
         distinct.push_back(std::move(candidate));
       }
@@ -115,8 +104,8 @@ build_configurations(Cluster const &sub, Operations const &ops, double tol) {
 
   std::vector<Configuration> configurations;
   for (std::span<int const> occupation : mixed_radix(radix)) {
-    auto const match = std::ranges::find_if(
-        configurations, [&](Configuration const &present) {
+    auto const match =
+        std::ranges::find_if(configurations, [&](Configuration const &present) {
           return std::ranges::any_of(
               permutations, [&](std::vector<int> const &permutation) {
                 auto const relabelled =
@@ -147,11 +136,11 @@ struct TranslationBox {
 // The correlation of one assignment on `sites`: over every lattice placement
 // of every image landing entirely on the assignment's points, the product of
 // the point functions. A raw sum -- normalization is the v-matrix's prefactor.
-[[nodiscard]] double
-configuration_correlation(Cluster const &sites,
-                          std::span<int const> occupation,
-                          std::span<Cluster const> images,
-                          SiteBasis const &basis, double tol) {
+[[nodiscard]] double configuration_correlation(Cluster const &sites,
+                                               std::span<int const> occupation,
+                                               std::span<Cluster const> images,
+                                               SiteBasis const &basis,
+                                               double tol) {
   if (images.empty() || images.front().empty()) {
     return 1.0; // the empty cluster function correlates to one by definition
   }
@@ -167,20 +156,20 @@ configuration_correlation(Cluster const &sites,
   // A lattice translation is an integer triple in the parent's frame, so the
   // box is the componentwise range of the rounded differences. Not const: the
   // joined inner views are prvalues, which join_view holds in a member.
-  auto offsets =
-      images | std::views::transform([&sites](Cluster const &image) {
-        return std::views::cartesian_product(sites, image) |
-               std::views::transform([](auto const &pair) {
-                 auto const &[occupied, point] = pair;
-                 return Vector3d((occupied.position - point.position)
-                                     .array()
-                                     .round()
-                                     .matrix());
-               });
-      }) |
-      std::views::join;
+  auto offsets = images | std::views::transform([&sites](Cluster const &image) {
+                   return std::views::cartesian_product(sites, image) |
+                          std::views::transform([](auto const &pair) {
+                            auto const &[occupied, point] = pair;
+                            return Vector3d((occupied.position - point.position)
+                                                .array()
+                                                .round()
+                                                .matrix());
+                          });
+                 }) |
+                 std::views::join;
   auto const box = std::ranges::fold_left(
-      offsets, TranslationBox{}, [](TranslationBox span, Vector3d const &offset) {
+      offsets, TranslationBox{},
+      [](TranslationBox span, Vector3d const &offset) {
         return TranslationBox{Vector3d(span.low.cwiseMin(offset)),
                               Vector3d(span.high.cwiseMax(offset))};
       });
@@ -227,8 +216,7 @@ configuration_correlation(Cluster const &sites,
 // functions. Non-overlapping functions come out zero, which is what makes
 // rho = V . xi a plain product over the whole correlation vector.
 [[nodiscard]] MatrixXd
-build_vmatrix(Cluster const &sub,
-              std::span<Configuration const> configurations,
+build_vmatrix(Cluster const &sub, std::span<Configuration const> configurations,
               std::span<ClusterFunction const> functions,
               SiteBasis const &basis, double tol) {
   MatrixXd vmatrix(static_cast<Index>(configurations.size()),
@@ -240,10 +228,10 @@ build_vmatrix(Cluster const &sub,
     double const prefactor = std::ranges::fold_left(
         sub, 1.0, [&](double running, ClusterPoint const &point) {
           auto const at = coincident(function.cluster, point.position, tol);
-          return running * (at == function.cluster.end()
-                                ? static_cast<double>(point.species)
-                                : basis.sum_of_squares(at->species,
-                                                       at->function));
+          return running *
+                 (at == function.cluster.end()
+                      ? static_cast<double>(point.species)
+                      : basis.sum_of_squares(at->species, at->function));
         });
     for (auto const &[row, configuration] :
          std::views::enumerate(configurations)) {
@@ -265,16 +253,14 @@ struct Overlap {
 
 // Every symmetry image of every non-empty subcluster that, re-anchored on
 // `site`, passes through it. The overlapping point is moved to index 0 and the
-// rest follow, carried by the same lattice shift.
+// rest follow, carried by the same lattice shift. `images[i]` holds the
+// symmetry images of subcluster i (none for the empty cluster).
 [[nodiscard]] std::vector<Overlap>
-overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
-                 Operations const &ops, double tol) {
+overlaps_at_site(Vector3d const &site,
+                 std::span<std::vector<Cluster> const> images, double tol) {
   std::vector<Overlap> overlaps;
-  for (auto const &[index, sub] : std::views::enumerate(subclusters)) {
-    if (sub.empty()) {
-      continue;
-    }
-    for (Cluster const &image : symmetry_images(sub, ops, tol)) {
+  for (auto const &[index, sub_images] : std::views::enumerate(images)) {
+    for (Cluster const &image : sub_images) {
       for (auto const &[centre, anchor] : std::views::enumerate(image)) {
         Vector3d const shift = site - anchor.position;
         // A plain integrality test on the fractional shift. The reference
@@ -312,6 +298,13 @@ overlaps_at_site(Vector3d const &site, std::span<Cluster const> subclusters,
 [[nodiscard]] std::vector<double>
 build_kikuchi_barker(std::span<Cluster const> subclusters,
                      Operations const &ops, double tol) {
+  // Each subcluster's images, built once rather than once per overlap query.
+  std::vector<std::vector<Cluster>> const images{
+      std::from_range,
+      subclusters | std::views::transform([&](Cluster const &s) {
+        return s.empty() ? std::vector<Cluster>{}
+                         : symmetry_images(s, ops, tol);
+      })};
   std::vector<double> coefficients(subclusters.size(), 0.0);
   for (std::size_t const current :
        std::views::iota(std::size_t{1}, subclusters.size()) |
@@ -319,7 +312,7 @@ build_kikuchi_barker(std::span<Cluster const> subclusters,
     Cluster const &sub = subclusters[current];
 
     auto containing =
-        overlaps_at_site(sub[0].position, subclusters, ops, tol) |
+        overlaps_at_site(sub[0].position, images, tol) |
         std::views::filter([&](Overlap const &overlap) {
           return overlap.cluster.size() > sub.size() && // strictly larger
                  std::ranges::all_of(sub, [&](ClusterPoint const &point) {

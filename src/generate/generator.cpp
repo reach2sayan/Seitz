@@ -29,8 +29,8 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                       GenerateOptions const &options) {
   return std::ranges::fold_left(comp, 0.0, [&](double sum, auto const &entry) {
     auto const &[type, count] = entry;
-    return sum + static_cast<double>(count) * 2.0 *
-                     options.distance.radius(type);
+    return sum +
+           static_cast<double>(count) * 2.0 * options.distance.radius(type);
   });
 }
 
@@ -42,22 +42,26 @@ constexpr double kVacuum = 18.0;        // angstrom, the aperiodic padding
                                  Matrix3d const &lattice,
                                  CellPeriodicity const &periodicity,
                                  SeedBox const &box, std::mt19937_64 &rng) {
-  std::vector<Vector3d> rows;
+  // Each orbit is copied once, straight into its block of the result.
+  std::vector<Positions> orbits;
+  orbits.reserve(assignment.size());
   Types types;
   for (auto &placed : assignment) {
-    placed.coordinate = placed.position->canonical(
-        placed.coordinate.value_or(box.sample(rng)));
-    Positions const orbit =
-        placed.position->orbit(*placed.coordinate, periodicity);
-    rows.append_range(std::views::iota(Index{0}, orbit.rows()) |
-                      std::views::transform([&](Index i) {
-                        return Vector3d(orbit.row(i).transpose());
-                      }));
+    placed.coordinate =
+        placed.position->canonical(placed.coordinate.value_or(box.sample(rng)));
+    Positions const &orbit = orbits.emplace_back(
+        placed.position->orbit(*placed.coordinate, periodicity));
     types.insert(types.end(), static_cast<std::size_t>(orbit.rows()),
                  placed.type);
   }
-  return Generated{Cell{Lattice{lattice}, to_positions(rows), std::move(types),
-                        periodicity},
+  Positions positions(static_cast<Index>(types.size()), 3);
+  Index row = 0;
+  for (Positions const &orbit : orbits) {
+    positions.middleRows(row, orbit.rows()) = orbit;
+    row += orbit.rows();
+  }
+  return Generated{Cell{Lattice{lattice}, std::move(positions),
+                        std::move(types), periodicity},
                    std::move(assignment)};
 }
 
@@ -133,7 +137,9 @@ Matrix3d GroupTraits<group::SpaceGroup>::lattice(group::SpaceGroup const &g,
     return random_layer_lattice(g.operations(), volume / kLayerThickness,
                                 kVacuum, rng());
   }
-  return random_lattice(crystal_system(g.number()), volume, rng());
+  return random_lattice(
+      pointgroup_by_number(g.type().pointgroup_number).holohedry, volume,
+      rng());
 }
 
 std::string_view
@@ -163,7 +169,7 @@ Matrix3d GroupTraits<group::PointGroup>::lattice(group::PointGroup const &g,
   // grows on repeated failure, to spread the atoms apart.
   double const volume = options.scale * estimated_cell_volume(comp) *
                         (1.0 + 0.2 * static_cast<double>(attempt));
-  return random_lattice(crystal_system(g.representative_spacegroup()), volume,
+  return random_lattice(pointgroup_by_number(g.number()).holohedry, volume,
                         rng());
 }
 
@@ -253,9 +259,10 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
   if (options_.placement == Placement::general_only) {
     group::Wyckoff const *general = &positions.back();
     std::erase_if(assignments, [&](Assignment<group::Wyckoff> const &a) {
-      return std::ranges::any_of(
-          a | std::views::drop(pinned),
-          [&](Placed<group::Wyckoff> const &p) { return p.position != general; });
+      return std::ranges::any_of(a | std::views::drop(pinned),
+                                 [&](Placed<group::Wyckoff> const &p) {
+                                   return p.position != general;
+                                 });
     });
     if (assignments.empty()) {
       return leaf::new_error(e_message{std::format(
@@ -288,7 +295,8 @@ Result<Generated> Generator<G>::operator()(Composition const &comp) const {
           options_.lattice
               ? options_.lattice->matrix()
               : Traits::lattice(*group_, comp, options_, attempt, rng);
-      Generated candidate = assemble(assignment, lattice, periodicity, box, rng);
+      Generated candidate =
+          assemble(assignment, lattice, periodicity, box, rng);
       if (distances_valid(candidate.cell, options_.distance)) {
         return candidate;
       }

@@ -20,6 +20,8 @@
 
 #include <cstddef>
 #include <optional>
+#include <ranges>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -60,7 +62,15 @@ using analysis::SymmetryAnalyzer;
 // at all. The vectorized route: a 5000-atom cell is 5000 model constructions
 // through .sites, and this is what the docstring points large cells at.
 [[nodiscard]] py::dict site_arrays(SymmetryAnalyzer const &self) {
-  std::vector<Site> sites = memo(&SymmetryAnalyzer::sites)(self);
+  // A span into the analyzer's memo, not memo()'s copy: `self` is borrowed for
+  // the whole call and the span never reaches Python.
+  auto const sites = unwrap([&]() -> Result<std::span<Site const>> {
+    py::gil_scoped_release const unlocked;
+    // ASSIGN with a reference, not AUTO: AUTO declares `auto all`, a copy, and
+    // the span would outlive it.
+    BOOST_LEAF_ASSIGN(auto const &all, self.sites());
+    return std::span<Site const>{all};
+  });
   auto const count = static_cast<Index>(sites.size());
 
   py::array_t<int> wyckoff(count);
@@ -73,8 +83,7 @@ using analysis::SymmetryAnalyzer;
   auto e = equivalent_atom.mutable_unchecked<1>();
   auto o = orbit.mutable_unchecked<1>();
   auto p = primitive_atom.mutable_unchecked<1>();
-  for (Index i = 0; i < count; ++i) {
-    Site const &site = sites[static_cast<std::size_t>(i)];
+  for (auto const [i, site] : std::views::enumerate(sites)) {
     w(i) = site.wyckoff;
     e(i) = site.equivalent_atom;
     o(i) = site.orbit;

@@ -93,12 +93,12 @@ SpaceGroup::SpaceGroup(HallNumber hall) : hall_(hall) {
   symbol_ = t.international_short;
   operations_ = data::operations_from_database(hall);
 
-  std::vector<data::WyckoffEntry> const entries = data::wyckoff_entries(hall);
-  positions_ = {
-      std::from_range,
-      entries | std::views::transform([&](data::WyckoffEntry const &entry) {
-        return build_position(entry.global_index, entry.letter, operations_);
-      })};
+  positions_ = {std::from_range,
+                data::wyckoff_entries(hall) |
+                    std::views::transform([&](data::WyckoffEntry const &entry) {
+                      return build_position(entry.global_index, entry.letter,
+                                            operations_);
+                    })};
 }
 
 // The Boost.Flyweight: one immutable SpaceGroup per HallNumber, built on first
@@ -116,9 +116,7 @@ SpaceGroup const &SpaceGroup::of(HallNumber hall) {
 
 Result<SpaceGroup const *> SpaceGroup::from_number(GroupFamily family,
                                                    int number) {
-  auto const hall = family == GroupFamily::layer
-                        ? data::default_hall<GroupFamily::layer>(number)
-                        : data::default_hall<GroupFamily::space>(number);
+  auto const hall = data::default_hall(family, number);
   if (!hall) {
     return leaf::new_error(e_message{
         family == GroupFamily::layer

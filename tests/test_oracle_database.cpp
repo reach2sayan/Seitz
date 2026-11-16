@@ -16,13 +16,14 @@ TEST_CASE(
   for (int index = 1; index <= kSpaceHallSettings; ++index) {
     auto const &ours = data::operations_from_database(space_hall(index));
     auto const ref = oracle::reference_database_operations(index);
-    bool ok = ours.size() == ref.size();
-    for (std::size_t s = 0; ok && s < ours.size(); ++s)
-      ok = ours[s].rotation == ref[s].rotation &&
-           (ours[s].translation - ref[s].translation).cwiseAbs().maxCoeff() <
-               1e-12;
-    if (!ok && first_bad == 0)
+    bool const ok =
+        std::ranges::equal(ours, ref, [](auto const &a, auto const &b) {
+          return a.rotation == b.rotation &&
+                 (a.translation - b.translation).cwiseAbs().maxCoeff() < 1e-12;
+        });
+    if (!ok && first_bad == 0) {
       first_bad = index;
+    }
     mismatches += ok ? 0 : 1;
   }
   INFO("first mismatching hall number = " << first_bad);

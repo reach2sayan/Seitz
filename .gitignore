@@ -1,6 +1,8 @@
 # Build trees, fetched dependencies, caches
 /build/
 /cmake-build-*/
+/Testing/
+/test_package/build/
 /.cache/
 /.deps/
 /_skbuild/

@@ -56,9 +56,13 @@ def reduce(t, basis):
     return t - (basis @ np.floor(np.linalg.solve(basis, t.T) + TOL)).T
 
 
+def integral(M):
+    return np.allclose(M, np.rint(M), atol=TOL)
+
+
 def subset(RA, tA, RB, tB, lattice=np.eye(3)):
     """Every (RA, tA) is some (RB, tB) modulo the lattice's columns."""
-    if not np.allclose(RA, np.rint(RA), atol=TOL):
+    if not integral(RA):
         return False
     d = np.linalg.solve(lattice, (tA[:, None] - tB[None]).reshape(-1, 3).T).T
     d = np.abs(d - np.rint(d)).reshape(len(RA), len(RB), 3).max(axis=2) < TOL
@@ -138,7 +142,7 @@ def close(gens, basis, order):
             R, t = Ra @ Rg, Ra @ tg + ta
             if key(R) in elems:
                 d = np.linalg.solve(basis, elems[key(R)][1] - t)
-                if not np.allclose(d, np.rint(d), atol=TOL):
+                if not integral(d):
                     return None
             else:
                 elems[key(R)] = (R, t)
@@ -169,10 +173,6 @@ def primitive_basis(R, t):
     pure = np.rint(t[(R == np.eye(3)).all(axis=(1, 2))] * DEN).astype(int)
     hnf = hermite_normal_form(Matrix(np.c_[np.eye(3, dtype=int) * DEN, pure.T]))
     return np.array(hnf, dtype=float)[:, -3:] / DEN
-
-
-def integral(M):
-    return np.allclose(M, np.rint(M), atol=TOL)
 
 
 def candidates(number):

@@ -60,33 +60,38 @@ using seitz::test::must;
   REQUIRE(it != kOrder.end());
   return it->second;
 }
+
+// Three independently sourced quantities in one identity, per Wyckoff position:
+// tabulated multiplicity, the stabiliser at a generic point of the tabulated
+// locus, and the orbit expanded from a generic seed. The site-symmetry symbol
+// pins the stabiliser's order a second way, so a pair mistabulated together is
+// caught. Returns the number of positions checked.
+int check_orbit_stabilizer(group::SpaceGroup const &g,
+                           CellPeriodicity const &periodicity) {
+  Vector3d const seed{0.1234, 0.2718, 0.3142};
+  auto const nops = static_cast<int>(g.operations().size());
+  REQUIRE(nops > 0);
+  for (auto const &wp : g.wyckoffs()) {
+    INFO("group " << g.number() << ", position " << wp.letter() << " ("
+                  << wp.site_symmetry() << ")");
+    auto const order = static_cast<int>(wp.operations().size());
+    // multiplicity * |site-symmetry group| == |conventional operations|
+    REQUIRE(wp.multiplicity() * order == nops);
+    // The expanded orbit of a generic point has exactly that many points.
+    REQUIRE(wp.orbit(seed, periodicity).rows() == wp.multiplicity());
+    // The tabulated symbol names a point group of the stabiliser's order.
+    REQUIRE(site_symmetry_order(wp.site_symmetry()) == order);
+  }
+  return static_cast<int>(g.wyckoffs().size());
+}
 } // namespace
 
 TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
           "[group]") {
-  // Three independently sourced quantities in one identity: tabulated
-  // multiplicity, the stabiliser at a generic point of the tabulated locus, and
-  // the orbit expanded from a generic seed. The site-symmetry symbol pins the
-  // stabiliser's order a second way, so a pair mistabulated together is caught.
-  Vector3d const seed{0.1234, 0.2718, 0.3142};
   int checked = 0;
   for (int number = 1; number <= 230; ++number) {
-    auto const *sg =
-        must(group::SpaceGroup::from_number(GroupFamily::space, number));
-    auto const nops = static_cast<int>(sg->operations().size());
-    REQUIRE(nops > 0);
-    for (auto const &wp : sg->wyckoffs()) {
-      INFO("space group " << number << ", position " << wp.letter() << " ("
-                          << wp.site_symmetry() << ")");
-      auto const order = static_cast<int>(wp.operations().size());
-      // multiplicity * |site-symmetry group| == |conventional operations|
-      REQUIRE(wp.multiplicity() * order == nops);
-      // The expanded orbit of a generic point has exactly that many points.
-      REQUIRE(wp.orbit(seed).rows() == wp.multiplicity());
-      // The tabulated symbol names a point group of the stabiliser's order.
-      REQUIRE(site_symmetry_order(wp.site_symmetry()) == order);
-      ++checked;
-    }
+    auto const *sg = test::space_group(number);
+    checked += check_orbit_stabilizer(*sg, all_periodic());
     // The general position is last, fully free, with trivial site symmetry.
     auto const &general = sg->wyckoffs().back();
     REQUIRE(general.degrees_of_freedom() == 3);
@@ -97,7 +102,7 @@ TEST_CASE("orbit-stabilizer invariant holds for all 230 space groups",
 
 TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 221));
+      test::space_group(221);
   REQUIRE(sg->number() == 221);
   REQUIRE(sg->operations().size() == 48);
 
@@ -117,7 +122,7 @@ TEST_CASE("SpaceGroup Pm-3m (221) matches ITA reference", "[group]") {
 
 TEST_CASE("Wyckoff orbit expansion respects multiplicity", "[group]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
+      test::space_group(225); // Fm-3m
   auto const &general = sg->wyckoffs().back();
   Positions const orbit = general.orbit(Vector3d{0.11, 0.23, 0.37});
   REQUIRE(orbit.rows() == general.multiplicity());
@@ -130,7 +135,7 @@ TEST_CASE("from_number rejects out-of-range numbers", "[group]") {
 
 TEST_CASE("crystal generation round-trips through the analyzer", "[generate]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 225)); // Fm-3m
+      test::space_group(225); // Fm-3m
   // NaCl: Na (type 11) and Cl (type 17), four of each (the 4a / 4b orbits).
   generate::Composition const comp{{11, 4}, {17, 4}};
   REQUIRE(generate::Generator{*sg}.compatible(comp));
@@ -160,7 +165,7 @@ TEST_CASE("generated structures recover their target space group",
   };
   for (auto const &c : cases) {
     auto const *sg =
-        must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+        test::space_group(c.number);
     auto gen = must(generate::Generator{*sg, {.seed = 7u}}(c.comp));
     auto analyzer = analysis::SymmetryAnalyzer::from_cell(gen.cell);
     REQUIRE(data::spacegroup_type(must(analyzer.hall())).number == c.number);
@@ -170,7 +175,7 @@ TEST_CASE("generated structures recover their target space group",
 TEST_CASE("generated structures are free of interatomic clashes",
           "[generate]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+      test::space_group(225);
   generate::Composition const comp{{11, 4}, {17, 4}};
   auto gen = must(generate::Generator{*sg, {.seed = 99u}}(comp));
   // The builder only returns distance-valid cells; confirm independently.
@@ -179,7 +184,7 @@ TEST_CASE("generated structures are free of interatomic clashes",
 
 TEST_CASE("generation is deterministic in the seed", "[generate]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+      test::space_group(225);
   generate::Composition const comp{{11, 4}, {17, 4}};
   generate::Generator const gen{*sg, {.seed = 123u}};
   auto a = must(gen(comp));
@@ -189,8 +194,7 @@ TEST_CASE("generation is deterministic in the seed", "[generate]") {
 }
 
 TEST_CASE("incompatible composition is rejected", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(
-      GroupFamily::space, 225)); // Fm-3m, smallest mult 4
+  auto const *sg = test::space_group(225); // Fm-3m, smallest mult 4
   // Three atoms cannot fill any combination of multiplicity-4-or-more orbits.
   REQUIRE_FALSE(
       generate::Generator{*sg}.compatible(generate::Composition{{1, 3}}));
@@ -199,7 +203,7 @@ TEST_CASE("incompatible composition is rejected", "[generate]") {
 TEST_CASE("fixed sites pin their Wyckoff letters and are counted",
           "[generate]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 225));
+      test::space_group(225);
   generate::Composition const comp{{11, 4}, {17, 4}};
   generate::GenerateOptions options{.seed = 5u};
   options.sites = {{.type = 11, .letter = 'a'}, {.type = 17, .letter = 'b'}};
@@ -227,7 +231,7 @@ TEST_CASE("fixed sites pin their Wyckoff letters and are counted",
 
 TEST_CASE("a fixed coordinate is kept, projected onto its locus",
           "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 1));
+  auto const *sg = test::space_group(1);
   Vector3d const pinned(0.1, 0.2, 0.3);
   generate::GenerateOptions options{.seed = 3u};
   options.sites = {{.type = 6, .letter = 'a', .coordinate = pinned}};
@@ -240,7 +244,7 @@ TEST_CASE("a fixed coordinate is kept, projected onto its locus",
 
 TEST_CASE("a caller's lattice is used as given or rejected", "[generate]") {
   auto const *sg =
-      must(group::SpaceGroup::from_number(GroupFamily::space, 221));
+      test::space_group(221);
   generate::Composition const comp{{55, 1}, {17, 1}}; // CsCl
   generate::GenerateOptions options{.seed = 1u};
   options.lattice = Lattice{Matrix3d::Identity() * 4.1};
@@ -277,22 +281,11 @@ TEST_CASE("orbit-stabilizer invariant holds for all 80 layer groups",
           "[layergen]") {
   // The same three-way check as for the space groups; the orbit folds only
   // the periodic plane, so a c-flipped image stays at -z rather than 1-z.
-  Vector3d const seed{0.1234, 0.2718, 0.3142};
   for (int number = 1; number <= 80; ++number) {
-    auto const *lg =
-        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+    auto const *lg = test::layer_group(number);
     REQUIRE(lg->number() == number);
     REQUIRE(lg->hall().family() == GroupFamily::layer);
-    auto const nops = static_cast<int>(lg->operations().size());
-    REQUIRE(nops > 0);
-    for (auto const &wp : lg->wyckoffs()) {
-      INFO("layer group " << number << ", position " << wp.letter() << " ("
-                          << wp.site_symmetry() << ")");
-      auto const order = static_cast<int>(wp.operations().size());
-      REQUIRE(wp.multiplicity() * order == nops);
-      REQUIRE(wp.orbit(seed, aperiodic_along(2)).rows() == wp.multiplicity());
-      REQUIRE(site_symmetry_order(wp.site_symmetry()) == order);
-    }
+    check_orbit_stabilizer(*lg, aperiodic_along(2));
   }
 }
 
@@ -304,7 +297,7 @@ TEST_CASE("generated layer structures carry their full layer symmetry",
   for (int number : {1, 2, 19, 49, 61, 65}) {
     INFO("layer group " << number);
     auto const *lg =
-        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+        test::layer_group(number);
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 
@@ -336,7 +329,7 @@ TEST_CASE("layer crystal round-trips through the layer dataset", "[layergen]") {
   for (int number : {1, 49, 55, 65}) {
     INFO("layer group " << number);
     auto const *lg =
-        must(group::SpaceGroup::from_number(GroupFamily::layer, number));
+        test::layer_group(number);
     int const m = lg->wyckoffs().back().multiplicity();
     generate::Composition const comp{{6, m}, {7, m}};
 

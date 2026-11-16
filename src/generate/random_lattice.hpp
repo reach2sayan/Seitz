@@ -1,5 +1,6 @@
 #pragma once
 
+#include <seitz/core/point_group.hpp> // Holohedry
 #include <seitz/core/symmetry_operation.hpp>
 #include <seitz/core/types.hpp>
 #include <seitz/generate/assignments.hpp> // Composition
@@ -11,43 +12,14 @@
 // asks a Generator for a structure, not for a lattice.
 namespace seitz::generate {
 
-enum class CrystalSystem {
-  triclinic,
-  monoclinic,
-  orthorhombic,
-  tetragonal,
-  trigonal,
-  hexagonal,
-  cubic,
-};
-
-[[nodiscard]] constexpr CrystalSystem
-crystal_system(int spacegroup_number) noexcept {
-  int const n = spacegroup_number;
-  if (n <= 2) {
-    return CrystalSystem::triclinic;
-  } else if (n <= 15) {
-    return CrystalSystem::monoclinic;
-  } else if (n <= 74) {
-    return CrystalSystem::orthorhombic;
-  } else if (n <= 142) {
-    return CrystalSystem::tetragonal;
-  } else if (n <= 167) {
-    return CrystalSystem::trigonal;
-  } else if (n <= 194) {
-    return CrystalSystem::hexagonal;
-  }
-  return CrystalSystem::cubic;
-}
-
 // A random lattice (columns = Cartesian basis vectors) consistent with the
 // crystal system's metric constraints, scaled to `target_volume`. Deterministic
 // in `seed`. The unconstrained parameters are sampled from sensible ranges
 // (lengths around unity before scaling, angles within the usual
 // crystallographic bounds); the absolute scale is then fixed by
 // `target_volume`.
-[[nodiscard]] Matrix3d random_lattice(CrystalSystem system,
-                                      double target_volume, std::uint64_t seed);
+[[nodiscard]] Matrix3d random_lattice(Holohedry system, double target_volume,
+                                      std::uint64_t seed);
 
 // Element-aware estimate of the conventional-cell volume (A^3) of a
 // composition: each atom contributes (4/3) pi r_cov^3 (data::atomic_volume),

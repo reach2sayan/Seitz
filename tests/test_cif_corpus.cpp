@@ -37,7 +37,7 @@ namespace {
 } // namespace
 
 TEST_CASE("every per-space-group CIF reads", "[oracle][cif]") {
-  auto const corpus = oracle::cif_corpus("miscellaneous");
+  auto const &corpus = oracle::cif_corpus("miscellaneous");
   REQUIRE(corpus.size() == 209);
 
   int resolved = 0;
@@ -102,7 +102,7 @@ TEST_CASE("a written CIF reads back as the same structure", "[oracle][cif]") {
 }
 
 TEST_CASE("the real-structure corpus reads", "[oracle][cif]") {
-  auto const corpus = oracle::cif_corpus("database");
+  auto const &corpus = oracle::cif_corpus("database");
   REQUIRE(corpus.size() == 77);
   for (auto const &file : corpus) {
     INFO(file.name);

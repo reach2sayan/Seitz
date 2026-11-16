@@ -11,7 +11,6 @@
     "boost-graph",
     "boost-leaf",
     "boost-parser",
-    "boost-range",
     "eigen3",
     {
       "name": "vcpkg-cmake",

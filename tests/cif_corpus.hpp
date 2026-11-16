@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -28,7 +30,8 @@ struct CifFile {
 }
 
 // Every `.cif` in one corpus directory, name-ordered for reproducibility.
-[[nodiscard]] inline std::vector<CifFile> cif_corpus(std::string_view corpus) {
+[[nodiscard]] inline std::vector<CifFile>
+load_cif_corpus(std::string_view corpus) {
   std::filesystem::path const directory =
       std::filesystem::path{SEITZ_PYXTAL_CIF_DIR} / corpus / "cifs";
   std::vector<CifFile> files;
@@ -43,6 +46,18 @@ struct CifFile {
   }
   std::ranges::sort(files, {}, &CifFile::name);
   return files;
+}
+
+// The same, read from disk once per test process: only the text is cached, so
+// parsing stays under test in every case.
+[[nodiscard]] inline std::vector<CifFile> const &
+cif_corpus(std::string_view corpus) {
+  static std::map<std::string, std::vector<CifFile>, std::less<>> cache;
+  auto it = cache.find(corpus);
+  if (it == cache.end()) {
+    it = cache.emplace(std::string{corpus}, load_cif_corpus(corpus)).first;
+  }
+  return it->second;
 }
 
 } // namespace seitz::oracle

@@ -23,9 +23,9 @@ namespace {
 // runs once per atom pair per attempt.
 //
 // The distributed form differs from the matvec in the last place. Acceptable
-// here only: it feeds `distance < scale * (r_i + r_j)`, a two-significant-figure
-// covalent-radius threshold, not a tolerance-parity check against the reference.
-// The seeded generation tests pin the consequence.
+// here only: it feeds `distance < scale * (r_i + r_j)`, a
+// two-significant-figure covalent-radius threshold, not a tolerance-parity
+// check against the reference. The seeded generation tests pin the consequence.
 class MinimumImage {
 public:
   MinimumImage(Matrix3d const &lattice, CellPeriodicity const &periodicity)
@@ -84,11 +84,11 @@ private:
   }
   boost::container::flat_set const present(types.begin(), types.end());
   auto const pairs = std::views::cartesian_product(present, present);
-  double const cutoff = std::ranges::max(
-      pairs | std::views::transform([&](auto const &pair) {
-        auto const [a, b] = pair;
-        return tol.min_distance(a, b);
-      }));
+  double const cutoff =
+      std::ranges::max(pairs | std::views::transform([&](auto const &pair) {
+                         auto const [a, b] = pair;
+                         return tol.min_distance(a, b);
+                       }));
 
   MinimumImage const metric(lattice, periodicity);
 

@@ -38,7 +38,7 @@ void raise(py::handle type, char const *text) {
   throw py::error_already_set();
 }
 
-void raise(py::handle type, char const *text, char const *name, double value) {
+void raise(py::handle type, char const *text, Payload payload) {
   // Built by hand rather than through py::set_error(type, text), so the payload
   // can be attached to the instance the caller will actually catch.
   py::object const error = py::reinterpret_steal<py::object>(
@@ -46,19 +46,9 @@ void raise(py::handle type, char const *text, char const *name, double value) {
   if (!error) {
     throw py::error_already_set();
   }
-  py::setattr(error, name, py::float_(value));
-  PyErr_SetObject(type.ptr(), error.ptr());
-  throw py::error_already_set();
-}
-
-void raise(py::handle type, char const *text, char const *name,
-           py::object value) {
-  py::object const error = py::reinterpret_steal<py::object>(
-      PyObject_CallFunction(type.ptr(), "s", text));
-  if (!error) {
-    throw py::error_already_set();
+  for (auto const &[name, value] : payload) {
+    py::setattr(error, name, value);
   }
-  py::setattr(error, name, value);
   PyErr_SetObject(type.ptr(), error.ptr());
   throw py::error_already_set();
 }

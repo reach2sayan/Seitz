@@ -148,7 +148,7 @@ TEST_CASE("enumerate_assignments equals the backtracking reference as sets",
   for (auto const &c : cases) {
     INFO("space group " << c.number);
     auto const *sg =
-        must(group::SpaceGroup::from_number(GroupFamily::space, c.number));
+        test::space_group(c.number);
     auto const expected = reference_assignments(*sg, c.comp);
     CHECK(enumerated_assignments(*sg, c.comp) == expected);
     CHECK(generate::Generator{*sg}.compatible(c.comp) == !expected.empty());
@@ -156,7 +156,7 @@ TEST_CASE("enumerate_assignments equals the backtracking reference as sets",
 }
 
 TEST_CASE("a bounded enumeration stops early", "[generate]") {
-  auto const *sg = must(group::SpaceGroup::from_number(GroupFamily::space, 1));
+  auto const *sg = test::space_group(1);
   generate::Composition const comp{{6, 4}, {8, 4}};
   generate::Generator const gen{*sg};
   CHECK(gen.assignments(comp, 1).size() == 1);
@@ -167,8 +167,7 @@ TEST_CASE("distances_valid agrees with the all-pairs scan", "[generate]") {
   std::mt19937 rng(31);
   std::uniform_real_distribution<double> unit(0.0, 1.0);
   std::uniform_real_distribution<double> wide(-4.0, 4.0);
-  constexpr CellPeriodicity layer{AxisKind::periodic, AxisKind::periodic,
-                                  AxisKind::aperiodic};
+  constexpr CellPeriodicity layer = aperiodic_along(2);
   int agreements = 0;
   for (int trial = 0; trial < 60; ++trial) {
     // A lattice from 3 to 12 angstrom on a side, mildly skewed, and enough

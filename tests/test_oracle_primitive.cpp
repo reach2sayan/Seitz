@@ -1,6 +1,7 @@
 #include "oracle.hpp"
 
 #include "symmetry/primitive.hpp"
+#include "structures.hpp"
 #include <seitz/core/lattice.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -9,48 +10,14 @@
 using namespace seitz;
 using Catch::Approx;
 
-namespace {
-Cell fcc_conventional(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(4, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0});
-}
-
-Cell rock_salt(double a) {
-  Matrix3d lattice = Matrix3d::Identity() * a;
-  Positions pos(8, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  pos.row(4) << 0.5, 0.5, 0.5;
-  pos.row(5) << 0.0, 0.0, 0.5;
-  pos.row(6) << 0.0, 0.5, 0.0;
-  pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(Lattice{lattice}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
-}
-
-// Two formula units of a tetragonal body-centered structure (I-centered).
-Cell body_centered_tetragonal() {
-  Matrix3d lattice = Matrix3d::Zero();
-  lattice(0, 0) = 4.0;
-  lattice(1, 1) = 4.0;
-  lattice(2, 2) = 6.0;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{lattice}, pos, {0, 0});
-}
-} // namespace
+using seitz::test::bcc_tetragonal;
+using seitz::test::fcc;
+using seitz::test::rock_salt;
 
 TEST_CASE("find_primitive matches spg_find_primitive (size, lattice, volume)",
           "[oracle][primitive]") {
   for (Cell const &cell :
-       {fcc_conventional(4.0), rock_salt(5.6), body_centered_tetragonal()}) {
+       {fcc(4.0), rock_salt(5.6), bcc_tetragonal()}) {
     auto ours =
         symmetry::PrimitiveFinder<GroupFamily::space>{cell, {1e-5}}.find();
     REQUIRE(ours);

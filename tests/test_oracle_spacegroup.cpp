@@ -10,11 +10,15 @@
 #include <seitz/analysis/symmetry_analyzer.hpp>
 
 #include "helpers.hpp"
+#include "structures.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cmath>
+#include <algorithm>
+#include <ranges>
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace seitz;
@@ -22,228 +26,94 @@ using seitz::test::space_hall;
 
 namespace {
 
-// ---- a corpus spanning the crystal systems ----
+using namespace seitz::test;
 
-Cell primitive_cubic(double a) { // -> Pm-3m
-  Positions pos(1, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0});
-}
+constexpr double kSymprec = 1e-5;
 
-Cell fcc(double a) { // -> Fm-3m
-  Positions pos(4, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0});
-}
-
-Cell rock_salt(double a) { // -> Fm-3m, two species
-  Positions pos(8, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.0, 0.5, 0.5;
-  pos.row(4) << 0.5, 0.5, 0.5;
-  pos.row(5) << 0.0, 0.0, 0.5;
-  pos.row(6) << 0.0, 0.5, 0.0;
-  pos.row(7) << 0.5, 0.0, 0.0;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0, 1, 1, 1, 1});
-}
-
-Cell bcc_tetragonal() { // -> I4/mmm
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = 4.0;
-  l(1, 1) = 4.0;
-  l(2, 2) = 6.0;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{l}, pos, {0, 0});
-}
-
-Cell rutile() { // -> P4_2/mnm (tetragonal, non-symmorphic)
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = 4.6;
-  l(1, 1) = 4.6;
-  l(2, 2) = 3.0;
-  Positions pos(6, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  pos.row(2) << 0.3, 0.3, 0.0;
-  pos.row(3) << 0.7, 0.7, 0.0;
-  pos.row(4) << 0.8, 0.2, 0.5;
-  pos.row(5) << 0.2, 0.8, 0.5;
-  return Cell(Lattice{l}, pos, {0, 0, 1, 1, 1, 1});
-}
-
-Cell orthorhombic_p() { // -> Pmmm
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = 4.0;
-  l(1, 1) = 5.0;
-  l(2, 2) = 6.0;
-  Positions pos(1, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Lattice{l}, pos, {0});
-}
-
-Cell monoclinic_p() { // unique axis b, beta != 90 -> exercises monocli matcher
-  Matrix3d l;
-  l.col(0) = Vector3d(5.0, 0.0, 0.0);
-  l.col(1) = Vector3d(0.0, 6.0, 0.0);
-  l.col(2) = Vector3d(1.5, 0.0, 7.0);
-  Positions pos(1, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  return Cell(Lattice{l}, pos, {0});
-}
-
-Cell hcp() { // -> P6_3/mmc (hexagonal)
-  double const a = 3.2;
-  double const c = 5.2;
-  Matrix3d l;
-  l.col(0) = Vector3d(a, 0.0, 0.0);
-  l.col(1) = Vector3d(-a / 2.0, a * std::sqrt(3.0) / 2.0, 0.0);
-  l.col(2) = Vector3d(0.0, 0.0, c);
-  Positions pos(2, 3);
-  pos.row(0) << 1.0 / 3.0, 2.0 / 3.0, 0.25;
-  pos.row(1) << 2.0 / 3.0, 1.0 / 3.0, 0.75;
-  return Cell(Lattice{l}, pos, {0, 0});
-}
-
-Cell rhombohedral_r() { // R-centered hexagonal cell -> trigonal/rhombohedral
-  double const a = 3.0;
-  double const c = 12.0;
-  Matrix3d l;
-  l.col(0) = Vector3d(a, 0.0, 0.0);
-  l.col(1) = Vector3d(-a / 2.0, a * std::sqrt(3.0) / 2.0, 0.0);
-  l.col(2) = Vector3d(0.0, 0.0, c);
-  Positions pos(3, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0;
-  pos.row(2) << 2.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0;
-  return Cell(Lattice{l}, pos, {0, 0, 0});
-}
-
-Cell diamond(double a) { // -> Fd-3m (cubic F, non-symmorphic)
-  Positions pos(8, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.0, 0.5, 0.5;
-  pos.row(2) << 0.5, 0.0, 0.5;
-  pos.row(3) << 0.5, 0.5, 0.0;
-  pos.row(4) << 0.25, 0.25, 0.25;
-  pos.row(5) << 0.25, 0.75, 0.75;
-  pos.row(6) << 0.75, 0.25, 0.75;
-  pos.row(7) << 0.75, 0.75, 0.25;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0, 0, 0, 0, 0, 0, 0});
-}
-
-Cell zincblende(double a) { // -> F-43m
-  Cell d = diamond(a);
-  return Cell(Lattice{d.lattice().matrix()}, d.positions(),
-              {0, 0, 0, 0, 1, 1, 1, 1});
-}
-
-Cell bcc(double a) { // -> Im-3m
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 0});
-}
-
-Cell cscl(double a) { // -> Pm-3m, two species
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.5;
-  return Cell(Lattice{Matrix3d::Identity() * a}, pos, {0, 1});
-}
-
-Cell wurtzite() { // -> P6_3mc (hexagonal, polar)
-  double const a = 3.2;
-  double const c = 5.2;
-  double const u = 0.375;
-  Matrix3d l;
-  l.col(0) = Vector3d(a, 0.0, 0.0);
-  l.col(1) = Vector3d(-a / 2.0, a * std::sqrt(3.0) / 2.0, 0.0);
-  l.col(2) = Vector3d(0.0, 0.0, c);
-  Positions pos(4, 3);
-  pos.row(0) << 1.0 / 3.0, 2.0 / 3.0, 0.0;
-  pos.row(1) << 2.0 / 3.0, 1.0 / 3.0, 0.5;
-  pos.row(2) << 1.0 / 3.0, 2.0 / 3.0, u;
-  pos.row(3) << 2.0 / 3.0, 1.0 / 3.0, 0.5 + u;
-  return Cell(Lattice{l}, pos, {0, 0, 1, 1});
-}
-
-Cell c_centered_ortho() { // C-centered orthorhombic -> Cmmm-ish
-  Matrix3d l = Matrix3d::Zero();
-  l(0, 0) = 4.0;
-  l(1, 1) = 6.0;
-  l(2, 2) = 7.0;
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  return Cell(Lattice{l}, pos, {0, 0});
-}
-
-Cell c_centered_monocli() { // C-centered monoclinic (unique b) -> C2/m
-  double const beta = 1.91; // radians, ~109.5 deg
-  Matrix3d l;
-  l.col(0) = Vector3d(5.0, 0.0, 0.0);
-  l.col(1) = Vector3d(0.0, 6.0, 0.0);
-  l.col(2) = Vector3d(7.0 * std::cos(beta), 0.0, 7.0 * std::sin(beta));
-  Positions pos(2, 3);
-  pos.row(0) << 0.0, 0.0, 0.0;
-  pos.row(1) << 0.5, 0.5, 0.0;
-  return Cell(Lattice{l}, pos, {0, 0});
-}
-
-Cell triclinic() { // -> P1
-  Matrix3d l;
-  l.col(0) = Vector3d(4.0, 0.0, 0.0);
-  l.col(1) = Vector3d(0.7, 4.3, 0.0);
-  l.col(2) = Vector3d(0.5, 0.9, 5.1);
-  Positions pos(2, 3);
-  pos.row(0) << 0.1, 0.2, 0.3;
-  pos.row(1) << 0.6, 0.55, 0.27;
-  return Cell(Lattice{l}, pos, {0, 1});
-}
-
+// One structure with its reference dataset, computed once for every case.
 struct Case {
   std::string name;
   Cell cell;
+  oracle::RefDataset ref;
 };
 
-std::vector<Case> corpus() {
-  return {{"primitive_cubic", primitive_cubic(4.0)},
-          {"fcc", fcc(4.0)},
-          {"rock_salt", rock_salt(5.6)},
-          {"bcc_tetragonal", bcc_tetragonal()},
-          {"rutile", rutile()},
-          {"orthorhombic_p", orthorhombic_p()},
-          {"monoclinic_p", monoclinic_p()},
-          {"hcp", hcp()},
-          {"rhombohedral_r", rhombohedral_r()},
-          {"diamond", diamond(3.57)},
-          {"zincblende", zincblende(5.43)},
-          {"bcc", bcc(3.0)},
-          {"cscl", cscl(4.1)},
-          {"wurtzite", wurtzite()},
-          {"c_centered_ortho", c_centered_ortho()},
-          {"c_centered_monocli", c_centered_monocli()},
-          {"triclinic", triclinic()}};
+std::vector<Case> const &corpus() {
+  static std::vector<Case> const cases = [] {
+    std::vector<std::pair<std::string, Cell>> const cells{
+        {"primitive_cubic", primitive_cubic(4.0)},
+        {"fcc", fcc(4.0)},
+        {"rock_salt", rock_salt(5.6)},
+        {"bcc_tetragonal", bcc_tetragonal()},
+        {"rutile", rutile()},
+        {"orthorhombic_p", orthorhombic_p()},
+        {"monoclinic_p", monoclinic_p()},
+        {"hcp", hcp()},
+        {"rhombohedral_r", rhombohedral_r()},
+        {"diamond", diamond(3.57)},
+        {"zincblende", zincblende(5.43)},
+        {"bcc", bcc(3.0)},
+        {"cscl", rocksalt_motif(4.1)},
+        {"wurtzite", wurtzite()},
+        {"c_centered_ortho", c_centered_ortho()},
+        {"c_centered_monocli", c_centered_monocli()},
+        {"triclinic", triclinic()}};
+    return std::vector<Case>{
+        std::from_range, cells | std::views::transform([](auto const &c) {
+                           return Case{c.first, c.second,
+                                       oracle::reference_dataset(c.second,
+                                                                 kSymprec)};
+                         })};
+  }();
+  return cases;
+}
+
+// The pipeline stage by stage, up to the space-group match the refinement
+// starts from.
+struct Matched {
+  symmetry::Primitive prim;
+  SpacegroupMatch sg;
+};
+Matched matched(Cell const &cell) {
+  auto const prim =
+      symmetry::PrimitiveFinder<GroupFamily::space>{cell, {kSymprec}}.find();
+  REQUIRE(prim);
+  spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(
+      *prim, std::nullopt);
+  auto const sg = matcher.search();
+  REQUIRE(sg);
+  return {*prim,
+          refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec)};
+}
+
+// True iff every reference std atom has a matching (same type, overlapping)
+// atom in ours.
+bool same_std_cell(Cell const &ours, oracle::RefDataset const &ref,
+                   double tol) {
+  if (ours.types().size() != ref.std_types.size()) {
+    return false;
+  }
+  return std::ranges::all_of(
+      std::views::enumerate(ref.std_types), [&](auto const &entry) {
+        auto const [r, ref_type] = entry;
+        Vector3d const ref_pos = ref.std_positions.row(r).transpose();
+        return std::ranges::any_of(ours.atoms(), [&](auto const &atom) {
+          auto const &[pos, type] = atom;
+          return type == ref_type &&
+                 coincident(pos, ref_pos, ours.lattice().matrix(), tol,
+                            all_periodic());
+        });
+      });
 }
 
 } // namespace
 
 TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
           "[oracle][spacegroup]") {
-  constexpr double symprec = 1e-5;
-  for (auto const &[name, cell] : corpus()) {
+  for (auto const &[name, cell, ref] : corpus()) {
     INFO("structure: " << name);
-    auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0); // reference must succeed for the comparison
 
-    auto const ours = test::dataset_of(cell, {symprec});
+    auto const ours = test::dataset_of(cell, {kSymprec});
     REQUIRE(ours);
 
     INFO("ours: SG " << data::spacegroup_type(ours->hall).number << " hall "
@@ -263,22 +133,11 @@ TEST_CASE("get_dataset number/hall/international match spg_get_dataset",
 
 TEST_CASE("standardized lattice / rotation / transformation match the oracle",
           "[oracle][refine]") {
-  constexpr double symprec = 1e-5;
-  for (auto const &[name, cell] : corpus()) {
+  for (auto const &[name, cell, ref] : corpus()) {
     INFO("structure: " << name);
-    auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim =
-        symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
-    REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(
-        *prim, std::nullopt);
-    auto const sg = matcher.search();
-    REQUIRE(sg);
-
-    auto const sg2 =
-        refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec);
+    auto const [prim, sg2] = matched(cell);
     Lattice const std_lattice = refine::conventional_lattice(sg2);
     Matrix3d const std_lat = std_lattice.matrix();
     Matrix3d const std_rot =
@@ -292,43 +151,13 @@ TEST_CASE("standardized lattice / rotation / transformation match the oracle",
   }
 }
 
-namespace {
-// True iff every reference std atom has a matching (same type, overlapping)
-// atom in ours.
-bool same_std_cell(Positions const &ours_pos,
-                   std::vector<int> const &ours_types, Positions const &ref_pos,
-                   std::vector<int> const &ref_types, Matrix3d const &lattice,
-                   double tol) {
-  if (ours_types.size() != ref_types.size())
-    return false;
-  for (Eigen::Index r = 0; r < ref_pos.rows(); ++r) {
-    bool matched = false;
-    for (Eigen::Index o = 0; o < ours_pos.rows(); ++o) {
-      if (ours_types[static_cast<std::size_t>(o)] !=
-          ref_types[static_cast<std::size_t>(r)])
-        continue;
-      if (coincident(ours_pos.row(o).transpose(), ref_pos.row(r).transpose(),
-                     lattice, tol, all_periodic())) {
-        matched = true;
-        break;
-      }
-    }
-    if (!matched)
-      return false;
-  }
-  return true;
-}
-} // namespace
-
 TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
           "[oracle][dataset]") {
-  constexpr double symprec = 1e-5;
-  for (auto const &[name, cell] : corpus()) {
+  for (auto const &[name, cell, ref] : corpus()) {
     INFO("structure: " << name);
-    auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const d = test::dataset_of(cell, {symprec});
+    auto const d = test::dataset_of(cell, {kSymprec});
     REQUIRE(d);
 
     // Identity + transformation/standardization matrices.
@@ -347,92 +176,49 @@ TEST_CASE("get_dataset exposes the full standardized dataset (public API)",
     // Standardized cell + per-atom Wyckoff data.
     CHECK(static_cast<int>(d->standardized.positions().rows()) ==
           ref.n_std_atoms);
-    CHECK(same_std_cell(d->standardized.positions(), d->standardized.types(),
-                        ref.std_positions, ref.std_types,
-                        d->standardized.lattice().matrix(), 1e-4));
-    REQUIRE(d->sites.size() == ref.wyckoffs.size());
-    for (std::size_t i = 0; i < d->sites.size(); ++i) {
-      INFO("atom " << i);
-      CHECK(d->sites[i].wyckoff == ref.wyckoffs[i]);
-      CHECK(d->sites[i].equivalent_atom == ref.equivalent_atoms[i]);
-      CHECK(d->sites[i].site_symmetry == ref.site_symmetry_symbols[i]);
-    }
+    CHECK(same_std_cell(d->standardized, ref, 1e-4));
+    oracle::check_sites(d->sites, ref);
   }
 }
 
 TEST_CASE("standardized cell + Wyckoffs + equivalent atoms match the oracle",
           "[oracle][wyckoff]") {
-  constexpr double symprec = 1e-5;
-  for (auto const &[name, cell] : corpus()) {
+  for (auto const &[name, cell, ref] : corpus()) {
     INFO("structure: " << name);
-    auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const prim =
-        symmetry::PrimitiveFinder<GroupFamily::space>{cell, {symprec}}.find();
-    REQUIRE(prim);
-    spacegroup::SpacegroupMatcher<GroupFamily::space> const matcher(
-        *prim, std::nullopt);
-    auto const sg = matcher.search();
-    REQUIRE(sg);
+    auto const [prim, sg2] = matched(cell);
     auto const ops =
-        symmetry::SymmetrySearch<GroupFamily::space>{cell, prim->tolerance}
+        symmetry::SymmetrySearch<GroupFamily::space>{cell, prim.tolerance}
             .operations();
     REQUIRE(ops);
 
     refine::Refinement<GroupFamily::space> const refinement(
-        refine::find_similar_bravais_lattice(*sg, prim->tolerance.symprec),
-        prim->cell, cell, prim->tolerance);
-    auto const std = refinement.standardize(*ops, prim->mapping_table);
+        sg2, prim.cell, cell, prim.tolerance);
+    auto const std = refinement.standardize(*ops, prim.mapping_table);
     REQUIRE(std);
 
     // Standardized cell: same atom count, same atoms (set, mod lattice).
     CHECK(static_cast<int>(std->bravais.size()) == ref.n_std_atoms);
-    CHECK(same_std_cell(std->bravais.positions(), std->bravais.types(),
-                        ref.std_positions, ref.std_types,
-                        std->bravais.lattice().matrix(), 1e-4));
+    CHECK(same_std_cell(std->bravais, ref, 1e-4));
 
     // Per-atom Wyckoff letters, site-symmetry symbols, equivalent atoms.
-    CHECK(std->wyckoffs == ref.wyckoffs);
-    CHECK(std->equivalent_atoms == ref.equivalent_atoms);
-    CHECK(std->site_symmetry_symbols.size() ==
-          ref.site_symmetry_symbols.size());
-    for (std::size_t i = 0; i < std->site_symmetry_symbols.size(); ++i) {
-      INFO("atom " << i);
-      CHECK(std->site_symmetry_symbols[i] == ref.site_symmetry_symbols[i]);
-    }
+    oracle::check_sites(std->sites, ref);
   }
 }
 
 TEST_CASE("get_dataset operations equal the input cell symmetry set",
           "[oracle][spacegroup]") {
-  constexpr double symprec = 1e-5;
-  for (auto const &[name, cell] : corpus()) {
+  for (auto const &[name, cell, ref] : corpus()) {
     INFO("structure: " << name);
-    auto const ref = oracle::reference_dataset(cell, symprec);
     REQUIRE(ref.number != 0);
 
-    auto const ours = test::dataset_of(cell, {symprec});
+    auto const ours = test::dataset_of(cell, {kSymprec});
     REQUIRE(ours);
     CHECK(static_cast<int>(ours->operations.size()) == ref.n_operations);
 
     // Set-equal to the reference operations (rotations exact, translations mod
     // lattice). spglib orders them differently than we discover them.
-    auto same_set = [](auto const &a, auto const &b) {
-      if (a.size() != b.size())
-        return false;
-      for (auto const &oa : a) {
-        bool matched = false;
-        for (auto const &ob : b)
-          if (same_operation(oa, ob, 1e-4)) {
-            matched = true;
-            break;
-          }
-        if (!matched)
-          return false;
-      }
-      return true;
-    };
-    CHECK(same_set(ours->operations, ref.operations));
+    CHECK(same_operation_set(ours->operations, ref.operations, 1e-4));
   }
 }

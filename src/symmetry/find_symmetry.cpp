@@ -20,6 +20,7 @@
 #include <numbers>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <utility>
 
 // The symmetry-operation search: Delaunay-reduce, enumerate the lattice point
@@ -305,7 +306,8 @@ void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
     };
   };
   std::vector<std::uint8_t> const seeds = found;
-  for (int const seed : std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
+  for (int const seed :
+       std::views::iota(0, n) | std::views::filter(is_found(seeds))) {
     // The walk: seed, its image, that one's image, ... until it closes or
     // dead-ends; a cycle is at most n long.
     int atom = seed;
@@ -329,9 +331,16 @@ void close_under_translation(std::vector<std::uint8_t> &found, Cell const &cell,
 // the group carries the reference atom onto is a candidate that is known to
 // pass -- so it is marked instead of tested. A supercell then pays for about
 // log2(multiplicity) full checks rather than one per lattice point.
+//
+// For any other rotation, given the cell's pure translations `pure`: the
+// accepted translations are one coset t0 + pure, since two operations sharing a
+// rotation differ by a pure translation. So the first accepted candidate
+// settles the rotation -- its coset is looked up, not tested -- and the rest
+// are never checked. Without `pure` every candidate is tested.
 [[nodiscard]] std::vector<Vector3d>
 translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
-                          Matrix3i const &rot, int min_index, double symprec) {
+                          Matrix3i const &rot, int min_index, double symprec,
+                          std::span<Vector3d const> pure = {}) {
   Vector3d const origin = rot.cast<double>() * cell.position(min_index);
   int const n = static_cast<int>(cell.size());
   bool const identity = rot == Matrix3i::Identity();
@@ -349,15 +358,34 @@ translations_for_rotation(Cell const &cell, OverlapChecker const &checker,
   for (int const i :
        std::views::iota(0, n) | std::views::filter(untested_of_type)) {
     Vector3d const trans = cell.position(i) - origin;
-    if (checker.check_total_overlap(trans, rot)) {
-      found[static_cast<std::size_t>(i)] = 1;
-      if (identity && i != min_index) {
+    if (!checker.check_total_overlap(trans, rot)) {
+      continue;
+    }
+    found[static_cast<std::size_t>(i)] = 1;
+    if (identity) {
+      if (i != min_index) {
         if (!index) {
           index.emplace(cell, symprec);
         }
         close_under_translation(found, cell, *index, scratch, trans);
       }
+      continue;
     }
+    if (pure.empty()) {
+      continue;
+    }
+    if (pure.size() > 1) {
+      if (!index) {
+        index.emplace(cell, symprec);
+      }
+      for (Vector3d const &tau : pure) {
+        if (auto const j = index->first_match(cell.position(i) + tau,
+                                              cell.type(i), scratch)) {
+          found[static_cast<std::size_t>(*j)] = 1;
+        }
+      }
+    }
+    break;
   }
   // Layer translations live in the periodic plane; the aperiodic component
   // is kept raw rather than folded into [0, 1).
@@ -397,10 +425,10 @@ Result<PointSymmetry> SymmetrySearch<F>::lattice_symmetry() const {
       return transform_pointsymmetry(*found, cell.lattice().matrix(),
                                      min_lattice->matrix());
     }
-    if (angle) {
-      *angle *= kAngleReduceRate; // too many: tighten and retry
+    if (!angle) {
+      break; // std::nullopt (auto): a retry would see identical inputs
     }
-    // std::nullopt (auto): identical retry, will exhaust attempts and fail.
+    *angle *= kAngleReduceRate; // too many: tighten and retry
   }
   return leaf::new_error(e_symmetry_operation_search_failed{});
 }
@@ -412,20 +440,29 @@ Result<Operations> SymmetrySearch<F>::operations() const {
     return valid.error();
   }
   BOOST_LEAF_AUTO(lat_sym, lattice_symmetry());
-  if (lat_sym.empty())
+  if (lat_sym.empty()) {
     return leaf::new_error(e_symmetry_operation_search_failed{});
+  }
 
   std::optional<int> const min_index = index_with_least_atoms(cell);
-  if (!min_index)
+  if (!min_index) {
     return leaf::new_error(e_empty_cell{});
+  }
 
   OverlapChecker const checker(cell, tol_.symprec);
+  std::vector<Vector3d> const pure = translations_for_rotation(
+      cell, checker, Matrix3i::Identity(), *min_index, tol_.symprec);
   std::vector<SymmetryOperation> ops;
-  for (Matrix3i const &rot : lat_sym)
-    for (Vector3d const &t :
-         translations_for_rotation(cell, checker, rot, *min_index,
-                                   tol_.symprec))
+  for (Matrix3i const &rot : lat_sym) {
+    auto const translations =
+        rot == Matrix3i::Identity()
+            ? pure
+            : translations_for_rotation(cell, checker, rot, *min_index,
+                                        tol_.symprec, pure);
+    for (Vector3d const &t : translations) {
       ops.push_back({rot, t});
+    }
+  }
 
   return Operations{std::move(ops)};
 }
@@ -451,8 +488,9 @@ template <GroupFamily F>
 std::vector<Vector3d> SymmetrySearch<F>::pure_translations() const {
   Cell const &cell = cell_;
   std::optional<int> const min_index = index_with_least_atoms(cell);
-  if (!min_index)
+  if (!min_index) {
     return {};
+  }
   OverlapChecker const checker(cell, tol_.symprec);
   return translations_for_rotation(cell, checker, Matrix3i::Identity(),
                                    *min_index, tol_.symprec);
